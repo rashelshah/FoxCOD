@@ -43,6 +43,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   try {
     stats = await getOrderStats(shopDomain);
+
+    // Ensure recent orders is an array
+    if (!Array.isArray(stats.recentOrders)) {
+      stats.recentOrders = [];
+    }
   } catch (error) {
     console.log("Error fetching order stats:", error);
   }
@@ -103,6 +108,11 @@ export default function Index() {
           padding: 0;
         }
         
+        /* Smooth transitions for all interactive elements */
+        * {
+          -webkit-font-smoothing: antialiased;
+        }
+        
         /* Welcome Banner - Premium Dark Theme */
         .welcome-banner {
           background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
@@ -113,6 +123,8 @@ export default function Index() {
           position: relative;
           overflow: hidden;
           box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+          will-change: transform;
+          transform: translateZ(0);
         }
         
         .welcome-banner::before {
@@ -257,15 +269,17 @@ export default function Index() {
           border-radius: 16px;
           padding: 24px;
           border: 1px solid #e5e7eb;
-          transition: all 0.3s ease;
+          transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
           position: relative;
           overflow: hidden;
+          will-change: transform;
+          transform: translateZ(0);
         }
         
         .stat-card:hover {
           border-color: #d1d5db;
           box-shadow: 0 8px 24px rgba(0,0,0,0.08);
-          transform: translateY(-2px);
+          transform: translateY(-2px) translateZ(0);
         }
         
         .stat-header {
@@ -356,17 +370,19 @@ export default function Index() {
           padding: 20px;
           text-decoration: none;
           color: inherit;
-          transition: all 0.3s ease;
+          transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
           cursor: pointer;
           display: flex;
           flex-direction: column;
           gap: 14px;
+          will-change: transform;
+          transform: translateZ(0);
         }
         
         .action-card:hover {
           border-color: #6366f1;
           box-shadow: 0 8px 24px rgba(99, 102, 241, 0.15);
-          transform: translateY(-3px);
+          transform: translateY(-3px) translateZ(0);
         }
         
         .action-icon {
@@ -726,13 +742,14 @@ export default function Index() {
                     <th>Amount</th>
                     <th>Status</th>
                     <th>Date</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {stats.recentOrders.slice(0, 5).map((order: any) => {
                     const statusInfo = getStatusInfo(order.status || 'pending');
                     return (
-                      <tr key={order.id} onClick={() => window.location.href = `/app/orders/${order.id}`} style={{ cursor: 'pointer' }}>
+                      <tr key={order.id}>
                         <td>
                           <Link to={`/app/orders/${order.id}`} className="order-id" style={{ color: '#6366f1', textDecoration: 'none' }}>
                             {order.shopify_order_name || `#${order.id.slice(0, 8)}`}
@@ -758,6 +775,11 @@ export default function Index() {
                         </td>
                         <td>
                           <span className="order-date">{formatDate(order.created_at)}</span>
+                        </td>
+                        <td>
+                          <Link to={`/app/orders/${order.id}`} style={{ color: '#6366f1', textDecoration: 'none', fontWeight: 500 }}>
+                            View →
+                          </Link>
                         </td>
                       </tr>
                     );

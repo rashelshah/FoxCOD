@@ -249,18 +249,22 @@ export async function updateOrderStatus(
  * Update just the order status (for seller dashboard)
  */
 export async function updateOrderStatusSimple(orderId: string, status: OrderStatus) {
-    const { error } = await supabase
+    console.log(`[Supabase] Updating order ${orderId} to status: ${status}`);
+
+    const { data, error } = await supabase
         .from('order_logs')
-        .update({
-            status: status,
-            updated_at: new Date().toISOString(),
-        })
-        .eq('id', orderId);
+        .update({ status: status })
+        .eq('id', orderId)
+        .select()
+        .single();
 
     if (error) {
-        console.error('Error updating order status:', error);
+        console.error('[Supabase] Error updating order status:', error);
         throw error;
     }
+
+    console.log(`[Supabase] Successfully updated order:`, data);
+    return data;
 }
 
 /**

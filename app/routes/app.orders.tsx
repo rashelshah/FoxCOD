@@ -5,7 +5,8 @@
 
 import { useState, useCallback, useEffect } from "react";
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
-import { useLoaderData, useSubmit, useNavigation, useRevalidator, Link } from "react-router";
+import { useLoaderData, useNavigation, useFetcher, Link } from "react-router";
+import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { getOrders, updateOrderStatusSimple } from "../config/supabase.server";
 import { ORDER_STATUSES, type OrderStatus } from "../config/constants";
@@ -43,20 +44,25 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
  * Action: Update order status
  */
 export const action = async ({ request }: ActionFunctionArgs) => {
-    const { session } = await authenticate.admin(request);
+    await authenticate.admin(request);
     const formData = await request.formData();
 
     const orderId = formData.get("orderId") as string;
     const newStatus = formData.get("status") as OrderStatus;
 
+    console.log(`[Order Action] Updating Order ${orderId} to status: ${newStatus}`);
+
     if (!orderId || !newStatus) {
+        console.error("[Order Action] Failed: Missing orderId or status");
         return { success: false, error: "Missing order ID or status" };
     }
 
     try {
-        await updateOrderStatusSimple(orderId, newStatus);
-        return { success: true };
+        const result = await updateOrderStatusSimple(orderId, newStatus);
+        console.log(`[Order Action] Success:`, result);
+        return { success: true, orderId, newStatus };
     } catch (error: any) {
+        console.error(`[Order Action] Exception:`, error);
         return { success: false, error: error.message };
     }
 };
@@ -66,22 +72,34 @@ export const action = async ({ request }: ActionFunctionArgs) => {
  */
 export default function OrdersPage() {
     const { orders, totalCount, currentPage, totalPages, statusFilter } = useLoaderData<typeof loader>();
-    const submit = useSubmit();
     const navigation = useNavigation();
-    const revalidator = useRevalidator();
+    const fetcher = useFetcher();
+    const shopify = useAppBridge();
 
-    const isUpdating = navigation.state === "submitting";
+    const isPageLoading = navigation.state === "loading";
+    const isUpdating = fetcher.state === "submitting" || fetcher.state === "loading";
 
-    // Revalidate after status update completes
+    // Optimistic status updates - track pending changes
+    const [pendingUpdates, setPendingUpdates] = useState<Record<string, string>>({});
+
+    // Handle fetcher response
     useEffect(() => {
-        if (navigation.state === "idle" && revalidator.state === "idle") {
-            // Check if we just finished submitting
-            const wasSubmitting = navigation.formMethod === "post";
-            if (wasSubmitting) {
-                revalidator.revalidate();
+        if (fetcher.state === "idle" && fetcher.data) {
+            if (fetcher.data.success) {
+                shopify.toast.show("✅ Status updated successfully!");
+                // Clear pending update for this order
+                if (fetcher.data.orderId) {
+                    setPendingUpdates(prev => {
+                        const next = { ...prev };
+                        delete next[fetcher.data.orderId];
+                        return next;
+                    });
+                }
+            } else if (fetcher.data.error) {
+                shopify.toast.show(`❌ Error: ${fetcher.data.error}`);
             }
         }
-    }, [navigation.state]);
+    }, [fetcher.state, fetcher.data, shopify]);
 
     // Format currency
     const formatCurrency = (amount: number) => {
@@ -103,13 +121,22 @@ export default function OrdersPage() {
         });
     };
 
-    // Handle status change
+    // Handle status change with optimistic update
     const handleStatusChange = useCallback((orderId: string, newStatus: string) => {
-        const formData = new FormData();
-        formData.append("orderId", orderId);
-        formData.append("status", newStatus);
-        submit(formData, { method: "post" });
-    }, [submit]);
+        // Optimistic update
+        setPendingUpdates(prev => ({ ...prev, [orderId]: newStatus }));
+
+        // Submit to server
+        fetcher.submit(
+            { orderId, status: newStatus },
+            { method: "post" }
+        );
+    }, [fetcher]);
+
+    // Get display status (optimistic or actual)
+    const getDisplayStatus = (order: any) => {
+        return pendingUpdates[order.id] || order.status || 'pending';
+    };
 
     // Get status color
     const getStatusColor = (status: string) => {
@@ -478,7 +505,7 @@ export default function OrdersPage() {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {orders.map((order: any) => (
+                                        {orders && orders.length > 0 && orders.map((order: any) => (
                                             <tr key={order.id}>
                                                 <td>
                                                     <Link to={`/app/orders/${order.id}`} className="order-id-link">
@@ -503,12 +530,13 @@ export default function OrdersPage() {
                                                 <td>
                                                     <select
                                                         className="status-select"
-                                                        value={order.status || 'pending'}
+                                                        value={getDisplayStatus(order)}
                                                         onChange={(e) => handleStatusChange(order.id, e.target.value)}
-                                                        disabled={isUpdating}
+                                                        disabled={isUpdating && !!pendingUpdates[order.id]}
                                                         style={{
-                                                            borderColor: getStatusColor(order.status || 'pending'),
-                                                            color: getStatusColor(order.status || 'pending'),
+                                                            borderColor: getStatusColor(getDisplayStatus(order)),
+                                                            color: getStatusColor(getDisplayStatus(order)),
+                                                            opacity: pendingUpdates[order.id] ? 0.7 : 1
                                                         }}
                                                     >
                                                         {ORDER_STATUSES.map((status) => (
@@ -517,6 +545,9 @@ export default function OrdersPage() {
                                                             </option>
                                                         ))}
                                                     </select>
+                                                    {pendingUpdates[order.id] && (
+                                                        <span style={{ fontSize: '10px', color: '#6b7280', marginLeft: '6px' }}>Saving...</span>
+                                                    )}
                                                 </td>
                                                 <td>
                                                     <span className="order-date">{formatDate(order.created_at)}</span>

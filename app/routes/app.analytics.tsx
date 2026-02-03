@@ -385,6 +385,70 @@ export default function AnalyticsPage() {
                                 </div>
                             </div>
 
+                            {/* Visual Chart Section */}
+                            <div className="section">
+                                <h2 className="section-title">📊 Order Distribution</h2>
+                                <div style={{
+                                    background: 'white',
+                                    border: '1px solid #e5e7eb',
+                                    borderRadius: '16px',
+                                    padding: '24px'
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '12px', height: '200px', paddingBottom: '40px', position: 'relative' }}>
+                                        {ORDER_STATUSES.map((status) => {
+                                            const count = stats.ordersByStatus?.[status.value] || 0;
+                                            const maxCount = Math.max(...ORDER_STATUSES.map(s => stats.ordersByStatus?.[s.value] || 0), 1);
+                                            const heightPercent = (count / maxCount) * 100;
+                                            return (
+                                                <div
+                                                    key={status.value}
+                                                    style={{
+                                                        flex: 1,
+                                                        display: 'flex',
+                                                        flexDirection: 'column',
+                                                        alignItems: 'center',
+                                                        height: '100%',
+                                                        justifyContent: 'flex-end'
+                                                    }}
+                                                >
+                                                    <span style={{
+                                                        fontSize: '14px',
+                                                        fontWeight: 700,
+                                                        color: status.color,
+                                                        marginBottom: '8px'
+                                                    }}>
+                                                        {count}
+                                                    </span>
+                                                    <div style={{
+                                                        width: '100%',
+                                                        maxWidth: '60px',
+                                                        height: `${Math.max(heightPercent, 5)}%`,
+                                                        background: `linear-gradient(180deg, ${status.color} 0%, ${status.color}80 100%)`,
+                                                        borderRadius: '8px 8px 0 0',
+                                                        transition: 'height 0.5s ease',
+                                                        boxShadow: `0 4px 12px ${status.color}30`
+                                                    }} />
+                                                    <span style={{
+                                                        position: 'absolute',
+                                                        bottom: '0',
+                                                        fontSize: '11px',
+                                                        color: '#6b7280',
+                                                        fontWeight: 500,
+                                                        textAlign: 'center',
+                                                        width: '70px',
+                                                        whiteSpace: 'nowrap',
+                                                        overflow: 'hidden',
+                                                        textOverflow: 'ellipsis'
+                                                    }}>
+                                                        {status.label}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+
                             {/* Insights */}
                             <div className="section">
                                 <h2 className="section-title">Quick Insights</h2>

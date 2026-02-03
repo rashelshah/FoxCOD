@@ -29,7 +29,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         .single();
 
     if (error || !order) {
-        console.error("Error fetching order:", error);
         throw redirect("/app/orders");
     }
 
