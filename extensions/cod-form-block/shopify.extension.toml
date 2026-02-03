@@ -1,0 +1,11 @@
+api_version = "2026-04"
+
+[[extensions]]
+uid = "87e0c6dc-4f49-e6ce-990c-7f93eadc93f862473f7f"
+type = "theme"
+name = "cod-form-block"
+handle = "cod-form-block"
+
+[[extensions.targeting]]
+module = "./blocks/cod-form.liquid"
+target = "block"
