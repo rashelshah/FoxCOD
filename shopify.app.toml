@@ -26,3 +26,12 @@ scopes = "write_orders,read_orders,read_products"
 
 [auth]
 redirect_urls = [ "https://example.com/api/auth" ]
+
+# App Proxy - Creates stable URLs on the store's domain
+# Store URL: https://your-store.myshopify.com/apps/fox-cod/... 
+# Routes to: https://your-app.com/proxy/...
+# This allows storefront forms to call APIs without knowing the ngrok URL
+[app_proxy]
+url = "/proxy"
+subpath = "fox-cod"
+prefix = "apps"

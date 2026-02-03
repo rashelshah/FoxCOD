@@ -150,9 +150,11 @@ export async function getFormSettings(shopDomain: string): Promise<FormSettings 
 }
 
 /**
- * Save or update form settings
+ * Save or update form settings - persists ALL fields to Supabase
  */
 export async function saveFormSettings(settings: FormSettings) {
+    console.log('[Supabase] Saving form settings for:', settings.shop_domain);
+
     const { data, error } = await supabase
         .from('form_settings')
         .upsert(
@@ -163,7 +165,26 @@ export async function saveFormSettings(settings: FormSettings) {
                 primary_color: settings.primary_color,
                 required_fields: settings.required_fields,
                 max_quantity: settings.max_quantity,
-                updated_at: new Date().toISOString(),
+                button_style: settings.button_style || 'solid',
+                button_size: settings.button_size || 'large',
+                button_position: settings.button_position || 'below_atc',
+                form_title: settings.form_title || '',
+                form_subtitle: settings.form_subtitle || '',
+                success_message: settings.success_message || '',
+                submit_button_text: settings.submit_button_text || 'Place COD Order',
+                show_product_image: settings.show_product_image ?? true,
+                show_price: settings.show_price ?? true,
+                show_quantity_selector: settings.show_quantity_selector ?? true,
+                show_email_field: settings.show_email_field ?? false,
+                show_notes_field: settings.show_notes_field ?? false,
+                email_required: settings.email_required ?? false,
+                name_placeholder: settings.name_placeholder || '',
+                phone_placeholder: settings.phone_placeholder || '',
+                address_placeholder: settings.address_placeholder || '',
+                notes_placeholder: settings.notes_placeholder || '',
+                modal_style: settings.modal_style || 'modern',
+                animation_style: settings.animation_style || 'fade',
+                border_radius: settings.border_radius ?? 12,
             },
             { onConflict: 'shop_domain' }
         )
@@ -171,10 +192,11 @@ export async function saveFormSettings(settings: FormSettings) {
         .single();
 
     if (error) {
-        console.error('Error saving form settings:', error);
+        console.error('[Supabase] Error saving form settings:', error);
         throw error;
     }
 
+    console.log('[Supabase] Settings saved successfully');
     return data;
 }
 

@@ -104,18 +104,32 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     // Save to Supabase
     await saveFormSettings(settings);
 
-    // Get app URL for metafields
-    let appUrl = process.env.SHOPIFY_APP_URL || '';
+    // Get app URL for metafields - auto-detect from request
+    // This handles the dynamic ngrok URLs in development
+    let appUrl = '';
+
+    // Method 1: Check environment variable (for production)
+    if (process.env.SHOPIFY_APP_URL) {
+        appUrl = process.env.SHOPIFY_APP_URL;
+    }
+
+    // Method 2: Extract from request URL/headers (for development with ngrok)
     if (!appUrl) {
-        const origin = request.headers.get('origin');
-        const host = request.headers.get('host');
-        const protocol = request.headers.get('x-forwarded-proto') || 'https';
-        if (origin) {
-            appUrl = origin;
-        } else if (host) {
-            appUrl = `${protocol}://${host}`;
+        const url = new URL(request.url);
+        // The request URL itself contains the ngrok URL
+        appUrl = url.origin;
+    }
+
+    // Method 3: Fallback to headers
+    if (!appUrl || appUrl.includes('localhost')) {
+        const forwardedHost = request.headers.get('x-forwarded-host');
+        const forwardedProto = request.headers.get('x-forwarded-proto') || 'https';
+        if (forwardedHost) {
+            appUrl = `${forwardedProto}://${forwardedHost}`;
         }
     }
+
+    console.log('[Settings] Detected App URL:', appUrl);
 
     // Sync to Shopify metafields
     try {
