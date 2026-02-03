@@ -1,0 +1,483 @@
+{% comment %}
+  COD Form Block - Cash on Delivery Order Form
+  Hides original Buy buttons and replaces with COD button in the same position
+{% endcomment %}
+
+{% schema %}
+{
+  "name": "COD Order Form",
+  "target": "section",
+  "settings": [
+    {
+      "type": "text",
+      "id": "button_text",
+      "label": "Submit Button Text",
+      "default": "Place Order (COD)"
+    },
+    {
+      "type": "color",
+      "id": "primary_color",
+      "label": "Primary Color",
+      "default": "#667eea"
+    },
+    {
+      "type": "range",
+      "id": "max_quantity",
+      "min": 1,
+      "max": 100,
+      "step": 1,
+      "label": "Maximum Quantity",
+      "default": 10
+    },
+    {
+      "type": "checkbox",
+      "id": "require_name",
+      "label": "Require Name",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "require_phone",
+      "label": "Require Phone",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "require_address",
+      "label": "Require Address",
+      "default": true
+    }
+  ]
+}
+{% endschema %}
+
+{% comment %} Get product and variant info {% endcomment %}
+{% assign current_variant = product.selected_or_first_available_variant %}
+{% assign product_price = current_variant.price | money_without_trailing_zeros %}
+
+{% comment %} Read COD settings from metafields (synced from app dashboard) {% endcomment %}
+{% assign cod_enabled = shop.metafields.fox_cod.enabled | default: 'false' %}
+{% assign cod_button_text = shop.metafields.fox_cod.button_text | default: 'Buy with COD' %}
+{% assign cod_primary_color = shop.metafields.fox_cod.primary_color | default: block.settings.primary_color %}
+{% assign cod_app_url = shop.metafields.fox_cod.app_url | default: '' %}
+
+{% comment %} Only render COD functionality if enabled in the app {% endcomment %}
+{% if cod_enabled == 'true' %}
+
+{% comment %} Container for COD form data - hidden, used by JavaScript {% endcomment %}
+<div class="cod-form-data" 
+     id="cod-data-{{ product.id }}"
+     style="display: none;"
+     data-product-id="{{ product.id }}"
+     data-variant-id="{{ current_variant.id }}"
+     data-product-title="{{ product.title | escape }}"
+     data-product-price="{{ current_variant.price | divided_by: 100.0 }}"
+     data-shop="{{ shop.permanent_domain }}"
+     data-app-url="{{ cod_app_url }}"
+     data-max-quantity="{{ block.settings.max_quantity }}"
+     data-require-name="{{ block.settings.require_name }}"
+     data-require-phone="{{ block.settings.require_phone }}"
+     data-require-address="{{ block.settings.require_address }}"
+     data-button-text="{{ cod_button_text }}"
+     data-primary-color="{{ cod_primary_color }}"
+     data-submit-text="{{ block.settings.button_text }}">
+</div>
+
+{% comment %} Modal Overlay {% endcomment %}
+<div class="cod-modal-overlay" id="cod-modal-overlay-{{ product.id }}" style="display: none;">
+
+<div class="cod-form-container cod-modal" 
+     id="cod-form-{{ product.id }}"
+     style="display: none;">
+  
+  {% comment %} Close Button {% endcomment %}
+  <button type="button" class="cod-close-btn" data-cod-close="{{ product.id }}">&times;</button>
+
+  {% comment %} Product Info {% endcomment %}
+  <div class="cod-product-info">
+    {% if product.featured_image %}
+      <img src="{{ product.featured_image | image_url: width: 100 }}" 
+           alt="{{ product.title }}" 
+           class="cod-product-image"
+           width="80"
+           height="80"
+           loading="lazy">
+    {% endif %}
+    <div class="cod-product-details">
+      <h3 class="cod-product-title">{{ product.title }}</h3>
+      <p class="cod-product-price" style="color: {{ cod_primary_color }};">{{ product_price }}</p>
+      {% if current_variant.title != 'Default Title' %}
+        <p class="cod-variant-title">{{ current_variant.title }}</p>
+      {% endif %}
+    </div>
+  </div>
+
+  {% comment %} COD Form {% endcomment %}
+  <form id="cod-order-form-{{ product.id }}" class="cod-order-form">
+    {% comment %} Name Field {% endcomment %}
+    <div class="cod-form-field">
+      <label for="cod-name-{{ product.id }}">
+        Full Name {% if block.settings.require_name %}<span class="required">*</span>{% endif %}
+      </label>
+      <input type="text" 
+             id="cod-name-{{ product.id }}" 
+             name="customerName" 
+             placeholder="Enter your full name"
+             {% if block.settings.require_name %}required{% endif %}>
+    </div>
+
+    {% comment %} Phone Field {% endcomment %}
+    <div class="cod-form-field">
+      <label for="cod-phone-{{ product.id }}">
+        Phone Number {% if block.settings.require_phone %}<span class="required">*</span>{% endif %}
+      </label>
+      <input type="tel" 
+             id="cod-phone-{{ product.id }}" 
+             name="customerPhone" 
+             placeholder="Enter your phone number"
+             {% if block.settings.require_phone %}required{% endif %}>
+    </div>
+
+    {% comment %} Address Field {% endcomment %}
+    <div class="cod-form-field">
+      <label for="cod-address-{{ product.id }}">
+        Delivery Address {% if block.settings.require_address %}<span class="required">*</span>{% endif %}
+      </label>
+      <textarea id="cod-address-{{ product.id }}" 
+                name="customerAddress" 
+                placeholder="Enter your complete delivery address"
+                rows="3"
+                {% if block.settings.require_address %}required{% endif %}></textarea>
+    </div>
+
+    {% comment %} Quantity Field {% endcomment %}
+    <div class="cod-form-field">
+      <label for="cod-quantity-{{ product.id }}">Quantity</label>
+      <div class="cod-quantity-selector">
+        <button type="button" class="cod-qty-btn cod-qty-minus">−</button>
+        <input type="number" 
+               id="cod-quantity-{{ product.id }}" 
+               name="quantity" 
+               value="1" 
+               min="1" 
+               max="{{ block.settings.max_quantity }}">
+        <button type="button" class="cod-qty-btn cod-qty-plus">+</button>
+      </div>
+    </div>
+
+    {% comment %} Total Price {% endcomment %}
+    <div class="cod-total">
+      <span>Total:</span>
+      <span class="cod-total-price" data-unit-price="{{ current_variant.price | divided_by: 100.0 }}" style="color: {{ cod_primary_color }};">
+        {{ product_price }}
+      </span>
+    </div>
+
+    {% comment %} Submit Button {% endcomment %}
+    <button type="submit" 
+            class="cod-submit-btn"
+            style="background-color: {{ cod_primary_color }};">
+      {{ block.settings.button_text }}
+    </button>
+
+    {% comment %} Status Messages {% endcomment %}
+    <div class="cod-message cod-message-success" style="display: none;">
+      <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+      <span class="cod-message-text">Order placed successfully!</span>
+    </div>
+    <div class="cod-message cod-message-error" style="display: none;">
+      <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg>
+      <span class="cod-message-text">Something went wrong</span>
+    </div>
+  </form>
+</div>
+
+</div>
+
+<style>
+  /* COD Buy Button - styled to match theme buttons */
+  .cod-buy-btn {
+    width: 100%;
+    padding: 14px 20px;
+    border: none;
+    border-radius: 6px;
+    color: #fff;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+    display: block;
+    box-sizing: border-box;
+  }
+
+  .cod-buy-btn:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+  }
+
+  /* Modal Overlay */
+  .cod-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 9998;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    animation: fadeIn 0.2s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  /* Modal Container */
+  .cod-form-container.cod-modal {
+    position: relative;
+    z-index: 9999;
+    max-height: 90vh;
+    overflow-y: auto;
+    animation: slideUp 0.3s ease;
+  }
+
+  @keyframes slideUp {
+    from { 
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to { 
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Close Button */
+  .cod-close-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: #f5f5f5;
+    border-radius: 50%;
+    font-size: 24px;
+    line-height: 1;
+    cursor: pointer;
+    color: #666;
+    transition: all 0.2s;
+  }
+
+  .cod-close-btn:hover {
+    background: #e0e0e0;
+    color: #333;
+  }
+
+  /* Base Container */
+  .cod-form-container {
+    max-width: 400px;
+    padding: 20px;
+    border: 1px solid #e5e5e5;
+    border-radius: 8px;
+    background: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  .cod-product-info {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #e5e5e5;
+  }
+
+  .cod-product-image {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 6px;
+  }
+
+  .cod-product-details {
+    flex: 1;
+  }
+
+  .cod-product-title {
+    margin: 0 0 4px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+  }
+
+  .cod-product-price {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  .cod-variant-title {
+    margin: 4px 0 0 0;
+    font-size: 13px;
+    color: #666;
+  }
+
+  .cod-order-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .cod-form-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .cod-form-field label {
+    font-size: 14px;
+    font-weight: 500;
+    color: #333;
+  }
+
+  .cod-form-field .required {
+    color: #e53935;
+  }
+
+  .cod-form-field input,
+  .cod-form-field textarea {
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    transition: border-color 0.2s;
+  }
+
+  .cod-form-field input:focus,
+  .cod-form-field textarea:focus {
+    outline: none;
+    border-color: {{ cod_primary_color }};
+  }
+
+  .cod-quantity-selector {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 140px;
+  }
+
+  .cod-qty-btn {
+    width: 36px;
+    height: 36px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: #f5f5f5;
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .cod-qty-btn:hover {
+    background: #e0e0e0;
+  }
+
+  .cod-quantity-selector input {
+    width: 50px;
+    text-align: center;
+  }
+
+  .cod-total {
+    display: flex;
+    justify-content: space-between;
+    padding: 12px 0;
+    border-top: 1px solid #e5e5e5;
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  .cod-submit-btn {
+    width: 100%;
+    padding: 14px 20px;
+    border: none;
+    border-radius: 6px;
+    color: #fff;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+
+  .cod-submit-btn:hover {
+    opacity: 0.9;
+  }
+
+  .cod-submit-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .cod-message {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px;
+    border-radius: 6px;
+    font-size: 14px;
+  }
+
+  .cod-message svg {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+  }
+
+  .cod-message-success {
+    background: #e8f5e9;
+    color: #2e7d32;
+  }
+
+  .cod-message-error {
+    background: #ffebee;
+    color: #c62828;
+  }
+
+  .cod-submit-btn.loading {
+    position: relative;
+    color: transparent;
+  }
+
+  .cod-submit-btn.loading::after {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    top: 50%;
+    left: 50%;
+    margin-left: -10px;
+    margin-top: -10px;
+    border: 2px solid #fff;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spinner 0.8s linear infinite;
+  }
+
+  @keyframes spinner {
+    to { transform: rotate(360deg); }
+  }
+
+  /* Prevent body scroll when modal is open */
+  body.cod-modal-open {
+    overflow: hidden;
+  }
+</style>
+
+<script src="{{ 'cod-form.js' | asset_url }}" defer></script>
+
+{% else %}
+{% comment %} COD is disabled - don't render anything {% endcomment %}
+{% endif %}
