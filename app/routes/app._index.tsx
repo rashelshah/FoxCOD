@@ -324,7 +324,7 @@ export default function Index() {
           margin-top: 6px;
         }
         
-        /* Quick Actions */
+        /* Quick Actions - Premium Horizontal Design */
         .section-header {
           display: flex;
           align-items: center;
@@ -351,66 +351,73 @@ export default function Index() {
         }
         
         .quick-actions {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 16px;
-          margin-bottom: 28px;
-        }
-
-        @media (max-width: 900px) {
-          .quick-actions {
-            grid-template-columns: repeat(2, 1fr);
-          }
-        }
-        
-        .action-card {
-          background: white;
-          border: 1px solid #e5e7eb;
-          border-radius: 16px;
-          padding: 20px;
-          text-decoration: none;
-          color: inherit;
-          transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
-          cursor: pointer;
           display: flex;
-          flex-direction: column;
-          gap: 14px;
+          gap: 12px;
+          margin-bottom: 28px;
+          flex-wrap: wrap;
+        }
+        
+        .action-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          padding: 14px 24px;
+          border-radius: 50px;
+          font-size: 14px;
+          font-weight: 600;
+          text-decoration: none;
+          color: white;
+          cursor: pointer;
+          border: none;
+          transition: all 0.2s ease;
+          position: relative;
+          overflow: hidden;
           will-change: transform;
-          transform: translateZ(0);
         }
         
-        .action-card:hover {
-          border-color: #6366f1;
-          box-shadow: 0 8px 24px rgba(99, 102, 241, 0.15);
-          transform: translateY(-3px) translateZ(0);
+        .action-btn::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: -100%;
+          width: 100%;
+          height: 100%;
+          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+          transition: left 0.5s ease;
         }
         
-        .action-icon {
-          width: 48px;
-          height: 48px;
-          border-radius: 12px;
+        .action-btn:hover::before {
+          left: 100%;
+        }
+        
+        .action-btn:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+        }
+        
+        .action-btn:active {
+          transform: scale(0.98);
+        }
+        
+        .action-btn-settings {
+          background: linear-gradient(135deg, #6366f1, #8b5cf6);
+          box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+        }
+        
+        .action-btn-orders {
+          background: linear-gradient(135deg, #10b981, #059669);
+          box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+        }
+        
+        .action-btn-analytics {
+          background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+          box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+        }
+        
+        .action-btn-icon {
+          font-size: 18px;
           display: flex;
           align-items: center;
-          justify-content: center;
-          font-size: 20px;
-        }
-        
-        .action-icon-settings { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
-        .action-icon-theme { background: linear-gradient(135deg, #f59e0b, #d97706); }
-        .action-icon-orders { background: linear-gradient(135deg, #10b981, #059669); }
-        .action-icon-analytics { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
-        
-        .action-content h3 {
-          font-size: 15px;
-          font-weight: 600;
-          color: #111827;
-          margin: 0 0 4px 0;
-        }
-        
-        .action-content p {
-          font-size: 13px;
-          color: #6b7280;
-          margin: 0;
         }
         
         /* Orders Table */
@@ -686,44 +693,24 @@ export default function Index() {
             </div>
           </div>
 
-          {/* Quick Actions */}
+          {/* Quick Actions - Premium Pill Buttons */}
           <div className="section-header">
             <h2>Quick Actions</h2>
           </div>
           <div className="quick-actions">
-            <Link to="/app/settings" className="action-card">
-              <div className="action-icon action-icon-settings">⚙️</div>
-              <div className="action-content">
-                <h3>Form Settings</h3>
-                <p>Customize your COD form</p>
-              </div>
+            <Link to="/app/settings" className="action-btn action-btn-settings">
+              <span className="action-btn-icon">⚙️</span>
+              Form Builder
             </Link>
 
-            <div
-              className="action-card"
-              onClick={() => window.open(`https://${shop}/admin/themes/current/editor?context=apps`, '_blank')}
-            >
-              <div className="action-icon action-icon-theme">🎨</div>
-              <div className="action-content">
-                <h3>Theme Editor</h3>
-                <p>Add form to your store</p>
-              </div>
-            </div>
-
-            <Link to="/app/orders" className="action-card">
-              <div className="action-icon action-icon-orders">📋</div>
-              <div className="action-content">
-                <h3>All Orders</h3>
-                <p>Manage COD orders</p>
-              </div>
+            <Link to="/app/orders" className="action-btn action-btn-orders">
+              <span className="action-btn-icon">📋</span>
+              View All Orders
             </Link>
 
-            <Link to="/app/analytics" className="action-card">
-              <div className="action-icon action-icon-analytics">📊</div>
-              <div className="action-content">
-                <h3>Analytics</h3>
-                <p>Track performance</p>
-              </div>
+            <Link to="/app/analytics" className="action-btn action-btn-analytics">
+              <span className="action-btn-icon">📊</span>
+              Analytics
             </Link>
           </div>
 

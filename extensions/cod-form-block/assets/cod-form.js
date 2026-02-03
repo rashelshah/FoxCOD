@@ -1,13 +1,11 @@
 /**
  * COD Form JavaScript Handler
  * Replaces Buy buttons with COD buttons and handles form submission
+ * Uses Shopify App Proxy for stable API URLs
  */
 
 (function() {
   'use strict';
-
-  // Store for app config fetched from API
-  var appConfig = null;
 
   // Wait for DOM to be ready
   if (document.readyState === 'loading') {
@@ -31,7 +29,6 @@
     dataContainers.forEach(function(dataContainer) {
       var productId = dataContainer.dataset.productId;
       var shop = dataContainer.dataset.shop;
-      var configuredAppUrl = dataContainer.dataset.appUrl;
       
       // Get configuration from data container
       var config = {
@@ -40,7 +37,8 @@
         productTitle: dataContainer.dataset.productTitle,
         productPrice: parseFloat(dataContainer.dataset.productPrice),
         shop: shop,
-        appUrl: configuredAppUrl,
+        // Use App Proxy URL - this is a store-relative path that never changes!
+        proxyUrl: '/apps/fox-cod',
         maxQuantity: parseInt(dataContainer.dataset.maxQuantity) || 10,
         requireName: dataContainer.dataset.requireName === 'true',
         requirePhone: dataContainer.dataset.requirePhone === 'true',
@@ -50,60 +48,22 @@
         submitText: dataContainer.dataset.submitText || 'Place Order (COD)'
       };
 
-      // If no app URL is configured, try to fetch it from the API
-      if (!config.appUrl && shop) {
-        fetchAppConfig(shop, function(fetchedConfig) {
-          if (fetchedConfig && fetchedConfig.appUrl) {
-            config.appUrl = fetchedConfig.appUrl;
-            console.log('[COD Form] Fetched app URL:', config.appUrl);
-          }
-          // Initialize form with updated config
-          initializeProduct(productId, config);
-        });
-      } else {
-        // Initialize form immediately
-        initializeProduct(productId, config);
-      }
+      console.log('[COD Form] Initialized for product:', productId, 'using proxy:', config.proxyUrl);
+      
+      // Initialize form immediately - no need to fetch config!
+      initializeProduct(productId, config);
     });
   }
 
   /**
-   * Fetch app configuration from the settings API
+   * Initialize a specific product
    */
-  function fetchAppConfig(shop, callback) {
-    // We need to find the app URL first - try common patterns
-    var possibleBases = [
-      // Check if there's a script tag that might reveal the app URL
-      findAppUrlFromScripts(),
-      // Use current script's origin if it's from the app
-      getScriptOrigin(),
-    ].filter(Boolean);
+  function initializeProduct(productId, config) {
+    // Replace buy buttons with COD button
+    replaceBuyButtons(productId, config);
 
-    if (possibleBases.length === 0) {
-      console.warn('[COD Form] Could not determine app URL. Please save settings in the app dashboard.');
-      callback(null);
-      return;
-    }
-
-    var baseUrl = possibleBases[0];
-    var apiUrl = baseUrl + '/api/settings?shop=' + encodeURIComponent(shop);
-
-    console.log('[COD Form] Fetching config from:', apiUrl);
-
-    fetch(apiUrl)
-      .then(function(response) { return response.json(); })
-      .then(function(data) {
-        if (data.success && data.appUrl) {
-          appConfig = data;
-          callback(data);
-        } else {
-          callback(null);
-        }
-      })
-      .catch(function(err) {
-        console.error('[COD Form] Failed to fetch config:', err);
-        callback(null);
-      });
+    // Initialize the form
+    initForm(productId, config);
   }
 
   /**
@@ -354,13 +314,6 @@
     var successMsg = container.querySelector('.cod-message-success');
     var errorMsg = container.querySelector('.cod-message-error');
 
-    // Validate app URL
-    if (!config.appUrl) {
-      showError(errorMsg, 'COD form configuration error. Please ask the store owner to save settings in the app dashboard.');
-      console.error('[COD Form] App URL is not configured. Store owner needs to save settings in the app.');
-      return;
-    }
-
     // Get form data
     var formData = new FormData(form);
     var data = {
@@ -387,12 +340,13 @@
     submitBtn.classList.add('loading');
     hideMessages(successMsg, errorMsg);
 
-    // Build API URL
-    var apiUrl = config.appUrl.replace(/\/$/, '') + '/api/create-order';
+    // Use App Proxy URL - this goes through the store's domain!
+    // Example: /apps/fox-cod/create-order
+    var apiUrl = config.proxyUrl + '/create-order';
 
-    console.log('[COD Form] Submitting order to:', apiUrl);
+    console.log('[COD Form] Submitting order via proxy:', apiUrl);
 
-    // Make API call
+    // Make API call via App Proxy
     fetch(apiUrl, {
       method: 'POST',
       headers: {
