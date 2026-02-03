@@ -58,8 +58,24 @@
 {% comment %} Read COD settings from metafields (synced from app dashboard) {% endcomment %}
 {% assign cod_enabled = shop.metafields.fox_cod.enabled | default: 'false' %}
 {% assign cod_button_text = shop.metafields.fox_cod.button_text | default: 'Buy with COD' %}
-{% assign cod_primary_color = shop.metafields.fox_cod.primary_color | default: block.settings.primary_color %}
+{% assign cod_primary_color = shop.metafields.fox_cod.primary_color | default: '#667eea' %}
 {% assign cod_app_url = shop.metafields.fox_cod.app_url | default: '' %}
+{% assign cod_max_quantity = shop.metafields.fox_cod.max_quantity | default: 10 %}
+{% assign cod_require_name = shop.metafields.fox_cod.require_name | default: 'true' %}
+{% assign cod_require_phone = shop.metafields.fox_cod.require_phone | default: 'true' %}
+{% assign cod_require_address = shop.metafields.fox_cod.require_address | default: 'true' %}
+{% assign cod_form_title = shop.metafields.fox_cod.form_title | default: 'Cash on Delivery' %}
+{% assign cod_form_subtitle = shop.metafields.fox_cod.form_subtitle | default: '' %}
+{% assign cod_button_style = shop.metafields.fox_cod.button_style | default: 'solid' %}
+{% assign cod_button_size = shop.metafields.fox_cod.button_size | default: 'large' %}
+{% assign cod_border_radius = shop.metafields.fox_cod.border_radius | default: 12 %}
+{% assign cod_show_product_image = shop.metafields.fox_cod.show_product_image | default: 'true' %}
+{% assign cod_show_price = shop.metafields.fox_cod.show_price | default: 'true' %}
+{% assign cod_show_quantity = shop.metafields.fox_cod.show_quantity_selector | default: 'true' %}
+{% assign cod_show_email = shop.metafields.fox_cod.show_email_field | default: 'false' %}
+{% assign cod_show_notes = shop.metafields.fox_cod.show_notes_field | default: 'false' %}
+{% assign cod_modal_style = shop.metafields.fox_cod.modal_style | default: 'modern' %}
+{% assign cod_anim_style = shop.metafields.fox_cod.animation_style | default: 'fade' %}
 
 {% comment %} Only render COD functionality if enabled in the app {% endcomment %}
 {% if cod_enabled == 'true' %}
@@ -74,13 +90,13 @@
      data-product-price="{{ current_variant.price | divided_by: 100.0 }}"
      data-shop="{{ shop.permanent_domain }}"
      data-app-url="{{ cod_app_url }}"
-     data-max-quantity="{{ block.settings.max_quantity }}"
-     data-require-name="{{ block.settings.require_name }}"
-     data-require-phone="{{ block.settings.require_phone }}"
-     data-require-address="{{ block.settings.require_address }}"
+     data-max-quantity="{{ cod_max_quantity }}"
+     data-require-name="{{ cod_require_name }}"
+     data-require-phone="{{ cod_require_phone }}"
+     data-require-address="{{ cod_require_address }}"
      data-button-text="{{ cod_button_text }}"
      data-primary-color="{{ cod_primary_color }}"
-     data-submit-text="{{ block.settings.button_text }}">
+     data-submit-text="{{ cod_submit_text }}">
 </div>
 
 {% comment %} Modal Overlay {% endcomment %}
@@ -94,8 +110,9 @@
   <button type="button" class="cod-close-btn" data-cod-close="{{ product.id }}">&times;</button>
 
   {% comment %} Product Info {% endcomment %}
+  {% if cod_show_product_image == 'true' or cod_show_price == 'true' %}
   <div class="cod-product-info">
-    {% if product.featured_image %}
+    {% if cod_show_product_image == 'true' and product.featured_image %}
       <img src="{{ product.featured_image | image_url: width: 100 }}" 
            alt="{{ product.title }}" 
            class="cod-product-image"
@@ -105,11 +122,19 @@
     {% endif %}
     <div class="cod-product-details">
       <h3 class="cod-product-title">{{ product.title }}</h3>
-      <p class="cod-product-price" style="color: {{ cod_primary_color }};">{{ product_price }}</p>
+      {% if cod_show_price == 'true' %}
+          <p class="cod-product-price" style="color: {{ cod_primary_color }};">{{ product_price }}</p>
+      {% endif %}
       {% if current_variant.title != 'Default Title' %}
         <p class="cod-variant-title">{{ current_variant.title }}</p>
       {% endif %}
     </div>
+  </div>
+  {% endif %}
+  
+  <div class="cod-form-headers" style="text-align: center; margin-bottom: 16px;">
+      {% if cod_form_title != blank %}<h2 style="margin: 0; font-size: 20px;">{{ cod_form_title }}</h2>{% endif %}
+      {% if cod_form_subtitle != blank %}<p style="margin: 4px 0 0; color: #666; font-size: 14px;">{{ cod_form_subtitle }}</p>{% endif %}
   </div>
 
   {% comment %} COD Form {% endcomment %}
@@ -117,40 +142,63 @@
     {% comment %} Name Field {% endcomment %}
     <div class="cod-form-field">
       <label for="cod-name-{{ product.id }}">
-        Full Name {% if block.settings.require_name %}<span class="required">*</span>{% endif %}
+        Full Name {% if cod_require_name == 'true' %}<span class="required">*</span>{% endif %}
       </label>
       <input type="text" 
              id="cod-name-{{ product.id }}" 
              name="customerName" 
              placeholder="Enter your full name"
-             {% if block.settings.require_name %}required{% endif %}>
+             {% if cod_require_name == 'true' %}required{% endif %}>
     </div>
 
     {% comment %} Phone Field {% endcomment %}
     <div class="cod-form-field">
       <label for="cod-phone-{{ product.id }}">
-        Phone Number {% if block.settings.require_phone %}<span class="required">*</span>{% endif %}
+        Phone Number {% if cod_require_phone == 'true' %}<span class="required">*</span>{% endif %}
       </label>
       <input type="tel" 
              id="cod-phone-{{ product.id }}" 
              name="customerPhone" 
              placeholder="Enter your phone number"
-             {% if block.settings.require_phone %}required{% endif %}>
+             {% if cod_require_phone == 'true' %}required{% endif %}>
     </div>
 
     {% comment %} Address Field {% endcomment %}
     <div class="cod-form-field">
       <label for="cod-address-{{ product.id }}">
-        Delivery Address {% if block.settings.require_address %}<span class="required">*</span>{% endif %}
+        Delivery Address {% if cod_require_address == 'true' %}<span class="required">*</span>{% endif %}
       </label>
       <textarea id="cod-address-{{ product.id }}" 
                 name="customerAddress" 
                 placeholder="Enter your complete delivery address"
                 rows="3"
-                {% if block.settings.require_address %}required{% endif %}></textarea>
+                {% if cod_require_address == 'true' %}required{% endif %}></textarea>
     </div>
 
+    {% comment %} Email Field (Optional) {% endcomment %}
+    {% if cod_show_email == 'true' %}
+    <div class="cod-form-field">
+      <label for="cod-email-{{ product.id }}">Email (Optional)</label>
+      <input type="email" 
+             id="cod-email-{{ product.id }}" 
+             name="email" 
+             placeholder="Enter your email address">
+    </div>
+    {% endif %}
+
+    {% comment %} Notes Field (Optional) {% endcomment %}
+    {% if cod_show_notes == 'true' %}
+    <div class="cod-form-field">
+      <label for="cod-notes-{{ product.id }}">Order Notes (Optional)</label>
+      <textarea id="cod-notes-{{ product.id }}" 
+                name="notes" 
+                placeholder="Any special instructions?"
+                rows="2"></textarea>
+    </div>
+    {% endif %}
+
     {% comment %} Quantity Field {% endcomment %}
+    {% if cod_show_quantity == 'true' %}
     <div class="cod-form-field">
       <label for="cod-quantity-{{ product.id }}">Quantity</label>
       <div class="cod-quantity-selector">
@@ -160,10 +208,13 @@
                name="quantity" 
                value="1" 
                min="1" 
-               max="{{ block.settings.max_quantity }}">
+               max="{{ cod_max_quantity }}">
         <button type="button" class="cod-qty-btn cod-qty-plus">+</button>
       </div>
     </div>
+    {% else %}
+        <input type="hidden" name="quantity" value="1">
+    {% endif %}
 
     {% comment %} Total Price {% endcomment %}
     <div class="cod-total">
@@ -476,6 +527,101 @@
   }
 </style>
 
+<style>
+  /* Dynamic Styles from Metafields */
+  :root {
+      --cod-primary: {{ cod_primary_color }};
+      --cod-radius: {{ cod_border_radius }}px;
+      --cod-btn-size: {% if cod_button_size == 'small' %}10px 20px{% elsif cod_button_size == 'large' %}16px 32px{% else %}14px 28px{% endif %};
+      --cod-btn-font: {% if cod_button_size == 'small' %}14px{% elsif cod_button_size == 'large' %}18px{% else %}16px{% endif %};
+  }
+
+  /* Base Button Styles */
+  .cod-buy-btn, .cod-submit-btn {
+      background-color: var(--cod-primary) !important;
+      border-radius: var(--cod-radius) !important;
+      padding: var(--cod-btn-size) !important;
+      font-size: var(--cod-btn-font) !important;
+      border: none !important;
+      color: white !important;
+      cursor: pointer !important;
+      transition: all 0.2s ease !important;
+  }
+
+  /* Outline Style */
+  {% if cod_button_style == 'outline' %}
+  .cod-buy-btn, .cod-submit-btn {
+      background-color: transparent !important;
+      border: 2px solid var(--cod-primary) !important;
+      color: var(--cod-primary) !important;
+  }
+  .cod-buy-btn:hover, .cod-submit-btn:hover {
+      background-color: var(--cod-primary) !important;
+      color: white !important;
+  }
+  {% endif %}
+
+  /* Gradient Style - More visible with darker bottom */
+  {% if cod_button_style == 'gradient' %}
+  .cod-buy-btn, .cod-submit-btn {
+      /* Fallback to primary */
+      background-color: var(--cod-primary) !important;
+      /* Darker gradient overlay for more visible effect */
+      background-image: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(0,0,0,0.25) 100%) !important;
+      box-shadow: 0 6px 12px -2px rgba(0, 0, 0, 0.2), 0 3px 6px -3px rgba(0, 0, 0, 0.15) !important;
+  }
+  {% endif %}
+  
+  /* Modal Container Styles */
+  .cod-form-container {
+      border-radius: var(--cod-radius) !important;
+      background: white !important;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+  }
+  
+  /* Minimal Style */
+  {% if cod_modal_style == 'minimal' %}
+  .cod-form-container {
+      border: 1px solid #e5e5e5 !important;
+      box-shadow: none !important;
+  }
+  {% endif %}
+
+  /* Glassmorphism Style */
+  {% if cod_modal_style == 'glassmorphism' %}
+  .cod-form-container {
+      background: rgba(255, 255, 255, 0.95) !important;
+      backdrop-filter: blur(10px) !important;
+      border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  }
+  .cod-modal-overlay {
+      background: rgba(0, 0, 0, 0.3) !important;
+      backdrop-filter: blur(4px) !important;
+  }
+  {% endif %}
+  
+  .cod-input, .cod-form-field textarea {
+      border-radius: 8px !important; 
+  }
+
+  .cod-input:focus, .cod-form-field textarea:focus {
+      border-color: var(--cod-primary) !important;
+      box-shadow: 0 0 0 2px {{ cod_primary_color }}20 !important;
+  }
+
+  /* Animation Overrides */
+  {% if cod_anim_style == 'scale' %}
+  @keyframes slideUp {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+  }
+  {% elsif cod_anim_style == 'slide' %}
+  @keyframes slideUp {
+      from { opacity: 0; transform: translateX(50px); }
+      to { opacity: 1; transform: translateX(0); }
+  }
+  {% endif %}
+</style>
 <script src="{{ 'cod-form.js' | asset_url }}" defer></script>
 
 {% else %}

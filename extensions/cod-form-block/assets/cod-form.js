@@ -442,9 +442,11 @@
     .catch(function(err) {
       console.error('[COD Form] Error:', err);
       var message = err.message || 'Unable to connect to the server. Please try again.';
-      // Handle common fetch errors
+      
+      // Handle common fetch errors and check for stale app URL
       if (message.includes('Failed to fetch') || message.includes('Load failed') || message.includes('NetworkError')) {
-        message = 'Network error. Please check your connection and try again.';
+        console.warn('[COD Form] Network error detected. Current App URL:', config.appUrl);
+        message = 'Network error. The app connection might be outdated. Please ask the store owner to go to the Fox COD App Dashboard and click "Save Settings" to refresh the connection.';
       }
       showError(errorMsg, message);
     })

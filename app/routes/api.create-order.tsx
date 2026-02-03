@@ -71,6 +71,10 @@ function validateOrderInput(body: OrderRequestBody, formSettings: any): string |
         return "Product and variant are required";
     }
 
+    if (!body.productTitle) {
+        return "Product title is required";
+    }
+
     // Validate price
     if (!body.price || body.price <= 0) {
         return "Invalid price";
