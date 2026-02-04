@@ -436,9 +436,27 @@ export default function SettingsPage() {
                 .settings-card { background: white; border: 1px solid #e5e7eb; border-radius: 16px; padding: 24px; margin-bottom: 20px; }
                 .card-title { font-size: 15px; font-weight: 600; color: #111827; margin: 0 0 16px 0; }
                 .input-field { width: 100%; padding: 12px 16px; border: 1px solid #e5e7eb; border-radius: 10px; font-size: 14px; color: #111827; transition: all 0.2s ease; box-sizing: border-box; }
-                .color-presets { display: flex; gap: 8px; flex-wrap: wrap; }
-                .color-preset { width: 32px; height: 32px; border-radius: 8px; border: 2px solid transparent; cursor: pointer; }
+                .color-presets { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+                .color-preset { width: 32px; height: 32px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; transition: all 0.2s ease; }
+                .color-preset:hover { transform: scale(1.1); }
                 .color-preset.active { border-color: #111827; box-shadow: 0 0 0 2px white, 0 0 0 4px #111827; }
+                .custom-color { position: relative; width: 32px; height: 32px; }
+                .custom-color input[type="color"] { 
+                    width: 32px; 
+                    height: 32px; 
+                    border-radius: 50%; 
+                    border: 2px dashed #d1d5db; 
+                    cursor: pointer; 
+                    padding: 0; 
+                    background: conic-gradient(red, yellow, lime, aqua, blue, magenta, red);
+                    -webkit-appearance: none;
+                    appearance: none;
+                    overflow: hidden;
+                }
+                .custom-color input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; border-radius: 50%; }
+                .custom-color input[type="color"]::-webkit-color-swatch { border: none; border-radius: 50%; }
+                .custom-color input[type="color"]::-moz-color-swatch { border: none; border-radius: 50%; }
+                .custom-color input[type="color"]:hover { transform: scale(1.1); border-color: #9ca3af; }
                 .style-options { display: flex; gap: 10px; flex-wrap: wrap; }
                 .style-option { padding: 10px 18px; border-radius: 10px; border: 2px solid #e5e7eb; background: white; font-size: 13px; font-weight: 600; color: #6b7280; cursor: pointer; }
                 .style-option.active { border-color: #6366f1; background: rgba(99, 102, 241, 0.05); color: #6366f1; }

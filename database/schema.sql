@@ -36,11 +36,41 @@ CREATE TABLE IF NOT EXISTS form_settings (
   -- Form toggle
   enabled BOOLEAN DEFAULT false,
   
-  -- Customization options
+  -- Basic customization options
   button_text VARCHAR(100) DEFAULT 'Order Now (COD)',
   primary_color VARCHAR(7) DEFAULT '#000000',
   required_fields JSONB DEFAULT '["name", "phone", "address"]'::jsonb,
   max_quantity INTEGER DEFAULT 10,
+  
+  -- Extended button settings
+  button_style VARCHAR(20) DEFAULT 'solid',
+  button_size VARCHAR(20) DEFAULT 'large',
+  button_position VARCHAR(20) DEFAULT 'below_atc',
+  
+  -- Form content settings
+  form_title VARCHAR(255) DEFAULT 'Cash on Delivery Order',
+  form_subtitle TEXT,
+  success_message TEXT DEFAULT 'Your order has been placed! We will contact you shortly.',
+  submit_button_text VARCHAR(100) DEFAULT 'Place COD Order',
+  
+  -- Display options
+  show_product_image BOOLEAN DEFAULT true,
+  show_price BOOLEAN DEFAULT true,
+  show_quantity_selector BOOLEAN DEFAULT true,
+  show_email_field BOOLEAN DEFAULT false,
+  show_notes_field BOOLEAN DEFAULT false,
+  email_required BOOLEAN DEFAULT false,
+  
+  -- Placeholder texts
+  name_placeholder VARCHAR(255) DEFAULT 'Enter your full name',
+  phone_placeholder VARCHAR(255) DEFAULT 'Enter your phone number',
+  address_placeholder VARCHAR(255) DEFAULT 'Enter your delivery address',
+  notes_placeholder VARCHAR(255) DEFAULT 'Any special instructions?',
+  
+  -- Style options
+  modal_style VARCHAR(20) DEFAULT 'modern',
+  animation_style VARCHAR(20) DEFAULT 'fade',
+  border_radius INTEGER DEFAULT 12,
   
   -- Timestamps
   created_at TIMESTAMPTZ DEFAULT NOW(),

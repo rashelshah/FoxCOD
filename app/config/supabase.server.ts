@@ -223,13 +223,41 @@ export interface OrderLogEntry {
 // Order status types are imported from ./constants
 
 /**
- * Log a new COD order
+ * Get the next order number for a shop (for generating order names)
+ */
+async function getNextOrderNumber(shopDomain: string): Promise<number> {
+    // Get the count of existing orders for this shop
+    const { count, error } = await supabase
+        .from('order_logs')
+        .select('*', { count: 'exact', head: true })
+        .eq('shop_domain', shopDomain);
+
+    if (error) {
+        console.error('Error getting order count:', error);
+        // Default to 1001 if there's an error
+        return 1001;
+    }
+
+    // Start from 1001 and increment
+    return 1001 + (count || 0);
+}
+
+/**
+ * Log a new COD order with auto-generated order name
  */
 export async function logOrder(order: OrderLogEntry) {
+    // Generate a sequential order name if not provided
+    let orderName = order.shopify_order_name;
+    if (!orderName) {
+        const orderNumber = await getNextOrderNumber(order.shop_domain);
+        orderName = `COD-${orderNumber}`;
+    }
+
     const { data, error } = await supabase
         .from('order_logs')
         .insert({
             ...order,
+            shopify_order_name: orderName,
             created_at: new Date().toISOString(),
         })
         .select()
