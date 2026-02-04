@@ -321,6 +321,8 @@
       customerName: formData.get('customerName') || '',
       customerPhone: formData.get('customerPhone') || '',
       customerAddress: formData.get('customerAddress') || '',
+      customerEmail: formData.get('email') || '',
+      customerNotes: formData.get('notes') || '',
       productId: config.productId,
       variantId: config.variantId,
       quantity: parseInt(formData.get('quantity')) || 1,

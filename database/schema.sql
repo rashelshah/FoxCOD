@@ -103,6 +103,8 @@ CREATE TABLE IF NOT EXISTS order_logs (
   customer_name VARCHAR(255),
   customer_phone VARCHAR(50),
   customer_address TEXT,
+  customer_email VARCHAR(255),
+  customer_notes TEXT,
   
   -- Product info
   product_id VARCHAR(255),

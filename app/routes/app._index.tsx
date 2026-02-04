@@ -602,6 +602,112 @@ export default function Index() {
         .setup-step-pending {
           color: #9ca3af;
         }
+        
+        /* ==================== RESPONSIVE DESIGN ==================== */
+        
+        @media (max-width: 768px) {
+          .fox-dashboard {
+            padding: 0 16px;
+          }
+          
+          .welcome-banner {
+            padding: 20px;
+            border-radius: 16px;
+          }
+          
+          .welcome-banner > div:first-child {
+            flex-direction: column !important;
+            gap: 16px;
+          }
+          
+          .welcome-banner h1 {
+            font-size: 22px;
+          }
+          
+          .welcome-banner p {
+            font-size: 14px;
+          }
+          
+          .welcome-actions {
+            flex-direction: column;
+            gap: 10px;
+          }
+          
+          .welcome-btn {
+            justify-content: center;
+            width: 100%;
+          }
+          
+          .stats-grid {
+            grid-template-columns: 1fr 1fr !important;
+            gap: 12px;
+          }
+          
+          .stat-card {
+            padding: 16px;
+          }
+          
+          .stat-icon {
+            width: 40px;
+            height: 40px;
+            font-size: 18px;
+          }
+          
+          .stat-value {
+            font-size: 24px;
+          }
+          
+          .quick-actions {
+            flex-direction: column;
+          }
+          
+          .action-btn {
+            justify-content: center;
+            width: 100%;
+          }
+          
+          .orders-card {
+            border-radius: 12px;
+          }
+          
+          .orders-table th,
+          .orders-table td {
+            padding: 12px 16px;
+          }
+          
+          .section-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 8px;
+          }
+        }
+        
+        @media (max-width: 480px) {
+          .stats-grid {
+            grid-template-columns: 1fr !important;
+          }
+          
+          .welcome-banner h1 {
+            font-size: 20px;
+          }
+          
+          .stat-header {
+            gap: 8px;
+          }
+          
+          .stat-label {
+            font-size: 12px;
+          }
+          
+          .stat-value {
+            font-size: 22px;
+          }
+          
+          .orders-table {
+            display: block;
+            overflow-x: auto;
+          }
+        }
       `}</style>
 
       <s-page heading="">
