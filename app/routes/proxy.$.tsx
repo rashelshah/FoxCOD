@@ -63,6 +63,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             customer_name: data.customerName || '',
             customer_phone: data.customerPhone || '',
             customer_address: data.customerAddress || '',
+            customer_email: data.customerEmail || '',
+            customer_notes: data.customerNotes || '',
             product_id: data.productId,
             product_title: data.productTitle || 'Product',
             variant_id: data.variantId,

@@ -479,6 +479,45 @@ export default function SettingsPage() {
                 .preview-modal { padding: 16px; margin-top: 12px; border-radius: 12px; background: #f9fafb; }
                 .preview-input { width: 100%; padding: 10px 12px; margin-bottom: 8px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 12px; box-sizing: border-box; }
                 .preview-submit { width: 100%; padding: 12px; border: none; color: white; border-radius: 8px; font-weight: 600; font-size: 13px; margin-top: 4px; }
+                
+                /* ==================== RESPONSIVE DESIGN ==================== */
+                
+                @media (max-width: 1024px) {
+                    .builder-layout { flex-direction: column; gap: 24px; }
+                    .settings-panel { width: 100%; flex: none; }
+                    .preview-panel { position: relative; top: 0; width: 100%; order: -1; }
+                    .preview-phone { max-width: 320px; }
+                }
+                
+                @media (max-width: 768px) {
+                    .form-builder { padding: 0 16px; }
+                    .builder-header { padding: 20px; border-radius: 16px; flex-direction: column; gap: 16px; align-items: stretch; }
+                    .builder-header-left { gap: 12px; }
+                    .builder-title h1 { font-size: 20px; }
+                    .save-btn { width: 100%; justify-content: center; }
+                    .main-toggle { padding: 16px; flex-direction: column; gap: 16px; text-align: center; }
+                    .tabs { gap: 6px; overflow-x: auto; flex-wrap: nowrap; padding-bottom: 8px; }
+                    .tab-btn { padding: 10px 16px; font-size: 12px; white-space: nowrap; flex-shrink: 0; }
+                    .settings-card { padding: 16px; }
+                    .style-options { gap: 8px; }
+                    .style-option { padding: 8px 14px; font-size: 12px; }
+                    .color-presets { gap: 6px; }
+                    .color-preset { width: 28px; height: 28px; }
+                    .custom-color, .custom-color input[type="color"] { width: 28px; height: 28px; }
+                    .preview-phone { padding: 8px; border-radius: 24px; }
+                    .preview-phone-screen { border-radius: 18px; min-height: 320px; }
+                }
+                
+                @media (max-width: 480px) {
+                    .form-builder { padding: 0 12px; }
+                    .builder-header { padding: 16px; }
+                    .back-btn { width: 38px; height: 38px; font-size: 16px; }
+                    .builder-title h1 { font-size: 18px; }
+                    .builder-title p { font-size: 12px; }
+                    .tabs { gap: 4px; }
+                    .tab-btn { padding: 8px 12px; }
+                    .toggle-switch { width: 48px; height: 26px; }
+                }
             `}</style>
 
             <s-page heading="">

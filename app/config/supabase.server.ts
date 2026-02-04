@@ -211,6 +211,8 @@ export interface OrderLogEntry {
     customer_name: string;
     customer_phone: string;
     customer_address: string;
+    customer_email?: string;
+    customer_notes?: string;
     product_id: string;
     product_title?: string;
     variant_id: string;
