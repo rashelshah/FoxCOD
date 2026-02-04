@@ -106,37 +106,50 @@ export default function OrderDetailPage() {
     return (
         <>
             <style>{`
+                /* Prevent horizontal scrolling globally */
+                html, body {
+                    overflow-x: hidden;
+                    max-width: 100vw;
+                }
+                
                 .order-detail-page {
                     max-width: 900px;
                     margin: 0 auto;
                     padding: 24px;
+                    box-sizing: border-box;
+                    overflow-x: hidden;
                 }
 
                 .page-header {
                     display: flex;
-                    align-items: center;
+                    align-items: flex-start;
                     justify-content: space-between;
-                    margin-bottom: 32px;
+                    margin-bottom: 24px;
+                    gap: 16px;
+                    flex-wrap: wrap;
                 }
 
                 .page-header-left {
                     display: flex;
                     align-items: center;
-                    gap: 16px;
+                    gap: 12px;
+                    flex: 1;
+                    min-width: 0;
                 }
 
                 .back-btn {
-                    width: 44px;
-                    height: 44px;
+                    width: 40px;
+                    height: 40px;
+                    min-width: 40px;
                     display: flex;
                     align-items: center;
                     justify-content: center;
                     border: 1px solid #e5e7eb;
-                    border-radius: 12px;
+                    border-radius: 10px;
                     background: white;
                     text-decoration: none;
                     color: #374151;
-                    font-size: 18px;
+                    font-size: 16px;
                     transition: all 0.2s ease;
                 }
 
@@ -145,15 +158,23 @@ export default function OrderDetailPage() {
                     border-color: #d1d5db;
                 }
 
+                .page-title {
+                    min-width: 0;
+                    overflow: hidden;
+                }
+
                 .page-title h1 {
-                    font-size: 24px;
+                    font-size: 22px;
                     font-weight: 700;
                     color: #111827;
                     margin: 0 0 4px 0;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
                 }
 
                 .page-title p {
-                    font-size: 14px;
+                    font-size: 13px;
                     color: #6b7280;
                     margin: 0;
                 }
@@ -163,49 +184,44 @@ export default function OrderDetailPage() {
                     border: 1px solid #e5e7eb;
                     border-radius: 16px;
                     overflow: hidden;
-                    margin-bottom: 24px;
+                    margin-bottom: 20px;
                 }
 
                 .order-card-header {
-                    padding: 24px;
+                    padding: 20px;
                     border-bottom: 1px solid #f3f4f6;
                     background: #f9fafb;
                 }
 
                 .order-card-header h2 {
-                    font-size: 16px;
+                    font-size: 15px;
                     font-weight: 600;
                     color: #374151;
                     margin: 0;
                     display: flex;
                     align-items: center;
-                    gap: 10px;
+                    gap: 8px;
                 }
 
                 .order-card-body {
-                    padding: 24px;
+                    padding: 20px;
                 }
 
                 .detail-grid {
                     display: grid;
                     grid-template-columns: repeat(2, 1fr);
-                    gap: 20px;
-                }
-
-                @media (max-width: 600px) {
-                    .detail-grid {
-                        grid-template-columns: 1fr;
-                    }
+                    gap: 16px;
                 }
 
                 .detail-item {
-                    padding: 16px;
+                    padding: 14px;
                     background: #f9fafb;
                     border-radius: 10px;
+                    overflow: hidden;
                 }
 
                 .detail-item-label {
-                    font-size: 12px;
+                    font-size: 11px;
                     font-weight: 600;
                     color: #6b7280;
                     text-transform: uppercase;
@@ -214,33 +230,21 @@ export default function OrderDetailPage() {
                 }
 
                 .detail-item-value {
-                    font-size: 15px;
+                    font-size: 14px;
                     font-weight: 500;
                     color: #111827;
                     line-height: 1.5;
-                }
-
-                .status-section {
-                    margin-top: 24px;
-                    padding-top: 24px;
-                    border-top: 1px solid #f3f4f6;
-                }
-
-                .status-section h3 {
-                    font-size: 14px;
-                    font-weight: 600;
-                    color: #374151;
-                    margin: 0 0 16px 0;
+                    word-break: break-word;
                 }
 
                 .status-options {
                     display: flex;
                     flex-wrap: wrap;
-                    gap: 10px;
+                    gap: 8px;
                 }
 
                 .status-option {
-                    padding: 10px 18px;
+                    padding: 10px 16px;
                     border-radius: 10px;
                     font-size: 13px;
                     font-weight: 600;
@@ -251,7 +255,7 @@ export default function OrderDetailPage() {
                     color: #6b7280;
                 }
 
-                .status-option:hover {
+                .status-option:hover:not(:disabled) {
                     transform: scale(1.02);
                 }
 
@@ -266,19 +270,20 @@ export default function OrderDetailPage() {
                 }
 
                 .amount-display {
-                    font-size: 32px;
+                    font-size: 28px;
                     font-weight: 800;
                     color: #111827;
                 }
 
                 .current-status {
-                    padding: 12px 24px;
-                    border-radius: 12px;
-                    font-size: 14px;
+                    padding: 10px 18px;
+                    border-radius: 10px;
+                    font-size: 13px;
                     font-weight: 700;
                     display: inline-flex;
                     align-items: center;
-                    gap: 8px;
+                    gap: 6px;
+                    flex-shrink: 0;
                 }
 
                 .address-text {
@@ -286,42 +291,94 @@ export default function OrderDetailPage() {
                     word-break: break-word;
                 }
 
-                .timeline {
-                    margin-top: 24px;
+                .notes-text {
+                    white-space: pre-wrap;
+                    word-break: break-word;
+                    font-style: italic;
                 }
 
-                .timeline-item {
-                    display: flex;
-                    gap: 16px;
-                    padding: 12px 0;
-                    border-bottom: 1px solid #f3f4f6;
+                /* ==================== RESPONSIVE DESIGN ==================== */
+
+                @media (max-width: 768px) {
+                    .order-detail-page {
+                        padding: 16px;
+                    }
+
+                    .page-header {
+                        flex-direction: column;
+                        align-items: stretch;
+                    }
+
+                    .page-header-left {
+                        width: 100%;
+                    }
+
+                    .current-status {
+                        align-self: flex-start;
+                    }
+
+                    .page-title h1 {
+                        font-size: 18px;
+                    }
+
+                    .detail-grid {
+                        grid-template-columns: 1fr;
+                        gap: 12px;
+                    }
+
+                    .order-card {
+                        border-radius: 12px;
+                    }
+
+                    .order-card-header,
+                    .order-card-body {
+                        padding: 16px;
+                    }
+
+                    .status-options {
+                        gap: 6px;
+                    }
+
+                    .status-option {
+                        padding: 8px 14px;
+                        font-size: 12px;
+                        flex: 1;
+                        min-width: calc(50% - 6px);
+                        text-align: center;
+                        justify-content: center;
+                    }
+
+                    .amount-display {
+                        font-size: 24px;
+                    }
                 }
 
-                .timeline-item:last-child {
-                    border-bottom: none;
-                }
+                @media (max-width: 480px) {
+                    .order-detail-page {
+                        padding: 12px;
+                    }
 
-                .timeline-dot {
-                    width: 10px;
-                    height: 10px;
-                    border-radius: 50%;
-                    margin-top: 5px;
-                    flex-shrink: 0;
-                }
+                    .back-btn {
+                        width: 36px;
+                        height: 36px;
+                        min-width: 36px;
+                    }
 
-                .timeline-content {
-                    flex: 1;
-                }
+                    .page-title h1 {
+                        font-size: 16px;
+                    }
 
-                .timeline-content strong {
-                    display: block;
-                    font-size: 14px;
-                    margin-bottom: 2px;
-                }
+                    .order-card-header h2 {
+                        font-size: 14px;
+                    }
 
-                .timeline-content span {
-                    font-size: 12px;
-                    color: #6b7280;
+                    .detail-item {
+                        padding: 12px;
+                    }
+
+                    .status-option {
+                        min-width: 100%;
+                    }
                 }
             `}</style>
 
@@ -361,11 +418,25 @@ export default function OrderDetailPage() {
                                     <div className="detail-item-label">Phone Number</div>
                                     <div className="detail-item-value">{order.customer_phone}</div>
                                 </div>
+                                {/* Show email only if provided */}
+                                {order.customer_email && (
+                                    <div className="detail-item">
+                                        <div className="detail-item-label">Email</div>
+                                        <div className="detail-item-value">{order.customer_email}</div>
+                                    </div>
+                                )}
                             </div>
-                            <div className="detail-item" style={{ marginTop: '16px' }}>
+                            <div className="detail-item" style={{ marginTop: '12px' }}>
                                 <div className="detail-item-label">Delivery Address</div>
                                 <div className="detail-item-value address-text">{order.customer_address}</div>
                             </div>
+                            {/* Show notes only if provided */}
+                            {order.customer_notes && (
+                                <div className="detail-item" style={{ marginTop: '12px' }}>
+                                    <div className="detail-item-label">📝 Order Notes</div>
+                                    <div className="detail-item-value notes-text">{order.customer_notes}</div>
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -385,7 +456,7 @@ export default function OrderDetailPage() {
                                     <div className="detail-item-value">{order.quantity}</div>
                                 </div>
                             </div>
-                            <div className="detail-item" style={{ marginTop: '16px', textAlign: 'center' }}>
+                            <div className="detail-item" style={{ marginTop: '12px', textAlign: 'center' }}>
                                 <div className="detail-item-label">Total Amount (COD)</div>
                                 <div className="amount-display">{formatCurrency(order.total_price)}</div>
                             </div>
