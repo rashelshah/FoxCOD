@@ -104,13 +104,16 @@ export default function Index() {
     <>
       {/* Custom Styles for Premium Dashboard */}
       <style>{`
-        .fox-dashboard {
-          padding: 0;
+        /* Prevent horizontal scrolling globally */
+        html, body {
+          overflow-x: hidden !important;
+          max-width: 100vw !important;
         }
         
-        /* Smooth transitions for all interactive elements */
-        * {
-          -webkit-font-smoothing: antialiased;
+        .fox-dashboard {
+          padding: 0;
+          box-sizing: border-box;
+          overflow-x: hidden;
         }
         
         /* Welcome Banner - Premium Dark Theme */

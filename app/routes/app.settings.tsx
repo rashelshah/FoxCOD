@@ -408,9 +408,15 @@ export default function SettingsPage() {
     return (
         <>
             <style>{`
+                /* Prevent horizontal scrolling globally */
+                html, body { overflow-x: hidden !important; max-width: 100vw !important; }
+                
                 .form-builder {
                     max-width: 1200px;
                     margin: 0 auto;
+                    padding: 0; 
+                    box-sizing: border-box; 
+                    overflow-x: hidden;
                 }
                 .builder-header {
                     display: flex;

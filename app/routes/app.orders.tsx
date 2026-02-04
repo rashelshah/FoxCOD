@@ -149,10 +149,18 @@ export default function OrdersPage() {
             <style>{`
                 /* ==================== PREMIUM ORDERS PAGE ==================== */
                 
+                /* Prevent horizontal scrolling globally */
+                html, body {
+                    overflow-x: hidden !important;
+                    max-width: 100vw !important;
+                }
+                
                 .orders-page {
                     max-width: 1200px;
                     margin: 0 auto;
                     padding: 0;
+                    box-sizing: border-box;
+                    overflow-x: hidden;
                 }
 
                 /* Header with Gradient */
