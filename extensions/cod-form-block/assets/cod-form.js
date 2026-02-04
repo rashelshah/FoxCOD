@@ -371,7 +371,8 @@
       console.log('[COD Form] Response:', result);
       
       if (result.success) {
-        showSuccess(successMsg, 'Order ' + (result.orderName || '') + ' placed successfully! We will contact you shortly.');
+        // Show success popup with order ID
+        showOrderSuccessPopup(result.orderName || result.orderId, config);
         
         // Reset form completely
         form.reset();
@@ -384,11 +385,11 @@
         var totalEl = container.querySelector('.cod-total-price');
         if (totalEl) totalEl.textContent = formatCurrency(config.productPrice);
 
-        // Close modal after 3 seconds
+        // Close the form modal after showing popup
         setTimeout(function() {
           closeModal(config.productId);
           hideMessages(successMsg, errorMsg);
-        }, 3000);
+        }, 500);
       } else {
         showError(errorMsg, result.error || 'Failed to place order. Please try again.');
       }
@@ -463,6 +464,97 @@
   function hideMessages(successEl, errorEl) {
     if (successEl) successEl.style.display = 'none';
     if (errorEl) errorEl.style.display = 'none';
+  }
+
+  /**
+   * Show success popup with order ID
+   */
+  function showOrderSuccessPopup(orderName, config) {
+    // Remove any existing popup
+    var existingPopup = document.getElementById('cod-success-popup');
+    if (existingPopup) existingPopup.remove();
+
+    // Create popup overlay
+    var popupOverlay = document.createElement('div');
+    popupOverlay.id = 'cod-success-popup';
+    popupOverlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:999999;animation:codFadeIn 0.3s ease;backdrop-filter:blur(4px);';
+
+    // Create popup content
+    var popupContent = document.createElement('div');
+    popupContent.style.cssText = 'background:white;border-radius:20px;padding:40px 50px;text-align:center;max-width:400px;margin:20px;box-shadow:0 20px 60px rgba(0,0,0,0.3);animation:codSlideUp 0.4s ease;';
+
+    // Success icon
+    var successIcon = document.createElement('div');
+    successIcon.style.cssText = 'width:80px;height:80px;background:linear-gradient(135deg,#10b981,#059669);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 24px;font-size:40px;animation:codPulse 0.6s ease;';
+    successIcon.innerHTML = '✓';
+    successIcon.style.color = 'white';
+
+    // Title
+    var title = document.createElement('h2');
+    title.style.cssText = 'font-size:24px;font-weight:700;color:#111;margin:0 0 8px 0;';
+    title.textContent = 'Order Placed Successfully!';
+
+    // Order ID box
+    var orderIdBox = document.createElement('div');
+    orderIdBox.style.cssText = 'background:linear-gradient(135deg,' + config.primaryColor + ',#8b5cf6);color:white;padding:16px 32px;border-radius:12px;margin:20px 0;display:inline-block;';
+    
+    var orderLabel = document.createElement('div');
+    orderLabel.style.cssText = 'font-size:12px;opacity:0.9;margin-bottom:4px;text-transform:uppercase;letter-spacing:1px;';
+    orderLabel.textContent = 'Your Order ID';
+    
+    var orderId = document.createElement('div');
+    orderId.style.cssText = 'font-size:28px;font-weight:800;letter-spacing:1px;';
+    orderId.textContent = orderName;
+
+    orderIdBox.appendChild(orderLabel);
+    orderIdBox.appendChild(orderId);
+
+    // Message
+    var message = document.createElement('p');
+    message.style.cssText = 'color:#6b7280;font-size:15px;margin:16px 0 0 0;line-height:1.6;';
+    message.textContent = 'We will contact you shortly to confirm your order. Thank you for shopping with us!';
+
+    // Close button
+    var closeBtn = document.createElement('button');
+    closeBtn.style.cssText = 'background:#f3f4f6;color:#374151;border:none;padding:12px 32px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;margin-top:24px;transition:all 0.2s ease;';
+    closeBtn.textContent = 'Close';
+    closeBtn.onmouseover = function() { this.style.background = '#e5e7eb'; };
+    closeBtn.onmouseout = function() { this.style.background = '#f3f4f6'; };
+    closeBtn.onclick = function() { popupOverlay.remove(); };
+
+    // Assemble popup
+    popupContent.appendChild(successIcon);
+    popupContent.appendChild(title);
+    popupContent.appendChild(orderIdBox);
+    popupContent.appendChild(message);
+    popupContent.appendChild(closeBtn);
+    popupOverlay.appendChild(popupContent);
+
+    // Add animations CSS if not already added
+    if (!document.getElementById('cod-popup-styles')) {
+      var styles = document.createElement('style');
+      styles.id = 'cod-popup-styles';
+      styles.textContent = '@keyframes codFadeIn{from{opacity:0}to{opacity:1}}@keyframes codSlideUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}@keyframes codPulse{0%{transform:scale(0)}50%{transform:scale(1.1)}100%{transform:scale(1)}}';
+      document.head.appendChild(styles);
+    }
+
+    // Add to page
+    document.body.appendChild(popupOverlay);
+
+    // Auto-close after 5 seconds
+    setTimeout(function() {
+      if (popupOverlay.parentNode) {
+        popupOverlay.style.animation = 'codFadeIn 0.3s ease reverse';
+        setTimeout(function() { popupOverlay.remove(); }, 300);
+      }
+    }, 5000);
+
+    // Close on overlay click
+    popupOverlay.addEventListener('click', function(e) {
+      if (e.target === popupOverlay) {
+        popupOverlay.remove();
+      }
+    });
   }
 
   /**

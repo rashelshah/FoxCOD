@@ -76,7 +76,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         return new Response(JSON.stringify({
             success: true,
             orderId: result.id,
-            orderName: result.shopify_order_name || `COD-${result.id.slice(0, 8).toUpperCase()}`
+            orderName: result.shopify_order_name
         }), {
             headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
         });
