@@ -434,22 +434,27 @@ const PreviewDisplay = memo(({
         return '✨ Fade';
     };
 
-    // Field icons for live preview (matching cod-form.js)
-    const FieldIcon = ({ fieldId }: { fieldId: string }) => {
-        const iconStyle = { width: 14, height: 14, display: 'inline-block', verticalAlign: 'middle', marginRight: 6, color: '#6b7280' };
-        const icons: Record<string, React.ReactNode> = {
-            phone: <svg style={iconStyle} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" /></svg>,
-            name: <svg style={iconStyle} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>,
-            email: <svg style={iconStyle} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg>,
-            address: <svg style={iconStyle} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>,
-            notes: <svg style={iconStyle} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14,2 14,8 20,8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10,9 9,9 8,9" /></svg>,
-            quantity: <svg style={iconStyle} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><line x1="9" y1="9" x2="15" y2="15" /><line x1="15" y1="9" x2="9" y2="15" /></svg>,
-            zip: <svg style={iconStyle} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>,
-            state: <svg style={iconStyle} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>,
-            city: <svg style={iconStyle} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>,
-            marketing: <svg style={iconStyle} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg>,
+    // Field icons - exact match to storefront (cod-form.js) - 18x18, inside input on left
+    const FieldIconSvg = ({ fieldId, isTextarea }: { fieldId: string; isTextarea?: boolean }) => {
+        const s: React.CSSProperties = {
+            width: 18, height: 18, position: 'absolute', left: 12,
+            top: isTextarea ? 12 : '50%',
+            transform: isTextarea ? 'none' : 'translateY(-50%)',
+            color: '#6b7280', pointerEvents: 'none'
         };
-        return icons[fieldId] || icons.name;
+        const svgs: Record<string, React.ReactNode> = {
+            phone: <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" /></svg>,
+            name: <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>,
+            email: <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg>,
+            address: <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>,
+            notes: <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14,2 14,8 20,8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10,9 9,9 8,9" /></svg>,
+            quantity: <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><line x1="9" y1="9" x2="15" y2="15" /><line x1="15" y1="9" x2="9" y2="15" /></svg>,
+            zip: <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>,
+            state: <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>,
+            city: <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>,
+            marketing: <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg>,
+        };
+        return svgs[fieldId] || svgs.name;
     };
 
     // Get visible fields sorted by order
@@ -471,7 +476,7 @@ const PreviewDisplay = memo(({
             </div>
             <div className="preview-content">
                 <div className="preview-phone">
-                    <div className="preview-phone-screen">
+                    <div className={`preview-phone-screen ${activeTab === 'button' ? 'preview-compact' : ''}`}>
                         <div className="preview-product" style={activeTab === 'button' ? { padding: '24px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' } : undefined}>
                             {/* Only show image and price when NOT on button tab */}
                             {activeTab !== 'button' && showProductImage && (
@@ -501,37 +506,42 @@ const PreviewDisplay = memo(({
                                     {/* Dynamic Fields based on visibility */}
                                     {visibleFields.map((field: FormField) => (
                                         <div key={field.id} style={{ marginBottom: '8px' }}>
-                                            <label style={{ ...getLabelStyle(), display: 'flex', alignItems: 'center', gap: 6 } as any}>
-                                                <FieldIcon fieldId={field.id} />
+                                            <label style={getLabelStyle() as any}>
                                                 {field.label} {field.required && <span style={{ color: '#ef4444' }}>*</span>}
                                             </label>
                                             {field.type === 'textarea' ? (
-                                                <textarea
-                                                    style={{ ...getInputStyle(), height: '50px', resize: 'none' }}
-                                                    placeholder={
-                                                        field.id === 'address' ? (addressPlaceholder || 'Enter address') :
-                                                            field.id === 'notes' ? (notesPlaceholder || 'Any notes...') :
-                                                                `Enter ${field.label.toLowerCase()}`
-                                                    }
-                                                    disabled
-                                                />
+                                                <div style={{ position: 'relative' }}>
+                                                    <FieldIconSvg fieldId={field.id} isTextarea />
+                                                    <textarea
+                                                        style={{ ...getInputStyle(), height: '50px', resize: 'none', paddingLeft: 40 } as any}
+                                                        placeholder={
+                                                            field.id === 'address' ? (addressPlaceholder || 'Enter address') :
+                                                                field.id === 'notes' ? (notesPlaceholder || 'Any notes...') :
+                                                                    `Enter ${field.label.toLowerCase()}`
+                                                        }
+                                                        disabled
+                                                    />
+                                                </div>
                                             ) : field.type === 'checkbox' ? (
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                                                     <input type="checkbox" disabled style={{ width: '16px', height: '16px' }} />
                                                     <span style={{ fontSize: '11px', color: '#6b7280' }}>{field.label}</span>
                                                 </div>
                                             ) : (
-                                                <input
-                                                    type={field.type === 'tel' ? 'tel' : field.type === 'email' ? 'email' : field.type === 'number' ? 'number' : 'text'}
-                                                    style={getInputStyle()}
-                                                    placeholder={
-                                                        field.id === 'name' ? (namePlaceholder || 'John Doe') :
-                                                            field.id === 'phone' ? (phonePlaceholder || '+91 98765 43210') :
-                                                                field.id === 'email' ? 'email@example.com' :
-                                                                    `Enter ${field.label.toLowerCase()}`
-                                                    }
-                                                    disabled
-                                                />
+                                                <div style={{ position: 'relative' }}>
+                                                    <FieldIconSvg fieldId={field.id} />
+                                                    <input
+                                                        type={field.type === 'tel' ? 'tel' : field.type === 'email' ? 'email' : field.type === 'number' ? 'number' : 'text'}
+                                                        style={{ ...getInputStyle(), paddingLeft: 40 } as any}
+                                                        placeholder={
+                                                            field.id === 'name' ? (namePlaceholder || 'John Doe') :
+                                                                field.id === 'phone' ? (phonePlaceholder || '+91 98765 43210') :
+                                                                    field.id === 'email' ? 'email@example.com' :
+                                                                        `Enter ${field.label.toLowerCase()}`
+                                                        }
+                                                        disabled
+                                                    />
+                                                </div>
                                             )}
                                         </div>
                                     ))}
@@ -897,6 +907,7 @@ export default function SettingsPage() {
                 .tab { flex: 1; padding: 14px 20px; border: none; background: transparent; border-radius: 8px; font-size: 14px; font-weight: 600; color: #6b7280; cursor: pointer; }
                 .tab.active { background: white; color: #111827; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
                 .builder-layout { display: grid; grid-template-columns: 1fr 380px; gap: 24px; align-items: start; min-height: 0; }
+                .builder-layout .settings-area { min-height: 0; }
                 .settings-card { background: white; border: 1px solid #e5e7eb; border-radius: 16px; padding: 24px; margin-bottom: 20px; }
                 .card-title { font-size: 15px; font-weight: 600; color: #111827; margin: 0 0 16px 0; }
                 .input-field { width: 100%; padding: 12px 16px; border: 1px solid #e5e7eb; border-radius: 10px; font-size: 14px; color: #111827; transition: all 0.2s ease; box-sizing: border-box; }
@@ -933,11 +944,12 @@ export default function SettingsPage() {
                 .mini-toggle.on::after { left: 23px; }
                 .mini-toggle.off { background: #d1d5db; }
                 .mini-toggle.off::after { left: 3px; }
-                .preview-panel { background: white; border: 1px solid #e5e7eb; border-radius: 16px; overflow: visible; position: sticky; top: 20px; align-self: flex-start; }
+                .preview-panel { background: white; border: 1px solid #e5e7eb; border-radius: 16px; overflow: visible; position: sticky; top: 24px; align-self: flex-start; }
                 .preview-header { background: #f9fafb; padding: 16px 20px; border-bottom: 1px solid #e5e7eb; }
                 .preview-content { padding: 24px; }
                 .preview-phone { background: #1f2937; border-radius: 32px; padding: 6px; max-width: 300px; margin: 0 auto; }
                 .preview-phone-screen { background: white; border-radius: 24px; overflow-y: auto; min-height: 550px; max-height: 600px; }
+                .preview-phone-screen.preview-compact { min-height: auto; max-height: none; padding: 20px 16px; }
                 .preview-product { padding: 16px; }
                 .preview-product-img { width: 100%; height: 100px; background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%); border-radius: 12px; margin-bottom: 12px; display: flex; align-items: center; justify-content: center; }
                 .preview-modal { padding: 16px; margin-top: 12px; border-radius: 12px; background: #f9fafb; }
