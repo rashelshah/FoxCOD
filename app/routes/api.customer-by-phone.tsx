@@ -64,8 +64,31 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
         console.log("[Customer Lookup] Searching for phone:", phone, "shop:", shop);
 
-        // Query Supabase for the latest order with matching phone and shop
-        // Using ilike for flexible phone matching
+        // First, try to query the customers table for complete customer data
+        const { data: customerData, error: customerError } = await supabase
+            .from('customers')
+            .select('name, phone, address, state, city, zipcode, email')
+            .eq('shop_domain', shop)
+            .eq('phone', phone)
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .single();
+
+        // If customer found in customers table, return all fields
+        if (customerData && !customerError) {
+            console.log("[Customer Lookup] Found in customers table:", customerData.name);
+            return Response.json({
+                found: true,
+                name: customerData.name,
+                address: customerData.address,
+                state: customerData.state || '',
+                city: customerData.city || '',
+                zipcode: customerData.zipcode || '',
+                email: customerData.email || '',
+            }, { headers: corsHeaders });
+        }
+
+        // Fallback: Query order_logs for basic customer data
         const { data, error } = await supabase
             .from('order_logs')
             .select('customer_name, customer_address, customer_phone, customer_email')
@@ -83,21 +106,51 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             );
         }
 
-        // Customer found
+        // Customer found in order_logs
         if (data) {
-            console.log("[Customer Lookup] Found customer:", data.customer_name);
+            console.log("[Customer Lookup] Found in order_logs:", data.customer_name);
             return Response.json({
                 found: true,
                 name: data.customer_name,
                 address: data.customer_address,
                 email: data.customer_email || '',
+                // New fields will be empty from order_logs
+                state: '',
+                city: '',
+                zipcode: '',
             }, { headers: corsHeaders });
         }
 
         // No customer found - try with normalized phone number
         const normalizedPhone = normalizePhone(phone);
 
-        // Query again with normalized phone (in case stored differently)
+        // Try customers table with normalized phone
+        const { data: normalizedCustomers } = await supabase
+            .from('customers')
+            .select('name, phone, address, state, city, zipcode, email')
+            .eq('shop_domain', shop)
+            .limit(50); // Limit to a reasonable number to avoid large fetches
+
+        if (normalizedCustomers) {
+            const matchedCustomer = normalizedCustomers.find(c =>
+                normalizePhone(c.phone) === normalizedPhone
+            );
+
+            if (matchedCustomer) {
+                console.log("[Customer Lookup] Found in customers (normalized):", matchedCustomer.name);
+                return Response.json({
+                    found: true,
+                    name: matchedCustomer.name,
+                    address: matchedCustomer.address,
+                    state: matchedCustomer.state || '',
+                    city: matchedCustomer.city || '',
+                    zipcode: matchedCustomer.zipcode || '',
+                    email: matchedCustomer.email || '',
+                }, { headers: corsHeaders });
+            }
+        }
+
+        // Query order_logs with normalized phone (last resort)
         const { data: normalizedData, error: normalizedError } = await supabase
             .from('order_logs')
             .select('customer_name, customer_address, customer_phone, customer_email')
@@ -112,12 +165,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             );
 
             if (match) {
-                console.log("[Customer Lookup] Found customer (normalized):", match.customer_name);
+                console.log("[Customer Lookup] Found in order_logs (normalized):", match.customer_name);
                 return Response.json({
                     found: true,
                     name: match.customer_name,
                     address: match.customer_address,
                     email: match.customer_email || '',
+                    state: '',
+                    city: '',
+                    zipcode: '',
                 }, { headers: corsHeaders });
             }
         }

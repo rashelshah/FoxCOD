@@ -360,7 +360,7 @@ const PreviewDisplay = memo(({
     namePlaceholder, phonePlaceholder, addressPlaceholder,
     notesPlaceholder, submitButtonText,
     primaryColor, buttonStyle, buttonSize, borderRadius, modalStyle, animationStyle,
-    fields, formStyles, buttonStylesState, blocks, shippingOpts
+    fields, formStyles, buttonStylesState, blocks, shippingOpts, activeTab
 }: any) => {
 
     // Calculate button styles - use primaryColor as the main color
@@ -478,149 +478,152 @@ const PreviewDisplay = memo(({
                             <button style={getButtonStyle()}>
                                 {buttonText || 'Buy with COD'}
                             </button>
-                            <div className="preview-modal" style={getModalStyle()}>
-                                <div className="preview-modal-title" style={{
-                                    fontWeight: 600,
-                                    marginBottom: '12px',
-                                    color: formStyles?.textColor || '#111',
-                                    textAlign: formStyles?.labelAlignment || 'left'
-                                }}>
-                                    {formTitle || 'Cash on Delivery'}
-                                </div>
-
-                                {/* Dynamic Fields based on visibility */}
-                                {visibleFields.map((field: FormField) => (
-                                    <div key={field.id} style={{ marginBottom: '8px' }}>
-                                        <label style={getLabelStyle() as any}>
-                                            {field.label} {field.required && <span style={{ color: '#ef4444' }}>*</span>}
-                                        </label>
-                                        {field.type === 'textarea' ? (
-                                            <textarea
-                                                style={{ ...getInputStyle(), height: '50px', resize: 'none' }}
-                                                placeholder={
-                                                    field.id === 'address' ? (addressPlaceholder || 'Enter address') :
-                                                        field.id === 'notes' ? (notesPlaceholder || 'Any notes...') :
-                                                            `Enter ${field.label.toLowerCase()}`
-                                                }
-                                                disabled
-                                            />
-                                        ) : field.type === 'checkbox' ? (
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                                                <input type="checkbox" disabled style={{ width: '16px', height: '16px' }} />
-                                                <span style={{ fontSize: '11px', color: '#6b7280' }}>{field.label}</span>
-                                            </div>
-                                        ) : (
-                                            <input
-                                                type={field.type === 'tel' ? 'tel' : field.type === 'email' ? 'email' : field.type === 'number' ? 'number' : 'text'}
-                                                style={getInputStyle()}
-                                                placeholder={
-                                                    field.id === 'name' ? (namePlaceholder || 'John Doe') :
-                                                        field.id === 'phone' ? (phonePlaceholder || '+91 98765 43210') :
-                                                            field.id === 'email' ? 'email@example.com' :
-                                                                `Enter ${field.label.toLowerCase()}`
-                                                }
-                                                disabled
-                                            />
-                                        )}
-                                    </div>
-                                ))}
-
-                                {/* Rate Card - Order Summary */}
-                                {blocks?.order_summary && (
-                                    <div style={{
-                                        background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-                                        borderRadius: '10px',
-                                        padding: '12px',
-                                        marginTop: '12px',
+                            {/* Only show form when NOT on button tab */}
+                            {activeTab !== 'button' && (
+                                <div className="preview-modal" style={getModalStyle()}>
+                                    <div className="preview-modal-title" style={{
+                                        fontWeight: 600,
                                         marginBottom: '12px',
-                                        border: '1px solid #e2e8f0'
+                                        color: formStyles?.textColor || '#111',
+                                        textAlign: formStyles?.labelAlignment || 'left'
                                     }}>
-                                        <div style={{ fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                            🧾 Order Summary
+                                        {formTitle || 'Cash on Delivery'}
+                                    </div>
+
+                                    {/* Dynamic Fields based on visibility */}
+                                    {visibleFields.map((field: FormField) => (
+                                        <div key={field.id} style={{ marginBottom: '8px' }}>
+                                            <label style={getLabelStyle() as any}>
+                                                {field.label} {field.required && <span style={{ color: '#ef4444' }}>*</span>}
+                                            </label>
+                                            {field.type === 'textarea' ? (
+                                                <textarea
+                                                    style={{ ...getInputStyle(), height: '50px', resize: 'none' }}
+                                                    placeholder={
+                                                        field.id === 'address' ? (addressPlaceholder || 'Enter address') :
+                                                            field.id === 'notes' ? (notesPlaceholder || 'Any notes...') :
+                                                                `Enter ${field.label.toLowerCase()}`
+                                                    }
+                                                    disabled
+                                                />
+                                            ) : field.type === 'checkbox' ? (
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                                                    <input type="checkbox" disabled style={{ width: '16px', height: '16px' }} />
+                                                    <span style={{ fontSize: '11px', color: '#6b7280' }}>{field.label}</span>
+                                                </div>
+                                            ) : (
+                                                <input
+                                                    type={field.type === 'tel' ? 'tel' : field.type === 'email' ? 'email' : field.type === 'number' ? 'number' : 'text'}
+                                                    style={getInputStyle()}
+                                                    placeholder={
+                                                        field.id === 'name' ? (namePlaceholder || 'John Doe') :
+                                                            field.id === 'phone' ? (phonePlaceholder || '+91 98765 43210') :
+                                                                field.id === 'email' ? 'email@example.com' :
+                                                                    `Enter ${field.label.toLowerCase()}`
+                                                    }
+                                                    disabled
+                                                />
+                                            )}
                                         </div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280', marginBottom: '6px' }}>
-                                            <span>Subtotal</span>
-                                            <span>₹{subtotal.toLocaleString()}</span>
-                                        </div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#10b981', marginBottom: '6px' }}>
-                                            <span>Discount</span>
-                                            <span>-₹{discount.toLocaleString()}</span>
-                                        </div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280', marginBottom: '8px' }}>
-                                            <span>Shipping</span>
-                                            <span>{shippingCost === 0 ? 'FREE' : `₹${shippingCost}`}</span>
-                                        </div>
+                                    ))}
+
+                                    {/* Rate Card - Order Summary */}
+                                    {blocks?.order_summary && (
                                         <div style={{
-                                            display: 'flex',
-                                            justifyContent: 'space-between',
-                                            fontSize: '13px',
-                                            fontWeight: 700,
-                                            color: '#111827',
-                                            paddingTop: '8px',
-                                            borderTop: '1px dashed #d1d5db'
+                                            background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                                            borderRadius: '10px',
+                                            padding: '12px',
+                                            marginTop: '12px',
+                                            marginBottom: '12px',
+                                            border: '1px solid #e2e8f0'
                                         }}>
-                                            <span>Total</span>
-                                            <span style={{ color: primaryColor }}>₹{total.toLocaleString()}</span>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Shipping Options */}
-                                {blocks?.shipping_options && shippingOpts?.enabled && (
-                                    <div style={{
-                                        background: '#f8fafc',
-                                        borderRadius: '8px',
-                                        padding: '10px',
-                                        marginBottom: '10px',
-                                        border: '1px solid #e2e8f0'
-                                    }}>
-                                        <div style={{ fontSize: '11px', fontWeight: 600, color: '#374151', marginBottom: '8px' }}>
-                                            🚚 Shipping
-                                        </div>
-                                        {shippingOpts.options?.slice(0, 2).map((opt: any) => (
-                                            <div key={opt.id} style={{
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '6px',
-                                                fontSize: '10px',
-                                                color: '#6b7280',
-                                                marginBottom: '4px'
-                                            }}>
-                                                <input type="radio" name="shipping-preview" disabled checked={opt.id === shippingOpts.defaultOption} style={{ width: '12px', height: '12px' }} />
-                                                <span>{opt.label}</span>
-                                                <span style={{ marginLeft: 'auto', fontWeight: 600 }}>{opt.price === 0 ? 'Free' : `₹${opt.price}`}</span>
+                                            <div style={{ fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                🧾 Order Summary
                                             </div>
-                                        ))}
-                                    </div>
-                                )}
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280', marginBottom: '6px' }}>
+                                                <span>Subtotal</span>
+                                                <span>₹{subtotal.toLocaleString()}</span>
+                                            </div>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#10b981', marginBottom: '6px' }}>
+                                                <span>Discount</span>
+                                                <span>-₹{discount.toLocaleString()}</span>
+                                            </div>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280', marginBottom: '8px' }}>
+                                                <span>Shipping</span>
+                                                <span>{shippingCost === 0 ? 'FREE' : `₹${shippingCost}`}</span>
+                                            </div>
+                                            <div style={{
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                fontSize: '13px',
+                                                fontWeight: 700,
+                                                color: '#111827',
+                                                paddingTop: '8px',
+                                                borderTop: '1px dashed #d1d5db'
+                                            }}>
+                                                <span>Total</span>
+                                                <span style={{ color: primaryColor }}>₹{total.toLocaleString()}</span>
+                                            </div>
+                                        </div>
+                                    )}
 
-                                {/* Buyer Marketing Checkbox */}
-                                {blocks?.buyer_marketing && (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', fontSize: '10px', color: '#6b7280' }}>
-                                        <input type="checkbox" disabled style={{ width: '14px', height: '14px' }} />
-                                        <span>Keep me updated with offers & news</span>
-                                    </div>
-                                )}
+                                    {/* Shipping Options */}
+                                    {blocks?.shipping_options && shippingOpts?.enabled && (
+                                        <div style={{
+                                            background: '#f8fafc',
+                                            borderRadius: '8px',
+                                            padding: '10px',
+                                            marginBottom: '10px',
+                                            border: '1px solid #e2e8f0'
+                                        }}>
+                                            <div style={{ fontSize: '11px', fontWeight: 600, color: '#374151', marginBottom: '8px' }}>
+                                                🚚 Shipping
+                                            </div>
+                                            {shippingOpts.options?.slice(0, 2).map((opt: any) => (
+                                                <div key={opt.id} style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px',
+                                                    fontSize: '10px',
+                                                    color: '#6b7280',
+                                                    marginBottom: '4px'
+                                                }}>
+                                                    <input type="radio" name="shipping-preview" disabled checked={opt.id === shippingOpts.defaultOption} style={{ width: '12px', height: '12px' }} />
+                                                    <span>{opt.label}</span>
+                                                    <span style={{ marginLeft: 'auto', fontWeight: 600 }}>{opt.price === 0 ? 'Free' : `₹${opt.price}`}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
 
-                                <button className="preview-submit" style={{
-                                    background: buttonStyle === 'outline'
-                                        ? 'transparent'
-                                        : buttonStyle === 'gradient'
-                                            ? `linear-gradient(135deg, ${primaryColor} 0%, ${darkenColor(primaryColor, 25)} 100%)`
-                                            : primaryColor,
-                                    border: buttonStyle === 'outline' ? `2px solid ${primaryColor}` : 'none',
-                                    borderRadius: (buttonStylesState?.borderRadius || borderRadius) + 'px',
-                                    color: buttonStyle === 'outline' ? primaryColor : '#ffffff',
-                                    boxShadow: buttonStylesState?.shadow ? '0 4px 6px rgba(0,0,0,0.1)' : 'none'
-                                }}>
-                                    {submitButtonText || 'Place Order'}
-                                </button>
-                            </div>
+                                    {/* Buyer Marketing Checkbox */}
+                                    {blocks?.buyer_marketing && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', fontSize: '10px', color: '#6b7280' }}>
+                                            <input type="checkbox" disabled style={{ width: '14px', height: '14px' }} />
+                                            <span>Keep me updated with offers & news</span>
+                                        </div>
+                                    )}
+
+                                    <button className="preview-submit" style={{
+                                        background: buttonStyle === 'outline'
+                                            ? 'transparent'
+                                            : buttonStyle === 'gradient'
+                                                ? `linear-gradient(135deg, ${primaryColor} 0%, ${darkenColor(primaryColor, 25)} 100%)`
+                                                : primaryColor,
+                                        border: buttonStyle === 'outline' ? `2px solid ${primaryColor}` : 'none',
+                                        borderRadius: (buttonStylesState?.borderRadius || borderRadius) + 'px',
+                                        color: buttonStyle === 'outline' ? primaryColor : '#ffffff',
+                                        boxShadow: buttonStylesState?.shadow ? '0 4px 6px rgba(0,0,0,0.1)' : 'none'
+                                    }}>
+                                        {submitButtonText || 'Place Order'}
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
+        </div >
     );
 });
 
@@ -1529,6 +1532,7 @@ export default function SettingsPage() {
                             buttonStylesState={buttonStylesState}
                             blocks={blocks}
                             shippingOpts={shippingOpts}
+                            activeTab={activeTab}
                         />
                     </div>
                 </div>
