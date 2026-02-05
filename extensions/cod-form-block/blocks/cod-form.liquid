@@ -208,7 +208,7 @@
     transform: translateY(-1px);
   }
 
-  /* Modal Overlay */
+  /* Modal Overlay - prevent horizontal swipe/scroll */
   .cod-modal-overlay {
     position: fixed;
     top: 0;
@@ -222,6 +222,9 @@
     justify-content: center;
     padding: 20px;
     animation: fadeIn 0.2s ease;
+    touch-action: pan-y;
+    overflow-x: hidden;
+    overscroll-behavior-x: contain;
   }
 
   @keyframes fadeIn {
@@ -229,12 +232,15 @@
     to { opacity: 1; }
   }
 
-  /* Modal Container */
+  /* Modal Container - prevent horizontal swipe */
   .cod-form-container.cod-modal {
     position: relative;
     z-index: 9999;
     max-height: 90vh;
     overflow-y: auto;
+    overflow-x: hidden;
+    touch-action: pan-y;
+    overscroll-behavior-x: none;
     animation: slideUp 0.3s ease;
   }
 
@@ -431,6 +437,8 @@
   .cod-message-success {
     background: #e8f5e9;
     color: #2e7d32;
+    touch-action: pan-y;
+    overflow-x: hidden;
   }
 
   .cod-message-error {

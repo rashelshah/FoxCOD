@@ -1253,27 +1253,6 @@ export default function SettingsPage() {
                             {/* Form Tab */}
                             {activeTab === 'form' && (
                                 <>
-                                    {/* Form Type Selector */}
-                                    <div className="settings-card">
-                                        <h3 className="card-title"><span>📱</span> Form Type</h3>
-                                        <div className="form-type-selector">
-                                            <div
-                                                className={`form-type-option ${formType === 'popup' ? 'active' : ''}`}
-                                                onClick={() => setFormType('popup')}
-                                            >
-                                                <div className="form-type-icon">🪟</div>
-                                                <div className="form-type-label">Popup Modal</div>
-                                            </div>
-                                            <div
-                                                className={`form-type-option ${formType === 'embedded' ? 'active' : ''}`}
-                                                onClick={() => setFormType('embedded')}
-                                            >
-                                                <div className="form-type-icon">📄</div>
-                                                <div className="form-type-label">Embedded Form</div>
-                                            </div>
-                                        </div>
-                                    </div>
-
                                     {/* Drag & Drop Fields */}
                                     <div className="settings-card">
                                         <h3 className="card-title"><span>📋</span> Form Fields</h3>

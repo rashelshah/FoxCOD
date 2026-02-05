@@ -261,6 +261,12 @@ export default function Index() {
           margin-bottom: 28px;
         }
 
+        @media (max-width: 1100px) {
+          .stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+        }
+
         @media (max-width: 900px) {
           .stats-grid {
             grid-template-columns: repeat(2, 1fr);
@@ -800,6 +806,15 @@ export default function Index() {
               </div>
               <p className="stat-value">{stats.todayOrders}</p>
               <div className="stat-subtext">Orders today</div>
+            </div>
+
+            <div className="stat-card">
+              <div className="stat-header">
+                <div className="stat-icon stat-icon-orange">📆</div>
+                <span className="stat-label">This Week</span>
+              </div>
+              <p className="stat-value">{stats.weekOrders || 0}</p>
+              <div className="stat-subtext">Orders in last 7 days</div>
             </div>
           </div>
 
