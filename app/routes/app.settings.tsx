@@ -9,7 +9,36 @@ import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
 import { useLoaderData, useSubmit, useNavigation, Link } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
+import {
+    DndContext,
+    closestCenter,
+    KeyboardSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
+    type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+    arrayMove,
+    SortableContext,
+    sortableKeyboardCoordinates,
+    useSortable,
+    verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { getFormSettings, saveFormSettings, type FormSettings } from "../config/supabase.server";
+import {
+    type FormField,
+    type ContentBlocks,
+    type FormStyles,
+    type ButtonStyles,
+    type ShippingOptions,
+    DEFAULT_FIELDS,
+    DEFAULT_BLOCKS,
+    DEFAULT_STYLES,
+    DEFAULT_BUTTON_STYLES,
+    DEFAULT_SHIPPING_OPTIONS,
+} from "../config/form-builder.types";
 
 // Default settings for new shops
 const defaultSettings: Omit<FormSettings, "shop_domain"> = {
@@ -38,7 +67,87 @@ const defaultSettings: Omit<FormSettings, "shop_domain"> = {
     modal_style: "modern",
     animation_style: "fade",
     border_radius: 12,
+    // New advanced features
+    form_type: "popup",
+    fields: DEFAULT_FIELDS,
+    blocks: DEFAULT_BLOCKS,
+    custom_fields: [],
+    styles: DEFAULT_STYLES,
+    button_styles: DEFAULT_BUTTON_STYLES,
+    shipping_options: DEFAULT_SHIPPING_OPTIONS,
 };
+
+/**
+ * Helper: Ensure metafield definitions exist with storefront access
+ * This allows Liquid templates to read the metafield values
+ */
+async function ensureMetafieldDefinitions(admin: any) {
+    const definitions = [
+        { key: "enabled", type: "single_line_text_field" },
+        { key: "button_text", type: "single_line_text_field" },
+        { key: "primary_color", type: "single_line_text_field" },
+        { key: "max_quantity", type: "single_line_text_field" },
+        { key: "required_fields", type: "json" },
+        { key: "app_url", type: "single_line_text_field" },
+        { key: "form_title", type: "single_line_text_field" },
+        { key: "submit_button_text", type: "single_line_text_field" },
+        { key: "button_style", type: "single_line_text_field" },
+        { key: "button_size", type: "single_line_text_field" },
+        { key: "button_position", type: "single_line_text_field" },
+        { key: "form_subtitle", type: "single_line_text_field" },
+        { key: "success_message", type: "single_line_text_field" },
+        { key: "show_product_image", type: "single_line_text_field" },
+        { key: "show_price", type: "single_line_text_field" },
+        { key: "show_quantity_selector", type: "single_line_text_field" },
+        { key: "require_name", type: "single_line_text_field" },
+        { key: "require_phone", type: "single_line_text_field" },
+        { key: "require_address", type: "single_line_text_field" },
+        { key: "show_email_field", type: "single_line_text_field" },
+        { key: "show_notes_field", type: "single_line_text_field" },
+        { key: "modal_style", type: "single_line_text_field" },
+        { key: "animation_style", type: "single_line_text_field" },
+        { key: "border_radius", type: "single_line_text_field" },
+        { key: "form_type", type: "single_line_text_field" },
+        { key: "fields", type: "single_line_text_field" },  // Storing JSON as string
+        { key: "blocks", type: "single_line_text_field" },  // Storing JSON as string
+        { key: "custom_fields", type: "single_line_text_field" },  // Storing JSON as string
+        { key: "styles", type: "single_line_text_field" },  // Storing JSON as string
+        { key: "button_styles_json", type: "single_line_text_field" },  // Storing JSON as string
+        { key: "shipping_options", type: "single_line_text_field" },  // Storing JSON as string
+    ];
+
+    console.log('[Settings] Ensuring metafield definitions with storefront access...');
+
+    for (const def of definitions) {
+        try {
+            await admin.graphql(`
+                mutation CreateMetafieldDefinition($definition: MetafieldDefinitionInput!) {
+                    metafieldDefinitionCreate(definition: $definition) {
+                        createdDefinition { id key }
+                        userErrors { field message }
+                    }
+                }
+            `, {
+                variables: {
+                    definition: {
+                        name: def.key.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
+                        namespace: "fox_cod",
+                        key: def.key,
+                        type: def.type,
+                        ownerType: "SHOP",
+                        access: {
+                            storefront: "PUBLIC_READ"
+                        }
+                    }
+                }
+            });
+        } catch (error) {
+            // Definition may already exist, which is fine
+        }
+    }
+
+    console.log('[Settings] Metafield definitions ensured.');
+}
 
 /**
  * Loader: Fetch current settings from Supabase
@@ -71,7 +180,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     const formData = await request.formData();
 
-    // Parse all form data
+    // Parse all form data including new JSONB fields
     const settings: FormSettings = {
         shop_domain: shopDomain,
         enabled: formData.get("enabled") === "true",
@@ -99,6 +208,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         modal_style: formData.get("modal_style") as any || defaultSettings.modal_style,
         animation_style: formData.get("animation_style") as any || defaultSettings.animation_style,
         border_radius: parseInt(formData.get("border_radius") as string) || defaultSettings.border_radius,
+        // New JSONB fields for advanced features
+        form_type: formData.get("form_type") as any || defaultSettings.form_type,
+        fields: JSON.parse(formData.get("fields") as string || JSON.stringify(defaultSettings.fields)),
+        blocks: JSON.parse(formData.get("blocks") as string || JSON.stringify(defaultSettings.blocks)),
+        custom_fields: JSON.parse(formData.get("custom_fields") as string || "[]"),
+        styles: JSON.parse(formData.get("styles") as string || JSON.stringify(defaultSettings.styles)),
+        button_styles: JSON.parse(formData.get("button_styles") as string || JSON.stringify(defaultSettings.button_styles)),
+        shipping_options: JSON.parse(formData.get("shipping_options") as string || JSON.stringify(defaultSettings.shipping_options)),
     };
 
     // Save to Supabase
@@ -133,14 +250,22 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     // Sync to Shopify metafields
     try {
+        // Ensure metafield definitions exist with storefront access
+        await ensureMetafieldDefinitions(admin);
+
         const shopQuery = await admin.graphql(`query { shop { id } }`);
         const shopData = await shopQuery.json();
         const shopGid = shopData.data.shop.id;
 
-        await admin.graphql(`
+        console.log('[Settings] Saving metafields for shop:', shopGid);
+        console.log('[Settings] Fields to save:', JSON.stringify(settings.fields).substring(0, 200) + '...');
+
+        // Shopify limit: 25 metafields per mutation
+        // Batch 1: Core settings (24 fields)
+        const batch1 = await admin.graphql(`
             mutation SetMetafields($metafields: [MetafieldsSetInput!]!) {
                 metafieldsSet(metafields: $metafields) {
-                    metafields { key value }
+                    metafields { key }
                     userErrors { field message }
                 }
             }
@@ -151,11 +276,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     { ownerId: shopGid, namespace: "fox_cod", key: "button_text", value: settings.button_text, type: "single_line_text_field" },
                     { ownerId: shopGid, namespace: "fox_cod", key: "primary_color", value: settings.primary_color, type: "single_line_text_field" },
                     { ownerId: shopGid, namespace: "fox_cod", key: "max_quantity", value: settings.max_quantity.toString(), type: "single_line_text_field" },
-                    { ownerId: shopGid, namespace: "fox_cod", key: "required_fields", value: JSON.stringify(settings.required_fields), type: "json" },
                     { ownerId: shopGid, namespace: "fox_cod", key: "app_url", value: appUrl, type: "single_line_text_field" },
                     { ownerId: shopGid, namespace: "fox_cod", key: "form_title", value: settings.form_title || "", type: "single_line_text_field" },
                     { ownerId: shopGid, namespace: "fox_cod", key: "submit_button_text", value: settings.submit_button_text || "", type: "single_line_text_field" },
-                    // Extended settings
                     { ownerId: shopGid, namespace: "fox_cod", key: "button_style", value: settings.button_style || "solid", type: "single_line_text_field" },
                     { ownerId: shopGid, namespace: "fox_cod", key: "button_size", value: settings.button_size || "large", type: "single_line_text_field" },
                     { ownerId: shopGid, namespace: "fox_cod", key: "button_position", value: settings.button_position || "below_atc", type: "single_line_text_field" },
@@ -164,19 +287,57 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     { ownerId: shopGid, namespace: "fox_cod", key: "show_product_image", value: String(settings.show_product_image), type: "single_line_text_field" },
                     { ownerId: shopGid, namespace: "fox_cod", key: "show_price", value: String(settings.show_price), type: "single_line_text_field" },
                     { ownerId: shopGid, namespace: "fox_cod", key: "show_quantity_selector", value: String(settings.show_quantity_selector), type: "single_line_text_field" },
-                    // Individual requirements for Liquid
                     { ownerId: shopGid, namespace: "fox_cod", key: "require_name", value: String(settings.required_fields.includes("name")), type: "single_line_text_field" },
                     { ownerId: shopGid, namespace: "fox_cod", key: "require_phone", value: String(settings.required_fields.includes("phone")), type: "single_line_text_field" },
                     { ownerId: shopGid, namespace: "fox_cod", key: "require_address", value: String(settings.required_fields.includes("address")), type: "single_line_text_field" },
-
                     { ownerId: shopGid, namespace: "fox_cod", key: "show_email_field", value: String(settings.show_email_field), type: "single_line_text_field" },
                     { ownerId: shopGid, namespace: "fox_cod", key: "show_notes_field", value: String(settings.show_notes_field), type: "single_line_text_field" },
-                    { ownerId: shopGid, namespace: "fox_cod", key: "modal_style", value: settings.modal_style || 'modern', type: "single_line_text_field" },
-                    { ownerId: shopGid, namespace: "fox_cod", key: "animation_style", value: settings.animation_style || 'fade', type: "single_line_text_field" },
+                    { ownerId: shopGid, namespace: "fox_cod", key: "modal_style", value: settings.modal_style || "modern", type: "single_line_text_field" },
+                    { ownerId: shopGid, namespace: "fox_cod", key: "animation_style", value: settings.animation_style || "fade", type: "single_line_text_field" },
                     { ownerId: shopGid, namespace: "fox_cod", key: "border_radius", value: (settings.border_radius ?? 12).toString(), type: "single_line_text_field" },
+                    { ownerId: shopGid, namespace: "fox_cod", key: "form_type", value: settings.form_type || "popup", type: "single_line_text_field" },
                 ]
             }
         });
+
+        // Batch 2: JSON fields (6 fields)
+        const batch2 = await admin.graphql(`
+            mutation SetMetafields($metafields: [MetafieldsSetInput!]!) {
+                metafieldsSet(metafields: $metafields) {
+                    metafields { key }
+                    userErrors { field message }
+                }
+            }
+        `, {
+            variables: {
+                metafields: [
+                    { ownerId: shopGid, namespace: "fox_cod", key: "fields", value: JSON.stringify(settings.fields || DEFAULT_FIELDS), type: "json" },
+                    { ownerId: shopGid, namespace: "fox_cod", key: "blocks", value: JSON.stringify(settings.blocks || DEFAULT_BLOCKS), type: "json" },
+                    { ownerId: shopGid, namespace: "fox_cod", key: "custom_fields", value: JSON.stringify(settings.custom_fields || []), type: "json" },
+                    { ownerId: shopGid, namespace: "fox_cod", key: "styles", value: JSON.stringify(settings.styles || DEFAULT_STYLES), type: "json" },
+                    { ownerId: shopGid, namespace: "fox_cod", key: "button_styles_json", value: JSON.stringify(settings.button_styles || DEFAULT_BUTTON_STYLES), type: "json" },
+                    { ownerId: shopGid, namespace: "fox_cod", key: "shipping_options", value: JSON.stringify(settings.shipping_options || DEFAULT_SHIPPING_OPTIONS), type: "json" },
+                ]
+            }
+        });
+
+        const batch1Json = await batch1.json();
+        const batch2Json = await batch2.json();
+
+
+        if (batch1Json.data?.metafieldsSet?.userErrors?.length > 0) {
+            console.error('[Settings] Batch 1 errors:', batch1Json.data.metafieldsSet.userErrors);
+        } else {
+            console.log('[Settings] Batch 1 saved:',
+                batch1Json.data?.metafieldsSet?.metafields?.length || 0, 'fields');
+        }
+
+        if (batch2Json.data?.metafieldsSet?.userErrors?.length > 0) {
+            console.error('[Settings] Batch 2 errors:', batch2Json.data.metafieldsSet.userErrors);
+        } else {
+            console.log('[Settings] Batch 2 saved:',
+                batch2Json.data?.metafieldsSet?.metafields?.length || 0, 'fields');
+        }
     } catch (error) {
         console.error("Error saving metafields:", error);
     }
@@ -196,67 +357,88 @@ const darkenColor = (hex: string, percent: number) => {
 // Memoized Preview Component
 const PreviewDisplay = memo(({
     showProductImage, showPrice, buttonText, formTitle,
-    requiredFields, namePlaceholder, phonePlaceholder, addressPlaceholder,
-    showEmailField, showNotesField, notesPlaceholder, submitButtonText,
-    primaryColor, buttonStyle, buttonSize, borderRadius, modalStyle, animationStyle
+    namePlaceholder, phonePlaceholder, addressPlaceholder,
+    notesPlaceholder, submitButtonText,
+    primaryColor, buttonStyle, buttonSize, borderRadius, modalStyle, animationStyle,
+    fields, formStyles, buttonStylesState, blocks, shippingOpts
 }: any) => {
 
-    // Calculate button styles
+    // Calculate button styles - use primaryColor as the main color
     const getButtonStyle = () => {
+        const buttonColor = primaryColor; // Use primaryColor directly
         const base: any = {
             width: '100%',
             padding: buttonSize === 'small' ? '10px' : buttonSize === 'large' ? '16px' : '13px',
-            borderRadius: borderRadius + 'px',
+            borderRadius: (buttonStylesState?.borderRadius || borderRadius) + 'px',
             fontWeight: 600,
             fontSize: buttonSize === 'small' ? '13px' : buttonSize === 'large' ? '15px' : '14px',
             border: 'none',
             cursor: 'pointer',
             transition: 'all 0.2s ease',
             color: 'white',
-            background: primaryColor,
-            boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+            background: buttonColor,
+            boxShadow: buttonStylesState?.shadow ? '0 4px 6px rgba(0,0,0,0.1)' : 'none'
         };
 
         if (buttonStyle === 'outline') {
-            base.background = 'transparent';
-            base.border = `2px solid ${primaryColor}`;
-            base.color = primaryColor;
+            base.background = 'none'; // Use 'none' instead of 'transparent'
+            base.backgroundColor = 'transparent';
+            base.border = `2px solid ${buttonColor}`;
+            base.color = buttonColor;
             base.boxShadow = 'none';
         } else if (buttonStyle === 'gradient') {
-            // More visible gradient - primary to darker shade
-            const darkColor = darkenColor(primaryColor, 25);
-            base.background = `linear-gradient(135deg, ${primaryColor} 0%, ${darkColor} 100%)`;
-            base.boxShadow = '0 6px 12px rgba(0,0,0,0.2)';
+            const darkColor = darkenColor(buttonColor, 25);
+            base.background = `linear-gradient(135deg, ${buttonColor} 0%, ${darkColor} 100%)`;
+            base.boxShadow = buttonStylesState?.shadow ? '0 6px 12px rgba(0,0,0,0.2)' : 'none';
         }
         return base;
     };
 
-    // Get modal container styles based on modalStyle setting
+    // Get modal container styles based on modalStyle and formStyles
     const getModalStyle = () => {
         const base: any = {
-            borderRadius: borderRadius + 'px',
+            borderRadius: (formStyles?.borderRadius || borderRadius) + 'px',
             padding: '16px',
             marginTop: '12px',
-            transition: 'all 0.3s ease'
+            transition: 'all 0.3s ease',
+            background: formStyles?.backgroundColor || '#f9fafb',
+            boxShadow: formStyles?.shadow ? '0 10px 25px rgba(0,0,0,0.1)' : 'none'
         };
 
         if (modalStyle === 'glassmorphism') {
             base.background = 'rgba(255, 255, 255, 0.7)';
             base.backdropFilter = 'blur(10px)';
             base.border = '1px solid rgba(255,255,255,0.3)';
-            base.boxShadow = '0 8px 32px rgba(0,0,0,0.1)';
+            base.boxShadow = formStyles?.shadow ? '0 8px 32px rgba(0,0,0,0.1)' : 'none';
         } else if (modalStyle === 'minimal') {
-            base.background = '#ffffff';
+            base.background = formStyles?.backgroundColor || '#ffffff';
             base.border = '1px solid #e5e7eb';
             base.boxShadow = 'none';
-        } else {
-            // modern (default)
-            base.background = '#f9fafb';
-            base.boxShadow = '0 10px 25px rgba(0,0,0,0.1)';
-            base.border = 'none';
         }
         return base;
     };
+
+    // Get label styles
+    const getLabelStyle = () => ({
+        display: 'block',
+        fontSize: '11px',
+        fontWeight: 600,
+        color: formStyles?.textColor || '#374151',
+        marginBottom: '4px',
+        textAlign: formStyles?.labelAlignment || 'left'
+    });
+
+    // Get input styles
+    const getInputStyle = () => ({
+        width: '100%',
+        padding: '10px 12px',
+        marginBottom: '8px',
+        border: '1px solid #e5e7eb',
+        borderRadius: (formStyles?.borderRadius || 8) + 'px',
+        fontSize: '12px',
+        boxSizing: 'border-box' as const,
+        background: '#ffffff'
+    });
 
     // Animation indicator
     const getAnimationLabel = () => {
@@ -264,6 +446,15 @@ const PreviewDisplay = memo(({
         if (animationStyle === 'scale') return '⚡ Scale';
         return '✨ Fade';
     };
+
+    // Get visible fields sorted by order
+    const visibleFields = (fields || []).filter((f: FormField) => f.visible).sort((a: FormField, b: FormField) => a.order - b.order);
+
+    // Sample price values for rate card
+    const subtotal = 1999;
+    const discount = 200;
+    const shippingCost = shippingOpts?.enabled ? (shippingOpts.options?.find((o: any) => o.id === shippingOpts.defaultOption)?.price || 0) : 0;
+    const total = subtotal - discount + shippingCost;
 
     return (
         <div className="preview-panel">
@@ -288,19 +479,139 @@ const PreviewDisplay = memo(({
                                 {buttonText || 'Buy with COD'}
                             </button>
                             <div className="preview-modal" style={getModalStyle()}>
-                                <div className="preview-modal-title" style={{ fontWeight: 600, marginBottom: '12px', color: '#111' }}>
+                                <div className="preview-modal-title" style={{
+                                    fontWeight: 600,
+                                    marginBottom: '12px',
+                                    color: formStyles?.textColor || '#111',
+                                    textAlign: formStyles?.labelAlignment || 'left'
+                                }}>
                                     {formTitle || 'Cash on Delivery'}
                                 </div>
-                                {requiredFields.includes('name') && <input className="preview-input" placeholder={namePlaceholder || 'Full Name'} disabled />}
-                                {requiredFields.includes('phone') && <input className="preview-input" placeholder={phonePlaceholder || 'Phone Number'} disabled />}
-                                {requiredFields.includes('address') && <input className="preview-input" placeholder={addressPlaceholder || 'Delivery Address'} disabled />}
-                                {showEmailField && <input className="preview-input" placeholder="Email (optional)" disabled />}
-                                {showNotesField && <input className="preview-input" placeholder={notesPlaceholder || 'Notes'} disabled />}
+
+                                {/* Dynamic Fields based on visibility */}
+                                {visibleFields.map((field: FormField) => (
+                                    <div key={field.id} style={{ marginBottom: '8px' }}>
+                                        <label style={getLabelStyle() as any}>
+                                            {field.label} {field.required && <span style={{ color: '#ef4444' }}>*</span>}
+                                        </label>
+                                        {field.type === 'textarea' ? (
+                                            <textarea
+                                                style={{ ...getInputStyle(), height: '50px', resize: 'none' }}
+                                                placeholder={
+                                                    field.id === 'address' ? (addressPlaceholder || 'Enter address') :
+                                                        field.id === 'notes' ? (notesPlaceholder || 'Any notes...') :
+                                                            `Enter ${field.label.toLowerCase()}`
+                                                }
+                                                disabled
+                                            />
+                                        ) : field.type === 'checkbox' ? (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                                                <input type="checkbox" disabled style={{ width: '16px', height: '16px' }} />
+                                                <span style={{ fontSize: '11px', color: '#6b7280' }}>{field.label}</span>
+                                            </div>
+                                        ) : (
+                                            <input
+                                                type={field.type === 'tel' ? 'tel' : field.type === 'email' ? 'email' : field.type === 'number' ? 'number' : 'text'}
+                                                style={getInputStyle()}
+                                                placeholder={
+                                                    field.id === 'name' ? (namePlaceholder || 'John Doe') :
+                                                        field.id === 'phone' ? (phonePlaceholder || '+91 98765 43210') :
+                                                            field.id === 'email' ? 'email@example.com' :
+                                                                `Enter ${field.label.toLowerCase()}`
+                                                }
+                                                disabled
+                                            />
+                                        )}
+                                    </div>
+                                ))}
+
+                                {/* Rate Card - Order Summary */}
+                                {blocks?.order_summary && (
+                                    <div style={{
+                                        background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                                        borderRadius: '10px',
+                                        padding: '12px',
+                                        marginTop: '12px',
+                                        marginBottom: '12px',
+                                        border: '1px solid #e2e8f0'
+                                    }}>
+                                        <div style={{ fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            🧾 Order Summary
+                                        </div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280', marginBottom: '6px' }}>
+                                            <span>Subtotal</span>
+                                            <span>₹{subtotal.toLocaleString()}</span>
+                                        </div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#10b981', marginBottom: '6px' }}>
+                                            <span>Discount</span>
+                                            <span>-₹{discount.toLocaleString()}</span>
+                                        </div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280', marginBottom: '8px' }}>
+                                            <span>Shipping</span>
+                                            <span>{shippingCost === 0 ? 'FREE' : `₹${shippingCost}`}</span>
+                                        </div>
+                                        <div style={{
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            fontSize: '13px',
+                                            fontWeight: 700,
+                                            color: '#111827',
+                                            paddingTop: '8px',
+                                            borderTop: '1px dashed #d1d5db'
+                                        }}>
+                                            <span>Total</span>
+                                            <span style={{ color: primaryColor }}>₹{total.toLocaleString()}</span>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Shipping Options */}
+                                {blocks?.shipping_options && shippingOpts?.enabled && (
+                                    <div style={{
+                                        background: '#f8fafc',
+                                        borderRadius: '8px',
+                                        padding: '10px',
+                                        marginBottom: '10px',
+                                        border: '1px solid #e2e8f0'
+                                    }}>
+                                        <div style={{ fontSize: '11px', fontWeight: 600, color: '#374151', marginBottom: '8px' }}>
+                                            🚚 Shipping
+                                        </div>
+                                        {shippingOpts.options?.slice(0, 2).map((opt: any) => (
+                                            <div key={opt.id} style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '6px',
+                                                fontSize: '10px',
+                                                color: '#6b7280',
+                                                marginBottom: '4px'
+                                            }}>
+                                                <input type="radio" name="shipping-preview" disabled checked={opt.id === shippingOpts.defaultOption} style={{ width: '12px', height: '12px' }} />
+                                                <span>{opt.label}</span>
+                                                <span style={{ marginLeft: 'auto', fontWeight: 600 }}>{opt.price === 0 ? 'Free' : `₹${opt.price}`}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* Buyer Marketing Checkbox */}
+                                {blocks?.buyer_marketing && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', fontSize: '10px', color: '#6b7280' }}>
+                                        <input type="checkbox" disabled style={{ width: '14px', height: '14px' }} />
+                                        <span>Keep me updated with offers & news</span>
+                                    </div>
+                                )}
+
                                 <button className="preview-submit" style={{
-                                    background: buttonStyle === 'gradient'
-                                        ? `linear-gradient(135deg, ${primaryColor} 0%, ${darkenColor(primaryColor, 25)} 100%)`
-                                        : primaryColor,
-                                    borderRadius: borderRadius + 'px'
+                                    background: buttonStyle === 'outline'
+                                        ? 'transparent'
+                                        : buttonStyle === 'gradient'
+                                            ? `linear-gradient(135deg, ${primaryColor} 0%, ${darkenColor(primaryColor, 25)} 100%)`
+                                            : primaryColor,
+                                    border: buttonStyle === 'outline' ? `2px solid ${primaryColor}` : 'none',
+                                    borderRadius: (buttonStylesState?.borderRadius || borderRadius) + 'px',
+                                    color: buttonStyle === 'outline' ? primaryColor : '#ffffff',
+                                    boxShadow: buttonStylesState?.shadow ? '0 4px 6px rgba(0,0,0,0.1)' : 'none'
                                 }}>
                                     {submitButtonText || 'Place Order'}
                                 </button>
@@ -312,6 +623,65 @@ const PreviewDisplay = memo(({
         </div>
     );
 });
+
+// Sortable Field Item Component for drag and drop
+interface SortableFieldItemProps {
+    field: FormField;
+    onToggleVisibility: (id: string) => void;
+    onToggleRequired: (id: string) => void;
+    isCustom?: boolean;
+    onRemove?: (id: string) => void;
+}
+
+const SortableFieldItem = ({ field, onToggleVisibility, onToggleRequired, isCustom, onRemove }: SortableFieldItemProps) => {
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: field.id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+    };
+
+    return (
+        <div ref={setNodeRef} style={style} className="sortable-field-item">
+            <div className="field-drag-handle" {...attributes} {...listeners}>
+                <span>⋮⋮</span>
+            </div>
+            <div className="field-info">
+                <span className="field-label">{field.label}</span>
+                <span className="field-type">{field.type}</span>
+            </div>
+            <div className="field-actions">
+                <button
+                    type="button"
+                    className={`icon-btn visibility-btn ${field.visible ? 'active' : ''}`}
+                    onClick={() => onToggleVisibility(field.id)}
+                    title={field.visible ? 'Hide field' : 'Show field'}
+                >
+                    {field.visible ? '👁️' : '👁️‍🗨️'}
+                </button>
+                <button
+                    type="button"
+                    className={`icon-btn required-btn ${field.required ? 'active' : ''}`}
+                    onClick={() => onToggleRequired(field.id)}
+                    title={field.required ? 'Make optional' : 'Make required'}
+                >
+                    ✱
+                </button>
+                {isCustom && onRemove && (
+                    <button
+                        type="button"
+                        className="icon-btn remove-btn"
+                        onClick={() => onRemove(field.id)}
+                        title="Remove field"
+                    >
+                        🗑️
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+};
 
 /**
  * Settings Page Component - Premium Form Builder
@@ -352,6 +722,73 @@ export default function SettingsPage() {
     const [animationStyle, setAnimationStyle] = useState(settings.animation_style || 'fade');
     const [borderRadius, setBorderRadius] = useState(settings.border_radius || 12);
 
+    // New advanced feature state
+    const [formType, setFormType] = useState<'popup' | 'embedded'>(settings.form_type || 'popup');
+    const [fields, setFields] = useState<FormField[]>(settings.fields || DEFAULT_FIELDS);
+    const [blocks, setBlocks] = useState<ContentBlocks>(settings.blocks || DEFAULT_BLOCKS);
+    const [customFields, setCustomFields] = useState<FormField[]>(settings.custom_fields || []);
+    const [formStyles, setFormStyles] = useState<FormStyles>(settings.styles || DEFAULT_STYLES);
+    const [buttonStylesState, setButtonStylesState] = useState<ButtonStyles>(settings.button_styles || DEFAULT_BUTTON_STYLES);
+    const [shippingOpts, setShippingOpts] = useState<ShippingOptions>(settings.shipping_options || DEFAULT_SHIPPING_OPTIONS);
+    const [showAddFieldModal, setShowAddFieldModal] = useState(false);
+    const [newFieldType, setNewFieldType] = useState<'text' | 'number' | 'dropdown' | 'checkbox'>('text');
+    const [newFieldLabel, setNewFieldLabel] = useState('');
+
+    // DnD sensors for drag and drop
+    const sensors = useSensors(
+        useSensor(PointerSensor),
+        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+    );
+
+    // Handle drag end for field reordering
+    const handleDragEnd = useCallback((event: DragEndEvent) => {
+        const { active, over } = event;
+        if (over && active.id !== over.id) {
+            setFields((items) => {
+                const oldIndex = items.findIndex((i) => i.id === active.id);
+                const newIndex = items.findIndex((i) => i.id === over.id);
+                const reordered = arrayMove(items, oldIndex, newIndex);
+                // Update order property
+                return reordered.map((item, idx) => ({ ...item, order: idx + 1 }));
+            });
+        }
+    }, []);
+
+    // Toggle field visibility
+    const toggleFieldVisibility = useCallback((fieldId: string) => {
+        setFields((prev) => prev.map((f) =>
+            f.id === fieldId ? { ...f, visible: !f.visible } : f
+        ));
+    }, []);
+
+    // Toggle field required
+    const toggleFieldRequired = useCallback((fieldId: string) => {
+        setFields((prev) => prev.map((f) =>
+            f.id === fieldId ? { ...f, required: !f.required } : f
+        ));
+    }, []);
+
+    // Add custom field
+    const addCustomField = useCallback(() => {
+        if (!newFieldLabel.trim()) return;
+        const newField: FormField = {
+            id: `custom_${Date.now()}`,
+            label: newFieldLabel,
+            type: newFieldType,
+            visible: true,
+            required: false,
+            order: fields.length + customFields.length + 1,
+        };
+        setCustomFields((prev) => [...prev, newField]);
+        setNewFieldLabel('');
+        setShowAddFieldModal(false);
+    }, [newFieldLabel, newFieldType, fields.length, customFields.length]);
+
+    // Remove custom field
+    const removeCustomField = useCallback((fieldId: string) => {
+        setCustomFields((prev) => prev.filter((f) => f.id !== fieldId));
+    }, []);
+
     // Toggle field
     const toggleField = useCallback((field: string) => {
         setRequiredFields((prev) =>
@@ -387,6 +824,14 @@ export default function SettingsPage() {
         formData.append("modal_style", modalStyle);
         formData.append("animation_style", animationStyle);
         formData.append("border_radius", borderRadius.toString());
+        // New JSONB fields
+        formData.append("form_type", formType);
+        formData.append("fields", JSON.stringify(fields));
+        formData.append("blocks", JSON.stringify(blocks));
+        formData.append("custom_fields", JSON.stringify(customFields));
+        formData.append("styles", JSON.stringify(formStyles));
+        formData.append("button_styles", JSON.stringify(buttonStylesState));
+        formData.append("shipping_options", JSON.stringify(shippingOpts));
 
         submit(formData, { method: "post" });
         shopify.toast.show("Settings saved successfully!");
@@ -396,7 +841,8 @@ export default function SettingsPage() {
         successMessage, submitButtonText, showProductImage, showPrice,
         showQuantitySelector, showEmailField, showNotesField, emailRequired,
         namePlaceholder, phonePlaceholder, addressPlaceholder, notesPlaceholder,
-        modalStyle, animationStyle, borderRadius, submit, shopify
+        modalStyle, animationStyle, borderRadius, formType, fields, blocks,
+        customFields, formStyles, buttonStylesState, shippingOpts, submit, shopify
     ]);
 
     // Color presets
@@ -438,7 +884,7 @@ export default function SettingsPage() {
                 .tabs { display: flex; gap: 8px; margin-bottom: 24px; background: #f3f4f6; padding: 6px; border-radius: 12px; }
                 .tab { flex: 1; padding: 14px 20px; border: none; background: transparent; border-radius: 8px; font-size: 14px; font-weight: 600; color: #6b7280; cursor: pointer; }
                 .tab.active { background: white; color: #111827; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-                .builder-layout { display: grid; grid-template-columns: 1fr 360px; gap: 24px; }
+                .builder-layout { display: grid; grid-template-columns: 1fr 380px; gap: 24px; align-items: start; }
                 .settings-card { background: white; border: 1px solid #e5e7eb; border-radius: 16px; padding: 24px; margin-bottom: 20px; }
                 .card-title { font-size: 15px; font-weight: 600; color: #111827; margin: 0 0 16px 0; }
                 .input-field { width: 100%; padding: 12px 16px; border: 1px solid #e5e7eb; border-radius: 10px; font-size: 14px; color: #111827; transition: all 0.2s ease; box-sizing: border-box; }
@@ -475,16 +921,139 @@ export default function SettingsPage() {
                 .mini-toggle.on::after { left: 23px; }
                 .mini-toggle.off { background: #d1d5db; }
                 .mini-toggle.off::after { left: 3px; }
-                .preview-panel { background: white; border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden; position: sticky; top: 20px; }
+                .preview-panel { background: white; border: 1px solid #e5e7eb; border-radius: 16px; overflow: visible; position: sticky; top: 20px; align-self: flex-start; }
                 .preview-header { background: #f9fafb; padding: 16px 20px; border-bottom: 1px solid #e5e7eb; }
                 .preview-content { padding: 24px; }
-                .preview-phone { background: #1f2937; border-radius: 32px; padding: 12px; max-width: 280px; margin: 0 auto; }
-                .preview-phone-screen { background: white; border-radius: 24px; overflow: hidden; min-height: 400px; }
+                .preview-phone { background: #1f2937; border-radius: 32px; padding: 12px; max-width: 300px; margin: 0 auto; }
+                .preview-phone-screen { background: white; border-radius: 24px; overflow-y: auto; min-height: 550px; max-height: 600px; }
                 .preview-product { padding: 16px; }
                 .preview-product-img { width: 100%; height: 100px; background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%); border-radius: 12px; margin-bottom: 12px; display: flex; align-items: center; justify-content: center; }
                 .preview-modal { padding: 16px; margin-top: 12px; border-radius: 12px; background: #f9fafb; }
                 .preview-input { width: 100%; padding: 10px 12px; margin-bottom: 8px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 12px; box-sizing: border-box; }
                 .preview-submit { width: 100%; padding: 12px; border: none; color: white; border-radius: 8px; font-weight: 600; font-size: 13px; margin-top: 4px; }
+                
+                /* Sortable Fields Styles */
+                .sortable-fields-container { margin-top: 16px; }
+                .sortable-field-item {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    padding: 12px 16px;
+                    background: white;
+                    border: 1px solid #e5e7eb;
+                    border-radius: 10px;
+                    margin-bottom: 8px;
+                    transition: all 0.2s ease;
+                }
+                .sortable-field-item:hover { border-color: #6366f1; box-shadow: 0 2px 8px rgba(99, 102, 241, 0.1); }
+                .field-drag-handle {
+                    cursor: grab;
+                    color: #9ca3af;
+                    font-size: 16px;
+                    padding: 4px;
+                    user-select: none;
+                }
+                .field-drag-handle:active { cursor: grabbing; }
+                .field-info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+                .field-label { font-weight: 600; color: #1f2937; font-size: 14px; }
+                .field-type { font-size: 11px; color: #9ca3af; text-transform: uppercase; }
+                .field-actions { display: flex; gap: 8px; }
+                .icon-btn {
+                    width: 32px;
+                    height: 32px;
+                    border-radius: 8px;
+                    border: 1px solid #e5e7eb;
+                    background: #f9fafb;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 14px;
+                    transition: all 0.2s ease;
+                }
+                .icon-btn:hover { background: #f3f4f6; border-color: #d1d5db; }
+                .icon-btn.active { background: rgba(99, 102, 241, 0.1); border-color: #6366f1; }
+                .visibility-btn.active { color: #10b981; }
+                .required-btn.active { color: #ef4444; }
+                .remove-btn:hover { background: #fef2f2; border-color: #ef4444; color: #ef4444; }
+
+                /* Form Type Selector */
+                .form-type-selector { display: flex; gap: 12px; margin-bottom: 20px; }
+                .form-type-option {
+                    flex: 1;
+                    padding: 16px;
+                    border: 2px solid #e5e7eb;
+                    border-radius: 12px;
+                    background: white;
+                    cursor: pointer;
+                    text-align: center;
+                    transition: all 0.2s ease;
+                }
+                .form-type-option:hover { border-color: #c7d2fe; }
+                .form-type-option.active { border-color: #6366f1; background: rgba(99, 102, 241, 0.05); }
+                .form-type-icon { font-size: 24px; margin-bottom: 8px; }
+                .form-type-label { font-weight: 600; color: #1f2937; }
+
+                /* Add Field Button & Modal */
+                .add-field-btn {
+                    width: 100%;
+                    padding: 14px;
+                    border: 2px dashed #d1d5db;
+                    border-radius: 10px;
+                    background: transparent;
+                    color: #6b7280;
+                    font-weight: 600;
+                    cursor: pointer;
+                    transition: all 0.2s ease;
+                    margin-top: 12px;
+                }
+                .add-field-btn:hover { border-color: #6366f1; color: #6366f1; background: rgba(99, 102, 241, 0.05); }
+                .modal-overlay {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: rgba(0, 0, 0, 0.5);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 1000;
+                }
+                .modal-content {
+                    background: white;
+                    border-radius: 16px;
+                    padding: 24px;
+                    width: 90%;
+                    max-width: 400px;
+                    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+                }
+                .modal-header { margin-bottom: 20px; }
+                .modal-header h3 { margin: 0; color: #1f2937; }
+                .modal-body { display: flex; flex-direction: column; gap: 16px; }
+                .modal-field { display: flex; flex-direction: column; gap: 6px; }
+                .modal-field label { font-weight: 600; color: #374151; font-size: 13px; }
+                .modal-field input, .modal-field select {
+                    padding: 12px;
+                    border: 1px solid #e5e7eb;
+                    border-radius: 8px;
+                    font-size: 14px;
+                }
+                .modal-actions { display: flex; gap: 12px; margin-top: 8px; }
+                .modal-btn {
+                    flex: 1;
+                    padding: 12px;
+                    border-radius: 8px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    border: none;
+                }
+                .modal-btn.cancel { background: #f3f4f6; color: #6b7280; }
+                .modal-btn.confirm { background: #6366f1; color: white; }
+
+                /* Content Blocks */
+                .content-blocks { margin-top: 20px; }
+                .section-title { font-weight: 600; color: #374151; margin-bottom: 12px; font-size: 14px; }
                 
                 /* ==================== RESPONSIVE DESIGN ==================== */
                 
@@ -660,46 +1229,125 @@ export default function SettingsPage() {
                             {/* Form Tab */}
                             {activeTab === 'form' && (
                                 <>
+                                    {/* Form Type Selector */}
                                     <div className="settings-card">
-                                        <h3 className="card-title"><span>📋</span> Required Fields</h3>
-                                        <div className="checkbox-options">
-                                            {[
-                                                { id: 'name', label: 'Full Name' },
-                                                { id: 'phone', label: 'Phone Number' },
-                                                { id: 'address', label: 'Delivery Address' },
-                                            ].map((field) => (
-                                                <div
-                                                    key={field.id}
-                                                    className={`checkbox-option ${requiredFields.includes(field.id) ? 'checked' : ''}`}
-                                                    onClick={() => toggleField(field.id)}
+                                        <h3 className="card-title"><span>📱</span> Form Type</h3>
+                                        <div className="form-type-selector">
+                                            <div
+                                                className={`form-type-option ${formType === 'popup' ? 'active' : ''}`}
+                                                onClick={() => setFormType('popup')}
+                                            >
+                                                <div className="form-type-icon">🪟</div>
+                                                <div className="form-type-label">Popup Modal</div>
+                                            </div>
+                                            <div
+                                                className={`form-type-option ${formType === 'embedded' ? 'active' : ''}`}
+                                                onClick={() => setFormType('embedded')}
+                                            >
+                                                <div className="form-type-icon">📄</div>
+                                                <div className="form-type-label">Embedded Form</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Drag & Drop Fields */}
+                                    <div className="settings-card">
+                                        <h3 className="card-title"><span>📋</span> Form Fields</h3>
+                                        <p style={{ color: '#6b7280', fontSize: '13px', marginBottom: '16px' }}>
+                                            Drag to reorder • 👁️ visibility • ✱ required
+                                        </p>
+                                        <div className="sortable-fields-container">
+                                            <DndContext
+                                                sensors={sensors}
+                                                collisionDetection={closestCenter}
+                                                onDragEnd={handleDragEnd}
+                                            >
+                                                <SortableContext
+                                                    items={fields.map(f => f.id)}
+                                                    strategy={verticalListSortingStrategy}
                                                 >
-                                                    <div className="checkbox-box">
-                                                        {requiredFields.includes(field.id) && '✓'}
-                                                    </div>
-                                                    <span className="checkbox-label">{field.label}</span>
-                                                </div>
+                                                    {fields.sort((a, b) => a.order - b.order).map((field) => (
+                                                        <SortableFieldItem
+                                                            key={field.id}
+                                                            field={field}
+                                                            onToggleVisibility={toggleFieldVisibility}
+                                                            onToggleRequired={toggleFieldRequired}
+                                                        />
+                                                    ))}
+                                                </SortableContext>
+                                            </DndContext>
+
+                                            {/* Custom Fields */}
+                                            {customFields.map((field) => (
+                                                <SortableFieldItem
+                                                    key={field.id}
+                                                    field={field}
+                                                    onToggleVisibility={(id) => setCustomFields(prev => prev.map(f => f.id === id ? { ...f, visible: !f.visible } : f))}
+                                                    onToggleRequired={(id) => setCustomFields(prev => prev.map(f => f.id === id ? { ...f, required: !f.required } : f))}
+                                                    isCustom
+                                                    onRemove={removeCustomField}
+                                                />
                                             ))}
+
+                                            <button
+                                                type="button"
+                                                className="add-field-btn"
+                                                onClick={() => setShowAddFieldModal(true)}
+                                            >
+                                                + Add Custom Field
+                                            </button>
                                         </div>
                                     </div>
 
+                                    {/* Content Blocks */}
                                     <div className="settings-card">
-                                        <h3 className="card-title"><span>➕</span> Optional Fields</h3>
+                                        <h3 className="card-title"><span>🧩</span> Content Blocks</h3>
                                         <div className="toggle-options">
-                                            <div className="toggle-option" onClick={() => setShowEmailField(!showEmailField)}>
-                                                <span className="toggle-option-label">Show Email Field</span>
-                                                <div className={`mini-toggle ${showEmailField ? 'on' : 'off'}`} />
+                                            <div className="toggle-option" onClick={() => setBlocks({ ...blocks, order_summary: !blocks.order_summary })}>
+                                                <span className="toggle-option-label">Order Summary</span>
+                                                <div className={`mini-toggle ${blocks.order_summary ? 'on' : 'off'}`} />
                                             </div>
-                                            <div className="toggle-option" onClick={() => setShowNotesField(!showNotesField)}>
-                                                <span className="toggle-option-label">Show Notes/Comments Field</span>
-                                                <div className={`mini-toggle ${showNotesField ? 'on' : 'off'}`} />
+                                            <div className="toggle-option" onClick={() => setBlocks({ ...blocks, shipping_options: !blocks.shipping_options })}>
+                                                <span className="toggle-option-label">Shipping Options</span>
+                                                <div className={`mini-toggle ${blocks.shipping_options ? 'on' : 'off'}`} />
                                             </div>
-                                            <div className="toggle-option" onClick={() => setShowQuantitySelector(!showQuantitySelector)}>
-                                                <span className="toggle-option-label">Show Quantity Selector</span>
-                                                <div className={`mini-toggle ${showQuantitySelector ? 'on' : 'off'}`} />
+                                            <div className="toggle-option" onClick={() => setBlocks({ ...blocks, cart_quantity_offers: !blocks.cart_quantity_offers })}>
+                                                <span className="toggle-option-label">Cart Content / Quantity Offers</span>
+                                                <div className={`mini-toggle ${blocks.cart_quantity_offers ? 'on' : 'off'}`} />
+                                            </div>
+                                            <div className="toggle-option" onClick={() => setBlocks({ ...blocks, buyer_marketing: !blocks.buyer_marketing })}>
+                                                <span className="toggle-option-label">Buyer Accepts Marketing</span>
+                                                <div className={`mini-toggle ${blocks.buyer_marketing ? 'on' : 'off'}`} />
                                             </div>
                                         </div>
                                     </div>
 
+                                    {/* Shipping Options */}
+                                    <div className="settings-card">
+                                        <h3 className="card-title"><span>🚚</span> Shipping Options</h3>
+                                        <div className="toggle-options">
+                                            <div className="toggle-option" onClick={() => setShippingOpts({ ...shippingOpts, enabled: !shippingOpts.enabled })}>
+                                                <span className="toggle-option-label">Enable Shipping Options</span>
+                                                <div className={`mini-toggle ${shippingOpts.enabled ? 'on' : 'off'}`} />
+                                            </div>
+                                        </div>
+                                        {shippingOpts.enabled && (
+                                            <div className="input-group" style={{ marginTop: '16px' }}>
+                                                <label className="input-label">Default Shipping Option</label>
+                                                <select
+                                                    className="input-field"
+                                                    value={shippingOpts.defaultOption}
+                                                    onChange={(e) => setShippingOpts({ ...shippingOpts, defaultOption: e.target.value })}
+                                                >
+                                                    {shippingOpts.options.map(opt => (
+                                                        <option key={opt.id} value={opt.id}>{opt.label} - {opt.price === 0 ? 'Free' : `₹${opt.price}`}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Order Settings */}
                                     <div className="settings-card">
                                         <h3 className="card-title"><span>📦</span> Order Settings</h3>
                                         <div className="input-group">
@@ -719,6 +1367,7 @@ export default function SettingsPage() {
                                         </div>
                                     </div>
 
+                                    {/* Form Content */}
                                     <div className="settings-card">
                                         <h3 className="card-title"><span>✍️</span> Form Content</h3>
                                         <div className="input-group">
@@ -751,6 +1400,44 @@ export default function SettingsPage() {
                                             />
                                         </div>
                                     </div>
+
+                                    {/* Add Field Modal */}
+                                    {showAddFieldModal && (
+                                        <div className="modal-overlay" onClick={() => setShowAddFieldModal(false)}>
+                                            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                                                <div className="modal-header">
+                                                    <h3>Add Custom Field</h3>
+                                                </div>
+                                                <div className="modal-body">
+                                                    <div className="modal-field">
+                                                        <label>Field Type</label>
+                                                        <select
+                                                            value={newFieldType}
+                                                            onChange={(e) => setNewFieldType(e.target.value as any)}
+                                                        >
+                                                            <option value="text">Text</option>
+                                                            <option value="number">Number</option>
+                                                            <option value="dropdown">Dropdown</option>
+                                                            <option value="checkbox">Checkbox</option>
+                                                        </select>
+                                                    </div>
+                                                    <div className="modal-field">
+                                                        <label>Field Label</label>
+                                                        <input
+                                                            type="text"
+                                                            value={newFieldLabel}
+                                                            onChange={(e) => setNewFieldLabel(e.target.value)}
+                                                            placeholder="Enter field label"
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div className="modal-actions">
+                                                    <button className="modal-btn cancel" onClick={() => setShowAddFieldModal(false)}>Cancel</button>
+                                                    <button className="modal-btn confirm" onClick={addCustomField}>Add Field</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </>
                             )}
 
@@ -826,12 +1513,9 @@ export default function SettingsPage() {
                             showPrice={showPrice}
                             buttonText={buttonText}
                             formTitle={formTitle}
-                            requiredFields={requiredFields}
                             namePlaceholder={namePlaceholder}
                             phonePlaceholder={phonePlaceholder}
                             addressPlaceholder={addressPlaceholder}
-                            showEmailField={showEmailField}
-                            showNotesField={showNotesField}
                             notesPlaceholder={notesPlaceholder}
                             submitButtonText={submitButtonText}
                             primaryColor={primaryColor}
@@ -840,6 +1524,11 @@ export default function SettingsPage() {
                             borderRadius={borderRadius}
                             modalStyle={modalStyle}
                             animationStyle={animationStyle}
+                            fields={fields}
+                            formStyles={formStyles}
+                            buttonStylesState={buttonStylesState}
+                            blocks={blocks}
+                            shippingOpts={shippingOpts}
                         />
                     </div>
                 </div>

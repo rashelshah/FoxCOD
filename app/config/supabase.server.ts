@@ -99,6 +99,25 @@ export async function markShopUninstalled(shopDomain: string) {
 // FORM SETTINGS OPERATIONS
 // =============================================
 
+// Import types and defaults from shared file for local use
+import {
+    FormField,
+    ContentBlocks,
+    FormStyles,
+    ButtonStyles,
+    ShippingOption,
+    ShippingOptions,
+    DEFAULT_FIELDS,
+    DEFAULT_BLOCKS,
+    DEFAULT_STYLES,
+    DEFAULT_BUTTON_STYLES,
+    DEFAULT_SHIPPING_OPTIONS,
+} from './form-builder.types';
+
+// Re-export for other modules
+export type { FormField, ContentBlocks, FormStyles, ButtonStyles, ShippingOption, ShippingOptions };
+export { DEFAULT_FIELDS, DEFAULT_BLOCKS, DEFAULT_STYLES, DEFAULT_BUTTON_STYLES, DEFAULT_SHIPPING_OPTIONS };
+
 export interface FormSettings {
     shop_domain: string;
     enabled: boolean;
@@ -129,6 +148,14 @@ export interface FormSettings {
     animation_style?: 'fade' | 'slide' | 'scale';
     border_radius?: number;
     font_family?: string;
+    // New advanced features (JSONB columns)
+    form_type?: 'popup' | 'embedded';
+    fields?: FormField[];
+    blocks?: ContentBlocks;
+    custom_fields?: FormField[];
+    styles?: FormStyles;
+    button_styles?: ButtonStyles;
+    shipping_options?: ShippingOptions;
 }
 
 /**
@@ -151,6 +178,7 @@ export async function getFormSettings(shopDomain: string): Promise<FormSettings 
 
 /**
  * Save or update form settings - persists ALL fields to Supabase
+ * Handles both legacy fields and new JSONB columns for advanced features
  */
 export async function saveFormSettings(settings: FormSettings) {
     console.log('[Supabase] Saving form settings for:', settings.shop_domain);
@@ -185,6 +213,14 @@ export async function saveFormSettings(settings: FormSettings) {
                 modal_style: settings.modal_style || 'modern',
                 animation_style: settings.animation_style || 'fade',
                 border_radius: settings.border_radius ?? 12,
+                // New JSONB columns for advanced features
+                form_type: settings.form_type || 'popup',
+                fields: settings.fields || DEFAULT_FIELDS,
+                blocks: settings.blocks || DEFAULT_BLOCKS,
+                custom_fields: settings.custom_fields || [],
+                styles: settings.styles || DEFAULT_STYLES,
+                button_styles: settings.button_styles || DEFAULT_BUTTON_STYLES,
+                shipping_options: settings.shipping_options || DEFAULT_SHIPPING_OPTIONS,
             },
             { onConflict: 'shop_domain' }
         )
