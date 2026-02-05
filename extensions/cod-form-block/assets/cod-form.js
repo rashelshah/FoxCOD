@@ -423,21 +423,18 @@
 
 
   /**
-   * Smart Auto-fill on phone blur
-   * Checks LocalStorage first, then API fallback
+   * Smart Auto-fill - triggers when 10th digit entered (no delay)
+   * Database is the source of truth
    */
   function setupAutoFill(form, config) {
     var phoneInput = form.querySelector('input[name="phone"]');
     if (!phoneInput) return;
 
-    phoneInput.addEventListener('blur', function() {
-        var phone = this.value.trim();
-        if (phone.length < 8) return;
+    function triggerAutoFill() {
+        var phone = phoneInput.value.replace(/\D/g, '');
+        if (phone.length < 10) return;
 
-        console.log('[COD Form] Phone entered, fetching customer data from database...');
-
-        // Always fetch from API for cross-browser compatibility
-        // Database is the source of truth, not localStorage
+        console.log('[COD Form] 10 digits entered, fetching customer data...');
         fetch(config.proxyUrl + '/api/customer-by-phone?phone=' + encodeURIComponent(phone) + '&shop=' + encodeURIComponent(config.shop))
             .then(function(res) { return res.json(); })
             .then(function(data) {
@@ -452,14 +449,16 @@
                     };
                     autoFillFields(form, customerData);
                     console.log('[COD Form] Auto-filled from database');
-                } else {
-                    console.log('[COD Form] No previous customer data found');
                 }
             })
             .catch(function(err) {
-                // Silently fail - do not block checkout
                 console.warn('[COD Form] Auto-fill API error:', err);
             });
+    }
+
+    phoneInput.addEventListener('input', function() {
+        var digits = this.value.replace(/\D/g, '');
+        if (digits.length === 10) triggerAutoFill();
     });
   }
 
@@ -833,66 +832,45 @@
               var successText = successDiv ? successDiv.querySelector('.cod-message-text') : null;
               
               if (successDiv && successText) {
-                  // New green card success design
+                  // Premium success popup - aesthetic, easy to read, seller message + order ID
                   successText.innerHTML = 
-                      '<div style="width: 480px; max-width: 95vw; font-size: 1rem; line-height: 1.5rem; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif;">' +
-                      '<div style="padding: 1.5rem; border-radius: 0.5rem; background-color: rgb(240 253 244);">' +
-                      '<div style="display: flex;">' +
-                      '<div style="flex-shrink: 0;">' +
-                      '<svg style="color: rgb(74 222 128); width: 1.75rem; height: 1.75rem;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">' +
-                      '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 0 00-1.414 1.414l2 2a1 0 001.414 0l4-4z" clip-rule="evenodd" />' +
-                      '</svg>' +
+                      '<div class="cod-success-popup" style="width: 420px; max-width: 92vw; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif; text-align: center;">' +
+                      '<div style="background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); border-radius: 16px; padding: 32px 28px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05);">' +
+                      '<div style="width: 56px; height: 56px; margin: 0 auto 20px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center;">' +
+                      '<svg style="width: 28px; height: 28px; color: white;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>' +
                       '</div>' +
-                      '<div style="margin-left: 0.75rem;">' +
-                      '<p style="font-weight: bold; color: rgb(22 101 52); margin: 0 0 0.75rem 0; font-size: 1.125rem;">Order Completed</p>' +
-                      '<div style="color: rgb(21 128 61);">' +
-                      '<p style="margin: 0 0 0.5rem 0;">' + (config.successMessage || 'Your order has been placed successfully! We will contact you shortly.') + '</p>' +
-                      '<p style="margin: 0; font-weight: 600;">Order ID: ' + (result.orderName || result.orderId) + '</p>' +
+                      '<h2 style="margin: 0 0 12px; font-size: 1.375rem; font-weight: 700; color: #0f172a;">Order Confirmed</h2>' +
+                      '<p style="margin: 0 0 20px; font-size: 1rem; line-height: 1.6; color: #475569;">' + (config.successMessage || 'Your order has been placed successfully! We will contact you shortly.') + '</p>' +
+                      '<div style="background: #f1f5f9; border-radius: 10px; padding: 14px 18px; margin-bottom: 24px;">' +
+                      '<span style="font-size: 0.8125rem; color: #64748b; font-weight: 500;">Order ID</span>' +
+                      '<div style="font-size: 1.125rem; font-weight: 700; color: #0f172a; letter-spacing: 0.02em;">' + (result.orderName || result.orderId) + '</div>' +
                       '</div>' +
-                      '<div style="display: flex; margin-top: 0.875rem; margin-bottom: -0.375rem; margin-left: -0.5rem; margin-right: -0.5rem; gap: 0.75rem;">' +
-                      '<button onclick="window.location.reload()" style="cursor: pointer; padding-top: 0.375rem; padding-bottom: 0.375rem; padding-left: 0.5rem; padding-right: 0.5rem; background-color: #ECFDF5; color: rgb(22 101 52); font-size: 0.875rem; line-height: 1.25rem; font-weight: bold; border-radius: 0.375rem; border: none;" onmouseover="this.style.backgroundColor=\'#D1FAE5\'" onmouseout="this.style.backgroundColor=\'#ECFDF5\'">Continue Shopping</button>' +
-                      '<button onclick="document.getElementById(\'cod-form-' + config.productId + '\').querySelector(\'form\').reset(); var successDiv = document.querySelector(\'.cod-message-success\'); if(successDiv) successDiv.style.display = \'none\'; document.querySelectorAll(\'.cod-dynamic-fields-container, button[type=submit], .cod-total, .cod-product-info, .cod-form-headers\').forEach(el => el.style.display = \'\');" style="cursor: pointer; padding-top: 0.375rem; padding-bottom: 0.375rem; padding-left: 0.5rem; padding-right: 0.5rem; background-color: #ECFDF5; color: #065F46; font-size: 0.875rem; line-height: 1.25rem; border-radius: 0.375rem; border: none;">Dismiss</button>' +
-                      '</div>' +
-                      '</div>' +
+                      '<div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">' +
+                      '<button onclick="window.location.reload()" style="cursor: pointer; padding: 12px 24px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; font-size: 0.9375rem; font-weight: 600; border-radius: 10px; border: none; box-shadow: 0 4px 14px rgba(16,185,129,0.4);" onmouseover="this.style.transform=\'translateY(-1px)\'; this.style.boxShadow=\'0 6px 20px rgba(16,185,129,0.5)\'" onmouseout="this.style.transform=\'\'; this.style.boxShadow=\'0 4px 14px rgba(16,185,129,0.4)\'">Continue Shopping</button>' +
+                      '<button onclick="var f=document.getElementById(\'cod-form-' + config.productId + '\').querySelector(\'form\'); f.reset(); var sd=document.querySelector(\'.cod-message-success\'); if(sd) sd.style.display=\'none\'; f.querySelectorAll(\'.cod-dynamic-fields-container, button[type=submit], .cod-total, .cod-order-summary, .cod-product-info, .cod-form-headers, .cod-shipping-section\').forEach(function(e){e.style.display=e.classList.contains(\'cod-product-info\')||e.classList.contains(\'cod-total\')?\'flex\':\'\';});" style="cursor: pointer; padding: 12px 24px; background: white; color: #475569; font-size: 0.9375rem; font-weight: 600; border-radius: 10px; border: 1px solid #e2e8f0;" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'white\'">Place Another</button>' +
                       '</div>' +
                       '</div>' +
                       '</div>';
                   
-                  // Hide all form fields completely
-                  var fieldsContainer = form.querySelector('.cod-dynamic-fields-container');
-                  var submitBtn = form.querySelector('button[type="submit"]');
-                  var totalDiv = form.querySelector('.cod-total');
-                  var orderSummary = form.querySelector('.cod-order-summary');
-                  var productInfo = form.querySelector('.cod-product-info');
-                  var formHeaders = form.querySelector('.cod-form-headers');
+                  // Hide ALL form elements so only success popup is visible
+                  var toHide = form.querySelectorAll('.cod-dynamic-fields-container, button[type="submit"], .cod-total, .cod-order-summary, .cod-product-info, .cod-form-headers, .cod-shipping-section');
+                  toHide.forEach(function(el) { el.style.display = 'none'; });
                   
-                  if (fieldsContainer) fieldsContainer.style.display = 'none';
-                  if (submitBtn) submitBtn.style.display = 'none';
-                  if (totalDiv) totalDiv.style.display = 'none';
-                  if (orderSummary) orderSummary.style.display = 'none';
-                  if (productInfo) productInfo.style.display = 'none';
-                  if (formHeaders) formHeaders.style.display = 'none';
-                  
-                  // Style success div for perfect centering
                   successDiv.style.display = 'flex';
                   successDiv.style.justifyContent = 'center';
                   successDiv.style.alignItems = 'center';
-                  successDiv.style.minHeight = '360px';
-                  successDiv.style.padding = '28px';
+                  successDiv.style.minHeight = '320px';
+                  successDiv.style.padding = '24px';
                   successDiv.style.background = 'transparent';
                   successDiv.style.border = 'none';
                   
                   // Close modal after 3.5 seconds and reset
-                  setTimeout(() => {
+                  setTimeout(function() {
                       closeModal(productId);
-                      // Reset form for next use
                       form.reset();
-                      if (fieldsContainer) fieldsContainer.style.display = 'block';
-                      if (submitBtn) submitBtn.style.display = 'block';
-                      if (totalDiv) totalDiv.style.display = 'flex';
-                      if (orderSummary) orderSummary.style.display = 'block';
-                      if (productInfo) productInfo.style.display = 'flex';
-                      if (formHeaders) formHeaders.style.display = 'block';
+                      form.querySelectorAll('.cod-dynamic-fields-container, button[type="submit"], .cod-total, .cod-order-summary, .cod-product-info, .cod-form-headers, .cod-shipping-section').forEach(function(el) {
+                          el.style.display = el.classList.contains('cod-product-info') || el.classList.contains('cod-total') ? 'flex' : '';
+                      });
                       successDiv.style.display = 'none';
                       successDiv.style.justifyContent = '';
                       successDiv.style.alignItems = '';
