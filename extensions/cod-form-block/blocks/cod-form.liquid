@@ -55,15 +55,13 @@
 {% assign current_variant = product.selected_or_first_available_variant %}
 {% assign product_price = current_variant.price | money_without_trailing_zeros %}
 
+
 {% comment %} Read COD settings from metafields (synced from app dashboard) {% endcomment %}
 {% assign cod_enabled = shop.metafields.fox_cod.enabled | default: 'false' %}
 {% assign cod_button_text = shop.metafields.fox_cod.button_text | default: 'Buy with COD' %}
 {% assign cod_primary_color = shop.metafields.fox_cod.primary_color | default: '#667eea' %}
 {% assign cod_app_url = shop.metafields.fox_cod.app_url | default: '' %}
 {% assign cod_max_quantity = shop.metafields.fox_cod.max_quantity | default: 10 %}
-{% assign cod_require_name = shop.metafields.fox_cod.require_name | default: 'true' %}
-{% assign cod_require_phone = shop.metafields.fox_cod.require_phone | default: 'true' %}
-{% assign cod_require_address = shop.metafields.fox_cod.require_address | default: 'true' %}
 {% assign cod_form_title = shop.metafields.fox_cod.form_title | default: 'Cash on Delivery' %}
 {% assign cod_form_subtitle = shop.metafields.fox_cod.form_subtitle | default: '' %}
 {% assign cod_button_style = shop.metafields.fox_cod.button_style | default: 'solid' %}
@@ -71,11 +69,17 @@
 {% assign cod_border_radius = shop.metafields.fox_cod.border_radius | default: 12 %}
 {% assign cod_show_product_image = shop.metafields.fox_cod.show_product_image | default: 'true' %}
 {% assign cod_show_price = shop.metafields.fox_cod.show_price | default: 'true' %}
-{% assign cod_show_quantity = shop.metafields.fox_cod.show_quantity_selector | default: 'true' %}
-{% assign cod_show_email = shop.metafields.fox_cod.show_email_field | default: 'false' %}
-{% assign cod_show_notes = shop.metafields.fox_cod.show_notes_field | default: 'false' %}
 {% assign cod_modal_style = shop.metafields.fox_cod.modal_style | default: 'modern' %}
 {% assign cod_anim_style = shop.metafields.fox_cod.animation_style | default: 'fade' %}
+
+{% comment %} Advanced JSON Settings {% endcomment %}
+{% assign cod_form_type = shop.metafields.fox_cod.form_type | default: 'popup' %}
+{% assign cod_fields = shop.metafields.fox_cod.fields | default: '[]' %}
+{% assign cod_blocks = shop.metafields.fox_cod.blocks | default: '{}' %}
+{% assign cod_custom_fields = shop.metafields.fox_cod.custom_fields | default: '[]' %}
+{% assign cod_styles = shop.metafields.fox_cod.styles | default: '{}' %}
+{% assign cod_button_styles = shop.metafields.fox_cod.button_styles_json | default: '{}' %}
+{% assign cod_shipping_options = shop.metafields.fox_cod.shipping_options | default: '{}' %}
 
 {% comment %} Only render COD functionality if enabled in the app {% endcomment %}
 {% if cod_enabled == 'true' %}
@@ -91,12 +95,22 @@
      data-shop="{{ shop.permanent_domain }}"
      data-app-url="{{ cod_app_url }}"
      data-max-quantity="{{ cod_max_quantity }}"
-     data-require-name="{{ cod_require_name }}"
-     data-require-phone="{{ cod_require_phone }}"
-     data-require-address="{{ cod_require_address }}"
      data-button-text="{{ cod_button_text }}"
      data-primary-color="{{ cod_primary_color }}"
-     data-submit-text="{{ cod_submit_text }}">
+     data-form-type="{{ cod_form_type }}"
+     data-fields="{{ cod_fields | escape }}"
+     data-blocks="{{ cod_blocks | escape }}"
+     data-custom-fields="{{ cod_custom_fields | escape }}"
+     data-styles="{{ cod_styles | escape }}"
+     data-button-styles="{{ cod_button_styles | escape }}"
+     data-shipping-options="{{ cod_shipping_options | escape }}"
+     data-modal-style="{{ cod_modal_style }}"
+     data-anim-style="{{ cod_anim_style }}"
+     data-border-radius="{{ cod_border_radius }}"
+     data-show-image="{{ cod_show_product_image }}"
+     data-show-price="{{ cod_show_price }}"
+     data-form-title="{{ cod_form_title }}"
+     data-form-subtitle="{{ cod_form_subtitle }}">
 </div>
 
 {% comment %} Modal Overlay {% endcomment %}
@@ -137,84 +151,11 @@
       {% if cod_form_subtitle != blank %}<p style="margin: 4px 0 0; color: #666; font-size: 14px;">{{ cod_form_subtitle }}</p>{% endif %}
   </div>
 
-  {% comment %} COD Form {% endcomment %}
+  {% comment %} COD Form - Dynamic Content Rendered by JS {% endcomment %}
   <form id="cod-order-form-{{ product.id }}" class="cod-order-form">
-    {% comment %} Name Field {% endcomment %}
-    <div class="cod-form-field">
-      <label for="cod-name-{{ product.id }}">
-        Full Name {% if cod_require_name == 'true' %}<span class="required">*</span>{% endif %}
-      </label>
-      <input type="text" 
-             id="cod-name-{{ product.id }}" 
-             name="customerName" 
-             placeholder="Enter your full name"
-             {% if cod_require_name == 'true' %}required{% endif %}>
-    </div>
-
-    {% comment %} Phone Field {% endcomment %}
-    <div class="cod-form-field">
-      <label for="cod-phone-{{ product.id }}">
-        Phone Number {% if cod_require_phone == 'true' %}<span class="required">*</span>{% endif %}
-      </label>
-      <input type="tel" 
-             id="cod-phone-{{ product.id }}" 
-             name="customerPhone" 
-             placeholder="Enter your phone number"
-             {% if cod_require_phone == 'true' %}required{% endif %}>
-    </div>
-
-    {% comment %} Address Field {% endcomment %}
-    <div class="cod-form-field">
-      <label for="cod-address-{{ product.id }}">
-        Delivery Address {% if cod_require_address == 'true' %}<span class="required">*</span>{% endif %}
-      </label>
-      <textarea id="cod-address-{{ product.id }}" 
-                name="customerAddress" 
-                placeholder="Enter your complete delivery address"
-                rows="3"
-                {% if cod_require_address == 'true' %}required{% endif %}></textarea>
-    </div>
-
-    {% comment %} Email Field (Optional) {% endcomment %}
-    {% if cod_show_email == 'true' %}
-    <div class="cod-form-field">
-      <label for="cod-email-{{ product.id }}">Email (Optional)</label>
-      <input type="email" 
-             id="cod-email-{{ product.id }}" 
-             name="email" 
-             placeholder="Enter your email address">
-    </div>
-    {% endif %}
-
-    {% comment %} Notes Field (Optional) {% endcomment %}
-    {% if cod_show_notes == 'true' %}
-    <div class="cod-form-field">
-      <label for="cod-notes-{{ product.id }}">Order Notes (Optional)</label>
-      <textarea id="cod-notes-{{ product.id }}" 
-                name="notes" 
-                placeholder="Any special instructions?"
-                rows="2"></textarea>
-    </div>
-    {% endif %}
-
-    {% comment %} Quantity Field {% endcomment %}
-    {% if cod_show_quantity == 'true' %}
-    <div class="cod-form-field">
-      <label for="cod-quantity-{{ product.id }}">Quantity</label>
-      <div class="cod-quantity-selector">
-        <button type="button" class="cod-qty-btn cod-qty-minus">−</button>
-        <input type="number" 
-               id="cod-quantity-{{ product.id }}" 
-               name="quantity" 
-               value="1" 
-               min="1" 
-               max="{{ cod_max_quantity }}">
-        <button type="button" class="cod-qty-btn cod-qty-plus">+</button>
+      <div class="cod-dynamic-fields-container">
+          <!-- Fields will be injected here by cod-form.js -->
       </div>
-    </div>
-    {% else %}
-        <input type="hidden" name="quantity" value="1">
-    {% endif %}
 
     {% comment %} Total Price {% endcomment %}
     <div class="cod-total">
@@ -228,7 +169,7 @@
     <button type="submit" 
             class="cod-submit-btn"
             style="background-color: {{ cod_primary_color }};">
-      {{ block.settings.button_text }}
+      {{ shop.metafields.fox_cod.submit_button_text | default: 'Place Order (COD)' }}
     </button>
 
     {% comment %} Status Messages {% endcomment %}

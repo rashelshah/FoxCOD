@@ -729,7 +729,7 @@ export default function Index() {
             </div>
             <div className="welcome-actions">
               <Link to="/app/settings" className="welcome-btn welcome-btn-primary">
-                ⚙️ Configure Form
+                🎨 Form Builder
               </Link>
               <button
                 className="welcome-btn welcome-btn-secondary"
