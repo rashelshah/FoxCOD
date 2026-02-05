@@ -9,23 +9,38 @@
  */
 
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import { logOrder } from "../config/supabase.server";
+import { logOrder, supabase } from "../config/supabase.server";
 
-// Handle GET requests (for health checks or settings)
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+import { lookupCustomerByPhone } from "../services/customer-lookup.server";
+
+const corsHeaders = {
+    "Content-Type": "application/json",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+};
+
+// Handle GET requests - proxy for api/customer-by-phone (autofill)
+// Storefront: /apps/fox-cod/api/customer-by-phone → /proxy/api/customer-by-phone
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     const url = new URL(request.url);
-    const shop = url.searchParams.get('shop');
+    const path = params["*"] || params["$"] || "";
+    const shop = url.searchParams.get("shop");
+    const phone = url.searchParams.get("phone");
+
+    // Route customer lookup for autofill
+    if ((path === "api/customer-by-phone" || path.endsWith("customer-by-phone")) && phone && shop) {
+        const result = await lookupCustomerByPhone(phone, shop);
+        return new Response(JSON.stringify(
+            result.found ? { found: true, ...result } : { found: false }
+        ), { headers: corsHeaders });
+    }
 
     return new Response(JSON.stringify({
         success: true,
         message: "Fox COD App Proxy is working",
         shop: shop
-    }), {
-        headers: {
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*"
-        }
-    });
+    }), { headers: corsHeaders });
 };
 
 // Handle POST requests (for order creation)
@@ -57,6 +72,40 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             });
         }
 
+        // Save/update customer data in customers table for autofill
+        try {
+            if (data.customerPhone && data.customerPhone.trim()) {
+                const customerData = {
+                    shop_domain: data.shop,
+                    phone: data.customerPhone.trim(),
+                    name: data.customerName || '',
+                    address: data.customerAddress || '',
+                    state: data.customerState || '',
+                    city: data.customerCity || '',
+                    zipcode: data.customerZipcode || '',
+                    email: data.customerEmail || '',
+                    updated_at: new Date().toISOString()
+                };
+
+                // Upsert customer (insert or update if exists)
+                const { error: customerError } = await supabase
+                    .from('customers')
+                    .upsert(customerData, {
+                        onConflict: 'shop_domain,phone',
+                        ignoreDuplicates: false
+                    });
+
+                if (customerError) {
+                    console.error('[Proxy] Error saving customer data:', customerError);
+                } else {
+                    console.log('[Proxy] Customer data saved/updated for phone:', data.customerPhone);
+                }
+            }
+        } catch (custError) {
+            // Log but don't fail the order if customer save fails
+            console.error('[Proxy] Customer save error:', custError);
+        }
+
         // Create the order using logOrder
         const result = await logOrder({
             shop_domain: data.shop,
@@ -64,7 +113,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             customer_phone: data.customerPhone || '',
             customer_address: data.customerAddress || '',
             customer_email: data.customerEmail || '',
-            customer_notes: data.customerNotes || '',
+            customer_notes: data.notes || data.customerNotes || '',
             product_id: data.productId,
             product_title: data.productTitle || 'Product',
             variant_id: data.variantId,
