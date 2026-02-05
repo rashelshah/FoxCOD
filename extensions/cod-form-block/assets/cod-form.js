@@ -434,19 +434,10 @@
         var phone = this.value.trim();
         if (phone.length < 8) return;
 
-        // Check LocalStorage first
-        try {
-            var cached = JSON.parse(localStorage.getItem('cod_customer') || '{}');
-            if (cached.phone === phone) {
-                autoFillFields(form, cached);
-                console.log('[COD Form] Auto-filled from LocalStorage');
-                return;
-            }
-        } catch (e) {
-            console.warn('[COD Form] LocalStorage read error:', e);
-        }
+        console.log('[COD Form] Phone entered, fetching customer data from database...');
 
-        // Fetch from API
+        // Always fetch from API for cross-browser compatibility
+        // Database is the source of truth, not localStorage
         fetch(config.proxyUrl + '/api/customer-by-phone?phone=' + encodeURIComponent(phone) + '&shop=' + encodeURIComponent(config.shop))
             .then(function(res) { return res.json(); })
             .then(function(data) {
@@ -460,10 +451,9 @@
                         zipcode: data.zipcode || ''
                     };
                     autoFillFields(form, customerData);
-                    // Save to localStorage for next time
-                    customerData.phone = phone;
-                    localStorage.setItem('cod_customer', JSON.stringify(customerData));
-                    console.log('[COD Form] Auto-filled from API and saved to LocalStorage');
+                    console.log('[COD Form] Auto-filled from database');
+                } else {
+                    console.log('[COD Form] No previous customer data found');
                 }
             })
             .catch(function(err) {
@@ -843,52 +833,54 @@
               var successText = successDiv ? successDiv.querySelector('.cod-message-text') : null;
               
               if (successDiv && successText) {
-                  // Premium success popup HTML
+                  // New green card success design
                   successText.innerHTML = 
-                      '<div style="text-align: center; padding: 20px 10px;">' +
-                      
-                      // Animated checkmark
-                      '<div style="margin: 0 auto 24px; width: 80px; height: 80px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 40px rgba(16, 185, 129, 0.3); animation: successPop 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);">' +
-                      '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="animation: checkDraw 0.5s ease 0.3s forwards; stroke-dasharray: 100; stroke-dashoffset: 100;"><polyline points="20 6 9 17 4 12"></polyline></svg>' +
+                      '<div style="width: 480px; max-width: 95vw; font-size: 1rem; line-height: 1.5rem; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif;">' +
+                      '<div style="padding: 1.5rem; border-radius: 0.5rem; background-color: rgb(240 253 244);">' +
+                      '<div style="display: flex;">' +
+                      '<div style="flex-shrink: 0;">' +
+                      '<svg style="color: rgb(74 222 128); width: 1.75rem; height: 1.75rem;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">' +
+                      '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 0 00-1.414 1.414l2 2a1 0 001.414 0l4-4z" clip-rule="evenodd" />' +
+                      '</svg>' +
                       '</div>' +
-                      
-                      // Success message
-                      '<h3 style="margin: 0 0 8px 0; font-size: 24px; font-weight: 700; color: #111827; letter-spacing: -0.5px;">Order Confirmed!</h3>' +
-                      '<p style="margin: 0 0 24px 0; font-size: 14px; color: #6b7280; line-height: 1.5;">Your order has been placed successfully</p>' +
-                      
-                      // Order ID card with gradient
-                      '<div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 1px solid #86efac; border-radius: 16px; padding: 20px; margin: 0 auto 24px; max-width: 280px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">' +
-                      '<div style="font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #059669; font-weight: 600; margin-bottom: 8px;">Order ID</div>' +
-                      '<div style="font-size: 22px; font-weight: 800; color: #047857; font-family: monospace; letter-spacing: 1px;">' + (result.orderName || result.orderId) + '</div>' +
+                      '<div style="margin-left: 0.75rem;">' +
+                      '<p style="font-weight: bold; color: rgb(22 101 52); margin: 0 0 0.75rem 0; font-size: 1.125rem;">Order Completed</p>' +
+                      '<div style="color: rgb(21 128 61);">' +
+                      '<p style="margin: 0 0 0.5rem 0;">' + (config.successMessage || 'Your order has been placed successfully! We will contact you shortly.') + '</p>' +
+                      '<p style="margin: 0; font-weight: 600;">Order ID: ' + (result.orderName || result.orderId) + '</p>' +
                       '</div>' +
-                      
-                      // Thank you message with icon
-                      '<div style="display: flex; align-items: center; justify-content: center; gap: 8px; color: #6b7280; font-size: 13px;">' +
-                      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>' +
-                      '<span>Thank you for your order!</span>' +
+                      '<div style="display: flex; margin-top: 0.875rem; margin-bottom: -0.375rem; margin-left: -0.5rem; margin-right: -0.5rem; gap: 0.75rem;">' +
+                      '<button onclick="window.location.reload()" style="cursor: pointer; padding-top: 0.375rem; padding-bottom: 0.375rem; padding-left: 0.5rem; padding-right: 0.5rem; background-color: #ECFDF5; color: rgb(22 101 52); font-size: 0.875rem; line-height: 1.25rem; font-weight: bold; border-radius: 0.375rem; border: none;" onmouseover="this.style.backgroundColor=\'#D1FAE5\'" onmouseout="this.style.backgroundColor=\'#ECFDF5\'">Continue Shopping</button>' +
+                      '<button onclick="document.getElementById(\'cod-form-' + config.productId + '\').querySelector(\'form\').reset(); var successDiv = document.querySelector(\'.cod-message-success\'); if(successDiv) successDiv.style.display = \'none\'; document.querySelectorAll(\'.cod-dynamic-fields-container, button[type=submit], .cod-total, .cod-product-info, .cod-form-headers\').forEach(el => el.style.display = \'\');" style="cursor: pointer; padding-top: 0.375rem; padding-bottom: 0.375rem; padding-left: 0.5rem; padding-right: 0.5rem; background-color: #ECFDF5; color: #065F46; font-size: 0.875rem; line-height: 1.25rem; border-radius: 0.375rem; border: none;">Dismiss</button>' +
                       '</div>' +
-                      
                       '</div>' +
-                      
-                      // Add CSS animations
-                      '<style>' +
-                      '@keyframes successPop { 0% { transform: scale(0) rotate(-180deg); opacity: 0; } 100% { transform: scale(1) rotate(0deg); opacity: 1; } }' +
-                      '@keyframes checkDraw { to { stroke-dashoffset: 0; } }' +
-                      '</style>';
+                      '</div>' +
+                      '</div>' +
+                      '</div>';
                   
-                  // Hide all form fields
+                  // Hide all form fields completely
                   var fieldsContainer = form.querySelector('.cod-dynamic-fields-container');
                   var submitBtn = form.querySelector('button[type="submit"]');
                   var totalDiv = form.querySelector('.cod-total');
                   var orderSummary = form.querySelector('.cod-order-summary');
+                  var productInfo = form.querySelector('.cod-product-info');
+                  var formHeaders = form.querySelector('.cod-form-headers');
                   
                   if (fieldsContainer) fieldsContainer.style.display = 'none';
                   if (submitBtn) submitBtn.style.display = 'none';
                   if (totalDiv) totalDiv.style.display = 'none';
                   if (orderSummary) orderSummary.style.display = 'none';
+                  if (productInfo) productInfo.style.display = 'none';
+                  if (formHeaders) formHeaders.style.display = 'none';
                   
-                  // Show success message
+                  // Style success div for perfect centering
                   successDiv.style.display = 'flex';
+                  successDiv.style.justifyContent = 'center';
+                  successDiv.style.alignItems = 'center';
+                  successDiv.style.minHeight = '360px';
+                  successDiv.style.padding = '28px';
+                  successDiv.style.background = 'transparent';
+                  successDiv.style.border = 'none';
                   
                   // Close modal after 3.5 seconds and reset
                   setTimeout(() => {
@@ -899,7 +891,14 @@
                       if (submitBtn) submitBtn.style.display = 'block';
                       if (totalDiv) totalDiv.style.display = 'flex';
                       if (orderSummary) orderSummary.style.display = 'block';
+                      if (productInfo) productInfo.style.display = 'flex';
+                      if (formHeaders) formHeaders.style.display = 'block';
                       successDiv.style.display = 'none';
+                      successDiv.style.justifyContent = '';
+                      successDiv.style.alignItems = '';
+                      successDiv.style.minHeight = '';
+                      successDiv.style.padding = '';
+                      successDiv.style.background = '';
                   }, 3500);
               } else {
                   console.error('[COD Form] Success message elements not found');

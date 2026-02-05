@@ -116,36 +116,28 @@ async function ensureMetafieldDefinitions(admin: any) {
         { key: "shipping_options", type: "single_line_text_field" },  // Storing JSON as string
     ];
 
-    console.log('[Settings] Ensuring metafield definitions with storefront access...');
-
-    for (const def of definitions) {
-        try {
-            await admin.graphql(`
-                mutation CreateMetafieldDefinition($definition: MetafieldDefinitionInput!) {
-                    metafieldDefinitionCreate(definition: $definition) {
-                        createdDefinition { id key }
-                        userErrors { field message }
-                    }
+    console.log('[Settings] Ensuring metafield definitions (parallel)...');
+    await Promise.allSettled(definitions.map((def) =>
+        admin.graphql(`
+            mutation CreateMetafieldDefinition($definition: MetafieldDefinitionInput!) {
+                metafieldDefinitionCreate(definition: $definition) {
+                    createdDefinition { id key }
+                    userErrors { field message }
                 }
-            `, {
-                variables: {
-                    definition: {
-                        name: def.key.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
-                        namespace: "fox_cod",
-                        key: def.key,
-                        type: def.type,
-                        ownerType: "SHOP",
-                        access: {
-                            storefront: "PUBLIC_READ"
-                        }
-                    }
+            }
+        `, {
+            variables: {
+                definition: {
+                    name: def.key.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
+                    namespace: "fox_cod",
+                    key: def.key,
+                    type: def.type,
+                    ownerType: "SHOP",
+                    access: { storefront: "PUBLIC_READ" }
                 }
-            });
-        } catch (error) {
-            // Definition may already exist, which is fine
-        }
-    }
-
+            }
+        })
+    ));
     console.log('[Settings] Metafield definitions ensured.');
 }
 
@@ -248,21 +240,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     console.log('[Settings] Detected App URL:', appUrl);
 
-    // Sync to Shopify metafields
+    // Sync to Shopify metafields - run definitions + shop query in parallel, then both batches in parallel
     try {
-        // Ensure metafield definitions exist with storefront access
-        await ensureMetafieldDefinitions(admin);
-
-        const shopQuery = await admin.graphql(`query { shop { id } }`);
-        const shopData = await shopQuery.json();
-        const shopGid = shopData.data.shop.id;
+        const [_, shopRes] = await Promise.all([
+            ensureMetafieldDefinitions(admin),
+            admin.graphql(`query { shop { id } }`)
+        ]);
+        const shopGid = (await shopRes.json()).data.shop.id;
 
         console.log('[Settings] Saving metafields for shop:', shopGid);
-        console.log('[Settings] Fields to save:', JSON.stringify(settings.fields).substring(0, 200) + '...');
 
-        // Shopify limit: 25 metafields per mutation
-        // Batch 1: Core settings (24 fields)
-        const batch1 = await admin.graphql(`
+        const batch1Promise = admin.graphql(`
             mutation SetMetafields($metafields: [MetafieldsSetInput!]!) {
                 metafieldsSet(metafields: $metafields) {
                     metafields { key }
@@ -300,8 +288,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             }
         });
 
-        // Batch 2: JSON fields (6 fields)
-        const batch2 = await admin.graphql(`
+        const batch2Promise = admin.graphql(`
             mutation SetMetafields($metafields: [MetafieldsSetInput!]!) {
                 metafieldsSet(metafields: $metafields) {
                     metafields { key }
@@ -321,9 +308,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             }
         });
 
-        const batch1Json = await batch1.json();
-        const batch2Json = await batch2.json();
-
+        const [batch1Res, batch2Res] = await Promise.all([batch1Promise, batch2Promise]);
+        const batch1Json = await batch1Res.json();
+        const batch2Json = await batch2Res.json();
 
         if (batch1Json.data?.metafieldsSet?.userErrors?.length > 0) {
             console.error('[Settings] Batch 1 errors:', batch1Json.data.metafieldsSet.userErrors);
@@ -447,6 +434,24 @@ const PreviewDisplay = memo(({
         return '✨ Fade';
     };
 
+    // Field icons for live preview (matching cod-form.js)
+    const FieldIcon = ({ fieldId }: { fieldId: string }) => {
+        const iconStyle = { width: 14, height: 14, display: 'inline-block', verticalAlign: 'middle', marginRight: 6, color: '#6b7280' };
+        const icons: Record<string, React.ReactNode> = {
+            phone: <svg style={iconStyle} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" /></svg>,
+            name: <svg style={iconStyle} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>,
+            email: <svg style={iconStyle} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg>,
+            address: <svg style={iconStyle} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>,
+            notes: <svg style={iconStyle} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14,2 14,8 20,8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10,9 9,9 8,9" /></svg>,
+            quantity: <svg style={iconStyle} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><line x1="9" y1="9" x2="15" y2="15" /><line x1="15" y1="9" x2="9" y2="15" /></svg>,
+            zip: <svg style={iconStyle} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>,
+            state: <svg style={iconStyle} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>,
+            city: <svg style={iconStyle} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>,
+            marketing: <svg style={iconStyle} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg>,
+        };
+        return icons[fieldId] || icons.name;
+    };
+
     // Get visible fields sorted by order
     const visibleFields = (fields || []).filter((f: FormField) => f.visible).sort((a: FormField, b: FormField) => a.order - b.order);
 
@@ -467,15 +472,18 @@ const PreviewDisplay = memo(({
             <div className="preview-content">
                 <div className="preview-phone">
                     <div className="preview-phone-screen">
-                        <div className="preview-product">
-                            {showProductImage && (
+                        <div className="preview-product" style={activeTab === 'button' ? { padding: '24px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' } : undefined}>
+                            {/* Only show image and price when NOT on button tab */}
+                            {activeTab !== 'button' && showProductImage && (
                                 <div className="preview-product-img">📦</div>
                             )}
-                            <div className="preview-product-title">Sample Product</div>
-                            {showPrice && (
+                            {activeTab !== 'button' && (
+                                <div className="preview-product-title">Sample Product</div>
+                            )}
+                            {activeTab !== 'button' && showPrice && (
                                 <div className="preview-product-price">₹1,999</div>
                             )}
-                            <button style={getButtonStyle()}>
+                            <button style={{ ...getButtonStyle(), ...(activeTab === 'button' ? { maxWidth: '200px', width: '100%' } : { width: '100%' }) }}>
                                 {buttonText || 'Buy with COD'}
                             </button>
                             {/* Only show form when NOT on button tab */}
@@ -493,7 +501,8 @@ const PreviewDisplay = memo(({
                                     {/* Dynamic Fields based on visibility */}
                                     {visibleFields.map((field: FormField) => (
                                         <div key={field.id} style={{ marginBottom: '8px' }}>
-                                            <label style={getLabelStyle() as any}>
+                                            <label style={{ ...getLabelStyle(), display: 'flex', alignItems: 'center', gap: 6 } as any}>
+                                                <FieldIcon fieldId={field.id} />
                                                 {field.label} {field.required && <span style={{ color: '#ef4444' }}>*</span>}
                                             </label>
                                             {field.type === 'textarea' ? (
@@ -858,7 +867,7 @@ export default function SettingsPage() {
         <>
             <style>{`
                 /* Prevent horizontal scrolling globally */
-                html, body { overflow-x: hidden !important; max-width: 100vw !important; }
+                html, body { overflow-x: clip !important; max-width: 100vw !important; }
                 
                 .form-builder {
                     max-width: 1200px;
@@ -887,14 +896,14 @@ export default function SettingsPage() {
                 .tabs { display: flex; gap: 8px; margin-bottom: 24px; background: #f3f4f6; padding: 6px; border-radius: 12px; }
                 .tab { flex: 1; padding: 14px 20px; border: none; background: transparent; border-radius: 8px; font-size: 14px; font-weight: 600; color: #6b7280; cursor: pointer; }
                 .tab.active { background: white; color: #111827; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-                .builder-layout { display: grid; grid-template-columns: 1fr 380px; gap: 24px; align-items: start; }
+                .builder-layout { display: grid; grid-template-columns: 1fr 380px; gap: 24px; align-items: start; min-height: 0; }
                 .settings-card { background: white; border: 1px solid #e5e7eb; border-radius: 16px; padding: 24px; margin-bottom: 20px; }
                 .card-title { font-size: 15px; font-weight: 600; color: #111827; margin: 0 0 16px 0; }
                 .input-field { width: 100%; padding: 12px 16px; border: 1px solid #e5e7eb; border-radius: 10px; font-size: 14px; color: #111827; transition: all 0.2s ease; box-sizing: border-box; }
                 .color-presets { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
                 .color-preset { width: 32px; height: 32px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; transition: all 0.2s ease; }
                 .color-preset:hover { transform: scale(1.1); }
-                .color-preset.active { border-color: #111827; box-shadow: 0 0 0 2px white, 0 0 0 4px #111827; }
+                .color-preset.active { border: 2px solid #111827; box-shadow: none; }
                 .custom-color { position: relative; width: 32px; height: 32px; }
                 .custom-color input[type="color"] { 
                     width: 32px; 
@@ -927,7 +936,7 @@ export default function SettingsPage() {
                 .preview-panel { background: white; border: 1px solid #e5e7eb; border-radius: 16px; overflow: visible; position: sticky; top: 20px; align-self: flex-start; }
                 .preview-header { background: #f9fafb; padding: 16px 20px; border-bottom: 1px solid #e5e7eb; }
                 .preview-content { padding: 24px; }
-                .preview-phone { background: #1f2937; border-radius: 32px; padding: 12px; max-width: 300px; margin: 0 auto; }
+                .preview-phone { background: #1f2937; border-radius: 32px; padding: 6px; max-width: 300px; margin: 0 auto; }
                 .preview-phone-screen { background: white; border-radius: 24px; overflow-y: auto; min-height: 550px; max-height: 600px; }
                 .preview-product { padding: 16px; }
                 .preview-product-img { width: 100%; height: 100px; background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%); border-radius: 12px; margin-bottom: 12px; display: flex; align-items: center; justify-content: center; }
