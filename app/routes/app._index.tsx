@@ -774,14 +774,15 @@ export default function Index() {
               <div className="stat-subtext">All time COD orders</div>
             </div>
 
-            <div className="stat-card">
+            {/* TEMPORARILY HIDDEN - Component preserved for future use */}
+            {/* <div className="stat-card">
               <div className="stat-header">
                 <div className="stat-icon stat-icon-orange">⏳</div>
                 <span className="stat-label">Pending</span>
               </div>
               <p className="stat-value">{stats.pendingOrders}</p>
               <div className="stat-subtext">Awaiting action</div>
-            </div>
+            </div> */}
 
             <div className="stat-card">
               <div className="stat-header">
@@ -812,10 +813,11 @@ export default function Index() {
               Form Builder
             </Link>
 
-            <Link to="/app/orders" className="action-btn action-btn-orders">
+            {/* TEMPORARILY HIDDEN - Component preserved for future use */}
+            {/* <Link to="/app/orders" className="action-btn action-btn-orders">
               <span className="action-btn-icon">📋</span>
               View All Orders
-            </Link>
+            </Link> */}
 
             <Link to="/app/analytics" className="action-btn action-btn-analytics">
               <span className="action-btn-icon">📊</span>
@@ -823,8 +825,9 @@ export default function Index() {
             </Link>
           </div>
 
+          {/* TEMPORARILY HIDDEN - Components preserved for future use */}
           {/* Recent Orders */}
-          <div className="section-header">
+          {/* <div className="section-header">
             <h2>Recent Orders</h2>
             <Link to="/app/orders">View all →</Link>
           </div>
@@ -889,7 +892,7 @@ export default function Index() {
                 <p>Enable your COD form and start receiving orders!</p>
               </div>
             )}
-          </div>
+          </div> */}
         </div>
       </s-page>
     </>

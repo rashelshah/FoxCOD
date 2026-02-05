@@ -273,16 +273,46 @@
   }
 
   /**
+   * Icon SVGs for form fields
+   */
+  var FIELD_ICONS = {
+    phone: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>',
+    name: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>',
+    email: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>',
+    address: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>',
+    notes: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14,2 14,8 20,8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10,9 9,9 8,9"></polyline></svg>',
+    quantity: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="9" x2="15" y2="15"></line><line x1="15" y1="9" x2="9" y2="15"></line></svg>'
+  };
+
+  /**
    * Render dynamic fields
    */
   function renderFields(container, config) {
+    console.log('[COD Form] renderFields called');
+    console.log('[COD Form] Container:', container);
+    console.log('[COD Form] Config fields:', config.fields);
+    console.log('[COD Form] Config.styles:', config.styles);
+    
+    // Ensure styles object exists with defaults
+    var styles = config.styles || {};
+    var textColor = styles.textColor || '#374151';
+    var labelAlignment = styles.labelAlignment || 'left';
+    var borderRadius = styles.borderRadius || 6;
+    
     container.innerHTML = '';
     
     // Sort fields by order
-    var sortedFields = config.fields.sort((a, b) => a.order - b.order);
+    var sortedFields = config.fields.sort(function(a, b) { return a.order - b.order; });
+    
+    console.log('[COD Form] Sorted fields:', sortedFields);
 
     sortedFields.forEach(function(field) {
-        if (!field.visible) return;
+        console.log('[COD Form] Processing field:', field.id, 'visible:', field.visible);
+        
+        if (!field.visible) {
+            console.log('[COD Form] Skipping invisible field:', field.id);
+            return;
+        }
 
         var wrapper = document.createElement('div');
         wrapper.className = 'cod-form-field';
@@ -294,11 +324,49 @@
         label.style.fontWeight = '600';
         label.style.marginBottom = '6px';
         label.style.fontSize = '14px';
-        label.style.color = config.styles.textColor || '#374151';
-        label.style.textAlign = config.styles.labelAlignment || 'left';
+        label.style.color = textColor;
+        label.style.textAlign = labelAlignment;
         label.innerHTML = field.label + (field.required ? ' <span style="color:red">*</span>' : '');
         wrapper.appendChild(label);
 
+        // Input container with icon
+        var inputContainer = document.createElement('div');
+        inputContainer.style.position = 'relative';
+        
+        // Add icon directly based on field type
+        var iconSvg = '';
+        if (field.id === 'phone') {
+            iconSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>';
+        } else if (field.id === 'name') {
+            iconSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>';
+        } else if (field.id === 'email') {
+            iconSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>';
+        } else if (field.id === 'address') {
+            iconSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>';
+        } else if (field.id === 'notes') {
+            iconSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14,2 14,8 20,8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10,9 9,9 8,9"></polyline></svg>';
+        } else if (field.id === 'quantity') {
+            iconSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="9" x2="15" y2="15"></line><line x1="15" y1="9" x2="9" y2="15"></line></svg>';
+        } else {
+            // Default icon for unknown fields
+            iconSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>';
+        }
+        
+        if (iconSvg) {
+            var iconWrapper = document.createElement('div');
+            iconWrapper.innerHTML = iconSvg;
+            iconWrapper.style.position = 'absolute';
+            iconWrapper.style.left = '12px';
+            iconWrapper.style.top = field.type === 'textarea' ? '12px' : '50%';
+            iconWrapper.style.transform = field.type === 'textarea' ? 'none' : 'translateY(-50%)';
+            iconWrapper.style.color = '#6b7280';
+            iconWrapper.style.pointerEvents = 'none';
+            iconWrapper.style.zIndex = '1';
+            iconWrapper.style.display = 'flex';
+            iconWrapper.style.alignItems = 'center';
+            inputContainer.appendChild(iconWrapper);
+        }
+        
         // Input
         var input;
         
@@ -309,7 +377,7 @@
             input = document.createElement('select');
             // Add options logic if custom fields have options
             if (field.options) {
-                field.options.forEach(opt => {
+                field.options.forEach(function(opt) {
                     var option = document.createElement('option');
                     option.value = opt;
                     option.textContent = opt;
@@ -334,19 +402,25 @@
             input.max = config.maxQuantity || 10;
         }
         
-        // Input Styles
+        // Input Styles with padding for icon on left
         input.style.width = '100%';
-        input.style.padding = '10px 12px';
+        input.style.padding = field.type === 'textarea' ? '10px 12px 10px 40px' : '10px 12px 10px 40px';
         input.style.border = '1px solid #d1d5db';
-        input.style.borderRadius = (config.styles.borderRadius || 6) + 'px';
+        input.style.borderRadius = borderRadius + 'px';
         input.style.fontSize = '14px';
         input.style.boxSizing = 'border-box';
         input.style.marginBottom = '4px';
 
-        wrapper.appendChild(input);
+        inputContainer.appendChild(input);
+        wrapper.appendChild(inputContainer);
         container.appendChild(wrapper);
+        
+        console.log('[COD Form] Added field to container:', field.id);
     });
+    
+    console.log('[COD Form] renderFields completed. Container children count:', container.children.length);
   }
+
 
   /**
    * Smart Auto-fill on phone blur
@@ -377,8 +451,19 @@
             .then(function(res) { return res.json(); })
             .then(function(data) {
                 if (data.found) {
-                    autoFillFields(form, { name: data.name, address: data.address, email: data.email });
-                    console.log('[COD Form] Auto-filled from API');
+                    var customerData = { 
+                        name: data.name, 
+                        address: data.address, 
+                        email: data.email,
+                        state: data.state || '',
+                        city: data.city || '',
+                        zipcode: data.zipcode || ''
+                    };
+                    autoFillFields(form, customerData);
+                    // Save to localStorage for next time
+                    customerData.phone = phone;
+                    localStorage.setItem('cod_customer', JSON.stringify(customerData));
+                    console.log('[COD Form] Auto-filled from API and saved to LocalStorage');
                 }
             })
             .catch(function(err) {
@@ -404,6 +489,18 @@
         var emailInput = form.querySelector('input[name="email"]');
         if (emailInput && !emailInput.value) emailInput.value = data.email;
     }
+    if (data.state) {
+        var stateInput = form.querySelector('input[name="state"], select[name="state"]');
+        if (stateInput && !stateInput.value) stateInput.value = data.state;
+    }
+    if (data.city) {
+        var cityInput = form.querySelector('input[name="city"]');
+        if (cityInput && !cityInput.value) cityInput.value = data.city;
+    }
+    if (data.zipcode) {
+        var zipInput = form.querySelector('input[name="zip"], input[name="zipcode"]');
+        if (zipInput && !zipInput.value) zipInput.value = data.zipcode;
+    }
   }
 
   /**
@@ -415,12 +512,18 @@
         var name = form.querySelector('[name="name"]');
         var address = form.querySelector('[name="address"]');
         var email = form.querySelector('[name="email"]');
+        var state = form.querySelector('[name="state"]');
+        var city = form.querySelector('[name="city"]');
+        var zip = form.querySelector('[name="zip"], [name="zipcode"]');
         
         localStorage.setItem('cod_customer', JSON.stringify({
             phone: phone ? phone.value : '',
             name: name ? name.value : '',
             address: address ? address.value : '',
-            email: email ? email.value : ''
+            email: email ? email.value : '',
+            state: state ? state.value : '',
+            city: city ? city.value : '',
+            zipcode: zip ? zip.value : ''
         }));
         console.log('[COD Form] Customer data saved to LocalStorage');
     } catch (e) {
@@ -577,9 +680,8 @@
   }
 
   function formatMoney(amount) {
-      return currency_symbol + amount.toFixed(2);
+      return '$' + amount.toFixed(2);
   }
-  var currency_symbol = '₹'; // Default fallback, could try to detect from page
 
   /**
    * Apply Modal Styles
@@ -707,6 +809,9 @@
           customerPhone: formData.get('phone') || '',
           customerAddress: formData.get('address') || '',
           customerEmail: formData.get('email') || '',
+          customerState: formData.get('state') || '',
+          customerCity: formData.get('city') || '',
+          customerZipcode: formData.get('zip') || formData.get('zipcode') || '',
           notes: formData.get('notes') || '',
           productId: config.productId,
           variantId: config.variantId,
@@ -734,33 +839,72 @@
               saveCustomerToLocalStorage(form);
               
               // Show success message with order ID
-              var successDiv = form.parentElement.querySelector('.cod-message-success');
-              var successText = successDiv.querySelector('.cod-message-text');
+              var successDiv = form.querySelector('.cod-message-success');
+              var successText = successDiv ? successDiv.querySelector('.cod-message-text') : null;
               
-              if (successText) {
+              if (successDiv && successText) {
+                  // Premium success popup HTML
                   successText.innerHTML = 
-                      '<div style="text-align: center;">' +
-                      '<div style="font-size: 48px; margin-bottom: 12px;">✅</div>' +
-                      '<strong style="font-size: 18px; color: #10b981;">Order Placed Successfully!</strong><br><br>' +
-                      '<div style="background: #f0fdf4; padding: 12px; border-radius: 8px; margin: 16px 0;">' +
-                      '<div style="font-size: 13px; color: #6b7280; margin-bottom: 4px;">Order ID</div>' +
-                      '<div style="font-size: 20px; font-weight: 700; color: #059669;">' + (result.orderName || result.orderId) + '</div>' +
+                      '<div style="text-align: center; padding: 20px 10px;">' +
+                      
+                      // Animated checkmark
+                      '<div style="margin: 0 auto 24px; width: 80px; height: 80px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 40px rgba(16, 185, 129, 0.3); animation: successPop 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);">' +
+                      '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="animation: checkDraw 0.5s ease 0.3s forwards; stroke-dasharray: 100; stroke-dashoffset: 100;"><polyline points="20 6 9 17 4 12"></polyline></svg>' +
                       '</div>' +
-                      '<p style="color: #6b7280; font-size: 14px; margin-top: 12px;">' + (result.message || 'Thank you for your order!') + '</p>' +
-                      '</div>';
-              }
-              
-              form.style.display = 'none';
-              successDiv.style.display = 'block';
-              
-              // Close modal after 3.5 seconds
-              setTimeout(() => {
+                      
+                      // Success message
+                      '<h3 style="margin: 0 0 8px 0; font-size: 24px; font-weight: 700; color: #111827; letter-spacing: -0.5px;">Order Confirmed!</h3>' +
+                      '<p style="margin: 0 0 24px 0; font-size: 14px; color: #6b7280; line-height: 1.5;">Your order has been placed successfully</p>' +
+                      
+                      // Order ID card with gradient
+                      '<div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 1px solid #86efac; border-radius: 16px; padding: 20px; margin: 0 auto 24px; max-width: 280px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">' +
+                      '<div style="font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #059669; font-weight: 600; margin-bottom: 8px;">Order ID</div>' +
+                      '<div style="font-size: 22px; font-weight: 800; color: #047857; font-family: monospace; letter-spacing: 1px;">' + (result.orderName || result.orderId) + '</div>' +
+                      '</div>' +
+                      
+                      // Thank you message with icon
+                      '<div style="display: flex; align-items: center; justify-content: center; gap: 8px; color: #6b7280; font-size: 13px;">' +
+                      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>' +
+                      '<span>Thank you for your order!</span>' +
+                      '</div>' +
+                      
+                      '</div>' +
+                      
+                      // Add CSS animations
+                      '<style>' +
+                      '@keyframes successPop { 0% { transform: scale(0) rotate(-180deg); opacity: 0; } 100% { transform: scale(1) rotate(0deg); opacity: 1; } }' +
+                      '@keyframes checkDraw { to { stroke-dashoffset: 0; } }' +
+                      '</style>';
+                  
+                  // Hide all form fields
+                  var fieldsContainer = form.querySelector('.cod-dynamic-fields-container');
+                  var submitBtn = form.querySelector('button[type="submit"]');
+                  var totalDiv = form.querySelector('.cod-total');
+                  var orderSummary = form.querySelector('.cod-order-summary');
+                  
+                  if (fieldsContainer) fieldsContainer.style.display = 'none';
+                  if (submitBtn) submitBtn.style.display = 'none';
+                  if (totalDiv) totalDiv.style.display = 'none';
+                  if (orderSummary) orderSummary.style.display = 'none';
+                  
+                  // Show success message
+                  successDiv.style.display = 'flex';
+                  
+                  // Close modal after 3.5 seconds and reset
+                  setTimeout(() => {
+                      closeModal(productId);
+                      // Reset form for next use
+                      form.reset();
+                      if (fieldsContainer) fieldsContainer.style.display = 'block';
+                      if (submitBtn) submitBtn.style.display = 'block';
+                      if (totalDiv) totalDiv.style.display = 'flex';
+                      if (orderSummary) orderSummary.style.display = 'block';
+                      successDiv.style.display = 'none';
+                  }, 3500);
+              } else {
+                  console.error('[COD Form] Success message elements not found');
                   closeModal(productId);
-                  // Reset form for next use
-                  form.reset();
-                  form.style.display = 'block';
-                  successDiv.style.display = 'none';
-              }, 3500);
+              }
           } else {
               throw new Error(result.error || result.message || 'Order failed');
           }
