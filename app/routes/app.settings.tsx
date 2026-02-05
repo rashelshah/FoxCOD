@@ -156,11 +156,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         appUrl = url.origin;
     }
 
-    return {
-        shop: shopDomain,
-        settings: settings ? { ...defaultSettings, ...settings } : { ...defaultSettings, shop_domain: shopDomain },
-        appUrl: appUrl,
-    };
+    const merged = settings
+        ? {
+            ...defaultSettings,
+            ...settings,
+            styles: { ...DEFAULT_STYLES, ...(settings.styles || {}) },
+            button_styles: { ...DEFAULT_BUTTON_STYLES, ...(settings.button_styles || {}) },
+        }
+        : { ...defaultSettings, shop_domain: shopDomain };
+    return { shop: shopDomain, settings: merged, appUrl };
 };
 
 /**
@@ -350,33 +354,37 @@ const PreviewDisplay = memo(({
     fields, formStyles, buttonStylesState, blocks, shippingOpts, activeTab
 }: any) => {
 
-    // Calculate button styles - use primaryColor as the main color
+    // Calculate button styles - sync with storefront
     const getButtonStyle = () => {
-        const buttonColor = primaryColor; // Use primaryColor directly
+        const btn = buttonStylesState || {};
+        const buttonColor = primaryColor;
+        const borderCol = btn.borderColor || buttonColor;
+        const borderW = btn.borderWidth ?? 0;
         const base: any = {
             width: '100%',
             padding: buttonSize === 'small' ? '10px' : buttonSize === 'large' ? '16px' : '13px',
-            borderRadius: (buttonStylesState?.borderRadius || borderRadius) + 'px',
-            fontWeight: 600,
-            fontSize: buttonSize === 'small' ? '13px' : buttonSize === 'large' ? '15px' : '14px',
-            border: 'none',
+            borderRadius: (btn.borderRadius ?? borderRadius) + 'px',
+            fontWeight: btn.fontStyle === 'bold' ? 700 : 400,
+            fontStyle: btn.fontStyle === 'italic' ? 'italic' : 'normal',
+            fontSize: (btn.textSize ?? 15) + 'px',
+            border: borderW ? `${borderW}px solid ${borderCol}` : 'none',
             cursor: 'pointer',
             transition: 'all 0.2s ease',
-            color: 'white',
-            background: buttonColor,
-            boxShadow: buttonStylesState?.shadow ? '0 4px 6px rgba(0,0,0,0.1)' : 'none'
+            color: btn.textColor || '#ffffff',
+            background: btn.backgroundColor || buttonColor,
+            boxShadow: btn.shadow ? '0 4px 6px rgba(0,0,0,0.1)' : 'none'
         };
 
         if (buttonStyle === 'outline') {
-            base.background = 'none'; // Use 'none' instead of 'transparent'
+            base.background = 'transparent';
             base.backgroundColor = 'transparent';
-            base.border = `2px solid ${buttonColor}`;
-            base.color = buttonColor;
+            base.border = `${Math.max(borderW, 2)}px solid ${borderCol}`;
+            base.color = btn.textColor || buttonColor;
             base.boxShadow = 'none';
         } else if (buttonStyle === 'gradient') {
             const darkColor = darkenColor(buttonColor, 25);
             base.background = `linear-gradient(135deg, ${buttonColor} 0%, ${darkColor} 100%)`;
-            base.boxShadow = buttonStylesState?.shadow ? '0 6px 12px rgba(0,0,0,0.2)' : 'none';
+            base.boxShadow = btn.shadow ? '0 6px 12px rgba(0,0,0,0.2)' : 'none';
         }
         return base;
     };
@@ -405,26 +413,30 @@ const PreviewDisplay = memo(({
         return base;
     };
 
-    // Get label styles
+    // Get label styles - sync with storefront
     const getLabelStyle = () => ({
         display: 'block',
-        fontSize: '11px',
-        fontWeight: 600,
+        fontSize: (formStyles?.textSize ?? 14) + 'px',
+        fontWeight: formStyles?.fontStyle === 'bold' ? 700 : 600,
+        fontStyle: formStyles?.fontStyle === 'italic' ? 'italic' : 'normal',
         color: formStyles?.textColor || '#374151',
         marginBottom: '4px',
-        textAlign: formStyles?.labelAlignment || 'left'
+        textAlign: (formStyles?.labelAlignment || 'left') as any
     });
 
-    // Get input styles
+    // Get input styles - sync with storefront
     const getInputStyle = () => ({
         width: '100%',
         padding: '10px 12px',
         marginBottom: '8px',
-        border: '1px solid #e5e7eb',
-        borderRadius: (formStyles?.borderRadius || 8) + 'px',
-        fontSize: '12px',
+        border: `${formStyles?.borderWidth ?? 1}px solid ${formStyles?.borderColor || '#e5e7eb'}`,
+        borderRadius: (formStyles?.borderRadius ?? 8) + 'px',
+        fontSize: (formStyles?.textSize ?? 14) + 'px',
+        fontWeight: formStyles?.fontStyle === 'bold' ? 700 : 400,
+        fontStyle: formStyles?.fontStyle === 'italic' ? 'italic' : 'normal',
         boxSizing: 'border-box' as const,
-        background: '#ffffff'
+        background: formStyles?.backgroundColor || '#ffffff',
+        boxShadow: formStyles?.shadow ? '0 1px 2px rgba(0,0,0,0.05)' : 'none'
     });
 
     // Animation indicator
@@ -434,13 +446,17 @@ const PreviewDisplay = memo(({
         return '✨ Fade';
     };
 
-    // Field icons - exact match to storefront (cod-form.js) - 18x18, inside input on left
+    // Field icons - exact match to storefront (cod-form.js) - iconColor, iconBackground
     const FieldIconSvg = ({ fieldId, isTextarea }: { fieldId: string; isTextarea?: boolean }) => {
         const s: React.CSSProperties = {
             width: 18, height: 18, position: 'absolute', left: 12,
             top: isTextarea ? 12 : '50%',
             transform: isTextarea ? 'none' : 'translateY(-50%)',
-            color: '#6b7280', pointerEvents: 'none'
+            color: formStyles?.iconColor || '#6b7280',
+            backgroundColor: formStyles?.iconBackground || 'transparent',
+            borderRadius: 4,
+            padding: 2,
+            pointerEvents: 'none'
         };
         const svgs: Record<string, React.ReactNode> = {
             phone: <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" /></svg>,
@@ -623,17 +639,7 @@ const PreviewDisplay = memo(({
                                         </div>
                                     )}
 
-                                    <button className="preview-submit" style={{
-                                        background: buttonStyle === 'outline'
-                                            ? 'transparent'
-                                            : buttonStyle === 'gradient'
-                                                ? `linear-gradient(135deg, ${primaryColor} 0%, ${darkenColor(primaryColor, 25)} 100%)`
-                                                : primaryColor,
-                                        border: buttonStyle === 'outline' ? `2px solid ${primaryColor}` : 'none',
-                                        borderRadius: (buttonStylesState?.borderRadius || borderRadius) + 'px',
-                                        color: buttonStyle === 'outline' ? primaryColor : '#ffffff',
-                                        boxShadow: buttonStylesState?.shadow ? '0 4px 6px rgba(0,0,0,0.1)' : 'none'
-                                    }}>
+                                    <button className="preview-submit" style={getButtonStyle()}>
                                         {submitButtonText || 'Place Order'}
                                     </button>
                                 </div>
@@ -1247,6 +1253,69 @@ export default function SettingsPage() {
                                             ))}
                                         </div>
                                     </div>
+
+                                    <div className="settings-card">
+                                        <h3 className="card-title"><span>✏️</span> Button Typography</h3>
+                                        <div className="input-group">
+                                            <label className="input-label">Text Color</label>
+                                            <div className="color-presets" style={{ marginTop: 6 }}>
+                                                <input type="color" value={buttonStylesState?.textColor || '#ffffff'} onChange={(e) => setButtonStylesState(s => ({ ...s, textColor: e.target.value }))} style={{ width: 40, height: 36, borderRadius: 8, border: '1px solid #e5e7eb', cursor: 'pointer' }} />
+                                                <span style={{ fontSize: 12, color: '#6b7280', marginLeft: 8 }}>{(buttonStylesState?.textColor || '#ffffff')}</span>
+                                            </div>
+                                        </div>
+                                        <div className="input-group" style={{ marginTop: 12 }}>
+                                            <label className="input-label">Text Size (px)</label>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                                <input type="range" min="12" max="24" value={buttonStylesState?.textSize ?? 15} onChange={(e) => setButtonStylesState(s => ({ ...s, textSize: parseInt(e.target.value) }))} style={{ flex: 1 }} />
+                                                <span style={{ fontSize: 13, fontWeight: 600, minWidth: 28 }}>{buttonStylesState?.textSize ?? 15}</span>
+                                            </div>
+                                        </div>
+                                        <div className="input-group" style={{ marginTop: 12 }}>
+                                            <label className="input-label">Font Style</label>
+                                            <div className="style-options">
+                                                {(['normal', 'bold', 'italic'] as const).map((fs) => (
+                                                    <button key={fs} type="button" className={`style-option ${(buttonStylesState?.fontStyle || 'bold') === fs ? 'active' : ''}`} onClick={() => setButtonStylesState(s => ({ ...s, fontStyle: fs }))} style={{ fontStyle: fs === 'italic' ? 'italic' : undefined, fontWeight: fs === 'bold' ? 700 : undefined }}>
+                                                        {fs.charAt(0).toUpperCase() + fs.slice(1)}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="settings-card">
+                                        <h3 className="card-title"><span>🔲</span> Button Border & Effects</h3>
+                                        <div className="input-group">
+                                            <label className="input-label">Border Color</label>
+                                            <div className="color-presets" style={{ marginTop: 6 }}>
+                                                <input type="color" value={buttonStylesState?.borderColor || primaryColor} onChange={(e) => setButtonStylesState(s => ({ ...s, borderColor: e.target.value }))} style={{ width: 40, height: 36, borderRadius: 8, border: '1px solid #e5e7eb', cursor: 'pointer' }} />
+                                            </div>
+                                        </div>
+                                        <div className="input-group" style={{ marginTop: 12 }}>
+                                            <label className="input-label">Border Width (px)</label>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                                <input type="range" min="0" max="4" value={buttonStylesState?.borderWidth ?? 0} onChange={(e) => setButtonStylesState(s => ({ ...s, borderWidth: parseInt(e.target.value) }))} style={{ flex: 1 }} />
+                                                <span style={{ fontSize: 13, fontWeight: 600, minWidth: 20 }}>{buttonStylesState?.borderWidth ?? 0}</span>
+                                            </div>
+                                        </div>
+                                        <div className="input-group" style={{ marginTop: 12 }}>
+                                            <label className="input-label">Rounded Corners (px)</label>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                                <input type="range" min="0" max="24" value={buttonStylesState?.borderRadius ?? 12} onChange={(e) => setButtonStylesState(s => ({ ...s, borderRadius: parseInt(e.target.value) }))} style={{ flex: 1 }} />
+                                                <span style={{ fontSize: 13, fontWeight: 600, minWidth: 28 }}>{buttonStylesState?.borderRadius ?? 12}</span>
+                                            </div>
+                                        </div>
+                                        <div className="toggle-option" style={{ marginTop: 12 }} onClick={() => setButtonStylesState(s => ({ ...s, shadow: !s.shadow }))}>
+                                            <span className="toggle-option-label">Shadow</span>
+                                            <div className={`mini-toggle ${buttonStylesState?.shadow ? 'on' : 'off'}`} />
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setButtonStylesState({ ...DEFAULT_BUTTON_STYLES })}
+                                            style={{ marginTop: 16, padding: '10px 16px', fontSize: 13, fontWeight: 600, color: '#6366f1', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid #6366f1', borderRadius: 10, cursor: 'pointer' }}
+                                        >
+                                            Restore to Default
+                                        </button>
+                                    </div>
                                 </>
                             )}
 
@@ -1300,6 +1369,93 @@ export default function SettingsPage() {
                                                 + Add Custom Field
                                             </button>
                                         </div>
+                                    </div>
+
+                                    {/* Form Field Styling - above Content Blocks */}
+                                    <div className="settings-card">
+                                        <h3 className="card-title"><span>🎨</span> Form Field Styling</h3>
+                                        <div className="input-group">
+                                            <label className="input-label">Text Color</label>
+                                            <div className="color-presets" style={{ marginTop: 6 }}>
+                                                <input type="color" value={formStyles?.textColor || '#333333'} onChange={(e) => setFormStyles(s => ({ ...s, textColor: e.target.value }))} style={{ width: 40, height: 36, borderRadius: 8, border: '1px solid #e5e7eb', cursor: 'pointer' }} />
+                                            </div>
+                                        </div>
+                                        <div className="input-group" style={{ marginTop: 12 }}>
+                                            <label className="input-label">Text Size (px)</label>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                                <input type="range" min="11" max="20" value={formStyles?.textSize ?? 14} onChange={(e) => setFormStyles(s => ({ ...s, textSize: parseInt(e.target.value) }))} style={{ flex: 1 }} />
+                                                <span style={{ fontSize: 13, fontWeight: 600, minWidth: 28 }}>{formStyles?.textSize ?? 14}</span>
+                                            </div>
+                                        </div>
+                                        <div className="input-group" style={{ marginTop: 12 }}>
+                                            <label className="input-label">Font Style</label>
+                                            <div className="style-options">
+                                                {(['normal', 'bold', 'italic'] as const).map((fs) => (
+                                                    <button key={fs} type="button" className={`style-option ${(formStyles?.fontStyle || 'normal') === fs ? 'active' : ''}`} onClick={() => setFormStyles(s => ({ ...s, fontStyle: fs }))} style={{ fontStyle: fs === 'italic' ? 'italic' : undefined, fontWeight: fs === 'bold' ? 700 : undefined }}>
+                                                        {fs.charAt(0).toUpperCase() + fs.slice(1)}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="input-group" style={{ marginTop: 12 }}>
+                                            <label className="input-label">Border Color</label>
+                                            <div className="color-presets" style={{ marginTop: 6 }}>
+                                                <input type="color" value={formStyles?.borderColor || '#d1d5db'} onChange={(e) => setFormStyles(s => ({ ...s, borderColor: e.target.value }))} style={{ width: 40, height: 36, borderRadius: 8, border: '1px solid #e5e7eb', cursor: 'pointer' }} />
+                                            </div>
+                                        </div>
+                                        <div className="input-group" style={{ marginTop: 12 }}>
+                                            <label className="input-label">Border Width (px)</label>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                                <input type="range" min="0" max="3" value={formStyles?.borderWidth ?? 1} onChange={(e) => setFormStyles(s => ({ ...s, borderWidth: parseInt(e.target.value) }))} style={{ flex: 1 }} />
+                                                <span style={{ fontSize: 13, fontWeight: 600, minWidth: 20 }}>{formStyles?.borderWidth ?? 1}</span>
+                                            </div>
+                                        </div>
+                                        <div className="input-group" style={{ marginTop: 12 }}>
+                                            <label className="input-label">Rounded Corners (px)</label>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                                <input type="range" min="0" max="20" value={formStyles?.borderRadius ?? 12} onChange={(e) => setFormStyles(s => ({ ...s, borderRadius: parseInt(e.target.value) }))} style={{ flex: 1 }} />
+                                                <span style={{ fontSize: 13, fontWeight: 600, minWidth: 28 }}>{formStyles?.borderRadius ?? 12}</span>
+                                            </div>
+                                        </div>
+                                        <div className="toggle-option" style={{ marginTop: 12 }} onClick={() => setFormStyles(s => ({ ...s, shadow: !s.shadow }))}>
+                                            <span className="toggle-option-label">Shadow</span>
+                                            <div className={`mini-toggle ${formStyles?.shadow ? 'on' : 'off'}`} />
+                                        </div>
+                                        <div className="input-group" style={{ marginTop: 12 }}>
+                                            <label className="input-label">Background Color</label>
+                                            <div className="color-presets" style={{ marginTop: 6 }}>
+                                                <input type="color" value={formStyles?.backgroundColor || '#ffffff'} onChange={(e) => setFormStyles(s => ({ ...s, backgroundColor: e.target.value }))} style={{ width: 40, height: 36, borderRadius: 8, border: '1px solid #e5e7eb', cursor: 'pointer' }} />
+                                            </div>
+                                        </div>
+                                        <div className="input-group" style={{ marginTop: 12 }}>
+                                            <label className="input-label">Labels Alignment</label>
+                                            <div className="style-options">
+                                                {(['left', 'center', 'right'] as const).map((a) => (
+                                                    <button key={a} type="button" className={`style-option ${(formStyles?.labelAlignment || 'left') === a ? 'active' : ''}`} onClick={() => setFormStyles(s => ({ ...s, labelAlignment: a }))}>
+                                                        {a.charAt(0).toUpperCase() + a.slice(1)}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="input-group" style={{ marginTop: 12 }}>
+                                            <label className="input-label">Icon Color</label>
+                                            <div className="color-presets" style={{ marginTop: 6 }}>
+                                                <input type="color" value={formStyles?.iconColor || '#6b7280'} onChange={(e) => setFormStyles(s => ({ ...s, iconColor: e.target.value }))} style={{ width: 40, height: 36, borderRadius: 8, border: '1px solid #e5e7eb', cursor: 'pointer' }} />
+                                            </div>
+                                        </div>
+                                        <div className="input-group" style={{ marginTop: 12 }}>
+                                            <label className="input-label">Icon Background</label>
+                                            <div className="color-presets" style={{ marginTop: 6 }}>
+                                                <input type="color" value={formStyles?.iconBackground || '#f3f4f6'} onChange={(e) => setFormStyles(s => ({ ...s, iconBackground: e.target.value }))} style={{ width: 40, height: 36, borderRadius: 8, border: '1px solid #e5e7eb', cursor: 'pointer' }} />
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setFormStyles({ ...DEFAULT_STYLES })}
+                                            style={{ marginTop: 16, padding: '10px 16px', fontSize: 13, fontWeight: 600, color: '#6366f1', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid #6366f1', borderRadius: 10, cursor: 'pointer' }}
+                                        >
+                                            Restore to Default
+                                        </button>
                                     </div>
 
                                     {/* Content Blocks */}
@@ -1505,6 +1661,21 @@ export default function SettingsPage() {
                                                 <div className={`mini-toggle ${showPrice ? 'on' : 'off'}`} />
                                             </div>
                                         </div>
+                                    </div>
+                                    <div className="settings-card">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setModalStyle('modern');
+                                                setAnimationStyle('fade');
+                                                setBorderRadius(12);
+                                                setShowProductImage(true);
+                                                setShowPrice(true);
+                                            }}
+                                            style={{ padding: '10px 16px', fontSize: 13, fontWeight: 600, color: '#6366f1', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid #6366f1', borderRadius: 10, cursor: 'pointer' }}
+                                        >
+                                            Restore to Default
+                                        </button>
                                     </div>
                                 </>
                             )}

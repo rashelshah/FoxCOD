@@ -32,6 +32,10 @@ export interface ContentBlocks {
  */
 export interface FormStyles {
     textColor: string;
+    textSize: number;       // px
+    fontStyle: 'normal' | 'bold' | 'italic';
+    borderColor: string;
+    borderWidth: number;
     backgroundColor: string;
     labelAlignment: 'left' | 'center' | 'right';
     iconColor: string;
@@ -45,6 +49,8 @@ export interface FormStyles {
  */
 export interface ButtonStyles {
     textColor: string;
+    textSize: number;       // px
+    fontStyle: 'normal' | 'bold' | 'italic';
     backgroundColor: string;
     borderColor: string;
     borderWidth: number;
@@ -102,9 +108,13 @@ export const DEFAULT_BLOCKS: ContentBlocks = {
  */
 export const DEFAULT_STYLES: FormStyles = {
     textColor: '#333333',
+    textSize: 14,
+    fontStyle: 'normal',
+    borderColor: '#d1d5db',
+    borderWidth: 1,
     backgroundColor: '#ffffff',
     labelAlignment: 'left',
-    iconColor: '#6366f1',
+    iconColor: '#6b7280',
     iconBackground: '#f3f4f6',
     borderRadius: 12,
     shadow: true,
@@ -115,6 +125,8 @@ export const DEFAULT_STYLES: FormStyles = {
  */
 export const DEFAULT_BUTTON_STYLES: ButtonStyles = {
     textColor: '#ffffff',
+    textSize: 15,
+    fontStyle: 'bold',
     backgroundColor: '#6366f1',
     borderColor: '#6366f1',
     borderWidth: 0,

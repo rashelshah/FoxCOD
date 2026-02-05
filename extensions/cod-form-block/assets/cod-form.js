@@ -92,6 +92,9 @@
         customFields: safeJSONParse(dataContainer.dataset.customFields, []),
         styles: safeJSONParse(dataContainer.dataset.styles, {}),
         buttonStyles: safeJSONParse(dataContainer.dataset.buttonStyles, {}),
+        buttonTextColor: dataContainer.dataset.buttonTextColor || null,
+        buttonBorderColor: dataContainer.dataset.buttonBorderColor || null,
+        buttonBorderWidth: dataContainer.dataset.buttonBorderWidth != null ? parseInt(dataContainer.dataset.buttonBorderWidth, 10) : null,
         shippingOptions: safeJSONParse(dataContainer.dataset.shippingOptions, {}),
         
         // Legacy/Direct props
@@ -150,21 +153,25 @@
         
         buttonsFound = true;
         
-        // Calculate Button Styles
+        // Calculate Button Styles - prefer explicit data attrs for text color, border (synced from Liquid)
         var btnStyles = config.buttonStyles || {};
+        var textColor = config.buttonTextColor || btnStyles.textColor || '#ffffff';
+        var borderColor = config.buttonBorderColor || btnStyles.borderColor || config.primaryColor;
+        var borderWidth = config.buttonBorderWidth != null && !isNaN(config.buttonBorderWidth) ? config.buttonBorderWidth : (btnStyles.borderWidth ?? 0);
         var baseStyles = {
           width: '100%',
-          padding: config.buttonStyles.buttonSize === 'small' ? '10px' : config.buttonStyles.buttonSize === 'large' ? '16px' : '14px',
-          borderRadius: (btnStyles.borderRadius || config.borderRadius) + 'px',
-          fontWeight: 600,
-          fontSize: config.buttonStyles.buttonSize === 'small' ? '13px' : config.buttonStyles.buttonSize === 'large' ? '16px' : '14px',
-          border: btnStyles.borderWidth ? btnStyles.borderWidth + 'px solid ' + (btnStyles.borderColor || config.primaryColor) : 'none',
+          padding: (config.buttonStyles && config.buttonStyles.buttonSize === 'small') ? '10px' : (config.buttonStyles && config.buttonStyles.buttonSize === 'large') ? '16px' : '14px',
+          borderRadius: (btnStyles.borderRadius ?? config.borderRadius) + 'px',
+          fontWeight: btnStyles.fontStyle === 'bold' ? 700 : 400,
+          fontStyle: btnStyles.fontStyle === 'italic' ? 'italic' : 'normal',
+          fontSize: (btnStyles.textSize ?? 15) + 'px',
+          border: borderWidth ? borderWidth + 'px solid ' + borderColor : 'none',
           cursor: 'pointer',
           transition: 'all 0.2s ease',
           textAlign: 'center',
           display: 'block',
           boxSizing: 'border-box',
-          color: btnStyles.textColor || '#ffffff',
+          color: textColor,
           backgroundColor: btnStyles.backgroundColor || config.primaryColor,
           boxShadow: btnStyles.shadow ? '0 4px 6px rgba(0,0,0,0.1)' : 'none'
         };
@@ -293,11 +300,18 @@
     console.log('[COD Form] Config fields:', config.fields);
     console.log('[COD Form] Config.styles:', config.styles);
     
-    // Ensure styles object exists with defaults
     var styles = config.styles || {};
     var textColor = styles.textColor || '#374151';
+    var textSize = styles.textSize ?? 14;
+    var fontStyle = styles.fontStyle || 'normal';
     var labelAlignment = styles.labelAlignment || 'left';
-    var borderRadius = styles.borderRadius || 6;
+    var borderRadius = styles.borderRadius ?? 6;
+    var borderColor = styles.borderColor || '#d1d5db';
+    var borderWidth = styles.borderWidth ?? 1;
+    var backgroundColor = styles.backgroundColor || '#ffffff';
+    var iconColor = styles.iconColor || '#6b7280';
+    var iconBackground = styles.iconBackground || 'transparent';
+    var hasShadow = styles.shadow !== false;
     
     container.innerHTML = '';
     
@@ -318,12 +332,12 @@
         wrapper.className = 'cod-form-field';
         wrapper.style.marginBottom = '12px';
 
-        // Label
         var label = document.createElement('label');
         label.style.display = 'block';
-        label.style.fontWeight = '600';
+        label.style.fontWeight = fontStyle === 'bold' ? '700' : '600';
+        label.style.fontStyle = fontStyle === 'italic' ? 'italic' : 'normal';
         label.style.marginBottom = '6px';
-        label.style.fontSize = '14px';
+        label.style.fontSize = textSize + 'px';
         label.style.color = textColor;
         label.style.textAlign = labelAlignment;
         label.innerHTML = field.label + (field.required ? ' <span style="color:red">*</span>' : '');
@@ -359,7 +373,10 @@
             iconWrapper.style.left = '12px';
             iconWrapper.style.top = field.type === 'textarea' ? '12px' : '50%';
             iconWrapper.style.transform = field.type === 'textarea' ? 'none' : 'translateY(-50%)';
-            iconWrapper.style.color = '#6b7280';
+            iconWrapper.style.color = iconColor;
+            iconWrapper.style.backgroundColor = iconBackground !== 'transparent' ? iconBackground : '';
+            iconWrapper.style.borderRadius = '4px';
+            iconWrapper.style.padding = '2px';
             iconWrapper.style.pointerEvents = 'none';
             iconWrapper.style.zIndex = '1';
             iconWrapper.style.display = 'flex';
@@ -402,12 +419,15 @@
             input.max = config.maxQuantity || 10;
         }
         
-        // Input Styles with padding for icon on left
         input.style.width = '100%';
         input.style.padding = field.type === 'textarea' ? '10px 12px 10px 40px' : '10px 12px 10px 40px';
-        input.style.border = '1px solid #d1d5db';
+        input.style.border = borderWidth + 'px solid ' + borderColor;
         input.style.borderRadius = borderRadius + 'px';
-        input.style.fontSize = '14px';
+        input.style.fontSize = textSize + 'px';
+        input.style.fontWeight = fontStyle === 'bold' ? '700' : '400';
+        input.style.fontStyle = fontStyle === 'italic' ? 'italic' : 'normal';
+        input.style.backgroundColor = backgroundColor;
+        input.style.boxShadow = hasShadow ? '0 1px 2px rgba(0,0,0,0.05)' : 'none';
         input.style.boxSizing = 'border-box';
         input.style.marginBottom = '4px';
 

@@ -79,6 +79,7 @@
 {% assign cod_custom_fields = shop.metafields.fox_cod.custom_fields | default: '[]' %}
 {% assign cod_styles = shop.metafields.fox_cod.styles | default: '{}' %}
 {% assign cod_button_styles = shop.metafields.fox_cod.button_styles_json | default: '{}' %}
+{% assign btn_styles = cod_button_styles | parse_json %}
 {% assign cod_shipping_options = shop.metafields.fox_cod.shipping_options | default: '{}' %}
 
 {% comment %} Only render COD functionality if enabled in the app {% endcomment %}
@@ -103,6 +104,9 @@
      data-custom-fields="{{ cod_custom_fields | escape }}"
      data-styles="{{ cod_styles | escape }}"
      data-button-styles="{{ cod_button_styles | escape }}"
+     data-button-text-color="{{ btn_styles.textColor | default: '#ffffff' }}"
+     data-button-border-color="{{ btn_styles.borderColor | default: cod_primary_color }}"
+     data-button-border-width="{{ btn_styles.borderWidth | default: 0 }}"
      data-shipping-options="{{ cod_shipping_options | escape }}"
      data-modal-style="{{ cod_modal_style }}"
      data-anim-style="{{ cod_anim_style }}"
@@ -477,47 +481,53 @@
 </style>
 
 <style>
-  /* Dynamic Styles from Metafields */
+  /* Dynamic Styles from Metafields - button_styles sync text color, border, etc. */
   :root {
       --cod-primary: {{ cod_primary_color }};
       --cod-radius: {{ cod_border_radius }}px;
       --cod-btn-size: {% if cod_button_size == 'small' %}10px 20px{% elsif cod_button_size == 'large' %}16px 32px{% else %}14px 28px{% endif %};
       --cod-btn-font: {% if cod_button_size == 'small' %}14px{% elsif cod_button_size == 'large' %}18px{% else %}16px{% endif %};
+      --cod-btn-text: {{ btn_styles.textColor | default: '#ffffff' }};
+      --cod-btn-border-color: {{ btn_styles.borderColor | default: cod_primary_color }};
+      --cod-btn-border-width: {{ btn_styles.borderWidth | default: 0 }}px;
+      --cod-btn-radius: {{ btn_styles.borderRadius | default: cod_border_radius }}px;
+      --cod-btn-bg: {{ btn_styles.backgroundColor | default: cod_primary_color }};
   }
 
-  /* Base Button Styles */
+  /* Base Button Styles - use button_styles for text, border, radius */
   .cod-buy-btn, .cod-submit-btn {
-      background-color: var(--cod-primary) !important;
-      border-radius: var(--cod-radius) !important;
+      background-color: var(--cod-btn-bg) !important;
+      border-radius: var(--cod-btn-radius) !important;
       padding: var(--cod-btn-size) !important;
-      font-size: var(--cod-btn-font) !important;
-      border: none !important;
-      color: white !important;
+      font-size: {{ btn_styles.textSize | default: 15 }}px !important;
+      font-weight: {% if btn_styles.fontStyle == 'bold' %}700{% else %}400{% endif %} !important;
+      font-style: {% if btn_styles.fontStyle == 'italic' %}italic{% else %}normal{% endif %} !important;
+      border: var(--cod-btn-border-width) solid var(--cod-btn-border-color) !important;
+      color: var(--cod-btn-text) !important;
       cursor: pointer !important;
       transition: all 0.2s ease !important;
+      box-shadow: {% if btn_styles.shadow %}0 4px 6px rgba(0,0,0,0.1){% else %}none{% endif %} !important;
   }
 
   /* Outline Style */
   {% if cod_button_style == 'outline' %}
   .cod-buy-btn, .cod-submit-btn {
       background-color: transparent !important;
-      border: 2px solid var(--cod-primary) !important;
-      color: var(--cod-primary) !important;
+      border: 2px solid var(--cod-btn-border-color) !important;
+      color: var(--cod-btn-text) !important;
   }
   .cod-buy-btn:hover, .cod-submit-btn:hover {
       background-color: var(--cod-primary) !important;
-      color: white !important;
+      color: var(--cod-btn-text) !important;
   }
   {% endif %}
 
-  /* Gradient Style - More visible with darker bottom */
+  /* Gradient Style */
   {% if cod_button_style == 'gradient' %}
   .cod-buy-btn, .cod-submit-btn {
-      /* Fallback to primary */
       background-color: var(--cod-primary) !important;
-      /* Darker gradient overlay for more visible effect */
       background-image: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(0,0,0,0.25) 100%) !important;
-      box-shadow: 0 6px 12px -2px rgba(0, 0, 0, 0.2), 0 3px 6px -3px rgba(0, 0, 0, 0.15) !important;
+      box-shadow: {% if btn_styles.shadow %}0 6px 12px -2px rgba(0, 0, 0, 0.2), 0 3px 6px -3px rgba(0, 0, 0, 0.15){% else %}none{% endif %} !important;
   }
   {% endif %}
   
