@@ -443,7 +443,11 @@
         input.style.fontWeight = fontStyle === 'bold' ? '700' : '400';
         input.style.fontStyle = fontStyle === 'italic' ? 'italic' : 'normal';
         input.style.color = textColor; // Input text color
-        input.style.backgroundColor = styles.fieldBackgroundColor || '#ffffff'; // Field background
+        if (styles.fieldBackgroundColor) {
+            input.style.setProperty('background-color', styles.fieldBackgroundColor, 'important');
+        } else {
+            input.style.backgroundColor = '#ffffff';
+        }
         input.style.boxShadow = hasShadow ? '0 1px 2px rgba(0,0,0,0.05)' : 'none';
         input.style.boxSizing = 'border-box';
         input.style.marginBottom = '4px';
@@ -738,13 +742,16 @@
       var styles = config.styles || {};
       
       // Apply modal style preset (glassmorphism, minimal, modern)
+      var userBgColor = styles.backgroundColor || '#ffffff';
+      console.log('[COD Form] Modal style:', config.modalStyle, 'Background color:', userBgColor);
+      
       if (config.modalStyle === 'glassmorphism') {
-          container.style.background = 'rgba(255, 255, 255, 0.8)';
+          container.style.setProperty('background', userBgColor, 'important');
           container.style.backdropFilter = 'blur(10px)';
           container.style.boxShadow = '0 8px 32px 0 rgba(31, 38, 135, 0.37)';
           container.style.border = '1px solid rgba(255, 255, 255, 0.18)';
       } else if (config.modalStyle === 'minimal') {
-          container.style.background = styles.backgroundColor || '#ffffff';
+          container.style.background = userBgColor;
           container.style.border = '1px solid #e5e7eb';
           container.style.boxShadow = 'none';
       } else {

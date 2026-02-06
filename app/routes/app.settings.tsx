@@ -4,7 +4,7 @@
  * EasySell-inspired design with comprehensive options
  */
 
-import { useState, useCallback, memo } from "react";
+import { useState, useCallback, memo, useDeferredValue } from "react";
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
 import { useLoaderData, useSubmit, useNavigation, Link } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
@@ -373,15 +373,20 @@ const PreviewDisplay = memo(({
             cursor: 'pointer',
             transition: 'all 0.2s ease',
             color: btn.textColor || '#ffffff',
-            background: btn.backgroundColor || buttonColor,
+            background: buttonColor, // Prefer global color over potentially stale local style
             boxShadow: btn.shadow ? '0 4px 6px rgba(0,0,0,0.1)' : 'none'
         };
 
         if (buttonStyle === 'outline') {
             base.background = 'transparent';
             base.backgroundColor = 'transparent';
-            base.border = `${Math.max(borderW, 2)}px solid ${borderCol}`;
-            base.color = btn.textColor || buttonColor;
+            // Use buttonColor (selected global color) for outline border unless strictly overridden by a specific check interaction
+            // Assuming user wants outline to match the "Button Color" picker they just used
+            base.border = borderW > 0 ? `${borderW}px solid ${buttonColor}` : 'none';
+            // If text color is white (default) or not set, use primary color for outline
+            // Otherwise respect the custom text color
+            const isWhite = (btn.textColor || '#ffffff').toLowerCase() === '#ffffff';
+            base.color = isWhite ? buttonColor : btn.textColor;
             base.boxShadow = 'none';
         } else if (buttonStyle === 'gradient') {
             const darkColor = darkenColor(buttonColor, 25);
@@ -393,22 +398,26 @@ const PreviewDisplay = memo(({
 
     // Get modal container styles based on modalStyle and formStyles
     const getModalStyle = () => {
+        console.log('[Modal] Background color from formStyles:', formStyles?.backgroundColor);
+        const userBgColor = formStyles?.backgroundColor || '#ffffff';
+
         const base: any = {
             borderRadius: (formStyles?.borderRadius || borderRadius) + 'px',
             padding: '16px',
             marginTop: '12px',
             transition: 'all 0.3s ease',
-            background: formStyles?.backgroundColor || '#f9fafb',
+            background: userBgColor,
             boxShadow: formStyles?.shadow ? '0 10px 25px rgba(0,0,0,0.1)' : 'none'
         };
 
         if (modalStyle === 'glassmorphism') {
-            base.background = 'rgba(255, 255, 255, 0.7)';
+            // Use user's color with transparency for glassmorphism effect
+            base.background = userBgColor; // Now respects user color
             base.backdropFilter = 'blur(10px)';
             base.border = '1px solid rgba(255,255,255,0.3)';
             base.boxShadow = formStyles?.shadow ? '0 8px 32px rgba(0,0,0,0.1)' : 'none';
         } else if (modalStyle === 'minimal') {
-            base.background = formStyles?.backgroundColor || '#ffffff';
+            base.background = userBgColor;
             base.border = '1px solid #e5e7eb';
             base.boxShadow = 'none';
         }
@@ -427,20 +436,24 @@ const PreviewDisplay = memo(({
     });
 
     // Get input styles - sync with storefront
-    const getInputStyle = () => ({
-        width: '100%',
-        padding: '10px 12px',
-        marginBottom: '8px',
-        border: `${formStyles?.borderWidth ?? 1}px solid ${formStyles?.borderColor || '#e5e7eb'}`,
-        borderRadius: (formStyles?.borderRadius ?? 8) + 'px',
-        fontSize: (formStyles?.textSize ?? 14) + 'px',
-        fontWeight: formStyles?.fontStyle === 'bold' ? 700 : 400,
-        fontStyle: formStyles?.fontStyle === 'italic' ? 'italic' : 'normal',
-        color: formStyles?.textColor || '#111827',
-        boxSizing: 'border-box' as const,
-        background: formStyles?.fieldBackgroundColor || '#ffffff',
-        boxShadow: formStyles?.shadow ? '0 1px 2px rgba(0,0,0,0.05)' : 'none'
-    });
+    const getInputStyle = () => {
+        const styles = {
+            width: '100%',
+            padding: '10px 12px',
+            marginBottom: '8px',
+            border: `${formStyles?.borderWidth ?? 1}px solid ${formStyles?.borderColor || '#e5e7eb'}`,
+            borderRadius: (formStyles?.borderRadius ?? 8) + 'px',
+            fontSize: (formStyles?.textSize ?? 14) + 'px',
+            fontWeight: formStyles?.fontStyle === 'bold' ? 700 : 400,
+            fontStyle: formStyles?.fontStyle === 'italic' ? 'italic' : 'normal',
+            color: formStyles?.textColor || '#111827',
+            boxSizing: 'border-box' as const,
+            // backgroundColor removed - set explicitly in preview divs to avoid React reconciliation conflicts
+            boxShadow: formStyles?.shadow ? '0 1px 2px rgba(0,0,0,0.05)' : 'none'
+        };
+        console.log('[Preview] getInputStyle - fieldBackgroundColor value:', formStyles?.fieldBackgroundColor);
+        return styles;
+    };
 
     // Animation indicator
     const getAnimationLabel = () => {
@@ -484,6 +497,9 @@ const PreviewDisplay = memo(({
     const discount = 200;
     const shippingCost = shippingOpts?.enabled ? (shippingOpts.options?.find((o: any) => o.id === shippingOpts.defaultOption)?.price || 0) : 0;
     const total = subtotal - discount + shippingCost;
+
+    // Use formStyles directly for immediate feedback
+    // const deferredFormStyles = useDeferredValue(formStyles);
 
     return (
         <div className="preview-panel">
@@ -532,13 +548,19 @@ const PreviewDisplay = memo(({
                                                 <div style={{ position: 'relative' }}>
                                                     <FieldIconSvg fieldId={field.id} isTextarea />
                                                     <textarea
-                                                        style={{ ...getInputStyle(), height: '50px', resize: 'none', paddingLeft: 40 } as any}
-                                                        placeholder={
-                                                            field.id === 'address' ? (addressPlaceholder || 'Enter address') :
-                                                                field.id === 'notes' ? (notesPlaceholder || 'Any notes...') :
-                                                                    `Enter ${field.label.toLowerCase()}`
-                                                        }
                                                         disabled
+                                                        placeholder={field.id === 'address' ? (addressPlaceholder || 'Enter address') :
+                                                            field.id === 'notes' ? (notesPlaceholder || 'Any notes...') :
+                                                                `Enter ${field.label.toLowerCase()}`}
+                                                        style={{
+                                                            ...getInputStyle(),
+                                                            height: '50px',
+                                                            paddingLeft: 40,
+                                                            resize: 'none',
+                                                            backgroundColor: formStyles?.fieldBackgroundColor || '#ffffff',
+                                                            cursor: 'not-allowed',
+                                                            opacity: 0.8
+                                                        } as any}
                                                     />
                                                 </div>
                                             ) : field.type === 'checkbox' ? (
@@ -550,15 +572,20 @@ const PreviewDisplay = memo(({
                                                 <div style={{ position: 'relative' }}>
                                                     <FieldIconSvg fieldId={field.id} />
                                                     <input
-                                                        type={field.type === 'tel' ? 'tel' : field.type === 'email' ? 'email' : field.type === 'number' ? 'number' : 'text'}
-                                                        style={{ ...getInputStyle(), paddingLeft: 40 } as any}
-                                                        placeholder={
-                                                            field.id === 'name' ? (namePlaceholder || 'John Doe') :
-                                                                field.id === 'phone' ? (phonePlaceholder || '+91 98765 43210') :
-                                                                    field.id === 'email' ? 'email@example.com' :
-                                                                        `Enter ${field.label.toLowerCase()}`
-                                                        }
+                                                        type={field.type === 'tel' ? 'tel' : field.type === 'email' ? 'email' : 'text'}
                                                         disabled
+                                                        placeholder={field.id === 'name' ? (namePlaceholder || 'John Doe') :
+                                                            field.id === 'phone' ? (phonePlaceholder || '+91 98765 43210') :
+                                                                field.id === 'email' ? 'email@example.com' :
+                                                                    `Enter ${field.label.toLowerCase()}`}
+                                                        style={{
+                                                            ...getInputStyle(),
+                                                            paddingLeft: 40,
+                                                            height: '42px',
+                                                            backgroundColor: formStyles?.fieldBackgroundColor || '#ffffff',
+                                                            cursor: 'not-allowed',
+                                                            opacity: 0.8
+                                                        } as any}
                                                     />
                                                 </div>
                                             )}
@@ -899,11 +926,10 @@ export default function SettingsPage() {
                 html, body { overflow-x: clip !important; max-width: 100vw !important; }
                 
                 .form-builder {
-                    max-width: 1200px;
-                    margin: 0 auto;
+                    /* Removed max-width and margin from here as they are handled by builder-page now */
                     padding: 0; 
                     box-sizing: border-box; 
-                    overflow-x: hidden;
+                    /* overflow-x: hidden; REMOVED per instruction */
                 }
                 .builder-header {
                     display: flex;
@@ -916,44 +942,10 @@ export default function SettingsPage() {
                 .builder-header-left { display: flex; align-items: center; gap: 16px; }
                 .back-btn { width: 44px; height: 44px; border-radius: 12px; border: 1px solid #e5e7eb; background: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; text-decoration: none; color: #374151; transition: all 0.2s ease; }
                 .save-btn { padding: 14px 28px; border-radius: 12px; font-weight: 600; font-size: 14px; border: none; cursor: pointer; transition: all 0.2s ease; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; }
-                .builder-title h1 { font-size: 24px; font-weight: 700; color: #111827; margin: 0 0 4px 0; }
-                .builder-title p { font-size: 14px; color: #6b7280; margin: 0; }
-                .main-toggle { background: ${enabled ? 'rgba(16, 185, 129, 0.1)' : '#f9fafb'}; border: 2px solid ${enabled ? '#10b981' : '#e5e7eb'}; border-radius: 16px; padding: 20px 24px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between; }
-                .toggle-info h3 { font-size: 16px; font-weight: 600; color: #111827; margin: 0 0 4px 0; }
-                .toggle-switch { width: 56px; height: 32px; background: ${enabled ? '#10b981' : '#d1d5db'}; border-radius: 16px; position: relative; cursor: pointer; transition: background 0.2s ease; }
-                .toggle-switch::after { content: ''; position: absolute; width: 26px; height: 26px; background: white; border-radius: 50%; top: 3px; left: ${enabled ? '27px' : '3px'}; transition: left 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
-                .tabs { display: flex; gap: 8px; margin-bottom: 24px; background: #f3f4f6; padding: 6px; border-radius: 12px; }
-                .tab { flex: 1; padding: 14px 20px; border: none; background: transparent; border-radius: 8px; font-size: 14px; font-weight: 600; color: #6b7280; cursor: pointer; }
-                .tab.active { background: white; color: #111827; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-                .builder-layout { display: flex; gap: 24px; align-items: flex-start; }
-                .builder-layout .settings-area { flex: 1; min-width: 0; }
-                .settings-card { background: white; border: 1px solid #e5e7eb; border-radius: 16px; padding: 24px; margin-bottom: 20px; }
-                .card-title { font-size: 15px; font-weight: 600; color: #111827; margin: 0 0 16px 0; }
-                .input-field { width: 100%; padding: 12px 16px; border: 1px solid #e5e7eb; border-radius: 10px; font-size: 14px; color: #111827; transition: all 0.2s ease; box-sizing: border-box; }
-                .color-presets { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-                .color-preset { width: 32px; height: 32px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; transition: all 0.2s ease; }
-                .color-preset:hover { transform: scale(1.1); }
-                .color-preset.active { border: 2px solid #111827; box-shadow: none; }
-                .custom-color { position: relative; width: 32px; height: 32px; }
-                .custom-color input[type="color"] { 
-                    width: 32px; 
-                    height: 32px; 
-                    border-radius: 50%; 
-                    border: 2px dashed #d1d5db; 
-                    cursor: pointer; 
-                    padding: 0; 
-                    background: conic-gradient(red, yellow, lime, aqua, blue, magenta, red);
-                    -webkit-appearance: none;
-                    appearance: none;
-                    overflow: hidden;
-                }
-                .custom-color input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; border-radius: 50%; }
-                .custom-color input[type="color"]::-webkit-color-swatch { border: none; border-radius: 50%; }
-                .custom-color input[type="color"]::-moz-color-swatch { border: none; border-radius: 50%; }
-                .custom-color input[type="color"]:hover { transform: scale(1.1); border-color: #9ca3af; }
-                .style-options { display: flex; gap: 10px; flex-wrap: wrap; }
-                .style-option { padding: 10px 18px; border-radius: 10px; border: 2px solid #e5e7eb; background: white; font-size: 13px; font-weight: 600; color: #6b7280; cursor: pointer; }
-                .style-option.active { border-color: #6366f1; background: rgba(99, 102, 241, 0.05); color: #6366f1; }
+                .style-options { display: flex; gap: 12px; flex-wrap: wrap; }
+                .style-option { padding: 12px 20px; border-radius: 12px; border: 1px solid #e5e7eb; background: white; font-size: 14px; font-weight: 600; color: #6b7280; cursor: pointer; transition: all 0.2s ease; flex: 1; text-align: center; }
+                .style-option:hover { border-color: #c7d2fe; color: #4f46e5; background: #eaexf8; }
+                .style-option.active { border-color: #6366f1; background: #e0e7ff; color: #4338ca; box-shadow: 0 0 0 1px #6366f1; }
                 .checkbox-option { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: #f9fafb; border-radius: 10px; cursor: pointer; }
                 .checkbox-option.checked { background: rgba(99, 102, 241, 0.1); }
                 .toggle-option { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; background: #f9fafb; border-radius: 10px; cursor: pointer; margin-bottom: 10px; }
@@ -963,11 +955,90 @@ export default function SettingsPage() {
                 .mini-toggle.on::after { left: 23px; }
                 .mini-toggle.off { background: #d1d5db; }
                 .mini-toggle.off::after { left: 3px; }
-                .preview-panel { background: white; border: 1px solid #e5e7eb; border-radius: 16px; position: sticky; top: 16px; width: 360px; height: fit-content; max-height: calc(100vh - 100px); overflow-y: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.1); z-index: 100; flex-shrink: 0; align-self: flex-start; }
+                .input-field { width: 100%; padding: 16px; border: 1px solid #e5e7eb; border-radius: 12px; font-size: 15px; color: #111827; transition: all 0.2s ease; box-sizing: border-box; background: #f9fafb; font-weight: 500; }
+                .input-field:focus { border-color: #6366f1; background: white; outline: none; box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1); }
+                .color-presets { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+                .color-preset { width: 36px; height: 36px; border-radius: 50%; border: 2px solid white; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 0 0 1px #e5e7eb; }
+                .color-preset:hover { transform: scale(1.15); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+                .color-preset.active { border: 2px solid white; box-shadow: 0 0 0 2px #111827; transform: scale(1.1); }
+                .custom-color { position: relative; width: 36px; height: 36px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 0 1px #e5e7eb; cursor: pointer; transition: all 0.2s ease; background: conic-gradient(from 0deg, red, yellow, lime, aqua, blue, magenta, red); }
+                .custom-color:hover { transform: scale(1.1); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+                .custom-color input[type="color"] { 
+                    position: absolute;
+                    width: 100%; 
+                    height: 100%; 
+                    opacity: 0;
+                    cursor: pointer;
+                    top: 0; left: 0;
+                    border-radius: 50%;
+                }
+                
+                /* Range Slider Styling */
+                input[type=range] {
+                    -webkit-appearance: none;
+                    width: 100%;
+                    background: transparent;
+                    height: 6px;
+                    border-radius: 3px;
+                    cursor: pointer;
+                    margin: 0;
+                }
+                input[type=range]:focus { outline: none; }
+                input[type=range]::-webkit-slider-runnable-track {
+                    width: 100%;
+                    height: 6px;
+                    border-radius: 3px;
+                    border: none;
+                }
+                input[type=range]::-webkit-slider-thumb {
+                    height: 20px;
+                    width: 20px;
+                    border-radius: 50%;
+                    background: #6366f1;
+                    border: 2px solid white;
+                    box-shadow: 0 2px 6px rgba(0,0,0,0.15), 0 0 0 1px rgba(99, 102, 241, 0.2);
+                    -webkit-appearance: none;
+                    margin-top: -7px;
+                    transition: transform 0.1s ease, box-shadow 0.1s ease;
+                }
+                input[type=range]:focus::-webkit-slider-thumb {
+                    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.2);
+                }
+                input[type=range]::-webkit-slider-thumb:hover {
+                    transform: scale(1.1);
+                }
+                .builder-title p { font-size: 14px; color: #6b7280; margin: 0; }
+                .main-toggle { background: ${enabled ? 'rgba(16, 185, 129, 0.1)' : '#f9fafb'}; border: 2px solid ${enabled ? '#10b981' : '#e5e7eb'}; border-radius: 16px; padding: 20px 24px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between; }
+                .toggle-info h3 { font-size: 16px; font-weight: 600; color: #111827; margin: 0 0 4px 0; }
+                .toggle-switch { width: 56px; height: 32px; background: ${enabled ? '#10b981' : '#d1d5db'}; border-radius: 16px; position: relative; cursor: pointer; transition: background 0.2s ease; }
+                .toggle-switch::after { content: ''; position: absolute; width: 26px; height: 26px; background: white; border-radius: 50%; top: 3px; left: ${enabled ? '27px' : '3px'}; transition: left 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+                .tabs { display: flex; gap: 8px; margin-bottom: 24px; background: #f3f4f6; padding: 6px; border-radius: 12px; }
+                .tab { flex: 1; padding: 14px 20px; border: none; background: transparent; border-radius: 8px; font-size: 14px; font-weight: 600; color: #6b7280; cursor: pointer; }
+                .tab.active { background: white; color: #111827; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+                .builder-page {
+                    display: grid;
+                    grid-template-columns: 1fr 420px;
+                    gap: 24px;
+                    height: calc(100vh - 64px);
+                    max-width: 1200px;
+                    margin: 0 auto;
+                }
+                .builder-left {
+                    overflow-y: auto;
+                    padding-right: 4px;
+                    padding-bottom: 40px;
+                }
+                .builder-right {
+                    position: sticky;
+                    top: 64px;
+                    height: fit-content;
+                }
+                .settings-card { background: white; border: 1px solid #e5e7eb; border-radius: 16px; padding: 24px; margin-bottom: 20px; }
+                .preview-panel { background: white; border: 1px solid #e5e7eb; border-radius: 16px; width: 100%; box-shadow: 0 10px 40px rgba(0,0,0,0.1); padding-bottom: 20px; }
                 .preview-header { background: #f9fafb; padding: 16px 20px; border-bottom: 1px solid #e5e7eb; }
                 .preview-content { padding: 24px; }
                 .preview-phone { background: #1f2937; border-radius: 32px; padding: 6px; max-width: 300px; margin: 0 auto; }
-                .preview-phone-screen { background: white; border-radius: 24px; overflow-y: auto; min-height: 500px; }
+                .preview-phone-screen { background: white; border-radius: 24px; overflow-y: auto; height: 500px; }
                 .preview-phone-screen.preview-compact { min-height: auto; max-height: none; padding: 20px 16px; }
                 .preview-product { padding: 16px; }
                 .preview-product-img { width: 100%; height: 100px; background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%); border-radius: 12px; margin-bottom: 12px; display: flex; align-items: center; justify-content: center; }
@@ -1195,8 +1266,8 @@ export default function SettingsPage() {
                     </div>
 
                     {/* Layout */}
-                    <div className="builder-layout">
-                        <div className="settings-area">
+                    <div className="builder-page">
+                        <div className="builder-left">
                             {/* Button Tab */}
                             {activeTab === 'button' && (
                                 <>
@@ -1226,7 +1297,7 @@ export default function SettingsPage() {
                                                         onClick={() => setPrimaryColor(color)}
                                                     />
                                                 ))}
-                                                <div className="custom-color">
+                                                <div className="custom-color" title="Custom Color">
                                                     <input
                                                         type="color"
                                                         value={primaryColor}
@@ -1244,7 +1315,17 @@ export default function SettingsPage() {
                                                 <button
                                                     key={style}
                                                     className={`style-option ${buttonStyle === style ? 'active' : ''}`}
-                                                    onClick={() => setButtonStyle(style as any)}
+                                                    onClick={() => {
+                                                        setButtonStyle(style as any);
+                                                        // Smart Border Logic:
+                                                        // - Outline: Needs visible border (default 2px)
+                                                        // - Solid/Gradient: Usually no border (default 0px)
+                                                        if (style === 'outline') {
+                                                            setButtonStylesState(s => ({ ...s, borderWidth: 2 }));
+                                                        } else {
+                                                            setButtonStylesState(s => ({ ...s, borderWidth: 0 }));
+                                                        }
+                                                    }}
                                                 >
                                                     {style.charAt(0).toUpperCase() + style.slice(1)}
                                                 </button>
@@ -1279,7 +1360,14 @@ export default function SettingsPage() {
                                         <div className="input-group" style={{ marginTop: 12 }}>
                                             <label className="input-label">Text Size (px)</label>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                                <input type="range" min="12" max="24" value={buttonStylesState?.textSize ?? 15} onChange={(e) => setButtonStylesState(s => ({ ...s, textSize: parseInt(e.target.value) }))} style={{ flex: 1 }} />
+                                                <input
+                                                    type="range"
+                                                    min="12"
+                                                    max="24"
+                                                    value={buttonStylesState?.textSize ?? 15}
+                                                    onChange={(e) => setButtonStylesState(s => ({ ...s, textSize: parseInt(e.target.value) }))}
+                                                    style={{ flex: 1, background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${((buttonStylesState?.textSize ?? 15) - 12) * 100 / (24 - 12)}%, #e5e7eb ${((buttonStylesState?.textSize ?? 15) - 12) * 100 / (24 - 12)}%, #e5e7eb 100%)` }}
+                                                />
                                                 <span style={{ fontSize: 13, fontWeight: 600, minWidth: 28 }}>{buttonStylesState?.textSize ?? 15}</span>
                                             </div>
                                         </div>
@@ -1306,14 +1394,14 @@ export default function SettingsPage() {
                                         <div className="input-group" style={{ marginTop: 12 }}>
                                             <label className="input-label">Border Width (px)</label>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                                <input type="range" min="0" max="4" value={buttonStylesState?.borderWidth ?? 0} onChange={(e) => setButtonStylesState(s => ({ ...s, borderWidth: parseInt(e.target.value) }))} style={{ flex: 1 }} />
+                                                <input type="range" min="0" max="4" value={buttonStylesState?.borderWidth ?? 0} onChange={(e) => setButtonStylesState(s => ({ ...s, borderWidth: parseInt(e.target.value) }))} style={{ flex: 1, background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${((buttonStylesState?.borderWidth ?? 0) - 0) * 100 / (4 - 0)}%, #e5e7eb ${((buttonStylesState?.borderWidth ?? 0) - 0) * 100 / (4 - 0)}%, #e5e7eb 100%)` }} />
                                                 <span style={{ fontSize: 13, fontWeight: 600, minWidth: 20 }}>{buttonStylesState?.borderWidth ?? 0}</span>
                                             </div>
                                         </div>
                                         <div className="input-group" style={{ marginTop: 12 }}>
                                             <label className="input-label">Rounded Corners (px)</label>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                                <input type="range" min="0" max="24" value={buttonStylesState?.borderRadius ?? 12} onChange={(e) => setButtonStylesState(s => ({ ...s, borderRadius: parseInt(e.target.value) }))} style={{ flex: 1 }} />
+                                                <input type="range" min="0" max="24" value={buttonStylesState?.borderRadius ?? 12} onChange={(e) => setButtonStylesState(s => ({ ...s, borderRadius: parseInt(e.target.value) }))} style={{ flex: 1, background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${((buttonStylesState?.borderRadius ?? 12) - 0) * 100 / (24 - 0)}%, #e5e7eb ${((buttonStylesState?.borderRadius ?? 12) - 0) * 100 / (24 - 0)}%, #e5e7eb 100%)` }} />
                                                 <span style={{ fontSize: 13, fontWeight: 600, minWidth: 28 }}>{buttonStylesState?.borderRadius ?? 12}</span>
                                             </div>
                                         </div>
@@ -1396,7 +1484,7 @@ export default function SettingsPage() {
                                         <div className="input-group" style={{ marginTop: 12 }}>
                                             <label className="input-label">Text Size (px)</label>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                                <input type="range" min="11" max="20" value={formStyles?.textSize ?? 14} onChange={(e) => setFormStyles(s => ({ ...s, textSize: parseInt(e.target.value) }))} style={{ flex: 1 }} />
+                                                <input type="range" min="11" max="20" value={formStyles?.textSize ?? 14} onChange={(e) => setFormStyles(s => ({ ...s, textSize: parseInt(e.target.value) }))} style={{ flex: 1, background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${((formStyles?.textSize ?? 14) - 11) * 100 / (20 - 11)}%, #e5e7eb ${((formStyles?.textSize ?? 14) - 11) * 100 / (20 - 11)}%, #e5e7eb 100%)` }} />
                                                 <span style={{ fontSize: 13, fontWeight: 600, minWidth: 28 }}>{formStyles?.textSize ?? 14}</span>
                                             </div>
                                         </div>
@@ -1419,14 +1507,14 @@ export default function SettingsPage() {
                                         <div className="input-group" style={{ marginTop: 12 }}>
                                             <label className="input-label">Border Width (px)</label>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                                <input type="range" min="0" max="3" value={formStyles?.borderWidth ?? 1} onChange={(e) => setFormStyles(s => ({ ...s, borderWidth: parseInt(e.target.value) }))} style={{ flex: 1 }} />
+                                                <input type="range" min="0" max="3" value={formStyles?.borderWidth ?? 1} onChange={(e) => setFormStyles(s => ({ ...s, borderWidth: parseInt(e.target.value) }))} style={{ flex: 1, background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${((formStyles?.borderWidth ?? 1) - 0) * 100 / (3 - 0)}%, #e5e7eb ${((formStyles?.borderWidth ?? 1) - 0) * 100 / (3 - 0)}%, #e5e7eb 100%)` }} />
                                                 <span style={{ fontSize: 13, fontWeight: 600, minWidth: 20 }}>{formStyles?.borderWidth ?? 1}</span>
                                             </div>
                                         </div>
                                         <div className="input-group" style={{ marginTop: 12 }}>
                                             <label className="input-label">Rounded Corners (px)</label>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                                <input type="range" min="0" max="20" value={formStyles?.borderRadius ?? 12} onChange={(e) => setFormStyles(s => ({ ...s, borderRadius: parseInt(e.target.value) }))} style={{ flex: 1 }} />
+                                                <input type="range" min="0" max="20" value={formStyles?.borderRadius ?? 12} onChange={(e) => setFormStyles(s => ({ ...s, borderRadius: parseInt(e.target.value) }))} style={{ flex: 1, background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${((formStyles?.borderRadius ?? 12) - 0) * 100 / (20 - 0)}%, #e5e7eb ${((formStyles?.borderRadius ?? 12) - 0) * 100 / (20 - 0)}%, #e5e7eb 100%)` }} />
                                                 <span style={{ fontSize: 13, fontWeight: 600, minWidth: 28 }}>{formStyles?.borderRadius ?? 12}</span>
                                             </div>
                                         </div>
@@ -1465,7 +1553,19 @@ export default function SettingsPage() {
                                         <div className="input-group" style={{ marginTop: 12 }}>
                                             <label className="input-label">Field Background Color</label>
                                             <div className="color-presets" style={{ marginTop: 6 }}>
-                                                <input type="color" value={formStyles?.fieldBackgroundColor || '#ffffff'} onChange={(e) => setFormStyles(s => ({ ...s, fieldBackgroundColor: e.target.value }))} style={{ width: 40, height: 36, borderRadius: 8, border: '1px solid #e5e7eb', cursor: 'pointer' }} />
+                                                <input
+                                                    type="color"
+                                                    value={formStyles?.fieldBackgroundColor || '#ffffff'}
+                                                    onChange={(e) => {
+                                                        console.log('[Color Picker] New value:', e.target.value);
+                                                        setFormStyles(s => {
+                                                            const newStyles = { ...s, fieldBackgroundColor: e.target.value };
+                                                            console.log('[Color Picker] Updated formStyles:', newStyles);
+                                                            return newStyles;
+                                                        });
+                                                    }}
+                                                    style={{ width: 40, height: 36, borderRadius: 8, border: '1px solid #e5e7eb', cursor: 'pointer' }}
+                                                />
                                             </div>
                                         </div>
                                         <div className="input-group" style={{ marginTop: 12 }}>
@@ -1477,7 +1577,14 @@ export default function SettingsPage() {
                                         <div className="input-group" style={{ marginTop: 12 }}>
                                             <label className="input-label">Label Font Size (px)</label>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                                <input type="range" min="11" max="20" value={formStyles?.labelFontSize ?? 14} onChange={(e) => setFormStyles(s => ({ ...s, labelFontSize: parseInt(e.target.value) }))} style={{ flex: 1 }} />
+                                                <input
+                                                    type="range"
+                                                    min="11"
+                                                    max="20"
+                                                    value={formStyles?.labelFontSize ?? 14}
+                                                    onChange={(e) => setFormStyles(s => ({ ...s, labelFontSize: parseInt(e.target.value) }))}
+                                                    style={{ flex: 1, background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${((formStyles?.labelFontSize ?? 14) - 11) * 100 / (20 - 11)}%, #e5e7eb ${((formStyles?.labelFontSize ?? 14) - 11) * 100 / (20 - 11)}%, #e5e7eb 100%)` }}
+                                                />
                                                 <span style={{ fontSize: 13, fontWeight: 600, minWidth: 28 }}>{formStyles?.labelFontSize ?? 14}</span>
                                             </div>
                                         </div>
@@ -1624,7 +1731,7 @@ export default function SettingsPage() {
                                                     max="50"
                                                     value={maxQuantity}
                                                     onChange={(e) => setMaxQuantity(parseInt(e.target.value))}
-                                                    style={{ flex: 1 }}
+                                                    style={{ flex: 1, background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${((maxQuantity - 1) * 100 / (50 - 1))}%, #e5e7eb ${((maxQuantity - 1) * 100 / (50 - 1))}%, #e5e7eb 100%)` }}
                                                 />
                                                 <span className="range-value">{maxQuantity}</span>
                                             </div>
@@ -1748,7 +1855,7 @@ export default function SettingsPage() {
                                                 max="24"
                                                 value={borderRadius}
                                                 onChange={(e) => setBorderRadius(parseInt(e.target.value))}
-                                                style={{ flex: 1 }}
+                                                style={{ flex: 1, background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${(borderRadius - 0) * 100 / (24 - 0)}%, #e5e7eb ${(borderRadius - 0) * 100 / (24 - 0)}%, #e5e7eb 100%)` }}
                                             />
                                             <span className="range-value">{borderRadius}px</span>
                                         </div>
@@ -1787,29 +1894,32 @@ export default function SettingsPage() {
                         </div>
 
                         {/* Preview Panel - Memoized */}
-                        <PreviewDisplay
-                            showProductImage={showProductImage}
-                            showPrice={showPrice}
-                            buttonText={buttonText}
-                            formTitle={formTitle}
-                            namePlaceholder={namePlaceholder}
-                            phonePlaceholder={phonePlaceholder}
-                            addressPlaceholder={addressPlaceholder}
-                            notesPlaceholder={notesPlaceholder}
-                            submitButtonText={submitButtonText}
-                            primaryColor={primaryColor}
-                            buttonStyle={buttonStyle}
-                            buttonSize={buttonSize}
-                            borderRadius={borderRadius}
-                            modalStyle={modalStyle}
-                            animationStyle={animationStyle}
-                            fields={fields}
-                            formStyles={formStyles}
-                            buttonStylesState={buttonStylesState}
-                            blocks={blocks}
-                            shippingOpts={shippingOpts}
-                            activeTab={activeTab}
-                        />
+                        <div className="builder-right">
+                            <PreviewDisplay
+                                showProductImage={showProductImage}
+                                showPrice={showPrice}
+                                buttonText={buttonText}
+                                formTitle={formTitle}
+                                namePlaceholder={namePlaceholder}
+                                phonePlaceholder={phonePlaceholder}
+                                addressPlaceholder={addressPlaceholder}
+                                notesPlaceholder={notesPlaceholder}
+                                submitButtonText={submitButtonText}
+                                primaryColor={primaryColor}
+                                buttonStyle={buttonStyle}
+                                buttonSize={buttonSize}
+                                borderRadius={borderRadius}
+                                modalStyle={modalStyle}
+                                animationStyle={animationStyle}
+                                fields={fields}
+                                formStyles={formStyles}
+                                buttonStylesState={buttonStylesState}
+                                blocks={blocks}
+                                shippingOpts={shippingOpts}
+                                activeTab={activeTab}
+                            />
+                        </div>
+
                     </div>
                 </div>
             </s-page>

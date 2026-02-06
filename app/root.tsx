@@ -65,11 +65,11 @@ export default function App() {
           }
           
           /* Button interactions */
-          button, .btn, [role="button"] {
+          button, .btn, [role='button'] {
             transition: transform 0.1s ease, background-color 0.1s ease, box-shadow 0.1s ease;
           }
           
-          button:active, .btn:active, [role="button"]:active {
+          button:active, .btn:active, [role='button']:active {
             transform: scale(0.98);
           }
         `}</style>
