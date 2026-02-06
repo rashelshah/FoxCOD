@@ -689,7 +689,17 @@ const SortableFieldItem = ({ field, onToggleVisibility, onToggleRequired, isCust
                     onClick={() => onToggleVisibility(field.id)}
                     title={field.visible ? 'Hide field' : 'Show field'}
                 >
-                    {field.visible ? '👁️' : '👁️‍🗨️'}
+                    {field.visible ? (
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 16, height: 16 }}>
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                            <circle cx="12" cy="12" r="3"></circle>
+                        </svg>
+                    ) : (
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 16, height: 16 }}>
+                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                            <line x1="1" y1="1" x2="23" y2="23"></line>
+                        </svg>
+                    )}
                 </button>
                 <button
                     type="button"
@@ -915,8 +925,8 @@ export default function SettingsPage() {
                 .tabs { display: flex; gap: 8px; margin-bottom: 24px; background: #f3f4f6; padding: 6px; border-radius: 12px; }
                 .tab { flex: 1; padding: 14px 20px; border: none; background: transparent; border-radius: 8px; font-size: 14px; font-weight: 600; color: #6b7280; cursor: pointer; }
                 .tab.active { background: white; color: #111827; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-                .builder-layout { display: flex; gap: 24px; position: relative; }
-                .builder-layout .settings-area { flex: 1; min-width: 0; max-width: calc(100% - 420px); }
+                .builder-layout { display: flex; gap: 24px; align-items: flex-start; }
+                .builder-layout .settings-area { flex: 1; min-width: 0; }
                 .settings-card { background: white; border: 1px solid #e5e7eb; border-radius: 16px; padding: 24px; margin-bottom: 20px; }
                 .card-title { font-size: 15px; font-weight: 600; color: #111827; margin: 0 0 16px 0; }
                 .input-field { width: 100%; padding: 12px 16px; border: 1px solid #e5e7eb; border-radius: 10px; font-size: 14px; color: #111827; transition: all 0.2s ease; box-sizing: border-box; }
@@ -953,11 +963,11 @@ export default function SettingsPage() {
                 .mini-toggle.on::after { left: 23px; }
                 .mini-toggle.off { background: #d1d5db; }
                 .mini-toggle.off::after { left: 3px; }
-                .preview-panel { background: white; border: 1px solid #e5e7eb; border-radius: 16px; position: fixed; right: 24px; top: 80px; width: 380px; height: calc(100vh - 100px); overflow-y: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.1); z-index: 100; }
+                .preview-panel { background: white; border: 1px solid #e5e7eb; border-radius: 16px; position: sticky; top: 16px; width: 360px; height: fit-content; max-height: calc(100vh - 100px); overflow-y: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.1); z-index: 100; flex-shrink: 0; align-self: flex-start; }
                 .preview-header { background: #f9fafb; padding: 16px 20px; border-bottom: 1px solid #e5e7eb; }
                 .preview-content { padding: 24px; }
                 .preview-phone { background: #1f2937; border-radius: 32px; padding: 6px; max-width: 300px; margin: 0 auto; }
-                .preview-phone-screen { background: white; border-radius: 24px; overflow-y: auto; min-height: 600px; max-height: 700px; }
+                .preview-phone-screen { background: white; border-radius: 24px; overflow-y: auto; min-height: 500px; }
                 .preview-phone-screen.preview-compact { min-height: auto; max-height: none; padding: 20px 16px; }
                 .preview-product { padding: 16px; }
                 .preview-product-img { width: 100%; height: 100px; background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%); border-radius: 12px; margin-bottom: 12px; display: flex; align-items: center; justify-content: center; }
