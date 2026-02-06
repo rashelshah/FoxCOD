@@ -1339,7 +1339,7 @@ export default function SettingsPage() {
                                     <div className="settings-card">
                                         <h3 className="card-title"><span>📋</span> Form Fields</h3>
                                         <p style={{ color: '#6b7280', fontSize: '13px', marginBottom: '16px' }}>
-                                            Drag to reorder • 👁️ visibility • ✱ required
+                                            Drag to reorder • <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle', marginBottom: 2 }}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg> visibility • ✱ required
                                         </p>
                                         <div className="sortable-fields-container">
                                             <DndContext
