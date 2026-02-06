@@ -78,8 +78,8 @@
 {% assign cod_blocks = shop.metafields.fox_cod.blocks | default: '{}' %}
 {% assign cod_custom_fields = shop.metafields.fox_cod.custom_fields | default: '[]' %}
 {% assign cod_styles = shop.metafields.fox_cod.styles | default: '{}' %}
-{% assign cod_button_styles = shop.metafields.fox_cod.button_styles_json | default: '{}' %}
-{% assign btn_styles = cod_button_styles | parse_json %}
+{% assign btn_styles_raw = shop.metafields.fox_cod.button_styles_json.value %}
+{% assign btn_styles = btn_styles_raw | parse_json %}
 {% assign cod_shipping_options = shop.metafields.fox_cod.shipping_options | default: '{}' %}
 
 {% comment %} Only render COD functionality if enabled in the app {% endcomment %}
@@ -534,7 +534,6 @@
   /* Modal Container Styles */
   .cod-form-container {
       border-radius: var(--cod-radius) !important;
-      background: white !important;
       box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
   }
   

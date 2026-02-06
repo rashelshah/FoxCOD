@@ -241,21 +241,25 @@ export async function saveFormSettings(settings: FormSettings) {
 // =============================================
 
 export interface OrderLogEntry {
+    id?: number;
     shop_domain: string;
-    shopify_order_id?: string;
-    shopify_order_name?: string;
+    product_id: string;
+    product_title: string;
+    variant_id?: string;
+    variant_title?: string;
+    quantity: number;
+    price: string;
     customer_name: string;
     customer_phone: string;
     customer_address: string;
     customer_email?: string;
-    customer_notes?: string;
-    product_id: string;
-    product_title?: string;
-    variant_id: string;
-    quantity: number;
-    total_price: number;
-    currency?: string;
-    status?: string;
+    notes?: string;
+    city?: string;
+    state?: string;
+    pincode?: string;
+    shipping_label?: string;
+    shipping_price?: number;
+    created_at?: string;
 }
 
 // Order status types are imported from ./constants
@@ -281,21 +285,13 @@ async function getNextOrderNumber(shopDomain: string): Promise<number> {
 }
 
 /**
- * Log a new COD order with auto-generated order name
+ * Log a new COD order
  */
 export async function logOrder(order: OrderLogEntry) {
-    // Generate a sequential order name if not provided
-    let orderName = order.shopify_order_name;
-    if (!orderName) {
-        const orderNumber = await getNextOrderNumber(order.shop_domain);
-        orderName = `COD-${orderNumber}`;
-    }
-
     const { data, error } = await supabase
         .from('order_logs')
         .insert({
             ...order,
-            shopify_order_name: orderName,
             created_at: new Date().toISOString(),
         })
         .select()

@@ -108,6 +108,7 @@
       };
 
       console.log('[COD Form] Initialized for product:', productId, config);
+      console.log('[COD Form] Styles from config:', JSON.stringify(config.styles, null, 2));
       
       // Initialize form immediately
       initializeProduct(productId, config);
@@ -337,8 +338,8 @@
         label.style.fontWeight = fontStyle === 'bold' ? '700' : '600';
         label.style.fontStyle = fontStyle === 'italic' ? 'italic' : 'normal';
         label.style.marginBottom = '6px';
-        label.style.fontSize = textSize + 'px';
-        label.style.color = textColor;
+        label.style.fontSize = (styles.labelFontSize || textSize) + 'px';
+        label.style.color = styles.labelColor || textColor;
         label.style.textAlign = labelAlignment;
         label.innerHTML = field.label + (field.required ? ' <span style="color:red">*</span>' : '');
         wrapper.appendChild(label);
@@ -412,12 +413,28 @@
         input.placeholder = field.placeholder || 'Enter ' + field.label.toLowerCase();
         if (field.required) input.required = true;
         
+        // Add browser autocomplete attributes for native autofill
+        var autocompleteMap = {
+            'name': 'name',
+            'phone': 'tel',
+            'address': 'street-address',
+            'city': 'address-level2',
+            'state': 'address-level1',
+            'zip': 'postal-code',
+            'zipcode': 'postal-code',
+            'email': 'email'
+        };
+        if (autocompleteMap[field.id]) {
+            input.setAttribute('autocomplete', autocompleteMap[field.id]);
+        }
+        
         // Set default value of 1 for quantity field
         if (field.id === 'quantity' && field.type === 'number') {
             input.value = 1;
             input.min = 1;
             input.max = config.maxQuantity || 10;
         }
+        
         
         input.style.width = '100%';
         input.style.padding = field.type === 'textarea' ? '10px 12px 10px 40px' : '10px 12px 10px 40px';
@@ -426,10 +443,18 @@
         input.style.fontSize = textSize + 'px';
         input.style.fontWeight = fontStyle === 'bold' ? '700' : '400';
         input.style.fontStyle = fontStyle === 'italic' ? 'italic' : 'normal';
-        input.style.backgroundColor = backgroundColor;
+        input.style.color = textColor; // Input text color
+        input.style.backgroundColor = styles.fieldBackgroundColor || '#ffffff'; // Field background
         input.style.boxShadow = hasShadow ? '0 1px 2px rgba(0,0,0,0.05)' : 'none';
         input.style.boxSizing = 'border-box';
         input.style.marginBottom = '4px';
+        
+        console.log('[COD Form] Applied input styles for ' + field.id + ':', {
+            color: input.style.color,
+            backgroundColor: input.style.backgroundColor,
+            borderColor: borderColor,
+            borderWidth: borderWidth
+        });
 
         inputContainer.appendChild(input);
         wrapper.appendChild(inputContainer);
@@ -537,6 +562,25 @@
         console.log('[COD Form] Customer data saved to LocalStorage');
     } catch (e) {
         console.warn('[COD Form] LocalStorage save error:', e);
+    }
+  }
+
+  /**
+   * Load customer data from LocalStorage for auto-fill
+   * Priority: LocalStorage first (called on init), then database lookup (on phone input)
+   */
+  function loadCustomerFromLocalStorage(form) {
+    try {
+        var saved = localStorage.getItem('cod_customer');
+        if (!saved) return;
+        
+        var data = JSON.parse(saved);
+        if (data) {
+            autoFillFields(form, data);
+            console.log('[COD Form] Auto-filled from LocalStorage');
+        }
+    } catch (e) {
+        console.warn('[COD Form] LocalStorage load error:', e);
     }
   }
 
@@ -675,36 +719,72 @@
 
   function updateTotalHelper(form, config, shippingPrice) {
       var qtyInput = form.querySelector('[name="quantity"]');
-      var qty = parseInt(qtyInput ? qtyInput.value : 1);
-      var subtotal = config.productPrice * qty;
-      var total = subtotal + shippingPrice;
+      var qty = parseInt(qtyInput ? qtyInput.value : 1) || 1;
+      var productPrice = parseFloat(config.productPrice) || 0;
+      var shipping = parseFloat(shippingPrice) || 0;
+      var subtotal = productPrice * qty;
+      var total = subtotal + shipping;
       
       var shipEl = form.querySelector('#cod-summary-shipping');
       var totalEl = form.querySelector('#cod-summary-total');
       var subEl = form.querySelector('#cod-summary-subtotal');
       
-      if (shipEl) shipEl.textContent = shippingPrice === 0 ? 'FREE' : formatMoney(shippingPrice);
+      if (shipEl) shipEl.textContent = shipping === 0 ? 'FREE' : formatMoney(shipping);
       if (totalEl) totalEl.textContent = formatMoney(total);
       if (subEl) subEl.textContent = formatMoney(subtotal);
   }
 
   function formatMoney(amount) {
-      return '$' + amount.toFixed(2);
+      var num = parseFloat(amount) || 0;
+      return '₹' + num.toFixed(2);
   }
 
   /**
    * Apply Modal Styles
    */
   function applyModalStyles(container, config) {
-     if (config.modalStyle === 'glassmorphism') {
-         container.style.background = 'rgba(255, 255, 255, 0.8)';
-         container.style.backdropFilter = 'blur(10px)';
-         container.style.boxShadow = '0 8px 32px 0 rgba(31, 38, 135, 0.37)';
-         container.style.border = '1px solid rgba(255, 255, 255, 0.18)';
-     }
-     if (config.styles.borderRadius) {
-        container.style.borderRadius = config.styles.borderRadius + 'px';
-     }
+      var styles = config.styles || {};
+      
+      // Apply modal style preset (glassmorphism, minimal, modern)
+      if (config.modalStyle === 'glassmorphism') {
+          container.style.background = 'rgba(255, 255, 255, 0.8)';
+          container.style.backdropFilter = 'blur(10px)';
+          container.style.boxShadow = '0 8px 32px 0 rgba(31, 38, 135, 0.37)';
+          container.style.border = '1px solid rgba(255, 255, 255, 0.18)';
+      } else if (config.modalStyle === 'minimal') {
+          container.style.background = styles.backgroundColor || '#ffffff';
+          container.style.border = '1px solid #e5e7eb';
+          container.style.boxShadow = 'none';
+      } else {
+          // Modern style or default - apply custom styles from seller settings
+          
+          // Background color for the entire form container
+          if (styles.backgroundColor) {
+              container.style.backgroundColor = styles.backgroundColor;
+          }
+          
+          // Shadow
+          if (styles.shadow) {
+              container.style.boxShadow = '0 10px 25px rgba(0,0,0,0.1)';
+          } else {
+              container.style.boxShadow = 'none';
+          }
+          
+          // Border width and color
+          var borderWidth = styles.borderWidth ?? 0;
+          var borderColor = styles.borderColor || '#e5e7eb';
+          if (borderWidth > 0) {
+              container.style.border = borderWidth + 'px solid ' + borderColor;
+          }
+      }
+      
+      // Border radius - always apply from styles or config
+      var borderRadius = styles.borderRadius ?? config.borderRadius ?? 12;
+      container.style.borderRadius = borderRadius + 'px';
+      
+      // Padding for the form container
+      container.style.padding = '20px';
+      container.style.boxSizing = 'border-box';
   }
 
   /**
@@ -777,12 +857,22 @@
   function openModal(productId) {
     var modal = document.getElementById('cod-form-' + productId);
     var overlay = document.getElementById('cod-modal-overlay-' + productId);
+    var form = document.getElementById('cod-order-form-' + productId);
+    
     if (modal) {
         modal.style.display = 'block';
         setTimeout(() => modal.classList.add('visible'), 10);
     }
     if (overlay) overlay.style.display = 'flex';
     document.body.style.overflow = 'hidden';
+    
+    // Clear form on open to ensure clean state
+    if (form) {
+        form.reset();
+        
+        // Then apply autofill from LocalStorage (highest priority)
+        loadCustomerFromLocalStorage(form);
+    }
   }
 
   function closeModal(productId) {
@@ -826,8 +916,20 @@
           variantId: config.variantId,
           quantity: parseInt(formData.get('quantity') || '1'),
           price: parseFloat(config.productPrice),
-          productTitle: config.productTitle
+          productTitle: config.productTitle,
+          shippingLabel: '',
+          shippingPrice: 0
       };
+      
+      // Get selected shipping option
+      var shippingRadio = form.querySelector('input[name="shipping_method"]:checked');
+      if (shippingRadio && config.shippingOptions && config.shippingOptions.options) {
+          var selectedOpt = config.shippingOptions.options.find(function(o) { return o.id === shippingRadio.value; });
+          if (selectedOpt) {
+              payload.shippingLabel = selectedOpt.label;
+              payload.shippingPrice = selectedOpt.price;
+          }
+      }
 
       console.log('[COD Form] Submitting order:', payload);
 

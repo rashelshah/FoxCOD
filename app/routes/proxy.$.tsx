@@ -31,9 +31,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     // Route customer lookup for autofill
     if ((path === "api/customer-by-phone" || path.endsWith("customer-by-phone")) && phone && shop) {
         const result = await lookupCustomerByPhone(phone, shop);
-        return new Response(JSON.stringify(
-            result.found ? { found: true, ...result } : { found: false }
-        ), { headers: corsHeaders });
+        return new Response(JSON.stringify(result), { headers: corsHeaders });
     }
 
     return new Response(JSON.stringify({
@@ -113,13 +111,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             customer_phone: data.customerPhone || '',
             customer_address: data.customerAddress || '',
             customer_email: data.customerEmail || '',
-            customer_notes: data.notes || data.customerNotes || '',
+            notes: data.notes || data.customerNotes || '',
+            city: data.customerCity || '',
+            state: data.customerState || '',
+            pincode: data.customerZipcode || '',
             product_id: data.productId,
             product_title: data.productTitle || 'Product',
-            variant_id: data.variantId,
+            variant_id: data.variantId || '',
             quantity: parseInt(data.quantity) || 1,
-            total_price: parseFloat(data.price) * (parseInt(data.quantity) || 1),
-            currency: 'INR'
+            price: (parseFloat(data.price) * (parseInt(data.quantity) || 1)).toString(),
+            shipping_label: data.shippingLabel || '',
+            shipping_price: parseFloat(data.shippingPrice) || 0,
         });
 
         console.log('[Proxy] Order created:', result);

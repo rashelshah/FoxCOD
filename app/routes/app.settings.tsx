@@ -312,6 +312,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             }
         });
 
+        console.log('[Settings] Saving button_styles to metafield:', JSON.stringify(settings.button_styles || DEFAULT_BUTTON_STYLES, null, 2));
+
         const [batch1Res, batch2Res] = await Promise.all([batch1Promise, batch2Promise]);
         const batch1Json = await batch1Res.json();
         const batch2Json = await batch2Res.json();
@@ -416,10 +418,10 @@ const PreviewDisplay = memo(({
     // Get label styles - sync with storefront
     const getLabelStyle = () => ({
         display: 'block',
-        fontSize: (formStyles?.textSize ?? 14) + 'px',
+        fontSize: (formStyles?.labelFontSize ?? formStyles?.textSize ?? 14) + 'px',
         fontWeight: formStyles?.fontStyle === 'bold' ? 700 : 600,
         fontStyle: formStyles?.fontStyle === 'italic' ? 'italic' : 'normal',
-        color: formStyles?.textColor || '#374151',
+        color: formStyles?.labelColor || formStyles?.textColor || '#374151',
         marginBottom: '4px',
         textAlign: (formStyles?.labelAlignment || 'left') as any
     });
@@ -434,8 +436,9 @@ const PreviewDisplay = memo(({
         fontSize: (formStyles?.textSize ?? 14) + 'px',
         fontWeight: formStyles?.fontStyle === 'bold' ? 700 : 400,
         fontStyle: formStyles?.fontStyle === 'italic' ? 'italic' : 'normal',
+        color: formStyles?.textColor || '#111827',
         boxSizing: 'border-box' as const,
-        background: formStyles?.backgroundColor || '#ffffff',
+        background: formStyles?.fieldBackgroundColor || '#ffffff',
         boxShadow: formStyles?.shadow ? '0 1px 2px rgba(0,0,0,0.05)' : 'none'
     });
 
@@ -912,8 +915,8 @@ export default function SettingsPage() {
                 .tabs { display: flex; gap: 8px; margin-bottom: 24px; background: #f3f4f6; padding: 6px; border-radius: 12px; }
                 .tab { flex: 1; padding: 14px 20px; border: none; background: transparent; border-radius: 8px; font-size: 14px; font-weight: 600; color: #6b7280; cursor: pointer; }
                 .tab.active { background: white; color: #111827; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-                .builder-layout { display: grid; grid-template-columns: 1fr 380px; gap: 24px; align-items: start; min-height: 0; }
-                .builder-layout .settings-area { min-height: 0; }
+                .builder-layout { display: flex; gap: 24px; position: relative; }
+                .builder-layout .settings-area { flex: 1; min-width: 0; max-width: calc(100% - 420px); }
                 .settings-card { background: white; border: 1px solid #e5e7eb; border-radius: 16px; padding: 24px; margin-bottom: 20px; }
                 .card-title { font-size: 15px; font-weight: 600; color: #111827; margin: 0 0 16px 0; }
                 .input-field { width: 100%; padding: 12px 16px; border: 1px solid #e5e7eb; border-radius: 10px; font-size: 14px; color: #111827; transition: all 0.2s ease; box-sizing: border-box; }
@@ -950,11 +953,11 @@ export default function SettingsPage() {
                 .mini-toggle.on::after { left: 23px; }
                 .mini-toggle.off { background: #d1d5db; }
                 .mini-toggle.off::after { left: 3px; }
-                .preview-panel { background: white; border: 1px solid #e5e7eb; border-radius: 16px; overflow: visible; position: sticky; top: 24px; align-self: flex-start; }
+                .preview-panel { background: white; border: 1px solid #e5e7eb; border-radius: 16px; position: fixed; right: 24px; top: 80px; width: 380px; height: calc(100vh - 100px); overflow-y: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.1); z-index: 100; }
                 .preview-header { background: #f9fafb; padding: 16px 20px; border-bottom: 1px solid #e5e7eb; }
                 .preview-content { padding: 24px; }
                 .preview-phone { background: #1f2937; border-radius: 32px; padding: 6px; max-width: 300px; margin: 0 auto; }
-                .preview-phone-screen { background: white; border-radius: 24px; overflow-y: auto; min-height: 550px; max-height: 600px; }
+                .preview-phone-screen { background: white; border-radius: 24px; overflow-y: auto; min-height: 600px; max-height: 700px; }
                 .preview-phone-screen.preview-compact { min-height: auto; max-height: none; padding: 20px 16px; }
                 .preview-product { padding: 16px; }
                 .preview-product-img { width: 100%; height: 100px; background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%); border-radius: 12px; margin-bottom: 12px; display: flex; align-items: center; justify-content: center; }
@@ -1449,6 +1452,25 @@ export default function SettingsPage() {
                                                 <input type="color" value={formStyles?.iconBackground || '#f3f4f6'} onChange={(e) => setFormStyles(s => ({ ...s, iconBackground: e.target.value }))} style={{ width: 40, height: 36, borderRadius: 8, border: '1px solid #e5e7eb', cursor: 'pointer' }} />
                                             </div>
                                         </div>
+                                        <div className="input-group" style={{ marginTop: 12 }}>
+                                            <label className="input-label">Field Background Color</label>
+                                            <div className="color-presets" style={{ marginTop: 6 }}>
+                                                <input type="color" value={formStyles?.fieldBackgroundColor || '#ffffff'} onChange={(e) => setFormStyles(s => ({ ...s, fieldBackgroundColor: e.target.value }))} style={{ width: 40, height: 36, borderRadius: 8, border: '1px solid #e5e7eb', cursor: 'pointer' }} />
+                                            </div>
+                                        </div>
+                                        <div className="input-group" style={{ marginTop: 12 }}>
+                                            <label className="input-label">Label Color</label>
+                                            <div className="color-presets" style={{ marginTop: 6 }}>
+                                                <input type="color" value={formStyles?.labelColor || '#111827'} onChange={(e) => setFormStyles(s => ({ ...s, labelColor: e.target.value }))} style={{ width: 40, height: 36, borderRadius: 8, border: '1px solid #e5e7eb', cursor: 'pointer' }} />
+                                            </div>
+                                        </div>
+                                        <div className="input-group" style={{ marginTop: 12 }}>
+                                            <label className="input-label">Label Font Size (px)</label>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                                <input type="range" min="11" max="20" value={formStyles?.labelFontSize ?? 14} onChange={(e) => setFormStyles(s => ({ ...s, labelFontSize: parseInt(e.target.value) }))} style={{ flex: 1 }} />
+                                                <span style={{ fontSize: 13, fontWeight: 600, minWidth: 28 }}>{formStyles?.labelFontSize ?? 14}</span>
+                                            </div>
+                                        </div>
                                         <button
                                             type="button"
                                             onClick={() => setFormStyles({ ...DEFAULT_STYLES })}
@@ -1491,17 +1513,90 @@ export default function SettingsPage() {
                                             </div>
                                         </div>
                                         {shippingOpts.enabled && (
-                                            <div className="input-group" style={{ marginTop: '16px' }}>
-                                                <label className="input-label">Default Shipping Option</label>
-                                                <select
-                                                    className="input-field"
-                                                    value={shippingOpts.defaultOption}
-                                                    onChange={(e) => setShippingOpts({ ...shippingOpts, defaultOption: e.target.value })}
+                                            <div style={{ marginTop: '16px' }}>
+                                                {/* Shipping Options List */}
+                                                {shippingOpts.options.map((opt, idx) => (
+                                                    <div key={opt.id} style={{
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '8px',
+                                                        padding: '12px',
+                                                        background: shippingOpts.defaultOption === opt.id ? 'rgba(16, 185, 129, 0.1)' : '#f9fafb',
+                                                        border: shippingOpts.defaultOption === opt.id ? '2px solid #10b981' : '1px solid #e5e7eb',
+                                                        borderRadius: '10px',
+                                                        marginBottom: '8px'
+                                                    }}>
+                                                        {/* Default Radio */}
+                                                        <input
+                                                            type="radio"
+                                                            name="defaultShipping"
+                                                            checked={shippingOpts.defaultOption === opt.id}
+                                                            onChange={() => setShippingOpts({ ...shippingOpts, defaultOption: opt.id })}
+                                                            style={{ cursor: 'pointer' }}
+                                                        />
+                                                        {/* Label Input */}
+                                                        <input
+                                                            type="text"
+                                                            value={opt.label}
+                                                            onChange={(e) => {
+                                                                const newOptions = [...shippingOpts.options];
+                                                                newOptions[idx] = { ...opt, label: e.target.value };
+                                                                setShippingOpts({ ...shippingOpts, options: newOptions });
+                                                            }}
+                                                            placeholder="Shipping name"
+                                                            style={{ flex: 1, padding: '8px 12px', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '14px' }}
+                                                        />
+                                                        {/* Price Input */}
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                            <span style={{ fontSize: '14px', color: '#6b7280' }}>₹</span>
+                                                            <input
+                                                                type="number"
+                                                                value={opt.price}
+                                                                onChange={(e) => {
+                                                                    const newOptions = [...shippingOpts.options];
+                                                                    newOptions[idx] = { ...opt, price: parseFloat(e.target.value) || 0 };
+                                                                    setShippingOpts({ ...shippingOpts, options: newOptions });
+                                                                }}
+                                                                placeholder="0"
+                                                                min="0"
+                                                                style={{ width: '70px', padding: '8px', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '14px' }}
+                                                            />
+                                                        </div>
+                                                        {/* Delete Button */}
+                                                        {shippingOpts.options.length > 1 && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    const newOptions = shippingOpts.options.filter((_, i) => i !== idx);
+                                                                    const newDefault = shippingOpts.defaultOption === opt.id
+                                                                        ? newOptions[0]?.id || ''
+                                                                        : shippingOpts.defaultOption;
+                                                                    setShippingOpts({ ...shippingOpts, options: newOptions, defaultOption: newDefault });
+                                                                }}
+                                                                style={{ padding: '6px 10px', background: '#fee2e2', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#dc2626', fontSize: '14px' }}
+                                                            >
+                                                                ✕
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                                {/* Add New Option Button */}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const newId = 'shipping_' + Date.now();
+                                                        setShippingOpts({
+                                                            ...shippingOpts,
+                                                            options: [...shippingOpts.options, { id: newId, label: 'New Shipping', price: 0 }]
+                                                        });
+                                                    }}
+                                                    style={{ width: '100%', padding: '12px', background: 'rgba(99, 102, 241, 0.1)', border: '1px dashed #6366f1', borderRadius: '8px', color: '#6366f1', fontWeight: 600, cursor: 'pointer', fontSize: '14px' }}
                                                 >
-                                                    {shippingOpts.options.map(opt => (
-                                                        <option key={opt.id} value={opt.id}>{opt.label} - {opt.price === 0 ? 'Free' : `₹${opt.price}`}</option>
-                                                    ))}
-                                                </select>
+                                                    + Add Shipping Option
+                                                </button>
+                                                <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '12px' }}>
+                                                    ⓘ Select the radio button to set the default option. Set price to 0 for free shipping.
+                                                </p>
                                             </div>
                                         )}
                                     </div>

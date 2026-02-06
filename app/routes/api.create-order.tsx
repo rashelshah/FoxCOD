@@ -156,8 +156,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         // Log order in Supabase - this is the primary order storage
         const orderLog = await logOrder({
             shop_domain: body.shop,
-            shopify_order_id: "", // Will be updated if Shopify order is created
-            shopify_order_name: orderName,
             customer_name: body.customerName,
             customer_phone: body.customerPhone,
             customer_address: body.customerAddress,
@@ -165,8 +163,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             product_title: body.productTitle,
             variant_id: body.variantId,
             quantity: body.quantity,
-            total_price: body.price * body.quantity,
-            status: "pending", // Pending = awaiting fulfillment
+            price: (body.price * body.quantity).toString(),
         });
 
         console.log("[COD Order] Order logged successfully:", orderLog.id, orderName);

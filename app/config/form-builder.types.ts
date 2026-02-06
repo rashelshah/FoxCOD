@@ -42,6 +42,9 @@ export interface FormStyles {
     iconBackground: string;
     borderRadius: number;
     shadow: boolean;
+    fieldBackgroundColor: string;  // Separate from container background
+    labelColor: string;            // Separate from textColor
+    labelFontSize: number;         // Separate control for labels
 }
 
 /**
@@ -118,6 +121,9 @@ export const DEFAULT_STYLES: FormStyles = {
     iconBackground: '#f3f4f6',
     borderRadius: 12,
     shadow: true,
+    fieldBackgroundColor: '#ffffff',
+    labelColor: '#111827',
+    labelFontSize: 14,
 };
 
 /**
