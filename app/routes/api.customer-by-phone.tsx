@@ -35,12 +35,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             );
         }
 
-        return Response.json(
-            result.found
-                ? { found: true, ...result }
-                : { found: false },
-            { headers: corsHeaders }
-        );
+        return Response.json(result, { headers: corsHeaders });
     } catch (error: any) {
         console.error("[Customer Lookup] Error:", error);
         return Response.json(

@@ -58,7 +58,7 @@ export async function lookupCustomerByPhone(phone: string, shop: string): Promis
     // Fallback: order_logs
     const { data: orderData, error: orderError } = await supabase
         .from('order_logs')
-        .select('customer_name, customer_address, customer_phone, customer_email')
+        .select('customer_name, customer_address, customer_phone, customer_email, city, state, pincode')
         .eq('shop_domain', shop)
         .eq('customer_phone', phone)
         .order('created_at', { ascending: false })
@@ -71,9 +71,9 @@ export async function lookupCustomerByPhone(phone: string, shop: string): Promis
             name: orderData.customer_name,
             address: orderData.customer_address,
             email: orderData.customer_email || '',
-            state: '',
-            city: '',
-            zipcode: '',
+            state: orderData.state || '',
+            city: orderData.city || '',
+            zipcode: orderData.pincode || '',
         };
     }
 
@@ -103,7 +103,7 @@ export async function lookupCustomerByPhone(phone: string, shop: string): Promis
 
     const { data: normalizedOrders } = await supabase
         .from('order_logs')
-        .select('customer_name, customer_address, customer_phone, customer_email')
+        .select('customer_name, customer_address, customer_phone, customer_email, city, state, pincode')
         .eq('shop_domain', shop)
         .order('created_at', { ascending: false })
         .limit(50);
@@ -116,9 +116,9 @@ export async function lookupCustomerByPhone(phone: string, shop: string): Promis
                 name: match.customer_name,
                 address: match.customer_address,
                 email: match.customer_email || '',
-                state: '',
-                city: '',
-                zipcode: '',
+                state: match.state || '',
+                city: match.city || '',
+                zipcode: match.pincode || '',
             };
         }
     }
