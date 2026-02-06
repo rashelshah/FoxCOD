@@ -108,7 +108,6 @@
       };
 
       console.log('[COD Form] Initialized for product:', productId, config);
-      console.log('[COD Form] Styles from config:', JSON.stringify(config.styles, null, 2));
       
       // Initialize form immediately
       initializeProduct(productId, config);
@@ -448,13 +447,6 @@
         input.style.boxShadow = hasShadow ? '0 1px 2px rgba(0,0,0,0.05)' : 'none';
         input.style.boxSizing = 'border-box';
         input.style.marginBottom = '4px';
-        
-        console.log('[COD Form] Applied input styles for ' + field.id + ':', {
-            color: input.style.color,
-            backgroundColor: input.style.backgroundColor,
-            borderColor: borderColor,
-            borderWidth: borderWidth
-        });
 
         inputContainer.appendChild(input);
         wrapper.appendChild(inputContainer);
