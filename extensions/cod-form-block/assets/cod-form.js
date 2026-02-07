@@ -281,6 +281,9 @@
     // 6. Setup Smart Auto-fill
     setupAutoFill(form, config);
 
+    // 7. Check LocalStorage for existing data (Returning User)
+    checkLocalStorageAndFill(form);
+
     // Setup Form Submission
     form.addEventListener('submit', function(e) {
       e.preventDefault();
@@ -473,6 +476,62 @@
 
 
   /**
+   * Save customer data to LocalStorage for future auto-fill
+   */
+  function saveCustomerToLocalStorage(form) {
+    try {
+        var phone = form.querySelector('[name="phone"]');
+        var name = form.querySelector('[name="name"]');
+        var address = form.querySelector('[name="address"]');
+        var email = form.querySelector('[name="email"]');
+        var state = form.querySelector('[name="state"]');
+        var city = form.querySelector('[name="city"]');
+        var zip = form.querySelector('[name="zip"], [name="zipcode"]');
+        
+        localStorage.setItem('cod_customer', JSON.stringify({
+            phone: phone ? phone.value : '',
+            name: name ? name.value : '',
+            address: address ? address.value : '',
+            email: email ? email.value : '',
+            state: state ? state.value : '',
+            city: city ? city.value : '',
+            zipcode: zip ? zip.value : ''
+        }));
+        console.log('[COD Form] Customer data saved to LocalStorage');
+    } catch (e) {
+        console.warn('[COD Form] LocalStorage save error:', e);
+    }
+  }
+
+  /**
+   * Check LocalStorage for existing customer data and autofill
+   * Priority 1: LocalStorage
+   */
+  function checkLocalStorageAndFill(form) {
+      try {
+          var stored = localStorage.getItem('cod_customer');
+          if (stored) {
+              var data = JSON.parse(stored);
+              // Only fill if we have at least a name or phone
+              if (data.name || data.phone) {
+                  console.log('[COD Form] Found data in LocalStorage, autofilling...');
+                  autoFillFields(form, data);
+
+                  // If phone is present in LS, also set the phone field explicitly if not set
+                  if (data.phone) {
+                      var phoneInput = form.querySelector('input[name="phone"]');
+                      if (phoneInput && !phoneInput.value) {
+                          phoneInput.value = data.phone;
+                      }
+                  }
+              }
+          }
+      } catch (e) {
+          console.warn('[COD Form] LocalStorage read error:', e);
+      }
+  }
+
+  /**
    * Smart Auto-fill - triggers when 10th digit entered (no delay)
    * Database is the source of truth
    */
@@ -484,7 +543,28 @@
         var phone = phoneInput.value.replace(/\D/g, '');
         if (phone.length < 10) return;
 
-        console.log('[COD Form] 10 digits entered, fetching customer data...');
+        // Priority 1: Check LocalStorage first for this phone number
+        try {
+            var stored = localStorage.getItem('cod_customer');
+            if (stored) {
+                var data = JSON.parse(stored);
+                // Clean stored phone for comparison
+                var storedPhone = data.phone ? data.phone.replace(/\D/g, '') : '';
+                
+                // If stored phone matches entered phone, use LocalStorage data
+                // This avoids an API call if we already have their data locally
+                if (storedPhone && (storedPhone === phone || storedPhone.endsWith(phone) || phone.endsWith(storedPhone))) {
+                     console.log('[COD Form] Phone matches LocalStorage, using local data');
+                     autoFillFields(form, data);
+                     return; // Skip API call
+                }
+            }
+        } catch (e) {
+            console.warn('[COD Form] LS check failed:', e);
+        }
+
+        // Priority 2: Database via API
+        console.log('[COD Form] 10 digits entered, fetching customer data from DB...');
         fetch(config.proxyUrl + '/api/customer-by-phone?phone=' + encodeURIComponent(phone) + '&shop=' + encodeURIComponent(config.shop))
             .then(function(res) { return res.json(); })
             .then(function(data) {
@@ -539,53 +619,6 @@
     if (data.zipcode) {
         var zipInput = form.querySelector('input[name="zip"], input[name="zipcode"]');
         if (zipInput && !zipInput.value) zipInput.value = data.zipcode;
-    }
-  }
-
-  /**
-   * Save customer data to LocalStorage for future auto-fill
-   */
-  function saveCustomerToLocalStorage(form) {
-    try {
-        var phone = form.querySelector('[name="phone"]');
-        var name = form.querySelector('[name="name"]');
-        var address = form.querySelector('[name="address"]');
-        var email = form.querySelector('[name="email"]');
-        var state = form.querySelector('[name="state"]');
-        var city = form.querySelector('[name="city"]');
-        var zip = form.querySelector('[name="zip"], [name="zipcode"]');
-        
-        localStorage.setItem('cod_customer', JSON.stringify({
-            phone: phone ? phone.value : '',
-            name: name ? name.value : '',
-            address: address ? address.value : '',
-            email: email ? email.value : '',
-            state: state ? state.value : '',
-            city: city ? city.value : '',
-            zipcode: zip ? zip.value : ''
-        }));
-        console.log('[COD Form] Customer data saved to LocalStorage');
-    } catch (e) {
-        console.warn('[COD Form] LocalStorage save error:', e);
-    }
-  }
-
-  /**
-   * Load customer data from LocalStorage for auto-fill
-   * Priority: LocalStorage first (called on init), then database lookup (on phone input)
-   */
-  function loadCustomerFromLocalStorage(form) {
-    try {
-        var saved = localStorage.getItem('cod_customer');
-        if (!saved) return;
-        
-        var data = JSON.parse(saved);
-        if (data) {
-            autoFillFields(form, data);
-            console.log('[COD Form] Auto-filled from LocalStorage');
-        }
-    } catch (e) {
-        console.warn('[COD Form] LocalStorage load error:', e);
     }
   }
 
@@ -1012,13 +1045,8 @@
     if (overlay) overlay.style.display = 'flex';
     document.body.style.overflow = 'hidden';
     
-    // Clear form on open to ensure clean state
-    if (form) {
-        form.reset();
-        
-        // Then apply autofill from LocalStorage (highest priority)
-        loadCustomerFromLocalStorage(form);
-    }
+    // Clear form on open so fields are empty on every modal open / page refresh
+    if (form) form.reset();
   }
 
   function closeModal(productId) {
