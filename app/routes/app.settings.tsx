@@ -75,6 +75,10 @@ const defaultSettings: Omit<FormSettings, "shop_domain"> = {
     styles: DEFAULT_STYLES,
     button_styles: DEFAULT_BUTTON_STYLES,
     shipping_options: DEFAULT_SHIPPING_OPTIONS,
+    // Partial COD settings
+    partial_cod_enabled: false,
+    partial_cod_advance_amount: 100,
+    partial_cod_commission: 0,
 };
 
 /**
@@ -114,6 +118,9 @@ async function ensureMetafieldDefinitions(admin: any) {
         { key: "styles", type: "single_line_text_field" },  // Storing JSON as string
         { key: "button_styles_json", type: "single_line_text_field" },  // Storing JSON as string
         { key: "shipping_options", type: "single_line_text_field" },  // Storing JSON as string
+        // Partial COD settings
+        { key: "partial_cod_enabled", type: "single_line_text_field" },
+        { key: "partial_cod_advance_amount", type: "single_line_text_field" },
     ];
 
     console.log('[Settings] Ensuring metafield definitions (parallel)...');
@@ -212,6 +219,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         styles: JSON.parse(formData.get("styles") as string || JSON.stringify(defaultSettings.styles)),
         button_styles: JSON.parse(formData.get("button_styles") as string || JSON.stringify(defaultSettings.button_styles)),
         shipping_options: JSON.parse(formData.get("shipping_options") as string || JSON.stringify(defaultSettings.shipping_options)),
+        // Partial COD settings
+        partial_cod_enabled: formData.get("partial_cod_enabled") === "true",
+        partial_cod_advance_amount: parseInt(formData.get("partial_cod_advance_amount") as string) || defaultSettings.partial_cod_advance_amount,
+        partial_cod_commission: parseFloat(formData.get("partial_cod_commission") as string) || defaultSettings.partial_cod_commission,
     };
 
     // Save to Supabase
@@ -308,6 +319,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     { ownerId: shopGid, namespace: "fox_cod", key: "styles", value: JSON.stringify(settings.styles || DEFAULT_STYLES), type: "json" },
                     { ownerId: shopGid, namespace: "fox_cod", key: "button_styles_json", value: JSON.stringify(settings.button_styles || DEFAULT_BUTTON_STYLES), type: "json" },
                     { ownerId: shopGid, namespace: "fox_cod", key: "shipping_options", value: JSON.stringify(settings.shipping_options || DEFAULT_SHIPPING_OPTIONS), type: "json" },
+                    // Partial COD settings
+                    { ownerId: shopGid, namespace: "fox_cod", key: "partial_cod_enabled", value: String(settings.partial_cod_enabled ?? false), type: "single_line_text_field" },
+                    { ownerId: shopGid, namespace: "fox_cod", key: "partial_cod_advance_amount", value: String(settings.partial_cod_advance_amount ?? 100), type: "single_line_text_field" },
                 ]
             }
         });
@@ -802,6 +816,11 @@ export default function SettingsPage() {
     const [newFieldType, setNewFieldType] = useState<'text' | 'number' | 'dropdown' | 'checkbox'>('text');
     const [newFieldLabel, setNewFieldLabel] = useState('');
 
+    // Partial COD settings
+    const [partialCodEnabled, setPartialCodEnabled] = useState(settings.partial_cod_enabled ?? false);
+    const [partialCodAdvanceAmount, setPartialCodAdvanceAmount] = useState(settings.partial_cod_advance_amount ?? 100);
+    const [partialCodCommission, setPartialCodCommission] = useState(settings.partial_cod_commission ?? 0);
+
     // DnD sensors for drag and drop
     const sensors = useSensors(
         useSensor(PointerSensor),
@@ -900,6 +919,10 @@ export default function SettingsPage() {
         formData.append("styles", JSON.stringify(formStyles));
         formData.append("button_styles", JSON.stringify(buttonStylesState));
         formData.append("shipping_options", JSON.stringify(shippingOpts));
+        // Partial COD settings
+        formData.append("partial_cod_enabled", partialCodEnabled.toString());
+        formData.append("partial_cod_advance_amount", partialCodAdvanceAmount.toString());
+        formData.append("partial_cod_commission", partialCodCommission.toString());
 
         submit(formData, { method: "post" });
         shopify.toast.show("Settings saved successfully!");
@@ -910,7 +933,9 @@ export default function SettingsPage() {
         showQuantitySelector, showEmailField, showNotesField, emailRequired,
         namePlaceholder, phonePlaceholder, addressPlaceholder, notesPlaceholder,
         modalStyle, animationStyle, borderRadius, formType, fields, blocks,
-        customFields, formStyles, buttonStylesState, shippingOpts, submit, shopify
+        customFields, formStyles, buttonStylesState, shippingOpts,
+        partialCodEnabled, partialCodAdvanceAmount, partialCodCommission,
+        submit, shopify
     ]);
 
     // Color presets
@@ -1714,6 +1739,58 @@ export default function SettingsPage() {
                                                 <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '12px' }}>
                                                     ⓘ Select the radio button to set the default option. Set price to 0 for free shipping.
                                                 </p>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Partial Cash on Delivery */}
+                                    <div className="settings-card">
+                                        <h3 className="card-title"><span>💳</span> Partial Cash on Delivery</h3>
+                                        <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '16px' }}>
+                                            Allow customers to pay a portion of the order online and the rest on delivery.
+                                        </p>
+                                        <div className="toggle-option" onClick={() => setPartialCodEnabled(!partialCodEnabled)}>
+                                            <span className="toggle-option-label">Enable Partial COD</span>
+                                            <div className={`mini-toggle ${partialCodEnabled ? 'on' : 'off'}`} />
+                                        </div>
+                                        {partialCodEnabled && (
+                                            <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                                <div className="input-group">
+                                                    <label className="input-label">Advance Amount (₹)</label>
+                                                    <input
+                                                        type="number"
+                                                        className="text-input"
+                                                        value={partialCodAdvanceAmount}
+                                                        onChange={(e) => setPartialCodAdvanceAmount(parseInt(e.target.value) || 0)}
+                                                        min="1"
+                                                        placeholder="Enter advance amount"
+                                                        style={{ padding: '12px', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '14px' }}
+                                                    />
+                                                    <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '6px' }}>
+                                                        This amount will be collected online via Shopify checkout.
+                                                    </p>
+                                                </div>
+                                                <div className="input-group">
+                                                    <label className="input-label">Commission per Order (₹)</label>
+                                                    <input
+                                                        type="number"
+                                                        className="text-input"
+                                                        value={partialCodCommission}
+                                                        onChange={(e) => setPartialCodCommission(parseFloat(e.target.value) || 0)}
+                                                        min="0"
+                                                        step="0.01"
+                                                        placeholder="Enter commission amount"
+                                                        style={{ padding: '12px', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '14px' }}
+                                                    />
+                                                    <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '6px' }}>
+                                                        Commission charged per partial COD order (for billing).
+                                                    </p>
+                                                </div>
+                                                <div style={{ padding: '12px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+                                                    <p style={{ fontSize: '13px', color: '#1d4ed8', margin: 0 }}>
+                                                        <strong>ⓘ How it works:</strong> When enabled, customers will see an option to pay ₹{partialCodAdvanceAmount} online now, with the remaining balance due on delivery.
+                                                    </p>
+                                                </div>
                                             </div>
                                         )}
                                     </div>

@@ -156,6 +156,10 @@ export interface FormSettings {
     styles?: FormStyles;
     button_styles?: ButtonStyles;
     shipping_options?: ShippingOptions;
+    // Partial COD settings
+    partial_cod_enabled?: boolean;
+    partial_cod_advance_amount?: number;
+    partial_cod_commission?: number;
 }
 
 /**
@@ -221,6 +225,10 @@ export async function saveFormSettings(settings: FormSettings) {
                 styles: settings.styles || DEFAULT_STYLES,
                 button_styles: settings.button_styles || DEFAULT_BUTTON_STYLES,
                 shipping_options: settings.shipping_options || DEFAULT_SHIPPING_OPTIONS,
+                // Partial COD settings
+                partial_cod_enabled: settings.partial_cod_enabled ?? false,
+                partial_cod_advance_amount: settings.partial_cod_advance_amount ?? 100,
+                partial_cod_commission: settings.partial_cod_commission ?? 0,
             },
             { onConflict: 'shop_domain' }
         )
@@ -260,6 +268,10 @@ export interface OrderLogEntry {
     shipping_label?: string;
     shipping_price?: number;
     created_at?: string;
+    // Partial COD tracking
+    is_partial_cod?: boolean;
+    advance_amount?: number;
+    remaining_cod_amount?: number;
 }
 
 // Order status types are imported from ./constants
@@ -286,14 +298,32 @@ async function getNextOrderNumber(shopDomain: string): Promise<number> {
 
 /**
  * Log a new COD order
+ * Maps OrderLogEntry fields to order_logs schema (total_price, customer_notes)
  */
 export async function logOrder(order: OrderLogEntry) {
+    const totalPrice = order.price ? parseFloat(String(order.price)) : 0;
+    const insertPayload: Record<string, unknown> = {
+        shop_domain: order.shop_domain,
+        customer_name: order.customer_name,
+        customer_phone: order.customer_phone,
+        customer_address: order.customer_address,
+        customer_email: order.customer_email ?? null,
+        customer_notes: order.notes ?? null,
+        product_id: order.product_id,
+        product_title: order.product_title,
+        variant_id: order.variant_id ?? null,
+        quantity: order.quantity,
+        total_price: totalPrice,
+        status: 'pending',
+        created_at: new Date().toISOString(),
+    };
+    if (order.city != null) insertPayload.city = order.city;
+    if (order.state != null) insertPayload.state = order.state;
+    if (order.pincode != null) insertPayload.pincode = order.pincode;
+
     const { data, error } = await supabase
         .from('order_logs')
-        .insert({
-            ...order,
-            created_at: new Date().toISOString(),
-        })
+        .insert(insertPayload)
         .select()
         .single();
 
@@ -302,7 +332,9 @@ export async function logOrder(order: OrderLogEntry) {
         throw error;
     }
 
-    return data;
+    // Generate order name for display (COD-XXX format)
+    const orderName = data ? `COD-${String(data.id).slice(-8).toUpperCase()}` : 'COD-PENDING';
+    return { ...data, shopify_order_name: orderName };
 }
 
 /**

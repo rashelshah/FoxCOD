@@ -82,6 +82,10 @@
 {% assign btn_styles = btn_styles_raw | parse_json %}
 {% assign cod_shipping_options = shop.metafields.fox_cod.shipping_options | default: '{}' %}
 
+{% comment %} Partial COD Settings {% endcomment %}
+{% assign cod_partial_enabled = shop.metafields.fox_cod.partial_cod_enabled | default: 'false' %}
+{% assign cod_partial_advance = shop.metafields.fox_cod.partial_cod_advance_amount | default: '100' %}
+
 {% comment %} Only render COD functionality if enabled in the app {% endcomment %}
 {% if cod_enabled == 'true' %}
 
@@ -114,7 +118,9 @@
      data-show-image="{{ cod_show_product_image }}"
      data-show-price="{{ cod_show_price }}"
      data-form-title="{{ cod_form_title }}"
-     data-form-subtitle="{{ cod_form_subtitle }}">
+     data-form-subtitle="{{ cod_form_subtitle }}"
+     data-partial-cod-enabled="{{ cod_partial_enabled }}"
+     data-partial-cod-advance="{{ cod_partial_advance }}">
 </div>
 
 {% comment %} Modal Overlay {% endcomment %}

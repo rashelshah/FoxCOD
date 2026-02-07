@@ -104,7 +104,11 @@
         showImage: dataContainer.dataset.showImage === 'true',
         showPrice: dataContainer.dataset.showPrice === 'true',
         formTitle: dataContainer.dataset.formTitle,
-        formSubtitle: dataContainer.dataset.formSubtitle
+        formSubtitle: dataContainer.dataset.formSubtitle,
+        
+        // Partial COD Configuration
+        partialCodEnabled: dataContainer.dataset.partialCodEnabled === 'true',
+        partialCodAdvance: parseInt(dataContainer.dataset.partialCodAdvance) || 100
       };
 
       console.log('[COD Form] Initialized for product:', productId, config);
@@ -253,6 +257,11 @@
     // 3. Render Shipping Options if enabled
     if (config.blocks && config.blocks.shipping_options && config.shippingOptions && config.shippingOptions.enabled) {
         renderShippingOptions(form, config);
+    }
+
+    // 3.5 Render Payment Method Options if Partial COD is enabled
+    if (config.partialCodEnabled) {
+        renderPaymentMethodOptions(form, config);
     }
 
     // 4. Render Marketing Consent if enabled
@@ -689,6 +698,144 @@
       }
   }
 
+  /**
+   * Render Payment Method Selection (Full COD vs Partial COD)
+   */
+  function renderPaymentMethodOptions(form, config) {
+      var container = document.createElement('div');
+      container.className = 'cod-payment-method-options';
+      container.style.marginBottom = '20px';
+      container.style.padding = '16px';
+      container.style.background = 'linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%)';
+      container.style.borderRadius = '12px';
+      container.style.border = '1px solid rgba(99, 102, 241, 0.2)';
+
+      var title = document.createElement('div');
+      title.textContent = 'Payment Method';
+      title.style.fontWeight = '600';
+      title.style.marginBottom = '12px';
+      title.style.color = '#1f2937';
+      title.style.fontSize = '14px';
+      container.appendChild(title);
+
+      var optionsWrapper = document.createElement('div');
+      optionsWrapper.style.display = 'flex';
+      optionsWrapper.style.flexDirection = 'column';
+      optionsWrapper.style.gap = '10px';
+
+      // Calculate order total for display
+      var orderTotal = config.productPrice || 0;
+      var remainingAmount = orderTotal - config.partialCodAdvance;
+      if (remainingAmount < 0) remainingAmount = 0;
+
+      var paymentOptions = [
+          {
+              id: 'full_cod',
+              label: 'Full COD',
+              description: 'Pay ₹' + orderTotal.toFixed(0) + ' on delivery',
+              checked: true
+          },
+          {
+              id: 'partial_cod',
+              label: 'Partial COD',
+              description: 'Pay ₹' + config.partialCodAdvance + ' now, ₹' + remainingAmount.toFixed(0) + ' on delivery',
+              checked: false
+          }
+      ];
+
+      var submitBtn = form.querySelector('button[type="submit"]');
+      var originalButtonText = submitBtn ? submitBtn.textContent : 'Place Order';
+
+      paymentOptions.forEach(function(opt) {
+          var row = document.createElement('label');
+          row.style.display = 'flex';
+          row.style.alignItems = 'flex-start';
+          row.style.gap = '12px';
+          row.style.padding = '14px';
+          row.style.background = opt.checked ? 'rgba(99, 102, 241, 0.1)' : '#fff';
+          row.style.borderRadius = '10px';
+          row.style.border = '2px solid ' + (opt.checked ? config.primaryColor : '#e5e7eb');
+          row.style.cursor = 'pointer';
+          row.style.transition = 'all 0.2s ease';
+
+          var radio = document.createElement('input');
+          radio.type = 'radio';
+          radio.name = 'payment_method';
+          radio.value = opt.id;
+          radio.checked = opt.checked;
+          radio.style.marginTop = '2px';
+          radio.style.accentColor = config.primaryColor;
+
+          var textContainer = document.createElement('div');
+          textContainer.style.flex = '1';
+          
+          var labelText = document.createElement('div');
+          labelText.textContent = opt.label;
+          labelText.style.fontWeight = '600';
+          labelText.style.color = '#1f2937';
+          labelText.style.fontSize = '14px';
+
+          var descText = document.createElement('div');
+          descText.textContent = opt.description;
+          descText.style.color = '#6b7280';
+          descText.style.fontSize = '13px';
+          descText.style.marginTop = '2px';
+
+          textContainer.appendChild(labelText);
+          textContainer.appendChild(descText);
+
+          row.appendChild(radio);
+          row.appendChild(textContainer);
+          optionsWrapper.appendChild(row);
+
+          // Mouse events for hover
+          row.addEventListener('mouseenter', function() {
+              if (!radio.checked) {
+                  row.style.borderColor = '#c7d2fe';
+                  row.style.background = 'rgba(99, 102, 241, 0.05)';
+              }
+          });
+          row.addEventListener('mouseleave', function() {
+              if (!radio.checked) {
+                  row.style.borderColor = '#e5e7eb';
+                  row.style.background = '#fff';
+              }
+          });
+
+          // Change event to update UI and button text
+          radio.addEventListener('change', function() {
+              // Update all row styles
+              var allRows = optionsWrapper.querySelectorAll('label');
+              allRows.forEach(function(r, idx) {
+                  var isSelected = r.querySelector('input[type="radio"]').checked;
+                  r.style.borderColor = isSelected ? config.primaryColor : '#e5e7eb';
+                  r.style.background = isSelected ? 'rgba(99, 102, 241, 0.1)' : '#fff';
+              });
+
+              // Update submit button text
+              if (submitBtn) {
+                  if (opt.id === 'partial_cod') {
+                      submitBtn.textContent = 'Pay ₹' + config.partialCodAdvance + ' Now';
+                      submitBtn.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+                  } else {
+                      submitBtn.textContent = originalButtonText;
+                      submitBtn.style.background = config.primaryColor;
+                  }
+              }
+          });
+      });
+
+      container.appendChild(optionsWrapper);
+
+      // Insert before order summary or submit button
+      var summary = form.querySelector('.cod-order-summary');
+      if (summary) {
+          form.insertBefore(container, summary);
+      } else {
+          form.insertBefore(container, form.querySelector('button[type="submit"]'));
+      }
+  }
+
   function renderMarketingCheckbox(form, config) {
       var div = document.createElement('div');
       div.style.marginBottom = '16px';
@@ -930,18 +1077,84 @@
           }
       }
 
-      console.log('[COD Form] Submitting order:', payload);
+      // Detect selected payment method
+      var paymentMethodRadio = form.querySelector('input[name="payment_method"]:checked');
+      var selectedPaymentMethod = paymentMethodRadio ? paymentMethodRadio.value : 'full_cod';
+      var isPartialCod = selectedPaymentMethod === 'partial_cod';
 
-      // Send to backend via Shopify App Proxy
-      fetch(config.proxyUrl + '/api/orders', {
+      console.log('[COD Form] Submitting order:', payload, 'Payment method:', selectedPaymentMethod);
+
+      // Route based on payment method
+      if (isPartialCod && config.partialCodEnabled) {
+          // Partial COD: Call create-checkout endpoint and redirect to Shopify checkout  
+          var partialCodPayload = {
+              ...payload,
+              paymentMethod: 'partial_cod',
+              advanceAmount: config.partialCodAdvance,
+              remainingAmount: (payload.price * payload.quantity) + (payload.shippingPrice || 0) - config.partialCodAdvance
+          };
+
+          console.log('[COD Form] Partial COD checkout:', partialCodPayload);
+
+          fetch(config.proxyUrl + '/api/partial-cod/create-checkout', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(partialCodPayload)
+          })
+          .then(function(res) {
+              var ct = res.headers.get('content-type');
+              if (!res.ok) {
+                  if (ct && ct.indexOf('application/json') !== -1) return res.json().then(function(j) { throw new Error(j.error || j.message || 'Request failed'); });
+                  throw new Error('Server error ' + res.status);
+              }
+              if (ct && ct.indexOf('application/json') !== -1) return res.json();
+              return res.text().then(function() { throw new Error('Invalid response'); });
+          })
+          .then(function(result) {
+              console.log('[COD Form] Partial COD response:', result);
+              
+              if (result.success && result.checkoutUrl) {
+                  // Redirect to Shopify checkout
+                  window.location.href = result.checkoutUrl;
+              } else {
+                  // Show error
+                  alert('Unable to create checkout: ' + (result.error || 'Unknown error'));
+                  submitBtn.disabled = false;
+                  submitBtn.textContent = originalBtnText;
+              }
+          })
+          .catch(function(err) {
+              console.error('[COD Form] Partial COD error:', err);
+              alert('Network error. Please try again.');
+              submitBtn.disabled = false;
+              submitBtn.textContent = originalBtnText;
+          });
+
+          return; // Exit - partial COD handling complete
+      }
+
+      // Full COD: Send to regular backend
+      fetch(config.proxyUrl + '/api/orders/', {
           method: 'POST',
           headers: {
               'Content-Type': 'application/json'
           },
           body: JSON.stringify(payload)
       })
-      .then(res => res.json())
-      .then(result => {
+      .then(function(res) {
+          var ct = res.headers.get('content-type');
+          if (!res.ok) {
+              if (ct && ct.indexOf('application/json') !== -1) {
+                  return res.json().then(function(j) { throw new Error(j.error || j.message || 'Order failed'); });
+              }
+              throw new Error('Server error ' + res.status + '. Please try again.');
+          }
+          if (ct && ct.indexOf('application/json') !== -1) return res.json();
+          return res.text().then(function(t) { throw new Error('Invalid server response'); });
+      })
+      .then(function(result) {
           console.log('[COD Form] Order response:', result);
           
           if (result.success) {
