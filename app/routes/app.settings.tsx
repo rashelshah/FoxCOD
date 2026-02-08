@@ -411,6 +411,38 @@ const PreviewDisplay = memo(({
         return base;
     };
 
+    // Generate animation CSS classes based on button settings
+    const getButtonAnimationClasses = () => {
+        const btn = buttonStylesState || {};
+        const classes: string[] = [];
+
+        // Animation preset
+        if (btn.animationPreset && btn.animationPreset !== 'none') {
+            classes.push(`btn-anim-${btn.animationPreset}`);
+            // Speed modifier
+            if (btn.animationSpeed === 'slow') classes.push('speed-slow');
+            if (btn.animationSpeed === 'fast') classes.push('speed-fast');
+        }
+
+        // Border effects
+        if (btn.borderEffect && btn.borderEffect !== 'static') {
+            classes.push(`btn-border-${btn.borderEffect}`);
+            // Intensity modifier
+            if (btn.borderIntensity === 'low') classes.push('intensity-low');
+            if (btn.borderIntensity === 'high') classes.push('intensity-high');
+        }
+
+        // Hover effects
+        if (btn.hoverLift) classes.push('btn-hover-lift');
+        if (btn.hoverGlow) classes.push('btn-hover-glow');
+
+        // Click effects
+        if (btn.clickRipple) classes.push('btn-click-ripple');
+        if (btn.clickPress) classes.push('btn-click-press');
+
+        return classes.join(' ');
+    };
+
     // Get modal container styles based on modalStyle and formStyles
     const getModalStyle = () => {
         console.log('[Modal] Background color from formStyles:', formStyles?.backgroundColor);
@@ -540,7 +572,10 @@ const PreviewDisplay = memo(({
                             )}
                             {/* Only show Order button in Button tab */}
                             {activeTab === 'button' && (
-                                <button style={{ ...getButtonStyle(), ...(activeTab === 'button' ? { maxWidth: '200px', width: '100%' } : { width: '100%' }) }}>
+                                <button
+                                    className={getButtonAnimationClasses()}
+                                    style={{ ...getButtonStyle(), maxWidth: '200px', width: '100%' }}
+                                >
                                     {buttonText || 'Buy with COD'}
                                 </button>
                             )}
@@ -1336,6 +1371,167 @@ export default function SettingsPage() {
                     .tab-btn { padding: 8px 12px; }
                     .toggle-switch { width: 48px; height: 26px; }
                 }
+                
+                /* =========================
+                   BUTTON ANIMATION PRESETS
+                   ========================= */
+                
+                /* Subtle Shake */
+                @keyframes btn-shake {
+                    0%, 100% { transform: translateX(0); }
+                    25% { transform: translateX(-3px); }
+                    75% { transform: translateX(3px); }
+                }
+                .btn-anim-shake { animation: btn-shake 0.5s ease-in-out infinite; }
+                .btn-anim-shake.speed-slow { animation-duration: 0.8s; }
+                .btn-anim-shake.speed-fast { animation-duration: 0.3s; }
+                
+                /* Pulse */
+                @keyframes btn-pulse {
+                    0%, 100% { transform: scale(1); }
+                    50% { transform: scale(1.05); }
+                }
+                .btn-anim-pulse { animation: btn-pulse 1.5s ease-in-out infinite; }
+                .btn-anim-pulse.speed-slow { animation-duration: 2.5s; }
+                .btn-anim-pulse.speed-fast { animation-duration: 0.8s; }
+                
+                /* Bounce */
+                @keyframes btn-bounce {
+                    0%, 100% { transform: translateY(0); }
+                    50% { transform: translateY(-6px); }
+                }
+                .btn-anim-bounce { animation: btn-bounce 1s ease-in-out infinite; }
+                .btn-anim-bounce.speed-slow { animation-duration: 1.5s; }
+                .btn-anim-bounce.speed-fast { animation-duration: 0.5s; }
+                
+                /* Glow */
+                @keyframes btn-glow {
+                    0%, 100% { box-shadow: 0 0 5px rgba(99, 102, 241, 0.4); }
+                    50% { box-shadow: 0 0 20px rgba(99, 102, 241, 0.8), 0 0 30px rgba(99, 102, 241, 0.4); }
+                }
+                .btn-anim-glow { animation: btn-glow 2s ease-in-out infinite; }
+                .btn-anim-glow.speed-slow { animation-duration: 3s; }
+                .btn-anim-glow.speed-fast { animation-duration: 1s; }
+                
+                /* Gradient Flow */
+                @keyframes btn-gradient-flow {
+                    0% { background-position: 0% 50%; }
+                    50% { background-position: 100% 50%; }
+                    100% { background-position: 0% 50%; }
+                }
+                .btn-anim-gradient-flow {
+                    background-size: 200% 200% !important;
+                    animation: btn-gradient-flow 3s ease infinite;
+                }
+                .btn-anim-gradient-flow.speed-slow { animation-duration: 5s; }
+                .btn-anim-gradient-flow.speed-fast { animation-duration: 1.5s; }
+                
+                /* Shimmer */
+                @keyframes btn-shimmer {
+                    0% { left: -100%; }
+                    100% { left: 100%; }
+                }
+                .btn-anim-shimmer {
+                    position: relative;
+                    overflow: hidden;
+                }
+                .btn-anim-shimmer::after {
+                    content: '';
+                    position: absolute;
+                    top: 0;
+                    left: -100%;
+                    width: 50%;
+                    height: 100%;
+                    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+                    animation: btn-shimmer 2s ease-in-out infinite;
+                }
+                .btn-anim-shimmer.speed-slow::after { animation-duration: 3s; }
+                .btn-anim-shimmer.speed-fast::after { animation-duration: 1s; }
+                
+                /* =========================
+                   BORDER EFFECT ANIMATIONS
+                   ========================= */
+                
+                /* Glowing Border */
+                @keyframes border-glow {
+                    0%, 100% { box-shadow: 0 0 3px var(--btn-border-color, #6366f1); }
+                    50% { box-shadow: 0 0 12px var(--btn-border-color, #6366f1), 0 0 20px var(--btn-border-color, #6366f1); }
+                }
+                .btn-border-glowing { animation: border-glow 2s ease-in-out infinite; }
+                .btn-border-glowing.intensity-low { animation-duration: 3s; }
+                .btn-border-glowing.intensity-high { animation-duration: 1s; }
+                
+                /* Animated Gradient Border */
+                @keyframes border-gradient {
+                    0% { border-color: #6366f1; }
+                    33% { border-color: #ec4899; }
+                    66% { border-color: #10b981; }
+                    100% { border-color: #6366f1; }
+                }
+                .btn-border-animated-gradient { animation: border-gradient 3s linear infinite; }
+                
+                /* Dashed Moving Border */
+                @keyframes border-dash {
+                    0% { stroke-dashoffset: 0; }
+                    100% { stroke-dashoffset: 16; }
+                }
+                .btn-border-dashed-moving {
+                    border-style: dashed !important;
+                    animation: none; /* Dashed effect is static but visible */
+                }
+                
+                /* =========================
+                   HOVER & CLICK EFFECTS
+                   ========================= */
+                .btn-hover-lift:hover {
+                    transform: translateY(-3px);
+                    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+                }
+                .btn-hover-glow:hover {
+                    box-shadow: 0 0 20px rgba(99, 102, 241, 0.6);
+                }
+                .btn-click-press:active {
+                    transform: scale(0.96);
+                }
+                
+                /* Ripple Effect */
+                .btn-click-ripple {
+                    position: relative;
+                    overflow: hidden;
+                }
+                .btn-click-ripple::before {
+                    content: '';
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    width: 0;
+                    height: 0;
+                    background: rgba(255, 255, 255, 0.3);
+                    border-radius: 50%;
+                    transform: translate(-50%, -50%);
+                    transition: width 0.4s ease, height 0.4s ease;
+                }
+                .btn-click-ripple:active::before {
+                    width: 200px;
+                    height: 200px;
+                }
+                
+                /* =========================
+                   REDUCED MOTION SUPPORT
+                   ========================= */
+                @media (prefers-reduced-motion: reduce) {
+                    .btn-anim-shake,
+                    .btn-anim-pulse,
+                    .btn-anim-bounce,
+                    .btn-anim-glow,
+                    .btn-anim-gradient-flow,
+                    .btn-anim-shimmer,
+                    .btn-anim-shimmer::after,
+                    .btn-border-glowing,
+                    .btn-border-animated-gradient {
+                        animation: none !important;
+                    }
+                }
             `}</style>
 
             <s-page heading="">
@@ -1591,12 +1787,143 @@ export default function SettingsPage() {
                                             <span className="toggle-option-label">Shadow</span>
                                             <div className={`mini-toggle ${buttonStylesState?.shadow ? 'on' : 'off'}`} />
                                         </div>
+                                    </div>
+
+                                    {/* Animation Presets */}
+                                    <div className="settings-card">
+                                        <h3 className="card-title"><span>✨</span> Animation Presets</h3>
+                                        <div className="input-group">
+                                            <label className="input-label">Button Animation</label>
+                                            <select
+                                                className="input-field"
+                                                value={buttonStylesState?.animationPreset || 'none'}
+                                                onChange={(e) => setButtonStylesState(s => ({ ...s, animationPreset: e.target.value as any }))}
+                                                style={{ cursor: 'pointer' }}
+                                            >
+                                                <option value="none">None (Static)</option>
+                                                <option value="shake">Subtle Shake</option>
+                                                <option value="pulse">Pulse</option>
+                                                <option value="bounce">Bounce</option>
+                                                <option value="glow">Glow</option>
+                                                <option value="gradient-flow">Gradient Flow</option>
+                                                <option value="shimmer">Shimmer Sweep</option>
+                                            </select>
+                                        </div>
+                                        <div className="input-group" style={{ marginTop: 12 }}>
+                                            <label className="input-label">Animation Speed</label>
+                                            <div className="style-options">
+                                                {(['slow', 'normal', 'fast'] as const).map((speed) => (
+                                                    <button key={speed} type="button" className={`style-option ${(buttonStylesState?.animationSpeed || 'normal') === speed ? 'active' : ''}`} onClick={() => setButtonStylesState(s => ({ ...s, animationSpeed: speed }))}>
+                                                        {speed.charAt(0).toUpperCase() + speed.slice(1)}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Border Effects */}
+                                    <div className="settings-card">
+                                        <h3 className="card-title"><span>🔲</span> Border Effects</h3>
+                                        <div className="input-group">
+                                            <label className="input-label">Border Animation</label>
+                                            <div className="style-options" style={{ flexWrap: 'wrap' }}>
+                                                {([
+                                                    { value: 'static', label: 'Static' },
+                                                    { value: 'glowing', label: 'Glowing' },
+                                                    { value: 'animated-gradient', label: 'Gradient' },
+                                                    { value: 'dashed-moving', label: 'Dashed' }
+                                                ] as const).map((effect) => (
+                                                    <button key={effect.value} type="button" className={`style-option ${(buttonStylesState?.borderEffect || 'static') === effect.value ? 'active' : ''}`} onClick={() => setButtonStylesState(s => ({ ...s, borderEffect: effect.value }))}>
+                                                        {effect.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="input-group" style={{ marginTop: 12 }}>
+                                            <label className="input-label">Border Intensity</label>
+                                            <div className="style-options">
+                                                {(['low', 'medium', 'high'] as const).map((intensity) => (
+                                                    <button key={intensity} type="button" className={`style-option ${(buttonStylesState?.borderIntensity || 'medium') === intensity ? 'active' : ''}`} onClick={() => setButtonStylesState(s => ({ ...s, borderIntensity: intensity }))}>
+                                                        {intensity.charAt(0).toUpperCase() + intensity.slice(1)}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Hover & Click Effects */}
+                                    <div className="settings-card">
+                                        <h3 className="card-title"><span>👆</span> Hover & Click Effects</h3>
+                                        <div className="toggle-option" onClick={() => setButtonStylesState(s => ({ ...s, hoverLift: !s.hoverLift }))}>
+                                            <span className="toggle-option-label">Hover Lift + Shadow</span>
+                                            <div className={`mini-toggle ${buttonStylesState?.hoverLift ? 'on' : 'off'}`} />
+                                        </div>
+                                        <div className="toggle-option" style={{ marginTop: 10 }} onClick={() => setButtonStylesState(s => ({ ...s, hoverGlow: !s.hoverGlow }))}>
+                                            <span className="toggle-option-label">Glow on Hover</span>
+                                            <div className={`mini-toggle ${buttonStylesState?.hoverGlow ? 'on' : 'off'}`} />
+                                        </div>
+                                        <div className="toggle-option" style={{ marginTop: 10 }} onClick={() => setButtonStylesState(s => ({ ...s, clickRipple: !s.clickRipple }))}>
+                                            <span className="toggle-option-label">Ripple Effect on Click</span>
+                                            <div className={`mini-toggle ${buttonStylesState?.clickRipple ? 'on' : 'off'}`} />
+                                        </div>
+                                        <div className="toggle-option" style={{ marginTop: 10 }} onClick={() => setButtonStylesState(s => ({ ...s, clickPress: !s.clickPress }))}>
+                                            <span className="toggle-option-label">Press-down on Click</span>
+                                            <div className={`mini-toggle ${buttonStylesState?.clickPress ? 'on' : 'off'}`} />
+                                        </div>
+                                    </div>
+
+                                    {/* Timing & Behavior */}
+                                    <div className="settings-card">
+                                        <h3 className="card-title"><span>⏱️</span> Timing & Behavior</h3>
+                                        <div className="input-group">
+                                            <label className="input-label">Start Animation</label>
+                                            <select
+                                                className="input-field"
+                                                value={buttonStylesState?.animationTrigger || 'page-load'}
+                                                onChange={(e) => setButtonStylesState(s => ({ ...s, animationTrigger: e.target.value as any }))}
+                                                style={{ cursor: 'pointer' }}
+                                            >
+                                                <option value="page-load">On Page Load</option>
+                                                <option value="form-filled">After Form is Filled</option>
+                                                <option value="inactivity">After Inactivity</option>
+                                            </select>
+                                        </div>
+                                        {buttonStylesState?.animationTrigger === 'inactivity' && (
+                                            <div className="input-group" style={{ marginTop: 12 }}>
+                                                <label className="input-label">Inactivity Delay (seconds)</label>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                                    <input type="range" min="1" max="10" value={buttonStylesState?.inactivityDelay ?? 3} onChange={(e) => setButtonStylesState(s => ({ ...s, inactivityDelay: parseInt(e.target.value) }))} style={{ flex: 1, background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${((buttonStylesState?.inactivityDelay ?? 3) - 1) * 100 / (10 - 1)}%, #e5e7eb ${((buttonStylesState?.inactivityDelay ?? 3) - 1) * 100 / (10 - 1)}%, #e5e7eb 100%)` }} />
+                                                    <span style={{ fontSize: 13, fontWeight: 600, minWidth: 28 }}>{buttonStylesState?.inactivityDelay ?? 3}s</span>
+                                                </div>
+                                            </div>
+                                        )}
+                                        <div className="toggle-option" style={{ marginTop: 12 }} onClick={() => setButtonStylesState(s => ({ ...s, stopAfterInteraction: !s.stopAfterInteraction }))}>
+                                            <span className="toggle-option-label">Stop Animation After First Interaction</span>
+                                            <div className={`mini-toggle ${buttonStylesState?.stopAfterInteraction ? 'on' : 'off'}`} />
+                                        </div>
+                                    </div>
+
+                                    {/* Device Control */}
+                                    <div className="settings-card">
+                                        <h3 className="card-title"><span>📱</span> Device Control</h3>
+                                        <div className="toggle-option" onClick={() => setButtonStylesState(s => ({ ...s, enableDesktop: !s.enableDesktop }))}>
+                                            <span className="toggle-option-label">Enable Animations on Desktop</span>
+                                            <div className={`mini-toggle ${buttonStylesState?.enableDesktop !== false ? 'on' : 'off'}`} />
+                                        </div>
+                                        <div className="toggle-option" style={{ marginTop: 10 }} onClick={() => setButtonStylesState(s => ({ ...s, enableMobile: !s.enableMobile }))}>
+                                            <span className="toggle-option-label">Enable Animations on Mobile</span>
+                                            <div className={`mini-toggle ${buttonStylesState?.enableMobile !== false ? 'on' : 'off'}`} />
+                                        </div>
+                                    </div>
+
+                                    {/* Restore to Default */}
+                                    <div className="settings-card">
                                         <button
                                             type="button"
                                             onClick={() => setButtonStylesState({ ...DEFAULT_BUTTON_STYLES })}
-                                            style={{ marginTop: 16, padding: '10px 16px', fontSize: 13, fontWeight: 600, color: '#6366f1', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid #6366f1', borderRadius: 10, cursor: 'pointer' }}
+                                            style={{ width: '100%', padding: '12px 16px', fontSize: 13, fontWeight: 600, color: '#6366f1', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid #6366f1', borderRadius: 10, cursor: 'pointer' }}
                                         >
-                                            Restore to Default
+                                            Restore All to Default
                                         </button>
                                     </div>
                                 </>

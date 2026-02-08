@@ -51,6 +51,7 @@ export interface FormStyles {
  * Button style configuration
  */
 export interface ButtonStyles {
+    // Basic styling
     textColor: string;
     textSize: number;       // px
     fontStyle: 'normal' | 'bold' | 'italic';
@@ -60,6 +61,29 @@ export interface ButtonStyles {
     borderRadius: number;
     shadow: boolean;
     animation: 'none' | 'fade' | 'slide' | 'pulse';
+
+    // Animation Presets
+    animationPreset: 'none' | 'shake' | 'pulse' | 'bounce' | 'glow' | 'gradient-flow' | 'shimmer';
+
+    // Border Effects
+    borderEffect: 'static' | 'glowing' | 'animated-gradient' | 'dashed-moving';
+    borderIntensity: 'low' | 'medium' | 'high';
+
+    // Hover & Click Effects
+    hoverLift: boolean;
+    hoverGlow: boolean;
+    clickRipple: boolean;
+    clickPress: boolean;
+
+    // Timing Controls
+    animationTrigger: 'page-load' | 'form-filled' | 'inactivity';
+    inactivityDelay: number;  // seconds
+    stopAfterInteraction: boolean;
+    animationSpeed: 'slow' | 'normal' | 'fast';
+
+    // Device Control
+    enableDesktop: boolean;
+    enableMobile: boolean;
 }
 
 /**
@@ -130,6 +154,7 @@ export const DEFAULT_STYLES: FormStyles = {
  * Default button styles
  */
 export const DEFAULT_BUTTON_STYLES: ButtonStyles = {
+    // Basic styling
     textColor: '#ffffff',
     textSize: 15,
     fontStyle: 'bold',
@@ -139,6 +164,29 @@ export const DEFAULT_BUTTON_STYLES: ButtonStyles = {
     borderRadius: 12,
     shadow: true,
     animation: 'none',
+
+    // Animation Presets
+    animationPreset: 'none',
+
+    // Border Effects
+    borderEffect: 'static',
+    borderIntensity: 'medium',
+
+    // Hover & Click Effects
+    hoverLift: false,
+    hoverGlow: false,
+    clickRipple: false,
+    clickPress: false,
+
+    // Timing Controls
+    animationTrigger: 'page-load',
+    inactivityDelay: 3,
+    stopAfterInteraction: true,
+    animationSpeed: 'normal',
+
+    // Device Control
+    enableDesktop: true,
+    enableMobile: true,
 };
 
 /**

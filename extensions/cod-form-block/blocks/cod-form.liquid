@@ -120,7 +120,15 @@
      data-form-title="{{ cod_form_title }}"
      data-form-subtitle="{{ cod_form_subtitle }}"
      data-partial-cod-enabled="{{ cod_partial_enabled }}"
-     data-partial-cod-advance="{{ cod_partial_advance }}">
+     data-partial-cod-advance="{{ cod_partial_advance }}"
+     data-animation-preset="{{ btn_styles.animationPreset | default: 'none' }}"
+     data-animation-speed="{{ btn_styles.animationSpeed | default: 'normal' }}"
+     data-border-effect="{{ btn_styles.borderEffect | default: 'static' }}"
+     data-border-intensity="{{ btn_styles.borderIntensity | default: 'medium' }}"
+     data-hover-lift="{{ btn_styles.hoverLift | default: false }}"
+     data-hover-glow="{{ btn_styles.hoverGlow | default: false }}"
+     data-click-ripple="{{ btn_styles.clickRipple | default: false }}"
+     data-click-press="{{ btn_styles.clickPress | default: false }}">
 </div>
 
 {% comment %} Modal Overlay {% endcomment %}
@@ -596,6 +604,170 @@
   }
   {% endif %}
 </style>
+
+<style>
+  /* =========================
+     BUTTON ANIMATION PRESETS
+     ========================= */
+  
+  /* Subtle Shake */
+  @keyframes btn-shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-3px); }
+      75% { transform: translateX(3px); }
+  }
+  .btn-anim-shake { animation: btn-shake 0.5s ease-in-out infinite; }
+  .btn-anim-shake.speed-slow { animation-duration: 0.8s; }
+  .btn-anim-shake.speed-fast { animation-duration: 0.3s; }
+  
+  /* Pulse */
+  @keyframes btn-pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+  }
+  .btn-anim-pulse { animation: btn-pulse 1.5s ease-in-out infinite; }
+  .btn-anim-pulse.speed-slow { animation-duration: 2.5s; }
+  .btn-anim-pulse.speed-fast { animation-duration: 0.8s; }
+  
+  /* Bounce */
+  @keyframes btn-bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+  }
+  .btn-anim-bounce { animation: btn-bounce 1s ease-in-out infinite; }
+  .btn-anim-bounce.speed-slow { animation-duration: 1.5s; }
+  .btn-anim-bounce.speed-fast { animation-duration: 0.5s; }
+  
+  /* Glow */
+  @keyframes btn-glow {
+      0%, 100% { box-shadow: 0 0 5px rgba(99, 102, 241, 0.4); }
+      50% { box-shadow: 0 0 20px rgba(99, 102, 241, 0.8), 0 0 30px rgba(99, 102, 241, 0.4); }
+  }
+  .btn-anim-glow { animation: btn-glow 2s ease-in-out infinite; }
+  .btn-anim-glow.speed-slow { animation-duration: 3s; }
+  .btn-anim-glow.speed-fast { animation-duration: 1s; }
+  
+  /* Gradient Flow */
+  @keyframes btn-gradient-flow {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+  }
+  .btn-anim-gradient-flow {
+      background-size: 200% 200% !important;
+      animation: btn-gradient-flow 3s ease infinite;
+  }
+  .btn-anim-gradient-flow.speed-slow { animation-duration: 5s; }
+  .btn-anim-gradient-flow.speed-fast { animation-duration: 1.5s; }
+  
+  /* Shimmer */
+  @keyframes btn-shimmer {
+      0% { left: -100%; }
+      100% { left: 100%; }
+  }
+  .btn-anim-shimmer {
+      position: relative;
+      overflow: hidden;
+  }
+  .btn-anim-shimmer::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 50%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+      animation: btn-shimmer 2s ease-in-out infinite;
+  }
+  .btn-anim-shimmer.speed-slow::after { animation-duration: 3s; }
+  .btn-anim-shimmer.speed-fast::after { animation-duration: 1s; }
+  
+  /* =========================
+     BORDER EFFECT ANIMATIONS
+     ========================= */
+  
+  /* Glowing Border */
+  @keyframes border-glow {
+      0%, 100% { box-shadow: 0 0 3px var(--cod-btn-border-color, #6366f1); }
+      50% { box-shadow: 0 0 12px var(--cod-btn-border-color, #6366f1), 0 0 20px var(--cod-btn-border-color, #6366f1); }
+  }
+  .btn-border-glowing { animation: border-glow 2s ease-in-out infinite; }
+  .btn-border-glowing.intensity-low { animation-duration: 3s; }
+  .btn-border-glowing.intensity-high { animation-duration: 1s; }
+  
+  /* Animated Gradient Border */
+  @keyframes border-gradient {
+      0% { border-color: #6366f1; }
+      33% { border-color: #ec4899; }
+      66% { border-color: #10b981; }
+      100% { border-color: #6366f1; }
+  }
+  .btn-border-animated-gradient { 
+      animation: border-gradient 3s linear infinite; 
+      border-width: 2px !important;
+      border-style: solid !important;
+  }
+  
+  /* Dashed Moving Border */
+  .btn-border-dashed-moving {
+      border-style: dashed !important;
+      border-width: 2px !important;
+  }
+  
+  /* =========================
+     HOVER & CLICK EFFECTS
+     ========================= */
+  .btn-hover-lift:hover {
+      transform: translateY(-3px) !important;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.15) !important;
+  }
+  .btn-hover-glow:hover {
+      box-shadow: 0 0 20px rgba(99, 102, 241, 0.6) !important;
+  }
+  .btn-click-press:active {
+      transform: scale(0.96) !important;
+  }
+  
+  /* Ripple Effect */
+  .btn-click-ripple {
+      position: relative;
+      overflow: hidden;
+  }
+  .btn-click-ripple::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      transition: width 0.4s ease, height 0.4s ease;
+  }
+  .btn-click-ripple:active::before {
+      width: 200px;
+      height: 200px;
+  }
+  
+  /* =========================
+     REDUCED MOTION SUPPORT
+     ========================= */
+  @media (prefers-reduced-motion: reduce) {
+      .btn-anim-shake,
+      .btn-anim-pulse,
+      .btn-anim-bounce,
+      .btn-anim-glow,
+      .btn-anim-gradient-flow,
+      .btn-anim-shimmer,
+      .btn-anim-shimmer::after,
+      .btn-border-glowing,
+      .btn-border-animated-gradient {
+          animation: none !important;
+      }
+  }
+</style>
+
 <script src="{{ 'cod-form.js' | asset_url }}" defer></script>
 
 {% else %}
