@@ -4,7 +4,7 @@
  * EasySell-inspired design with comprehensive options
  */
 
-import { useState, useCallback, memo, useDeferredValue } from "react";
+import { useState, useCallback, memo, useDeferredValue, useEffect } from "react";
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
 import { useLoaderData, useSubmit, useNavigation, Link } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
@@ -39,6 +39,7 @@ import {
     DEFAULT_BUTTON_STYLES,
     DEFAULT_SHIPPING_OPTIONS,
 } from "../config/form-builder.types";
+import { ColorSelector, colorSelectorStyles } from "./ColorSelector";
 
 // Default settings for new shops
 const defaultSettings: Omit<FormSettings, "shop_domain"> = {
@@ -824,6 +825,26 @@ export default function SettingsPage() {
     const [partialCodAdvanceAmount, setPartialCodAdvanceAmount] = useState(settings.partial_cod_advance_amount ?? 100);
     const [partialCodCommission, setPartialCodCommission] = useState(settings.partial_cod_commission ?? 0);
 
+    // Custom hex color input state
+    const [customHexInput, setCustomHexInput] = useState(settings.primary_color || '#6366f1');
+    const [hexError, setHexError] = useState('');
+    const [isCustomColorActive, setIsCustomColorActive] = useState(
+        !['#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f59e0b', '#10b981', '#06b6d4', '#3b82f6', '#000000'].includes(settings.primary_color)
+    );
+
+    // Hex validation helpers
+    const isValidHex = (hex: string): boolean => {
+        return /^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6})$/.test(hex);
+    };
+
+    const normalizeHex = (hex: string): string => {
+        // Convert #RGB to #RRGGBB
+        if (/^#[A-Fa-f0-9]{3}$/.test(hex)) {
+            return '#' + hex[1] + hex[1] + hex[2] + hex[2] + hex[3] + hex[3];
+        }
+        return hex.toLowerCase();
+    };
+
     // DnD sensors for drag and drop
     const sensors = useSensors(
         useSensor(PointerSensor),
@@ -1000,6 +1021,86 @@ export default function SettingsPage() {
                     top: 0; left: 0;
                     border-radius: 50%;
                 }
+                
+                /* Checkmark for selected color preset */
+                .color-preset { position: relative; }
+                .color-preset .check-icon {
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    color: white;
+                    font-size: 16px;
+                    font-weight: bold;
+                    text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+                    pointer-events: none;
+                }
+                
+                /* OR divider between presets and custom input */
+                .color-divider {
+                    display: flex;
+                    align-items: center;
+                    margin: 16px 0;
+                    color: #9ca3af;
+                    font-size: 12px;
+                    text-transform: uppercase;
+                    font-weight: 500;
+                }
+                .color-divider::before,
+                .color-divider::after {
+                    content: '';
+                    flex: 1;
+                    height: 1px;
+                    background: #e5e7eb;
+                }
+                .color-divider span {
+                    padding: 0 12px;
+                }
+                
+                /* Custom color picker row */
+                .custom-color-row {
+                    display: flex;
+                    align-items: flex-start;
+                    gap: 12px;
+                }
+                .color-picker-wrapper input[type="color"] {
+                    width: 44px;
+                    height: 44px;
+                    border-radius: 10px;
+                    border: 2px solid #e5e7eb;
+                    cursor: pointer;
+                    padding: 0;
+                    background: none;
+                }
+                .color-picker-wrapper input[type="color"]::-webkit-color-swatch-wrapper {
+                    padding: 0;
+                }
+                .color-picker-wrapper input[type="color"]::-webkit-color-swatch {
+                    border-radius: 8px;
+                    border: none;
+                }
+                .hex-input-wrapper {
+                    flex: 1;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 4px;
+                }
+                .hex-input {
+                    width: 100%;
+                    padding: 12px;
+                    border: 1px solid #e5e7eb;
+                    border-radius: 10px;
+                    font-size: 14px;
+                    font-family: 'SF Mono', Monaco, monospace;
+                    text-transform: uppercase;
+                    box-sizing: border-box;
+                }
+                .hex-input:focus { border-color: #6366f1; outline: none; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1); }
+                .hex-input.error { border-color: #ef4444; background: #fef2f2; }
+                .hex-error { color: #ef4444; font-size: 11px; margin-top: 2px; }
+                
+                /* ColorSelector component styles */
+                ${colorSelectorStyles}
                 
                 /* Range Slider Styling */
                 input[type=range] {
@@ -1316,21 +1417,73 @@ export default function SettingsPage() {
                                     <div className="settings-card">
                                         <h3 className="card-title"><span>🎨</span> Button Color</h3>
                                         <div className="color-picker">
+                                            {/* Preset color palette with checkmark indicator */}
                                             <div className="color-presets">
                                                 {colorPresets.map((color) => (
                                                     <div
                                                         key={color}
-                                                        className={`color-preset ${primaryColor === color ? 'active' : ''}`}
+                                                        className={`color-preset ${primaryColor === color && !isCustomColorActive ? 'active' : ''}`}
                                                         style={{ background: color }}
-                                                        onClick={() => setPrimaryColor(color)}
-                                                    />
+                                                        onClick={() => {
+                                                            setPrimaryColor(color);
+                                                            setIsCustomColorActive(false);
+                                                            setCustomHexInput(color);
+                                                            setHexError('');
+                                                        }}
+                                                    >
+                                                        {primaryColor === color && !isCustomColorActive && (
+                                                            <span className="check-icon">✓</span>
+                                                        )}
+                                                    </div>
                                                 ))}
-                                                <div className="custom-color" title="Custom Color">
+                                            </div>
+
+                                            {/* Divider */}
+                                            <div className="color-divider">
+                                                <span>or choose custom</span>
+                                            </div>
+
+                                            {/* Custom Color Row: Picker + Hex Input */}
+                                            <div className="custom-color-row">
+                                                <div className="color-picker-wrapper">
                                                     <input
                                                         type="color"
                                                         value={primaryColor}
-                                                        onChange={(e) => setPrimaryColor(e.target.value)}
+                                                        onChange={(e) => {
+                                                            setPrimaryColor(e.target.value);
+                                                            setCustomHexInput(e.target.value);
+                                                            setIsCustomColorActive(true);
+                                                            setHexError('');
+                                                        }}
                                                     />
+                                                </div>
+                                                <div className="hex-input-wrapper">
+                                                    <input
+                                                        type="text"
+                                                        className={`hex-input ${hexError ? 'error' : ''}`}
+                                                        value={customHexInput}
+                                                        placeholder="#FF5733"
+                                                        maxLength={7}
+                                                        onChange={(e) => {
+                                                            let val = e.target.value;
+                                                            // Auto-add # if user types without it
+                                                            if (val && !val.startsWith('#')) {
+                                                                val = '#' + val;
+                                                            }
+                                                            setCustomHexInput(val);
+                                                            if (isValidHex(val)) {
+                                                                const normalized = normalizeHex(val);
+                                                                setPrimaryColor(normalized);
+                                                                setIsCustomColorActive(true);
+                                                                setHexError('');
+                                                            } else if (val.length > 1) {
+                                                                setHexError('Invalid hex (use #RGB or #RRGGBB)');
+                                                            } else {
+                                                                setHexError('');
+                                                            }
+                                                        }}
+                                                    />
+                                                    {hexError && <span className="hex-error">{hexError}</span>}
                                                 </div>
                                             </div>
                                         </div>
@@ -1379,11 +1532,11 @@ export default function SettingsPage() {
                                     <div className="settings-card">
                                         <h3 className="card-title"><span>✏️</span> Button Typography</h3>
                                         <div className="input-group">
-                                            <label className="input-label">Text Color</label>
-                                            <div className="color-presets" style={{ marginTop: 6 }}>
-                                                <input type="color" value={buttonStylesState?.textColor || '#ffffff'} onChange={(e) => setButtonStylesState(s => ({ ...s, textColor: e.target.value }))} style={{ width: 40, height: 36, borderRadius: 8, border: '1px solid #e5e7eb', cursor: 'pointer' }} />
-                                                <span style={{ fontSize: 12, color: '#6b7280', marginLeft: 8 }}>{(buttonStylesState?.textColor || '#ffffff')}</span>
-                                            </div>
+                                            <ColorSelector
+                                                label="Text Color"
+                                                value={buttonStylesState?.textColor || '#ffffff'}
+                                                onChange={(c) => setButtonStylesState(s => ({ ...s, textColor: c }))}
+                                            />
                                         </div>
                                         <div className="input-group" style={{ marginTop: 12 }}>
                                             <label className="input-label">Text Size (px)</label>
@@ -1414,10 +1567,11 @@ export default function SettingsPage() {
                                     <div className="settings-card">
                                         <h3 className="card-title"><span>🔲</span> Button Border & Effects</h3>
                                         <div className="input-group">
-                                            <label className="input-label">Border Color</label>
-                                            <div className="color-presets" style={{ marginTop: 6 }}>
-                                                <input type="color" value={buttonStylesState?.borderColor || primaryColor} onChange={(e) => setButtonStylesState(s => ({ ...s, borderColor: e.target.value }))} style={{ width: 40, height: 36, borderRadius: 8, border: '1px solid #e5e7eb', cursor: 'pointer' }} />
-                                            </div>
+                                            <ColorSelector
+                                                label="Border Color"
+                                                value={buttonStylesState?.borderColor || primaryColor}
+                                                onChange={(c) => setButtonStylesState(s => ({ ...s, borderColor: c }))}
+                                            />
                                         </div>
                                         <div className="input-group" style={{ marginTop: 12 }}>
                                             <label className="input-label">Border Width (px)</label>
@@ -1504,10 +1658,11 @@ export default function SettingsPage() {
                                     <div className="settings-card">
                                         <h3 className="card-title"><span>🎨</span> Form Field Styling</h3>
                                         <div className="input-group">
-                                            <label className="input-label">Text Color</label>
-                                            <div className="color-presets" style={{ marginTop: 6 }}>
-                                                <input type="color" value={formStyles?.textColor || '#333333'} onChange={(e) => setFormStyles(s => ({ ...s, textColor: e.target.value }))} style={{ width: 40, height: 36, borderRadius: 8, border: '1px solid #e5e7eb', cursor: 'pointer' }} />
-                                            </div>
+                                            <ColorSelector
+                                                label="Text Color"
+                                                value={formStyles?.textColor || '#333333'}
+                                                onChange={(c) => setFormStyles(s => ({ ...s, textColor: c }))}
+                                            />
                                         </div>
                                         <div className="input-group" style={{ marginTop: 12 }}>
                                             <label className="input-label">Text Size (px)</label>
@@ -1527,10 +1682,11 @@ export default function SettingsPage() {
                                             </div>
                                         </div>
                                         <div className="input-group" style={{ marginTop: 12 }}>
-                                            <label className="input-label">Border Color</label>
-                                            <div className="color-presets" style={{ marginTop: 6 }}>
-                                                <input type="color" value={formStyles?.borderColor || '#d1d5db'} onChange={(e) => setFormStyles(s => ({ ...s, borderColor: e.target.value }))} style={{ width: 40, height: 36, borderRadius: 8, border: '1px solid #e5e7eb', cursor: 'pointer' }} />
-                                            </div>
+                                            <ColorSelector
+                                                label="Border Color"
+                                                value={formStyles?.borderColor || '#d1d5db'}
+                                                onChange={(c) => setFormStyles(s => ({ ...s, borderColor: c }))}
+                                            />
                                         </div>
                                         <div className="input-group" style={{ marginTop: 12 }}>
                                             <label className="input-label">Border Width (px)</label>
@@ -1551,10 +1707,11 @@ export default function SettingsPage() {
                                             <div className={`mini-toggle ${formStyles?.shadow ? 'on' : 'off'}`} />
                                         </div>
                                         <div className="input-group" style={{ marginTop: 12 }}>
-                                            <label className="input-label">Background Color</label>
-                                            <div className="color-presets" style={{ marginTop: 6 }}>
-                                                <input type="color" value={formStyles?.backgroundColor || '#ffffff'} onChange={(e) => setFormStyles(s => ({ ...s, backgroundColor: e.target.value }))} style={{ width: 40, height: 36, borderRadius: 8, border: '1px solid #e5e7eb', cursor: 'pointer' }} />
-                                            </div>
+                                            <ColorSelector
+                                                label="Background Color"
+                                                value={formStyles?.backgroundColor || '#ffffff'}
+                                                onChange={(c) => setFormStyles(s => ({ ...s, backgroundColor: c }))}
+                                            />
                                         </div>
                                         <div className="input-group" style={{ marginTop: 12 }}>
                                             <label className="input-label">Labels Alignment</label>
@@ -1567,40 +1724,39 @@ export default function SettingsPage() {
                                             </div>
                                         </div>
                                         <div className="input-group" style={{ marginTop: 12 }}>
-                                            <label className="input-label">Icon Color</label>
-                                            <div className="color-presets" style={{ marginTop: 6 }}>
-                                                <input type="color" value={formStyles?.iconColor || '#6b7280'} onChange={(e) => setFormStyles(s => ({ ...s, iconColor: e.target.value }))} style={{ width: 40, height: 36, borderRadius: 8, border: '1px solid #e5e7eb', cursor: 'pointer' }} />
-                                            </div>
+                                            <ColorSelector
+                                                label="Icon Color"
+                                                value={formStyles?.iconColor || '#6b7280'}
+                                                onChange={(c) => setFormStyles(s => ({ ...s, iconColor: c }))}
+                                            />
                                         </div>
                                         <div className="input-group" style={{ marginTop: 12 }}>
-                                            <label className="input-label">Icon Background</label>
-                                            <div className="color-presets" style={{ marginTop: 6 }}>
-                                                <input type="color" value={formStyles?.iconBackground || '#f3f4f6'} onChange={(e) => setFormStyles(s => ({ ...s, iconBackground: e.target.value }))} style={{ width: 40, height: 36, borderRadius: 8, border: '1px solid #e5e7eb', cursor: 'pointer' }} />
-                                            </div>
+                                            <ColorSelector
+                                                label="Icon Background"
+                                                value={formStyles?.iconBackground || '#f3f4f6'}
+                                                onChange={(c) => setFormStyles(s => ({ ...s, iconBackground: c }))}
+                                            />
                                         </div>
                                         <div className="input-group" style={{ marginTop: 12 }}>
-                                            <label className="input-label">Field Background Color</label>
-                                            <div className="color-presets" style={{ marginTop: 6 }}>
-                                                <input
-                                                    type="color"
-                                                    value={formStyles?.fieldBackgroundColor || '#ffffff'}
-                                                    onChange={(e) => {
-                                                        console.log('[Color Picker] New value:', e.target.value);
-                                                        setFormStyles(s => {
-                                                            const newStyles = { ...s, fieldBackgroundColor: e.target.value };
-                                                            console.log('[Color Picker] Updated formStyles:', newStyles);
-                                                            return newStyles;
-                                                        });
-                                                    }}
-                                                    style={{ width: 40, height: 36, borderRadius: 8, border: '1px solid #e5e7eb', cursor: 'pointer' }}
-                                                />
-                                            </div>
+                                            <ColorSelector
+                                                label="Field Background Color"
+                                                value={formStyles?.fieldBackgroundColor || '#ffffff'}
+                                                onChange={(c) => {
+                                                    console.log('[ColorSelector] New value:', c);
+                                                    setFormStyles(s => {
+                                                        const newStyles = { ...s, fieldBackgroundColor: c };
+                                                        console.log('[ColorSelector] Updated formStyles:', newStyles);
+                                                        return newStyles;
+                                                    });
+                                                }}
+                                            />
                                         </div>
                                         <div className="input-group" style={{ marginTop: 12 }}>
-                                            <label className="input-label">Label Color</label>
-                                            <div className="color-presets" style={{ marginTop: 6 }}>
-                                                <input type="color" value={formStyles?.labelColor || '#111827'} onChange={(e) => setFormStyles(s => ({ ...s, labelColor: e.target.value }))} style={{ width: 40, height: 36, borderRadius: 8, border: '1px solid #e5e7eb', cursor: 'pointer' }} />
-                                            </div>
+                                            <ColorSelector
+                                                label="Label Color"
+                                                value={formStyles?.labelColor || '#111827'}
+                                                onChange={(c) => setFormStyles(s => ({ ...s, labelColor: c }))}
+                                            />
                                         </div>
                                         <div className="input-group" style={{ marginTop: 12 }}>
                                             <label className="input-label">Label Font Size (px)</label>
