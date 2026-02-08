@@ -538,8 +538,8 @@ const PreviewDisplay = memo(({
                             {activeTab !== 'button' && showPrice && (
                                 <div className="preview-product-price">₹1,999</div>
                             )}
-                            {/* Hide Order button when in Form Fields tab - only show the form layout */}
-                            {activeTab !== 'form' && (
+                            {/* Only show Order button in Button tab */}
+                            {activeTab === 'button' && (
                                 <button style={{ ...getButtonStyle(), ...(activeTab === 'button' ? { maxWidth: '200px', width: '100%' } : { width: '100%' }) }}>
                                     {buttonText || 'Buy with COD'}
                                 </button>
