@@ -108,7 +108,17 @@
         
         // Partial COD Configuration
         partialCodEnabled: dataContainer.dataset.partialCodEnabled === 'true',
-        partialCodAdvance: parseInt(dataContainer.dataset.partialCodAdvance) || 100
+        partialCodAdvance: parseInt(dataContainer.dataset.partialCodAdvance) || 100,
+        
+        // Button Animation Configuration
+        animationPreset: dataContainer.dataset.animationPreset || 'none',
+        animationSpeed: dataContainer.dataset.animationSpeed || 'normal',
+        borderEffect: dataContainer.dataset.borderEffect || 'static',
+        borderIntensity: dataContainer.dataset.borderIntensity || 'medium',
+        hoverLift: dataContainer.dataset.hoverLift === 'true',
+        hoverGlow: dataContainer.dataset.hoverGlow === 'true',
+        clickRipple: dataContainer.dataset.clickRipple === 'true',
+        clickPress: dataContainer.dataset.clickPress === 'true'
       };
 
       console.log('[COD Form] Initialized for product:', productId, config);
@@ -116,6 +126,40 @@
       // Initialize form immediately
       initializeProduct(productId, config);
     });
+  }
+
+  /**
+   * Generate animation CSS classes based on config
+   * Mirrors the getButtonAnimationClasses function from app.settings.tsx
+   */
+  function getButtonAnimationClasses(config) {
+    var classes = [];
+    
+    // Animation preset
+    if (config.animationPreset && config.animationPreset !== 'none') {
+      classes.push('btn-anim-' + config.animationPreset);
+      // Speed modifier
+      if (config.animationSpeed === 'slow') classes.push('speed-slow');
+      if (config.animationSpeed === 'fast') classes.push('speed-fast');
+    }
+    
+    // Border effects
+    if (config.borderEffect && config.borderEffect !== 'static') {
+      classes.push('btn-border-' + config.borderEffect);
+      // Intensity modifier
+      if (config.borderIntensity === 'low') classes.push('intensity-low');
+      if (config.borderIntensity === 'high') classes.push('intensity-high');
+    }
+    
+    // Hover effects
+    if (config.hoverLift) classes.push('btn-hover-lift');
+    if (config.hoverGlow) classes.push('btn-hover-glow');
+    
+    // Click effects
+    if (config.clickRipple) classes.push('btn-click-ripple');
+    if (config.clickPress) classes.push('btn-click-press');
+    
+    return classes.join(' ');
   }
 
   /**
@@ -189,7 +233,7 @@
         // Create COD button
         var codBtn = document.createElement('button');
         codBtn.type = 'button';
-        codBtn.className = 'cod-buy-btn';
+        codBtn.className = 'cod-buy-btn ' + getButtonAnimationClasses(config);
         codBtn.textContent = config.buttonText;
         codBtn.style.cssText = styleString;
         codBtn.dataset.codOpen = productId;
