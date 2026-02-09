@@ -125,6 +125,10 @@
         quantityOffers: safeJSONParse(dataContainer.dataset.quantityOffers, [])
       };
 
+      // Debug: Log quantity offers data
+      console.log('[COD Form] Quantity Offers raw:', dataContainer.dataset.quantityOffers ? dataContainer.dataset.quantityOffers.substring(0, 200) + '...' : 'EMPTY');
+      console.log('[COD Form] Quantity Offers parsed:', config.quantityOffers);
+
       console.log('[COD Form] Initialized for product:', productId, config);
       
       // Initialize form immediately
@@ -367,16 +371,30 @@
   function renderQuantityOffers(container, config) {
     var offers = config.quantityOffers || [];
     
+    console.log('[COD Form] renderQuantityOffers called with', offers.length, 'offer groups');
+    console.log('[COD Form] Current product ID:', config.productId, 'type:', typeof config.productId);
+    
     // Check if current product has offers
-    if (!offers.length) return null;
+    if (!offers.length) {
+      console.log('[COD Form] No quantity offers available');
+      return null;
+    }
     
     // Find offers applicable to this product
     var applicableGroup = null;
+    var currentProductId = String(config.productId); // Convert to string for comparison
+    
     for (var i = 0; i < offers.length; i++) {
       var group = offers[i];
       // Handle both snake_case (from DB) and camelCase (from JS)
       var productIds = group.product_ids || group.productIds || [];
-      if (group.active && productIds && productIds.includes(config.productId)) {
+      // Convert all product IDs to strings for comparison
+      var productIdStrings = productIds.map(function(id) { return String(id); });
+      
+      console.log('[COD Form] Checking group:', group.name, 'active:', group.active, 'productIds:', productIdStrings);
+      
+      if (group.active && productIdStrings.length > 0 && productIdStrings.includes(currentProductId)) {
+        console.log('[COD Form] Found matching group:', group.name);
         applicableGroup = group;
         break;
       }
@@ -384,6 +402,7 @@
 
     
     if (!applicableGroup || !applicableGroup.offers || !applicableGroup.offers.length) {
+      console.log('[COD Form] No applicable group found for product:', currentProductId);
       return null;
     }
     
