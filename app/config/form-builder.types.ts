@@ -84,6 +84,9 @@ export interface ButtonStyles {
     // Device Control
     enableDesktop: boolean;
     enableMobile: boolean;
+
+    // Mobile Features
+    stickyOnMobile: boolean;  // Sticky button on mobile scrolling
 }
 
 /**
@@ -187,6 +190,9 @@ export const DEFAULT_BUTTON_STYLES: ButtonStyles = {
     // Device Control
     enableDesktop: true,
     enableMobile: true,
+
+    // Mobile Features
+    stickyOnMobile: false,
 };
 
 /**

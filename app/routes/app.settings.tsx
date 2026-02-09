@@ -478,7 +478,8 @@ const PreviewDisplay = memo(({
         fontWeight: formStyles?.fontStyle === 'bold' ? 700 : 600,
         fontStyle: formStyles?.fontStyle === 'italic' ? 'italic' : 'normal',
         color: formStyles?.labelColor || formStyles?.textColor || '#374151',
-        marginBottom: '4px',
+        marginBottom: '2px',
+        fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
         textAlign: (formStyles?.labelAlignment || 'left') as any
     });
 
@@ -487,12 +488,13 @@ const PreviewDisplay = memo(({
         const styles = {
             width: '100%',
             padding: '10px 12px',
-            marginBottom: '8px',
+            marginBottom: '6px',
             border: `${formStyles?.borderWidth ?? 1}px solid ${formStyles?.borderColor || '#e5e7eb'}`,
             borderRadius: (formStyles?.borderRadius ?? 8) + 'px',
             fontSize: (formStyles?.textSize ?? 14) + 'px',
             fontWeight: formStyles?.fontStyle === 'bold' ? 700 : 400,
             fontStyle: formStyles?.fontStyle === 'italic' ? 'italic' : 'normal',
+            fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
             color: formStyles?.textColor || '#111827',
             boxSizing: 'border-box' as const,
             // backgroundColor removed - set explicitly in preview divs to avoid React reconciliation conflicts
@@ -1915,6 +1917,10 @@ export default function SettingsPage() {
                                         <div className="toggle-option" style={{ marginTop: 10 }} onClick={() => setButtonStylesState(s => ({ ...s, enableMobile: !s.enableMobile }))}>
                                             <span className="toggle-option-label">Enable Animations on Mobile</span>
                                             <div className={`mini-toggle ${buttonStylesState?.enableMobile !== false ? 'on' : 'off'}`} />
+                                        </div>
+                                        <div className="toggle-option" style={{ marginTop: 10 }} onClick={() => setButtonStylesState(s => ({ ...s, stickyOnMobile: !s.stickyOnMobile }))}>
+                                            <span className="toggle-option-label">Sticky Button on Mobile (below fold)</span>
+                                            <div className={`mini-toggle ${buttonStylesState?.stickyOnMobile ? 'on' : 'off'}`} />
                                         </div>
                                     </div>
 

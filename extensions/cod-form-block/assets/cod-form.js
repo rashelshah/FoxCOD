@@ -118,7 +118,8 @@
         hoverLift: dataContainer.dataset.hoverLift === 'true',
         hoverGlow: dataContainer.dataset.hoverGlow === 'true',
         clickRipple: dataContainer.dataset.clickRipple === 'true',
-        clickPress: dataContainer.dataset.clickPress === 'true'
+        clickPress: dataContainer.dataset.clickPress === 'true',
+        stickyOnMobile: dataContainer.dataset.stickyMobile === 'true'
       };
 
       console.log('[COD Form] Initialized for product:', productId, config);
@@ -213,10 +214,24 @@
         var hasHoverGlow = config.hoverGlow;
         var animationsNeedBoxShadow = hasGlowAnim || hasBorderGlow || hasHoverGlow;
         
-        // Determine button style type from Liquid-set variables
-        var buttonStyleType = 'solid'; // Default
-        if (document.documentElement.style.getPropertyValue('--cod-btn-bg') === 'transparent') {
-          buttonStyleType = 'outline';
+        // Determine button style type from CSS variable (set by Liquid)
+        var computedStyle = getComputedStyle(document.documentElement);
+        var codBtnBg = computedStyle.getPropertyValue('--cod-btn-bg').trim();
+        var isOutlineStyle = codBtnBg === 'transparent';
+        
+        // For outline buttons, use primary color for text (like preview does)
+        var finalTextColor = textColor;
+        var finalBgColor = btnStyles.backgroundColor || config.primaryColor;
+        if (isOutlineStyle) {
+          finalBgColor = 'transparent';
+          // If text color is white (default), use primary color instead for visibility
+          if (textColor.toLowerCase() === '#ffffff' || textColor.toLowerCase() === 'white') {
+            finalTextColor = config.primaryColor;
+          }
+          // Ensure border for outline
+          if (!borderWidth || borderWidth === 0) {
+            borderWidth = 2;
+          }
         }
         
         var baseStyles = {
@@ -226,17 +241,20 @@
           fontWeight: btnStyles.fontStyle === 'bold' ? 700 : 400,
           fontStyle: btnStyles.fontStyle === 'italic' ? 'italic' : 'normal',
           fontSize: (btnStyles.textSize ?? 15) + 'px',
-          border: borderWidth ? borderWidth + 'px solid ' + borderColor : 'none',
+          border: borderWidth + 'px solid ' + (isOutlineStyle ? config.primaryColor : borderColor),
           cursor: 'pointer',
           transition: 'all 0.2s ease',
           textAlign: 'center',
           display: 'block',
           boxSizing: 'border-box',
-          color: textColor,
-          backgroundColor: btnStyles.backgroundColor || config.primaryColor,
-          // Only set boxShadow if no animations need it - otherwise CSS handles it
-          boxShadow: animationsNeedBoxShadow ? 'none' : (btnStyles.shadow ? '0 4px 6px rgba(0,0,0,0.1)' : 'none')
+          color: finalTextColor,
+          backgroundColor: finalBgColor
         };
+        
+        // Only add boxShadow if no CSS animations need to control it
+        if (!animationsNeedBoxShadow) {
+          baseStyles.boxShadow = btnStyles.shadow ? '0 4px 6px rgba(0,0,0,0.1)' : 'none';
+        }
 
         // Apply styles to string
         var styleString = Object.keys(baseStyles).map(function(key) {
@@ -280,6 +298,45 @@
         btn.parentNode.insertBefore(codBtn, btn);
         btn.style.display = 'none';
         btn.dataset.codReplaced = 'true';
+        
+        // Create sticky button clone for mobile (separate button)
+        if (config.stickyOnMobile && window.innerWidth <= 600) {
+          var stickyBtn = codBtn.cloneNode(true);
+          stickyBtn.classList.add('sticky-mobile');
+          stickyBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            openModal(productId);
+          });
+          
+          // Append to body
+          document.body.appendChild(stickyBtn);
+          
+          // Track original button position with IntersectionObserver
+          // Only show sticky when user has scrolled DOWN past the button
+          var observer = new IntersectionObserver(function(entries) {
+            entries.forEach(function(entry) {
+              // Check if button is above viewport (user scrolled down past it)
+              var rect = entry.boundingClientRect;
+              
+              if (entry.isIntersecting) {
+                // Original button is visible in viewport - always hide sticky
+                stickyBtn.classList.remove('visible');
+              } else if (rect.bottom < 0) {
+                // Button is above viewport (user scrolled down past it) - show sticky
+                stickyBtn.classList.add('visible');
+              } else {
+                // Button is below viewport (hasn't reached it yet) - hide sticky
+                stickyBtn.classList.remove('visible');
+              }
+            });
+          }, { 
+            threshold: 0,
+            rootMargin: '0px'
+          });
+          
+          observer.observe(codBtn);
+        }
       });
     });
 
@@ -407,17 +464,18 @@
 
         var wrapper = document.createElement('div');
         wrapper.className = 'cod-form-field';
-        wrapper.style.marginBottom = '12px';
+        wrapper.style.marginBottom = '6px';
 
         var label = document.createElement('label');
         label.style.display = 'block';
-        label.style.fontWeight = fontStyle === 'bold' ? '700' : '600';
+        label.style.fontWeight = fontStyle === 'bold' ? '700' : '500';
         label.style.fontStyle = fontStyle === 'italic' ? 'italic' : 'normal';
-        label.style.marginBottom = '6px';
+        label.style.marginBottom = '2px';
         label.style.fontSize = (styles.labelFontSize || textSize) + 'px';
         label.style.color = styles.labelColor || textColor;
         label.style.textAlign = labelAlignment;
-        label.innerHTML = field.label + (field.required ? ' <span style="color:red">*</span>' : '');
+        label.style.fontFamily = '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        label.innerHTML = field.label + (field.required ? ' <span style="color:#e53935">*</span>' : '');
         wrapper.appendChild(label);
 
         // Input container with icon
@@ -519,6 +577,7 @@
         input.style.fontSize = textSize + 'px';
         input.style.fontWeight = fontStyle === 'bold' ? '700' : '400';
         input.style.fontStyle = fontStyle === 'italic' ? 'italic' : 'normal';
+        input.style.fontFamily = '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
         input.style.color = textColor; // Input text color
         if (styles.fieldBackgroundColor) {
             input.style.setProperty('background-color', styles.fieldBackgroundColor, 'important');

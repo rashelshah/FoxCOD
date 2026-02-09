@@ -128,7 +128,8 @@
      data-hover-lift="{{ btn_styles.hoverLift | default: false }}"
      data-hover-glow="{{ btn_styles.hoverGlow | default: false }}"
      data-click-ripple="{{ btn_styles.clickRipple | default: false }}"
-     data-click-press="{{ btn_styles.clickPress | default: false }}">
+     data-click-press="{{ btn_styles.clickPress | default: false }}"
+     data-sticky-mobile="{{ btn_styles.stickyOnMobile | default: false }}">
 </div>
 
 {% comment %} Modal Overlay {% endcomment %}
@@ -346,13 +347,13 @@
   .cod-order-form {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 6px;
   }
 
   .cod-form-field {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 2px;
   }
 
   .cod-form-field label {
@@ -501,6 +502,24 @@
     }
     .cod-form-container {
       width: 100%;
+    }
+    
+    /* Sticky Button on Mobile */
+    .cod-buy-btn.sticky-mobile {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      width: 100%;
+      border-radius: 0;
+      z-index: 10000;
+      box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.15);
+      transform: translateY(100%);
+      transition: transform 0.3s ease-in-out;
+    }
+    
+    .cod-buy-btn.sticky-mobile.visible {
+      transform: translateY(0);
     }
   }
 </style>
