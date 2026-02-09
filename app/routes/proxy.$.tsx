@@ -11,6 +11,7 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { logOrder, supabase, getShop } from "../config/supabase.server";
 import { lookupCustomerByPhone } from "../services/customer-lookup.server";
+import { syncOrderToGoogleSheets } from "../services/google-sheets.server";
 
 const corsHeaders = {
     "Content-Type": "application/json",
@@ -174,6 +175,26 @@ async function handlePartialCodCheckout(request: Request, data: any) {
             console.log('[Proxy Partial COD] Logging order to database:', orderRef);
             await logOrder(orderLogEntry);
             console.log('[Proxy Partial COD] Order logged successfully');
+
+            // Non-blocking Google Sheets sync for partial COD
+            syncOrderToGoogleSheets(shop, {
+                orderId: orderRef,
+                orderName: orderRef,
+                customerName: customerName || '',
+                phone: customerPhone || '',
+                email: customerEmail || '',
+                address: customerAddress || '',
+                city: customerCity || '',
+                state: customerState || '',
+                pincode: customerZipcode || '',
+                product: productTitle || 'Product',
+                quantity: parseInt(quantity) || 1,
+                totalPrice: totalOrderValue.toString(),
+                paymentMethod: 'partial_cod',
+                status: 'pending_advance_payment',
+            }).catch(err => {
+                console.error('[Proxy Partial COD] Google Sheets sync error (non-blocking):', err.message);
+            });
         } catch (dbError: any) {
             console.error('[Proxy Partial COD] Database error (non-blocking):', dbError.message);
             // Continue even if DB logging fails
@@ -287,6 +308,25 @@ async function handleRegularOrder(data: any) {
     });
 
     console.log('[Proxy] Order created:', result);
+
+    // Non-blocking Google Sheets sync
+    syncOrderToGoogleSheets(data.shop, {
+        orderId: result.id,
+        orderName: result.shopify_order_name || `COD-${result.id}`,
+        customerName: data.customerName || '',
+        phone: data.customerPhone || '',
+        email: data.customerEmail || '',
+        address: data.customerAddress || '',
+        city: data.customerCity || '',
+        state: data.customerState || '',
+        pincode: data.customerZipcode || '',
+        product: data.productTitle || 'Product',
+        quantity: parseInt(data.quantity) || 1,
+        totalPrice: (parseFloat(data.price) * (parseInt(data.quantity) || 1)).toString(),
+        paymentMethod: 'full_cod',
+    }).catch(err => {
+        console.error('[Proxy] Google Sheets sync error (non-blocking):', err.message);
+    });
 
     return new Response(JSON.stringify({
         success: true,
