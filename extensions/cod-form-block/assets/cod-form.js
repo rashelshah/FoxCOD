@@ -119,7 +119,10 @@
         hoverGlow: dataContainer.dataset.hoverGlow === 'true',
         clickRipple: dataContainer.dataset.clickRipple === 'true',
         clickPress: dataContainer.dataset.clickPress === 'true',
-        stickyOnMobile: dataContainer.dataset.stickyMobile === 'true'
+        stickyOnMobile: dataContainer.dataset.stickyMobile === 'true',
+        
+        // Quantity Offers Configuration
+        quantityOffers: safeJSONParse(dataContainer.dataset.quantityOffers, [])
       };
 
       console.log('[COD Form] Initialized for product:', productId, config);
@@ -359,6 +362,163 @@
   }
 
   /**
+   * Render Quantity Offers (Bundle/Volume Discounts)
+   */
+  function renderQuantityOffers(container, config) {
+    var offers = config.quantityOffers || [];
+    
+    // Check if current product has offers
+    if (!offers.length) return null;
+    
+    // Find offers applicable to this product
+    var applicableGroup = null;
+    for (var i = 0; i < offers.length; i++) {
+      var group = offers[i];
+      // Handle both snake_case (from DB) and camelCase (from JS)
+      var productIds = group.product_ids || group.productIds || [];
+      if (group.active && productIds && productIds.includes(config.productId)) {
+        applicableGroup = group;
+        break;
+      }
+    }
+
+    
+    if (!applicableGroup || !applicableGroup.offers || !applicableGroup.offers.length) {
+      return null;
+    }
+    
+    var design = applicableGroup.design || {};
+    var template = design.template || 'modern';
+    
+    // Create offers container
+    var offersContainer = document.createElement('div');
+    offersContainer.className = 'cod-quantity-offers' + (template === 'vertical' ? ' vertical' : '');
+    offersContainer.setAttribute('data-product-id', config.productId);
+    
+    // State: selected offer index
+    var selectedIndex = design.autoSelectBestValue ? 
+      applicableGroup.offers.reduce(function(maxIdx, offer, idx, arr) {
+        return (offer.discountPercent || 0) > (arr[maxIdx].discountPercent || 0) ? idx : maxIdx;
+      }, 0) : 0;
+    
+    // Render each offer card
+    applicableGroup.offers.forEach(function(offer, idx) {
+      var card = document.createElement('div');
+      card.className = 'cod-offer-card' + (idx === selectedIndex ? ' selected' : '');
+      card.setAttribute('data-offer-idx', idx);
+      card.setAttribute('data-quantity', offer.quantity);
+      card.setAttribute('data-discount', offer.discountPercent || 0);
+      
+      // Apply design styles
+      if (idx === selectedIndex) {
+        card.style.background = design.selectedBgColor || 'rgba(99,102,241,0.08)';
+        card.style.borderColor = design.selectedBorderColor || config.primaryColor;
+        card.style.color = design.selectedTextColor || '#1f2937';
+      } else {
+        card.style.background = design.unselectedBgColor || '#ffffff';
+        card.style.borderColor = design.unselectedBorderColor || '#e5e7eb';
+      }
+      card.style.borderRadius = (design.selectedBorderRadius || 10) + 'px';
+      
+      // Badge (label)
+      if (offer.label && (design.showMostPopularBadge !== false || offer.label !== 'Most Popular')) {
+        var badge = document.createElement('div');
+        badge.className = 'cod-offer-badge';
+        badge.style.background = design.selectedTagBgColor || config.primaryColor;
+        badge.style.color = design.selectedTagTextColor || '#ffffff';
+        badge.textContent = offer.label;
+        card.appendChild(badge);
+      }
+      
+      // Quantity text
+      var qtyDiv = document.createElement('div');
+      qtyDiv.className = 'cod-offer-quantity';
+      qtyDiv.textContent = offer.quantity + (offer.quantity === 1 ? ' Unit' : ' Units');
+      card.appendChild(qtyDiv);
+      
+      // Discount text
+      if (offer.discountPercent) {
+        var discountDiv = document.createElement('div');
+        discountDiv.className = 'cod-offer-discount';
+        discountDiv.textContent = 'Save ' + offer.discountPercent + '%';
+        card.appendChild(discountDiv);
+      }
+      
+      // Price calculation
+      var unitPrice = config.productPrice;
+      var discountedPrice = unitPrice * offer.quantity * (1 - (offer.discountPercent || 0) / 100);
+      var originalPrice = unitPrice * offer.quantity;
+      
+      var priceDiv = document.createElement('div');
+      priceDiv.className = 'cod-offer-price';
+      priceDiv.textContent = (design.currencySymbol || '₹') + discountedPrice.toFixed(0);
+      if (offer.discountPercent) {
+        priceDiv.innerHTML += '<span class="cod-offer-original-price">' + 
+          (design.currencySymbol || '₹') + originalPrice.toFixed(0) + '</span>';
+      }
+      card.appendChild(priceDiv);
+      
+      // Click handler
+      card.addEventListener('click', function() {
+        // Update selected state
+        offersContainer.querySelectorAll('.cod-offer-card').forEach(function(c, i) {
+          c.classList.remove('selected');
+          c.style.background = design.unselectedBgColor || '#ffffff';
+          c.style.borderColor = design.unselectedBorderColor || '#e5e7eb';
+        });
+        card.classList.add('selected');
+        card.style.background = design.selectedBgColor || 'rgba(99,102,241,0.08)';
+        card.style.borderColor = design.selectedBorderColor || config.primaryColor;
+        
+        // Update quantity selector
+        var form = container.closest('.cod-modal') || container.closest('form');
+        var qtyInput = form.querySelector('.cod-qty-input');
+        if (qtyInput) {
+          qtyInput.value = offer.quantity;
+          // Trigger change event for price update
+          qtyInput.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        
+        // Store selected offer for price calculation
+        offersContainer.setAttribute('data-selected-offer', JSON.stringify({
+          quantity: offer.quantity,
+          discountPercent: offer.discountPercent || 0
+        }));
+        
+        // Update price display
+        updateOfferPrice(form, config, offer);
+      });
+      
+      offersContainer.appendChild(card);
+    });
+    
+    // Set initial selected offer
+    offersContainer.setAttribute('data-selected-offer', JSON.stringify({
+      quantity: applicableGroup.offers[selectedIndex].quantity,
+      discountPercent: applicableGroup.offers[selectedIndex].discountPercent || 0
+    }));
+    
+    return offersContainer;
+  }
+  
+  /**
+   * Update price display based on selected offer
+   */
+  function updateOfferPrice(form, config, offer) {
+    var priceElement = form.querySelector('.cod-product-price');
+    if (!priceElement) return;
+    
+    var unitPrice = config.productPrice;
+    var total = unitPrice * offer.quantity * (1 - (offer.discountPercent || 0) / 100);
+    
+    priceElement.innerHTML = '₹' + total.toFixed(0);
+    if (offer.discountPercent) {
+      priceElement.innerHTML += ' <span style="text-decoration:line-through;color:#9ca3af;font-size:14px;">₹' + 
+        (unitPrice * offer.quantity).toFixed(0) + '</span>';
+    }
+  }
+
+  /**
    * Initialize form functionality and render fields
    */
   function initForm(productId, config) {
@@ -370,6 +530,13 @@
 
     // 1. Render Fields
     renderFields(fieldsContainer, config);
+
+    // 1.5 Render Quantity Offers if applicable
+    var quantityOffersEl = renderQuantityOffers(container, config);
+    if (quantityOffersEl) {
+        // Insert before the dynamic fields
+        fieldsContainer.parentNode.insertBefore(quantityOffersEl, fieldsContainer);
+    }
 
     // 2. Render Rate Card (Order Summary) if enabled
     if (config.blocks && config.blocks.order_summary) {

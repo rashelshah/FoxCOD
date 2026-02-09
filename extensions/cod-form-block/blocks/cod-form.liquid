@@ -86,6 +86,9 @@
 {% assign cod_partial_enabled = shop.metafields.fox_cod.partial_cod_enabled | default: 'false' %}
 {% assign cod_partial_advance = shop.metafields.fox_cod.partial_cod_advance_amount | default: '100' %}
 
+{% comment %} Quantity Offers Settings {% endcomment %}
+{% assign cod_quantity_offers = shop.metafields.fox_cod.quantity_offers_json.value | default: '[]' %}
+
 {% comment %} Only render COD functionality if enabled in the app {% endcomment %}
 {% if cod_enabled == 'true' %}
 
@@ -129,7 +132,8 @@
      data-hover-glow="{{ btn_styles.hoverGlow | default: false }}"
      data-click-ripple="{{ btn_styles.clickRipple | default: false }}"
      data-click-press="{{ btn_styles.clickPress | default: false }}"
-     data-sticky-mobile="{{ btn_styles.stickyOnMobile | default: false }}">
+     data-sticky-mobile="{{ btn_styles.stickyOnMobile | default: false }}"
+     data-quantity-offers="{{ cod_quantity_offers | escape }}">
 </div>
 
 {% comment %} Modal Overlay {% endcomment %}
@@ -521,6 +525,80 @@
     .cod-buy-btn.sticky-mobile.visible {
       transform: translateY(0);
     }
+  }
+
+  /* =============================================
+     QUANTITY OFFERS STYLES
+     ============================================= */
+  .cod-quantity-offers {
+    display: flex;
+    gap: 8px;
+    margin: 16px 0;
+    flex-wrap: wrap;
+  }
+
+  .cod-quantity-offers.vertical {
+    flex-direction: column;
+  }
+
+  .cod-offer-card {
+    flex: 1;
+    min-width: 100px;
+    padding: 12px;
+    border-radius: 10px;
+    border: 2px solid #e5e7eb;
+    background: #ffffff;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s ease;
+    position: relative;
+  }
+
+  .cod-offer-card:hover {
+    border-color: {{ cod_primary_color }};
+  }
+
+  .cod-offer-card.selected {
+    background: rgba(99, 102, 241, 0.08);
+    border-color: {{ cod_primary_color }};
+  }
+
+  .cod-offer-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    background: {{ cod_primary_color }};
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-bottom: 6px;
+  }
+
+  .cod-offer-quantity {
+    font-size: 15px;
+    font-weight: 600;
+    color: #1f2937;
+    margin-bottom: 2px;
+  }
+
+  .cod-offer-discount {
+    font-size: 12px;
+    color: #10b981;
+    font-weight: 500;
+  }
+
+  .cod-offer-price {
+    font-size: 14px;
+    font-weight: 700;
+    color: {{ cod_primary_color }};
+    margin-top: 4px;
+  }
+
+  .cod-offer-original-price {
+    font-size: 12px;
+    color: #9ca3af;
+    text-decoration: line-through;
+    margin-left: 4px;
   }
 </style>
 
