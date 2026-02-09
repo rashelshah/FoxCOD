@@ -504,3 +504,112 @@ export async function getOrderStats(shopDomain: string) {
         ordersByStatus,
     };
 }
+
+// =============================================
+// INTEGRATION SETTINGS OPERATIONS
+// =============================================
+
+import type { IntegrationSettings } from './integrations.types';
+export type { IntegrationSettings };
+
+/**
+ * Get integration settings for a specific integration and shop
+ */
+export async function getIntegrationSettings(
+    shopDomain: string,
+    integrationId: string
+): Promise<IntegrationSettings | null> {
+    const { data, error } = await supabase
+        .from('integration_settings')
+        .select('*')
+        .eq('shop_domain', shopDomain)
+        .eq('integration_id', integrationId)
+        .single();
+
+    if (error && error.code !== 'PGRST116') {
+        console.error('Error getting integration settings:', error);
+        throw error;
+    }
+
+    return data;
+}
+
+/**
+ * Get all integration settings for a shop
+ */
+export async function getAllIntegrationSettings(
+    shopDomain: string
+): Promise<IntegrationSettings[]> {
+    const { data, error } = await supabase
+        .from('integration_settings')
+        .select('*')
+        .eq('shop_domain', shopDomain);
+
+    if (error) {
+        console.error('Error getting all integration settings:', error);
+        throw error;
+    }
+
+    return data || [];
+}
+
+/**
+ * Save or update integration settings
+ */
+export async function saveIntegrationSettings(settings: IntegrationSettings) {
+    console.log('[Supabase] Saving integration settings:', settings.integration_id);
+
+    const { data, error } = await supabase
+        .from('integration_settings')
+        .upsert(
+            {
+                shop_domain: settings.shop_domain,
+                integration_id: settings.integration_id,
+                enabled: settings.enabled,
+                connected: settings.connected,
+                connected_email: settings.connected_email || null,
+                config: settings.config || {},
+                connected_at: settings.connected ? new Date().toISOString() : null,
+            },
+            { onConflict: 'shop_domain,integration_id' }
+        )
+        .select()
+        .single();
+
+    if (error) {
+        console.error('[Supabase] Error saving integration settings:', error);
+        throw error;
+    }
+
+    console.log('[Supabase] Integration settings saved successfully');
+    return data;
+}
+
+/**
+ * Disconnect an integration (clear tokens and mark as disconnected)
+ */
+export async function disconnectIntegration(
+    shopDomain: string,
+    integrationId: string
+) {
+    const { error } = await supabase
+        .from('integration_settings')
+        .update({
+            connected: false,
+            enabled: false,
+            connected_email: null,
+            access_token: null,
+            refresh_token: null,
+            token_expires_at: null,
+            connected_at: null,
+        })
+        .eq('shop_domain', shopDomain)
+        .eq('integration_id', integrationId);
+
+    if (error) {
+        console.error('[Supabase] Error disconnecting integration:', error);
+        throw error;
+    }
+
+    console.log('[Supabase] Integration disconnected:', integrationId);
+}

@@ -22,6 +22,7 @@ export default function App() {
         <s-link href="/app/settings">Form Builder</s-link>
         <s-link href="/app/orders">Orders</s-link>
         <s-link href="/app/analytics">Analytics</s-link>
+        <s-link href="/app/integrations">Integrations</s-link>
       </s-app-nav>
       <Outlet />
     </AppProvider>

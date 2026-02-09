@@ -206,6 +206,19 @@
         var textColor = config.buttonTextColor || btnStyles.textColor || '#ffffff';
         var borderColor = config.buttonBorderColor || btnStyles.borderColor || config.primaryColor;
         var borderWidth = config.buttonBorderWidth != null && !isNaN(config.buttonBorderWidth) ? config.buttonBorderWidth : (btnStyles.borderWidth ?? 0);
+        
+        // Check if animations are enabled - don't set boxShadow inline if so (CSS handles it)
+        var hasGlowAnim = config.animationPreset === 'glow';
+        var hasBorderGlow = config.borderEffect === 'glowing';
+        var hasHoverGlow = config.hoverGlow;
+        var animationsNeedBoxShadow = hasGlowAnim || hasBorderGlow || hasHoverGlow;
+        
+        // Determine button style type from Liquid-set variables
+        var buttonStyleType = 'solid'; // Default
+        if (document.documentElement.style.getPropertyValue('--cod-btn-bg') === 'transparent') {
+          buttonStyleType = 'outline';
+        }
+        
         var baseStyles = {
           width: '100%',
           padding: (config.buttonStyles && config.buttonStyles.buttonSize === 'small') ? '10px' : (config.buttonStyles && config.buttonStyles.buttonSize === 'large') ? '16px' : '14px',
@@ -221,7 +234,8 @@
           boxSizing: 'border-box',
           color: textColor,
           backgroundColor: btnStyles.backgroundColor || config.primaryColor,
-          boxShadow: btnStyles.shadow ? '0 4px 6px rgba(0,0,0,0.1)' : 'none'
+          // Only set boxShadow if no animations need it - otherwise CSS handles it
+          boxShadow: animationsNeedBoxShadow ? 'none' : (btnStyles.shadow ? '0 4px 6px rgba(0,0,0,0.1)' : 'none')
         };
 
         // Apply styles to string
@@ -238,15 +252,22 @@
         codBtn.style.cssText = styleString;
         codBtn.dataset.codOpen = productId;
 
-        // Hover effects
-        codBtn.addEventListener('mouseenter', function() {
-          this.style.opacity = '0.9';
-          this.style.transform = 'translateY(-1px)';
-        });
-        codBtn.addEventListener('mouseleave', function() {
-          this.style.opacity = '1';
-          this.style.transform = 'translateY(0)';
-        });
+        // Only apply default hover if no custom effects defined
+        var hasCustomHover = config.hoverLift || config.hoverGlow;
+        var hasCustomClick = config.clickPress || config.clickRipple;
+        var hasAnimation = config.animationPreset && config.animationPreset !== 'none';
+        var hasBorderEffect = config.borderEffect && config.borderEffect !== 'static';
+        
+        if (!hasCustomHover && !hasAnimation && !hasBorderEffect) {
+          codBtn.addEventListener('mouseenter', function() {
+            this.style.opacity = '0.9';
+            this.style.transform = 'translateY(-1px)';
+          });
+          codBtn.addEventListener('mouseleave', function() {
+            this.style.opacity = '1';
+            this.style.transform = 'translateY(0)';
+          });
+        }
 
         // Click handler
         codBtn.addEventListener('click', function(e) {
