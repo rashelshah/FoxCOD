@@ -1,12 +1,12 @@
 /**
- * Quantity Offers Page - EasySell-Style Bundle Discounts
+ * Bundle Offers Page - EasySell-Style Bundle Discounts
  * Route: /app/quantity-offers
  * Matching EasySell UI exactly with offers list, templates, color presets
  */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
-import { useLoaderData, useSubmit, useNavigation } from "react-router";
+import { useLoaderData, useSubmit, useNavigation, useActionData, useRevalidator } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import {
@@ -76,7 +76,7 @@ async function ensureQuantityOffersMetafield(admin: any) {
         `, {
             variables: {
                 definition: {
-                    name: "Quantity Offers JSON",
+                    name: "Bundle Offers JSON",
                     namespace: "fox_cod",
                     key: "quantity_offers_json",
                     type: "json",
@@ -86,7 +86,7 @@ async function ensureQuantityOffersMetafield(admin: any) {
             }
         });
     } catch (e) {
-        console.log('[Quantity Offers] Metafield definition exists');
+        console.log('[Bundle Offers] Metafield definition exists');
     }
 }
 
@@ -99,7 +99,10 @@ async function syncOffersToMetafield(admin: any, offerGroups: any[]) {
     const shopData = await shopResponse.json();
     const shopId = shopData.data.shop.id;
 
-    await admin.graphql(`
+    console.log('[Bundle Offers] Syncing offers to metafield:', offerGroups.length, 'groups');
+    console.log('[Bundle Offers] Offer data:', JSON.stringify(offerGroups, null, 2));
+
+    const response = await admin.graphql(`
         mutation SetMetafield($metafields: [MetafieldsSetInput!]!) {
             metafieldsSet(metafields: $metafields) {
                 metafields { id key value }
@@ -117,6 +120,13 @@ async function syncOffersToMetafield(admin: any, offerGroups: any[]) {
             }]
         }
     });
+
+    const result = await response.json();
+    console.log('[Bundle Offers] Metafield sync result:', JSON.stringify(result, null, 2));
+
+    if (result.data?.metafieldsSet?.userErrors?.length > 0) {
+        console.error('[Bundle Offers] Metafield sync errors:', result.data.metafieldsSet.userErrors);
+    }
 }
 
 // Action
@@ -129,17 +139,23 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     if (actionType === "save") {
         const offerGroup = JSON.parse(formData.get("offerGroup") as string);
 
+        console.log('[Bundle Offers] Saving offer group:', JSON.stringify(offerGroup, null, 2));
+
+        let saveError = null;
+
         if (offerGroup.id) {
-            await supabase.from("quantity_offer_groups").update({
+            const { error } = await supabase.from("quantity_offer_groups").update({
                 name: offerGroup.name,
                 active: offerGroup.active,
                 product_ids: offerGroup.productIds,
                 offers: offerGroup.offers,
                 design: offerGroup.design,
                 placement: offerGroup.placement,
+                updated_at: new Date().toISOString(),
             }).eq("id", offerGroup.id).eq("shop_domain", shopDomain);
+            saveError = error;
         } else {
-            await supabase.from("quantity_offer_groups").insert({
+            const { error } = await supabase.from("quantity_offer_groups").insert({
                 shop_domain: shopDomain,
                 name: offerGroup.name,
                 active: offerGroup.active,
@@ -148,15 +164,26 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 design: offerGroup.design,
                 placement: offerGroup.placement,
             });
+            saveError = error;
+        }
+
+        if (saveError) {
+            console.error('[Bundle Offers] Supabase save error:', saveError);
+            return { success: false, error: saveError.message };
         }
 
         // Sync ALL active offers to metafield
-        const { data: allOffers } = await supabase
+        const { data: allOffers, error: fetchError } = await supabase
             .from("quantity_offer_groups")
             .select("*")
             .eq("shop_domain", shopDomain)
             .eq("active", true);
 
+        if (fetchError) {
+            console.error('[Bundle Offers] Error fetching offers for sync:', fetchError);
+        }
+
+        console.log('[Bundle Offers] Active offers to sync:', allOffers?.length || 0);
         await syncOffersToMetafield(admin, allOffers || []);
         return { success: true };
     }
@@ -270,6 +297,8 @@ function SortableOfferItem({
 // Main Component
 export default function QuantityOffersPage() {
     const { shopDomain, offerGroups: initialOfferGroups, formSettings } = useLoaderData<typeof loader>();
+    const actionData = useActionData<typeof action>();
+    const revalidator = useRevalidator();
     const submit = useSubmit();
     const navigation = useNavigation();
     const shopify = useAppBridge();
@@ -289,6 +318,67 @@ export default function QuantityOffersPage() {
     );
     const [editingOfferId, setEditingOfferId] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<'offers' | 'design'>('offers');
+
+    // Track saved state as a STATE VARIABLE (not ref) so changes trigger re-render
+    const [savedGroupString, setSavedGroupString] = useState<string | null>(() => {
+        const initial = initialOfferGroups[0];
+        if (!initial) return null;
+        return JSON.stringify({
+            ...initial,
+            productIds: initial.product_ids || [],
+            offers: initial.offers || DEFAULT_OFFERS,
+            design: { ...DEFAULT_OFFER_DESIGN, ...(initial.design || {}) },
+        });
+    });
+
+    // Update activeGroup when loader data changes (after revalidation)
+    useEffect(() => {
+        if (initialOfferGroups[0] && activeGroup?.id === initialOfferGroups[0].id) {
+            const freshGroup = {
+                ...initialOfferGroups[0],
+                productIds: initialOfferGroups[0].product_ids || [],
+                offers: initialOfferGroups[0].offers || DEFAULT_OFFERS,
+                design: { ...DEFAULT_OFFER_DESIGN, ...(initialOfferGroups[0].design || {}) },
+            };
+            setActiveGroup(freshGroup);
+            setSavedGroupString(JSON.stringify(freshGroup));
+        }
+    }, [initialOfferGroups]);
+
+    // Compute hasUnsavedChanges based on state comparison
+    const hasUnsavedChanges = useMemo(() => {
+        if (!activeGroup) return false;
+        if (!savedGroupString) return true; // New group
+        return JSON.stringify(activeGroup) !== savedGroupString;
+    }, [activeGroup, savedGroupString]);
+
+    // Discard handler - reset to saved state
+    const handleDiscard = useCallback(() => {
+        if (savedGroupString) {
+            setActiveGroup(JSON.parse(savedGroupString));
+        }
+    }, [savedGroupString]);
+
+    // Show/hide native Shopify save bar based on unsaved changes
+    useEffect(() => {
+        const saveBarId = 'bundle-offers-save-bar';
+        if (hasUnsavedChanges && activeGroup) {
+            shopify.saveBar.show(saveBarId);
+        } else {
+            shopify.saveBar.hide(saveBarId);
+        }
+    }, [hasUnsavedChanges, activeGroup, shopify]);
+
+    // Handle successful save - update savedGroupString state and reload data
+    useEffect(() => {
+        if (actionData?.success && activeGroup) {
+            const currentGroupStr = JSON.stringify(activeGroup);
+            setSavedGroupString(currentGroupStr);
+            shopify.toast.show('Bundle offers saved!', { duration: 3000 });
+            // Reload data from server to get fresh DB state
+            revalidator.revalidate();
+        }
+    }, [actionData, activeGroup, shopify, revalidator]);
 
     const sensors = useSensors(
         useSensor(PointerSensor),
@@ -372,6 +462,7 @@ export default function QuantityOffersPage() {
         formData.append("action", "save");
         formData.append("offerGroup", JSON.stringify(activeGroup));
         submit(formData, { method: "post" });
+        // Note: savedGroupString is updated in useEffect after successful save
     };
 
     const samplePrice = 2495;
@@ -379,25 +470,29 @@ export default function QuantityOffersPage() {
     return (
         <>
             <style>{styles}</style>
+            {/* Native Shopify Save Bar */}
+            <ui-save-bar id="bundle-offers-save-bar">
+                <button variant="primary" onClick={handleSave} disabled={isSaving}>
+                    {isSaving ? 'Saving...' : 'Save'}
+                </button>
+                <button onClick={handleDiscard} disabled={isSaving}>Discard</button>
+            </ui-save-bar>
+
             <div className="qo-page">
                 {/* Header */}
                 <div className="qo-header">
                     <div className="qo-header-left">
-                        <button className="btn-back" onClick={() => setActiveGroup(null)}>←</button>
-                        <h1>{activeGroup ? activeGroup.name || 'New offer' : 'Quantity Offers'}</h1>
+                        <button className="btn-back" onClick={() => {
+                            setActiveGroup(null);
+                            setSavedGroupString(null);
+                        }}>←</button>
+                        <h1>{activeGroup ? activeGroup.name || 'New offer' : 'Bundle Offers'}</h1>
                         {activeGroup && (
                             <div className={`status-toggle ${activeGroup.active ? 'on' : ''}`}
                                 onClick={() => updateActiveGroup({ active: !activeGroup.active })}>
                                 <div className="toggle-track"><div className="toggle-thumb" /></div>
                                 <span>{activeGroup.active ? 'Active' : 'Inactive'}</span>
                             </div>
-                        )}
-                    </div>
-                    <div className="qo-header-right">
-                        {activeGroup && (
-                            <button className="btn-save" onClick={handleSave} disabled={isSaving}>
-                                {isSaving ? 'Saving...' : 'Save'}
-                            </button>
                         )}
                     </div>
                 </div>
@@ -584,7 +679,7 @@ export default function QuantityOffersPage() {
                             </>
                         ) : (
                             <div className="qo-empty">
-                                <h2>Create Quantity Offers</h2>
+                                <h2>Create Bundle Offers</h2>
                                 <p>Encourage customers to buy more with volume discounts</p>
                                 <button className="btn-create" onClick={handleCreateNew}>+ New Offer</button>
                             </div>
@@ -593,84 +688,93 @@ export default function QuantityOffersPage() {
 
                     {/* Live Preview */}
                     <div className="qo-preview">
-                        <div className="preview-label">Live preview:</div>
-                        <div className="preview-container">
-                            <div className="preview-scroll">
-                                <div className="preview-header-row">
-                                    <span>Please fill in the form to order</span>
-                                    <span className="preview-close">×</span>
-                                </div>
+                        <div className="preview-label">
+                            <span>📱 Live Preview</span>
+                        </div>
+                        <div className="preview-panel">
+                            <div className="preview-header">
+                                <h3>Bundle Offers Preview</h3>
+                            </div>
+                            <div className="preview-content">
+                                <div className="preview-phone">
+                                    <div className="preview-phone-screen">
+                                        <div className="preview-header-row">
+                                            <span>Please fill in the form to order</span>
+                                            <span className="preview-close">×</span>
+                                        </div>
 
-                                {/* Quantity Offers - Starts here */}
-                                {activeGroup && (
-                                    <div className={`preview-offers template-${activeGroup.design.template || 'classic'}`}>
-                                        {activeGroup.offers.map((offer, i) => {
-                                            const total = samplePrice * offer.quantity * (1 - (offer.discountPercent || 0) / 100);
-                                            const original = samplePrice * offer.quantity;
-                                            const isSelected = offer.preselect || i === 0;
-                                            const showImage = activeGroup.design.template !== 'modern';
+                                        {/* Bundle Offers - Starts here */}
+                                        {activeGroup && (
+                                            <div className={`preview-offers template-${activeGroup.design.template || 'classic'}`}>
+                                                {activeGroup.offers.map((offer, i) => {
+                                                    const total = samplePrice * offer.quantity * (1 - (offer.discountPercent || 0) / 100);
+                                                    const original = samplePrice * offer.quantity;
+                                                    const isSelected = offer.preselect || i === 0;
+                                                    const showImage = activeGroup.design.template !== 'modern';
 
-                                            return (
-                                                <div key={offer.id}
-                                                    className={`preview-offer ${isSelected ? 'selected' : ''}`}
-                                                    style={{
-                                                        background: isSelected ? activeGroup.design.selectedBgColor : '#fff',
-                                                        borderColor: isSelected ? activeGroup.design.selectedBorderColor : '#e5e7eb',
-                                                    }}>
-                                                    {showImage && <div className="offer-thumb">🎁</div>}
-                                                    <div className="offer-details">
-                                                        <div className="offer-qty">{offer.title || `${offer.quantity} Unit${offer.quantity !== 1 ? 's' : ''}`}</div>
-                                                        {offer.label && (
-                                                            <span className="offer-tag" style={{
-                                                                background: offer.tagBgColor || activeGroup.design.selectedTagBgColor,
-                                                                color: activeGroup.design.selectedTagTextColor,
-                                                            }}>{offer.label || `Save ${offer.discountPercent || 0}%`}</span>
-                                                        )}
-                                                    </div>
-                                                    <div className="offer-pricing">
-                                                        {offer.discountPercent ? (
-                                                            <span className="offer-original">₹{original.toFixed(0)}</span>
-                                                        ) : null}
-                                                        <span className="offer-price">₹{total.toFixed(2)}</span>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
+                                                    return (
+                                                        <div key={offer.id}
+                                                            className={`preview-offer ${isSelected ? 'selected' : ''}`}
+                                                            style={{
+                                                                background: isSelected ? activeGroup.design.selectedBgColor : '#fff',
+                                                                borderColor: isSelected ? activeGroup.design.selectedBorderColor : '#e5e7eb',
+                                                            }}>
+                                                            {showImage && <div className="offer-thumb">🎁</div>}
+                                                            <div className="offer-details">
+                                                                <div className="offer-qty">{offer.title || `${offer.quantity} Unit${offer.quantity !== 1 ? 's' : ''}`}</div>
+                                                                {offer.label && (
+                                                                    <span className="offer-tag" style={{
+                                                                        background: offer.tagBgColor || activeGroup.design.selectedTagBgColor,
+                                                                        color: activeGroup.design.selectedTagTextColor,
+                                                                    }}>{offer.label || `Save ${offer.discountPercent || 0}%`}</span>
+                                                                )}
+                                                            </div>
+                                                            <div className="offer-pricing">
+                                                                {offer.discountPercent ? (
+                                                                    <span className="offer-original">₹{original.toFixed(0)}</span>
+                                                                ) : null}
+                                                                <span className="offer-price">₹{total.toFixed(2)}</span>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+
+                                        {/* Product Selector */}
+                                        <div className="preview-product-select">
+                                            <label>Title</label>
+                                            <div className="select-box">
+                                                <span>#1</span>
+                                                <select disabled><option>Sample Product</option></select>
+                                            </div>
+                                        </div>
+
+                                        {/* Summary */}
+                                        <div className="preview-summary">
+                                            <div className="summary-row"><span>Subtotal</span><span>₹{samplePrice.toFixed(2)}</span></div>
+                                            <div className="summary-row discount"><span>Discount</span><span>-₹{(samplePrice * 0.1).toFixed(2)}</span></div>
+                                            <div className="summary-row"><span>Shipping</span><span>₹{samplePrice.toFixed(2)}</span></div>
+                                            <div className="summary-row total"><span>Total</span><span>₹{(samplePrice * 1.9).toFixed(2)}</span></div>
+                                        </div>
+
+                                        {/* Form fields */}
+                                        <div className="preview-form">
+                                            <div className="preview-field"><label>Name *</label><input type="text" disabled placeholder="Enter name" /></div>
+                                            <div className="preview-field"><label>Phone *</label><input type="text" disabled placeholder="Enter phone" /></div>
+                                            <div className="preview-field"><label>Address *</label><textarea disabled placeholder="Enter address" /></div>
+                                        </div>
+
+                                        {/* Order Button */}
+                                        <button className="preview-btn" style={{
+                                            background: buttonStyles.backgroundColor || primaryColor,
+                                            color: buttonStyles.textColor || '#fff',
+                                            borderRadius: (buttonStyles.borderRadius || 8) + 'px',
+                                        }}>
+                                            {formSettings?.submit_button_text || 'Place Order (COD)'}
+                                        </button>
                                     </div>
-                                )}
-
-                                {/* Product Selector */}
-                                <div className="preview-product-select">
-                                    <label>Title</label>
-                                    <div className="select-box">
-                                        <span>#1</span>
-                                        <select disabled><option>Sample Product</option></select>
-                                    </div>
                                 </div>
-
-                                {/* Summary */}
-                                <div className="preview-summary">
-                                    <div className="summary-row"><span>Subtotal</span><span>₹{samplePrice.toFixed(2)}</span></div>
-                                    <div className="summary-row discount"><span>Discount</span><span>-₹{(samplePrice * 0.1).toFixed(2)}</span></div>
-                                    <div className="summary-row"><span>Shipping</span><span>₹{samplePrice.toFixed(2)}</span></div>
-                                    <div className="summary-row total"><span>Total</span><span>₹{(samplePrice * 1.9).toFixed(2)}</span></div>
-                                </div>
-
-                                {/* Form fields */}
-                                <div className="preview-form">
-                                    <div className="preview-field"><label>Name *</label><input type="text" disabled placeholder="Enter name" /></div>
-                                    <div className="preview-field"><label>Phone *</label><input type="text" disabled placeholder="Enter phone" /></div>
-                                    <div className="preview-field"><label>Address *</label><textarea disabled placeholder="Enter address" /></div>
-                                </div>
-
-                                {/* Order Button */}
-                                <button className="preview-btn" style={{
-                                    background: buttonStyles.backgroundColor || primaryColor,
-                                    color: buttonStyles.textColor || '#fff',
-                                    borderRadius: (buttonStyles.borderRadius || 8) + 'px',
-                                }}>
-                                    {formSettings?.submit_button_text || 'Place Order (COD)'}
-                                </button>
                             </div>
                         </div>
                     </div>
@@ -683,7 +787,7 @@ export default function QuantityOffersPage() {
 const styles = `
     * { box-sizing: border-box; }
     .qo-page { display: flex; flex-direction: column; min-height: 100vh; background: #f5f5f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-    
+
     /* Header */
     .qo-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; background: #fff; border-bottom: 1px solid #e5e5e5; }
     .qo-header-left { display: flex; align-items: center; gap: 12px; }
@@ -698,7 +802,7 @@ const styles = `
     .status-toggle:not(.on) span { color: #6b7280; background: #f3f4f6; }
     .btn-save { background: #1f2937; color: #fff; border: none; padding: 10px 24px; border-radius: 8px; font-weight: 600; cursor: pointer; }
     .btn-save:disabled { opacity: 0.6; }
-    
+
     /* Body */
     .qo-body { display: grid; grid-template-columns: 1fr 380px; gap: 24px; padding: 24px; flex: 1; }
     
@@ -785,14 +889,19 @@ const styles = `
     .qo-empty p { margin: 0 0 24px; color: #6b7280; }
     .btn-create { background: #1f2937; color: #fff; border: none; padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
     
-    /* Preview Panel */
+    /* Preview Panel - Phone Style */
     .qo-preview { position: sticky; top: 24px; }
-    .preview-label { font-size: 13px; font-weight: 500; color: #6b7280; margin-bottom: 8px; text-align: center; }
-    .preview-container { background: #fff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); overflow: hidden; }
-    .preview-scroll { max-height: calc(100vh - 150px); overflow-y: auto; }
-    .preview-header-row { display: flex; justify-content: space-between; align-items: center; padding: 16px; border-bottom: 1px solid #f3f4f6; }
-    .preview-header-row span { font-size: 14px; font-weight: 500; }
-    .preview-close { font-size: 20px; color: #9ca3af; cursor: pointer; }
+    .preview-label { font-size: 13px; font-weight: 500; color: #6b7280; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; padding: 0 4px; }
+    .preview-label span { display: flex; align-items: center; gap: 8px; }
+    .preview-panel { background: white; border: 1px solid #e5e7eb; border-radius: 16px; width: 100%; box-shadow: 0 10px 40px rgba(0,0,0,0.1); padding-bottom: 20px; }
+    .preview-header { background: #f9fafb; padding: 16px 20px; border-bottom: 1px solid #e5e7eb; border-radius: 16px 16px 0 0; }
+    .preview-header h3 { margin: 0; font-size: 14px; font-weight: 600; }
+    .preview-content { padding: 24px; }
+    .preview-phone { background: #1f2937; border-radius: 32px; padding: 6px; max-width: 300px; margin: 0 auto; }
+    .preview-phone-screen { background: white; border-radius: 24px; overflow-y: auto; max-height: 500px; padding: 16px; }
+    .preview-header-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f3f4f6; margin-bottom: 12px; }
+    .preview-header-row span { font-size: 13px; font-weight: 500; }
+    .preview-close { font-size: 18px; color: #9ca3af; cursor: pointer; }
     
     /* Preview Offers */
     .preview-offers { padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }

@@ -4,9 +4,9 @@
  * EasySell-inspired design with comprehensive options
  */
 
-import { useState, useCallback, memo, useDeferredValue, useEffect } from "react";
+import { useState, useCallback, memo, useDeferredValue, useEffect, useRef, useMemo } from "react";
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
-import { useLoaderData, useSubmit, useNavigation, Link } from "react-router";
+import { useLoaderData, useSubmit, useNavigation, Link, useActionData } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import {
@@ -813,6 +813,7 @@ const SortableFieldItem = ({ field, onToggleVisibility, onToggleRequired, isCust
  */
 export default function SettingsPage() {
     const { shop, settings } = useLoaderData<typeof loader>();
+    const actionData = useActionData<typeof action>();
     const submit = useSubmit();
     const navigation = useNavigation();
     const shopify = useAppBridge();
@@ -870,6 +871,111 @@ export default function SettingsPage() {
     const [isCustomColorActive, setIsCustomColorActive] = useState(
         !['#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f59e0b', '#10b981', '#06b6d4', '#3b82f6', '#000000'].includes(settings.primary_color)
     );
+
+    // Track saved settings as STATE (not ref) so changes trigger re-render
+    const [savedSettingsString, setSavedSettingsString] = useState<string>(() => JSON.stringify(settings));
+
+    // Track the last processed actionData to prevent duplicate processing
+    const lastProcessedActionRef = useRef<any>(null);
+
+    // Compute current settings state for comparison
+    const hasUnsavedChanges = useMemo(() => {
+        const current = {
+            enabled, button_text: buttonText, primary_color: primaryColor, required_fields: requiredFields,
+            max_quantity: maxQuantity, button_style: buttonStyle, button_size: buttonSize, button_position: buttonPosition,
+            form_title: formTitle, form_subtitle: formSubtitle, success_message: successMessage, submit_button_text: submitButtonText,
+            show_product_image: showProductImage, show_price: showPrice, show_quantity_selector: showQuantitySelector,
+            show_email_field: showEmailField, show_notes_field: showNotesField, email_required: emailRequired,
+            name_placeholder: namePlaceholder, phone_placeholder: phonePlaceholder, address_placeholder: addressPlaceholder,
+            notes_placeholder: notesPlaceholder, modal_style: modalStyle, animation_style: animationStyle, border_radius: borderRadius,
+            form_type: formType, fields, blocks, custom_fields: customFields, styles: formStyles, button_styles: buttonStylesState,
+            shipping_options: shippingOpts, partial_cod_enabled: partialCodEnabled, partial_cod_advance_amount: partialCodAdvanceAmount,
+            partial_cod_commission: partialCodCommission
+        };
+        return JSON.stringify(current) !== savedSettingsString;
+    }, [
+        enabled, buttonText, primaryColor, requiredFields, maxQuantity, buttonStyle, buttonSize, buttonPosition,
+        formTitle, formSubtitle, successMessage, submitButtonText, showProductImage, showPrice, showQuantitySelector,
+        showEmailField, showNotesField, emailRequired, namePlaceholder, phonePlaceholder, addressPlaceholder,
+        notesPlaceholder, modalStyle, animationStyle, borderRadius, formType, fields, blocks, customFields,
+        formStyles, buttonStylesState, shippingOpts, partialCodEnabled, partialCodAdvanceAmount, partialCodCommission,
+        savedSettingsString
+    ]);
+
+    // Discard handler - reset all fields to saved values
+    const handleDiscard = useCallback(() => {
+        const orig = JSON.parse(savedSettingsString);
+        setEnabled(orig.enabled);
+        setButtonText(orig.button_text);
+        setPrimaryColor(orig.primary_color);
+        setRequiredFields(orig.required_fields);
+        setMaxQuantity(orig.max_quantity);
+        setButtonStyle(orig.button_style || 'solid');
+        setButtonSize(orig.button_size || 'large');
+        setButtonPosition(orig.button_position || 'below_atc');
+        setFormTitle(orig.form_title || '');
+        setFormSubtitle(orig.form_subtitle || '');
+        setSuccessMessage(orig.success_message || '');
+        setSubmitButtonText(orig.submit_button_text || 'Place COD Order');
+        setShowProductImage(orig.show_product_image ?? true);
+        setShowPrice(orig.show_price ?? true);
+        setShowQuantitySelector(orig.show_quantity_selector ?? true);
+        setShowEmailField(orig.show_email_field ?? false);
+        setShowNotesField(orig.show_notes_field ?? false);
+        setEmailRequired(orig.email_required ?? false);
+        setNamePlaceholder(orig.name_placeholder || '');
+        setPhonePlaceholder(orig.phone_placeholder || '');
+        setAddressPlaceholder(orig.address_placeholder || '');
+        setNotesPlaceholder(orig.notes_placeholder || '');
+        setModalStyle(orig.modal_style || 'modern');
+        setAnimationStyle(orig.animation_style || 'fade');
+        setBorderRadius(orig.border_radius || 12);
+        setFormType(orig.form_type || 'popup');
+        setFields(orig.fields || DEFAULT_FIELDS);
+        setBlocks(orig.blocks || DEFAULT_BLOCKS);
+        setCustomFields(orig.custom_fields || []);
+        setFormStyles(orig.styles || DEFAULT_STYLES);
+        setButtonStylesState(orig.button_styles || DEFAULT_BUTTON_STYLES);
+        setShippingOpts(orig.shipping_options || DEFAULT_SHIPPING_OPTIONS);
+        setPartialCodEnabled(orig.partial_cod_enabled ?? false);
+        setPartialCodAdvanceAmount(orig.partial_cod_advance_amount ?? 100);
+        setPartialCodCommission(orig.partial_cod_commission ?? 0);
+    }, [savedSettingsString]);
+
+    // Show/hide native Shopify save bar based on unsaved changes
+    useEffect(() => {
+        const saveBarId = 'form-builder-save-bar';
+        if (hasUnsavedChanges) {
+            shopify.saveBar.show(saveBarId);
+        } else {
+            shopify.saveBar.hide(saveBarId);
+        }
+    }, [hasUnsavedChanges, shopify]);
+
+    // Handle successful save - only process each actionData once
+    useEffect(() => {
+        if (actionData?.success && actionData !== lastProcessedActionRef.current) {
+            lastProcessedActionRef.current = actionData;
+            const currentSettings = {
+                enabled, button_text: buttonText, primary_color: primaryColor, required_fields: requiredFields,
+                max_quantity: maxQuantity, button_style: buttonStyle, button_size: buttonSize, button_position: buttonPosition,
+                form_title: formTitle, form_subtitle: formSubtitle, success_message: successMessage, submit_button_text: submitButtonText,
+                show_product_image: showProductImage, show_price: showPrice, show_quantity_selector: showQuantitySelector,
+                show_email_field: showEmailField, show_notes_field: showNotesField, email_required: emailRequired,
+                name_placeholder: namePlaceholder, phone_placeholder: phonePlaceholder, address_placeholder: addressPlaceholder,
+                notes_placeholder: notesPlaceholder, modal_style: modalStyle, animation_style: animationStyle, border_radius: borderRadius,
+                form_type: formType, fields, blocks, custom_fields: customFields, styles: formStyles, button_styles: buttonStylesState,
+                shipping_options: shippingOpts, partial_cod_enabled: partialCodEnabled, partial_cod_advance_amount: partialCodAdvanceAmount,
+                partial_cod_commission: partialCodCommission
+            };
+            setSavedSettingsString(JSON.stringify(currentSettings));
+            shopify.toast.show('Settings saved!', { duration: 3000 });
+        }
+    }, [actionData, enabled, buttonText, primaryColor, requiredFields, maxQuantity, buttonStyle, buttonSize, buttonPosition,
+        formTitle, formSubtitle, successMessage, submitButtonText, showProductImage, showPrice, showQuantitySelector,
+        showEmailField, showNotesField, emailRequired, namePlaceholder, phonePlaceholder, addressPlaceholder,
+        notesPlaceholder, modalStyle, animationStyle, borderRadius, formType, fields, blocks, customFields,
+        formStyles, buttonStylesState, shippingOpts, partialCodEnabled, partialCodAdvanceAmount, partialCodCommission, shopify]);
 
     // Hex validation helpers
     const isValidHex = (hex: string): boolean => {
@@ -988,7 +1094,7 @@ export default function SettingsPage() {
         formData.append("partial_cod_commission", partialCodCommission.toString());
 
         submit(formData, { method: "post" });
-        shopify.toast.show("Settings saved successfully!");
+        // Note: savedSettingsString is updated in useEffect after action success
     }, [
         enabled, buttonText, primaryColor, requiredFields, maxQuantity,
         buttonStyle, buttonSize, buttonPosition, formTitle, formSubtitle,
@@ -1019,6 +1125,7 @@ export default function SettingsPage() {
                     box-sizing: border-box; 
                     /* overflow-x: hidden; REMOVED per instruction */
                 }
+                
                 .builder-header {
                     display: flex;
                     align-items: center;
@@ -1539,6 +1646,14 @@ export default function SettingsPage() {
             `}</style>
 
             <s-page heading="">
+                {/* Native Shopify Save Bar */}
+                <ui-save-bar id="form-builder-save-bar">
+                    <button variant="primary" onClick={handleSave} disabled={isSubmitting}>
+                        {isSubmitting ? 'Saving...' : 'Save'}
+                    </button>
+                    <button onClick={handleDiscard} disabled={isSubmitting}>Discard</button>
+                </ui-save-bar>
+
                 <div className="form-builder">
                     {/* Header */}
                     <div className="builder-header">
@@ -1549,13 +1664,6 @@ export default function SettingsPage() {
                                 <p>Customize your COD checkout form</p>
                             </div>
                         </div>
-                        <button
-                            className="save-btn"
-                            onClick={handleSave}
-                            disabled={isSubmitting}
-                        >
-                            {isSubmitting ? 'Saving...' : '💾 Save Changes'}
-                        </button>
                     </div>
 
                     {/* Main Toggle */}
