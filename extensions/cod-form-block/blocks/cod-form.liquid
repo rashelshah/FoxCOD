@@ -89,6 +89,13 @@
 {% comment %} Quantity Offers Settings {% endcomment %}
 {% assign cod_quantity_offers = shop.metafields.fox_cod.quantity_offers_json.value | default: '[]' %}
 
+{% comment %} DEBUG: Quantity offers metafield check {% endcomment %}
+{% if cod_quantity_offers != '[]' and cod_quantity_offers != blank %}
+  <!-- [LIQUID DEBUG] Quantity offers found: {{ cod_quantity_offers | slice: 0, 200 }}... -->
+{% else %}
+  <!-- [LIQUID DEBUG] No quantity offers in metafield -->
+{% endif %}
+
 {% comment %} Only render COD functionality if enabled in the app {% endcomment %}
 {% if cod_enabled == 'true' %}
 
@@ -135,6 +142,21 @@
      data-sticky-mobile="{{ btn_styles.stickyOnMobile | default: false }}"
      data-quantity-offers="{{ cod_quantity_offers | escape }}">
 </div>
+
+{% comment %} Inject quantity offers into global scope for reliable JavaScript access {% endcomment %}
+<script>
+  window.FoxCod = window.FoxCod || {};
+  try {
+    // Metafield .value outputs Ruby hash syntax (=>), use | json to convert to JS
+    var offersData = {{ shop.metafields.fox_cod.quantity_offers_json.value | json }};
+    window.FoxCod.quantityOffers = Array.isArray(offersData) ? offersData : (offersData ? [offersData] : []);
+    window.FoxCod.productId = '{{ product.id }}';
+    console.log('[FoxCod] Offers injected:', window.FoxCod.quantityOffers?.length || 0, 'groups');
+  } catch (e) {
+    console.error('[FoxCod] Failed to parse quantity offers:', e);
+    window.FoxCod.quantityOffers = [];
+  }
+</script>
 
 {% comment %} Modal Overlay {% endcomment %}
 <div class="cod-modal-overlay" id="cod-modal-overlay-{{ product.id }}" style="display: none;">

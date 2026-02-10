@@ -142,9 +142,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         console.log('[Bundle Offers] Saving offer group:', JSON.stringify(offerGroup, null, 2));
 
         let saveError = null;
+        let savedGroupId: string | null = null;
 
         if (offerGroup.id) {
-            const { error } = await supabase.from("quantity_offer_groups").update({
+            const { data, error } = await supabase.from("quantity_offer_groups").update({
                 name: offerGroup.name,
                 active: offerGroup.active,
                 product_ids: offerGroup.productIds,
@@ -152,10 +153,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 design: offerGroup.design,
                 placement: offerGroup.placement,
                 updated_at: new Date().toISOString(),
-            }).eq("id", offerGroup.id).eq("shop_domain", shopDomain);
+            })
+                .eq("id", offerGroup.id)
+                .eq("shop_domain", shopDomain)
+                .select("id")
+                .single();
             saveError = error;
+            savedGroupId = data?.id ? String(data.id) : String(offerGroup.id);
         } else {
-            const { error } = await supabase.from("quantity_offer_groups").insert({
+            const { data, error } = await supabase.from("quantity_offer_groups").insert({
                 shop_domain: shopDomain,
                 name: offerGroup.name,
                 active: offerGroup.active,
@@ -163,8 +169,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 offers: offerGroup.offers,
                 design: offerGroup.design,
                 placement: offerGroup.placement,
-            });
+            })
+                .select("id")
+                .single();
             saveError = error;
+            savedGroupId = data?.id ? String(data.id) : null;
         }
 
         if (saveError) {
@@ -184,13 +193,35 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
 
         console.log('[Bundle Offers] Active offers to sync:', allOffers?.length || 0);
-        await syncOffersToMetafield(admin, allOffers || []);
-        return { success: true };
+        try {
+            await syncOffersToMetafield(admin, allOffers || []);
+        } catch (e) {
+            console.error('[Bundle Offers] Metafield sync failed (save):', e);
+        }
+        return { success: true, savedGroupId };
     }
 
     if (actionType === "delete") {
         const groupId = formData.get("groupId") as string;
         await supabase.from("quantity_offer_groups").delete().eq("id", groupId).eq("shop_domain", shopDomain);
+        // After delete, resync ALL active offers to metafield so storefront stays in sync
+        const { data: allOffersAfterDelete, error: fetchErrorAfterDelete } = await supabase
+            .from("quantity_offer_groups")
+            .select("*")
+            .eq("shop_domain", shopDomain)
+            .eq("active", true);
+
+        if (fetchErrorAfterDelete) {
+            console.error('[Bundle Offers] Error fetching offers for sync after delete:', fetchErrorAfterDelete);
+        } else {
+            console.log('[Bundle Offers] Active offers to sync after delete:', allOffersAfterDelete?.length || 0);
+            try {
+                await syncOffersToMetafield(admin, allOffersAfterDelete || []);
+            } catch (e) {
+                console.error('[Bundle Offers] Metafield sync failed (delete):', e);
+            }
+        }
+
         return { success: true };
     }
 
@@ -304,52 +335,80 @@ export default function QuantityOffersPage() {
     const shopify = useAppBridge();
     const isSaving = navigation.state === "submitting";
 
+    // Track the last processed actionData to prevent duplicate processing
+    const lastProcessedActionRef = useRef<any>(null);
+    // Snapshot of the group state at save time (avoids reading reactive activeGroup in effect)
+    const pendingSaveRef = useRef<string | null>(null);
+    // The last saved DB id (helps us select the saved group after insert)
+    const lastSavedGroupIdRef = useRef<string | null>(null);
+
     const primaryColor = formSettings?.primary_color || "#ef4444";
     const buttonStyles = (formSettings?.button_styles || {}) as any;
 
-    // State
-    const [activeGroup, setActiveGroup] = useState<QuantityOfferGroup | null>(
-        initialOfferGroups[0] ? {
-            ...initialOfferGroups[0],
-            productIds: initialOfferGroups[0].product_ids || [],
-            offers: initialOfferGroups[0].offers || DEFAULT_OFFERS,
-            design: { ...DEFAULT_OFFER_DESIGN, ...(initialOfferGroups[0].design || {}) },
-        } : null
-    );
+    const [activeGroup, setActiveGroup] = useState<QuantityOfferGroup | null>(null);
     const [editingOfferId, setEditingOfferId] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<'offers' | 'design'>('offers');
 
     // Track saved state as a STATE VARIABLE (not ref) so changes trigger re-render
-    const [savedGroupString, setSavedGroupString] = useState<string | null>(() => {
-        const initial = initialOfferGroups[0];
-        if (!initial) return null;
-        return JSON.stringify({
-            ...initial,
-            productIds: initial.product_ids || [],
-            offers: initial.offers || DEFAULT_OFFERS,
-            design: { ...DEFAULT_OFFER_DESIGN, ...(initial.design || {}) },
-        });
-    });
+    const [savedGroupString, setSavedGroupString] = useState<string | null>(null);
+
+    const mapDbGroupToUi = useCallback((dbGroup: any, keepSelectedProducts?: any[]) => {
+        const uiGroup: QuantityOfferGroup = {
+            id: String(dbGroup.id),
+            name: dbGroup.name || '',
+            active: !!dbGroup.active,
+            productIds: dbGroup.product_ids || dbGroup.productIds || [],
+            offers: dbGroup.offers || DEFAULT_OFFERS,
+            design: { ...DEFAULT_OFFER_DESIGN, ...(dbGroup.design || {}) },
+            placement: dbGroup.placement || 'inside_form',
+            createdAt: dbGroup.created_at || dbGroup.createdAt || '',
+            updatedAt: dbGroup.updated_at || dbGroup.updatedAt || '',
+            selectedProducts: keepSelectedProducts,
+        };
+        return uiGroup;
+    }, []);
+
+    const stringifySavedGroup = useCallback((group: QuantityOfferGroup) => {
+        const { selectedProducts, ...groupToCompare } = group;
+        return JSON.stringify(groupToCompare);
+    }, []);
+
+    // Refs to track current activeGroup state without triggering re-renders
+    const activeGroupRef = useRef<QuantityOfferGroup | null>(null);
+    activeGroupRef.current = activeGroup;
+
+    // Track the previous initialOfferGroups to only react to actual changes
+    const prevOfferGroupsRef = useRef<any>(null);
 
     // Update activeGroup when loader data changes (after revalidation)
     useEffect(() => {
-        if (initialOfferGroups[0] && activeGroup?.id === initialOfferGroups[0].id) {
-            const freshGroup = {
-                ...initialOfferGroups[0],
-                productIds: initialOfferGroups[0].product_ids || [],
-                offers: initialOfferGroups[0].offers || DEFAULT_OFFERS,
-                design: { ...DEFAULT_OFFER_DESIGN, ...(initialOfferGroups[0].design || {}) },
-            };
-            setActiveGroup(freshGroup);
-            setSavedGroupString(JSON.stringify(freshGroup));
-        }
-    }, [initialOfferGroups]);
+        // Only process when initialOfferGroups actually changed
+        if (prevOfferGroupsRef.current === initialOfferGroups) return;
+        prevOfferGroupsRef.current = initialOfferGroups;
+
+        const currentGroup = activeGroupRef.current;
+        if (!currentGroup && !lastSavedGroupIdRef.current) return;
+
+        const targetId = lastSavedGroupIdRef.current || currentGroup?.id || null;
+        if (!targetId) return;
+
+        const matching = (initialOfferGroups || []).find((g: any) => String(g.id) === String(targetId));
+        if (!matching) return;
+
+        const keepSelectedProducts = currentGroup?.selectedProducts;
+        const fresh = mapDbGroupToUi(matching, keepSelectedProducts);
+        setActiveGroup(fresh);
+        setSavedGroupString(stringifySavedGroup(fresh));
+        lastSavedGroupIdRef.current = null;
+    }, [initialOfferGroups, mapDbGroupToUi, stringifySavedGroup]);
 
     // Compute hasUnsavedChanges based on state comparison
     const hasUnsavedChanges = useMemo(() => {
         if (!activeGroup) return false;
         if (!savedGroupString) return true; // New group
-        return JSON.stringify(activeGroup) !== savedGroupString;
+        // Exclude selectedProducts from comparison (client-only field)
+        const { selectedProducts, ...groupToCompare } = activeGroup;
+        return JSON.stringify(groupToCompare) !== savedGroupString;
     }, [activeGroup, savedGroupString]);
 
     // Discard handler - reset to saved state
@@ -362,23 +421,52 @@ export default function QuantityOffersPage() {
     // Show/hide native Shopify save bar based on unsaved changes
     useEffect(() => {
         const saveBarId = 'bundle-offers-save-bar';
-        if (hasUnsavedChanges && activeGroup) {
-            shopify.saveBar.show(saveBarId);
-        } else {
-            shopify.saveBar.hide(saveBarId);
+        try {
+            if (hasUnsavedChanges && activeGroup) {
+                shopify.saveBar.show(saveBarId);
+            } else {
+                shopify.saveBar.hide(saveBarId);
+            }
+        } catch (e) {
+            console.warn('[Bundle Offers] SaveBar control failed:', e);
         }
     }, [hasUnsavedChanges, activeGroup, shopify]);
 
     // Handle successful save - update savedGroupString state and reload data
     useEffect(() => {
-        if (actionData?.success && activeGroup) {
-            const currentGroupStr = JSON.stringify(activeGroup);
-            setSavedGroupString(currentGroupStr);
+        if (actionData?.success && actionData !== lastProcessedActionRef.current) {
+            lastProcessedActionRef.current = actionData;
+            if ((actionData as any)?.savedGroupId) {
+                lastSavedGroupIdRef.current = String((actionData as any).savedGroupId);
+                // If this was a newly created group, attach the id immediately so edits don't stay "id=null"
+                setActiveGroup((prev) => {
+                    if (!prev) return prev;
+                    if (prev.id) return prev;
+                    return { ...prev, id: String((actionData as any).savedGroupId) };
+                });
+            }
+            // Use the snapshot captured at save time instead of reactive activeGroup
+            if (pendingSaveRef.current) {
+                setSavedGroupString(pendingSaveRef.current);
+                pendingSaveRef.current = null;
+            }
             shopify.toast.show('Bundle offers saved!', { duration: 3000 });
-            // Reload data from server to get fresh DB state
-            revalidator.revalidate();
+            // Note: Removed revalidator.revalidate() to prevent AbortError
+            // Remix will automatically revalidate loader data after the action completes
         }
-    }, [actionData, activeGroup, shopify, revalidator]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [actionData]);
+
+    // Surface save errors to the seller
+    useEffect(() => {
+        if (actionData && (actionData as any).success === false && (actionData as any).error) {
+            try {
+                shopify.toast.show(`Save failed: ${(actionData as any).error}`, { duration: 5000 });
+            } catch {
+                // no-op
+            }
+        }
+    }, [actionData, shopify]);
 
     const sensors = useSensors(
         useSensor(PointerSensor),
@@ -387,9 +475,18 @@ export default function QuantityOffersPage() {
 
     // Handlers
     const handleCreateNew = () => {
-        const newGroup = { ...createDefaultOfferGroup(), id: "", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as QuantityOfferGroup;
+        const newGroup = { ...createDefaultOfferGroup(), id: null, createdAt: "", updatedAt: "" } as unknown as QuantityOfferGroup;
         setActiveGroup(newGroup);
+        setSavedGroupString(null);
     };
+
+    const handleSelectGroup = useCallback((dbGroup: any) => {
+        const uiGroup = mapDbGroupToUi(dbGroup);
+        setActiveGroup(uiGroup);
+        setSavedGroupString(stringifySavedGroup(uiGroup));
+        setEditingOfferId(null);
+        setActiveTab('offers');
+    }, [mapDbGroupToUi, stringifySavedGroup]);
 
     const updateActiveGroup = useCallback((updates: Partial<QuantityOfferGroup>) => {
         if (!activeGroup) return;
@@ -411,8 +508,9 @@ export default function QuantityOffersPage() {
     const addOffer = useCallback(() => {
         if (!activeGroup) return;
         const maxQty = Math.max(...activeGroup.offers.map(o => o.quantity));
+        const maxId = Math.max(...activeGroup.offers.map(o => parseInt(o.id.split('-')[1] || '0')));
         const newOffer: QuantityOffer = {
-            id: `offer-${Date.now()}`, quantity: maxQty + 1, price: 0, discountPercent: 0,
+            id: `offer-${maxId + 1}`, quantity: maxQty + 1, price: 0, discountPercent: 0,
             label: "", order: activeGroup.offers.length, title: `${maxQty + 1} Units`,
         };
         updateActiveGroup({ offers: [...activeGroup.offers, newOffer] });
@@ -456,23 +554,53 @@ export default function QuantityOffersPage() {
         } catch (e) { console.log('Picker cancelled'); }
     };
 
-    const handleSave = () => {
-        if (!activeGroup) return;
+    // Normalize product IDs — strip GID prefix if present
+    const normalizeProductIds = (ids: string[]) =>
+        ids.map(id => String(id).replace('gid://shopify/Product/', ''));
+
+    const handleSave = (groupOverride?: QuantityOfferGroup) => {
+        const group = groupOverride || activeGroup;
+        if (!group) return;
         const formData = new FormData();
         formData.append("action", "save");
-        formData.append("offerGroup", JSON.stringify(activeGroup));
+        // Exclude selectedProducts (client-only field) before saving
+        const { selectedProducts, ...groupToSave } = group;
+        // Normalize product IDs to bare numeric strings
+        groupToSave.productIds = normalizeProductIds(groupToSave.productIds || []);
+        formData.append("offerGroup", JSON.stringify(groupToSave));
+        // Snapshot the saved state NOW so the effect doesn't depend on activeGroup
+        pendingSaveRef.current = JSON.stringify(groupToSave);
         submit(formData, { method: "post" });
-        // Note: savedGroupString is updated in useEffect after successful save
     };
+
+    // Handler for quick-delete from the list view
+    const handleDeleteGroup = useCallback((groupId: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!confirm('Delete this offer group?')) return;
+        const formData = new FormData();
+        formData.append("action", "delete");
+        formData.append("groupId", groupId);
+        submit(formData, { method: "post" });
+    }, [submit]);
+
+    // Handler for quick-toggle active/inactive from the list view
+    const handleToggleGroupActive = useCallback((dbGroup: any, e: React.MouseEvent) => {
+        e.stopPropagation();
+        const uiGroup = mapDbGroupToUi(dbGroup);
+        uiGroup.active = !uiGroup.active;
+        handleSave(uiGroup);
+    }, [mapDbGroupToUi]);
 
     const samplePrice = 2495;
 
     return (
         <>
-            <style>{styles}</style>
+            <style
+                dangerouslySetInnerHTML={{ __html: styles }}
+            />
             {/* Native Shopify Save Bar */}
             <ui-save-bar id="bundle-offers-save-bar">
-                <button variant="primary" onClick={handleSave} disabled={isSaving}>
+                <button variant="primary" onClick={() => handleSave()} disabled={isSaving}>
                     {isSaving ? 'Saving...' : 'Save'}
                 </button>
                 <button onClick={handleDiscard} disabled={isSaving}>Discard</button>
@@ -482,10 +610,13 @@ export default function QuantityOffersPage() {
                 {/* Header */}
                 <div className="qo-header">
                     <div className="qo-header-left">
-                        <button className="btn-back" onClick={() => {
-                            setActiveGroup(null);
-                            setSavedGroupString(null);
-                        }}>←</button>
+                        {activeGroup && (
+                            <button className="btn-back" onClick={() => {
+                                setActiveGroup(null);
+                                setEditingOfferId(null);
+                                setActiveTab('offers');
+                            }}>←</button>
+                        )}
                         <h1>{activeGroup ? activeGroup.name || 'New offer' : 'Bundle Offers'}</h1>
                         {activeGroup && (
                             <div className={`status-toggle ${activeGroup.active ? 'on' : ''}`}
@@ -678,10 +809,54 @@ export default function QuantityOffersPage() {
                                 )}
                             </>
                         ) : (
-                            <div className="qo-empty">
-                                <h2>Create Bundle Offers</h2>
-                                <p>Encourage customers to buy more with volume discounts</p>
-                                <button className="btn-create" onClick={handleCreateNew}>+ New Offer</button>
+                            <div className="qo-card">
+                                <div className="qo-groups-header">
+                                    <div>
+                                        <h2 className="qo-groups-title">Your Bundle Offers</h2>
+                                        <p className="qo-groups-subtitle">Create and manage volume discounts for your products.</p>
+                                    </div>
+                                    <button className="btn-create" onClick={handleCreateNew}>+ New Offer</button>
+                                </div>
+
+                                {(initialOfferGroups || []).length > 0 ? (
+                                    <div className="qo-groups-list">
+                                        {(initialOfferGroups || []).map((g: any) => (
+                                            <div
+                                                key={String(g.id)}
+                                                className="qo-group-row"
+                                            >
+                                                <div className="qo-group-row-main" onClick={() => handleSelectGroup(g)} style={{ cursor: 'pointer', flex: 1 }}>
+                                                    <div className="qo-group-row-title">{g.name || 'Untitled offer'}</div>
+                                                    <div className="qo-group-row-meta">
+                                                        <span
+                                                            className={`qo-pill clickable ${g.active ? 'on' : ''}`}
+                                                            onClick={(e) => handleToggleGroupActive(g, e)}
+                                                            title={g.active ? 'Click to deactivate' : 'Click to activate'}
+                                                        >
+                                                            {g.active ? 'Active' : 'Inactive'}
+                                                        </span>
+                                                        <span>{(g.product_ids || []).length} products</span>
+                                                        <span>{(g.offers || []).length} offers</span>
+                                                    </div>
+                                                </div>
+                                                <div className="qo-group-row-actions">
+                                                    <button
+                                                        type="button"
+                                                        className="btn-delete-group"
+                                                        title="Delete offer"
+                                                        onClick={(e) => handleDeleteGroup(String(g.id), e)}
+                                                    >🗑</button>
+                                                    <span className="qo-group-row-cta" onClick={() => handleSelectGroup(g)}>Edit →</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="qo-empty">
+                                        <h2>Create Bundle Offers</h2>
+                                        <p>Encourage customers to buy more with volume discounts</p>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
@@ -888,6 +1063,24 @@ const styles = `
     .qo-empty h2 { margin: 0 0 8px; font-size: 20px; }
     .qo-empty p { margin: 0 0 24px; color: #6b7280; }
     .btn-create { background: #1f2937; color: #fff; border: none; padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+
+    /* Groups List (when no active group selected) */
+    .qo-groups-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+    .qo-groups-title { margin: 0 0 6px; font-size: 16px; font-weight: 700; color: #111827; }
+    .qo-groups-subtitle { margin: 0; font-size: 13px; color: #6b7280; }
+    .qo-groups-list { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+    .qo-group-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; text-align: left; padding: 14px 14px; border-radius: 10px; border: 1px solid #e5e7eb; background: #fff; }
+    .qo-group-row:hover { background: #f9fafb; border-color: #d1d5db; }
+    .qo-group-row-title { font-size: 14px; font-weight: 600; color: #111827; }
+    .qo-group-row-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 6px; font-size: 12px; color: #6b7280; }
+    .qo-pill { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px; background: #f3f4f6; color: #6b7280; font-weight: 600; }
+    .qo-pill.on { background: #d1fae5; color: #047857; }
+    .qo-pill.clickable { cursor: pointer; transition: transform 0.15s ease; }
+    .qo-pill.clickable:hover { transform: scale(1.05); opacity: 0.85; }
+    .qo-group-row-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .btn-delete-group { background: #fef2f2; border: 1px solid #fecaca; color: #ef4444; padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 14px; transition: all 0.15s ease; }
+    .btn-delete-group:hover { background: #fee2e2; border-color: #f87171; }
+    .qo-group-row-cta { font-size: 12px; font-weight: 700; color: #1f2937; cursor: pointer; }
     
     /* Preview Panel - Phone Style */
     .qo-preview { position: sticky; top: 24px; }

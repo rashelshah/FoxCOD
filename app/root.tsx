@@ -16,7 +16,8 @@ export default function App() {
         />
         <Meta />
         <Links />
-        <style>{`
+        <style dangerouslySetInnerHTML={{
+          __html: `
           /* Global smooth transitions */
           * {
             -webkit-font-smoothing: antialiased;
@@ -39,7 +40,7 @@ export default function App() {
             transition: opacity 0.2s ease;
           }
           
-          .page-loading-overlay.active {
+          .page-loading-overlay[data-loading="true"] {
             opacity: 1;
           }
           
@@ -54,7 +55,7 @@ export default function App() {
             transition: opacity 0.15s ease;
           }
           
-          .page-content.loading {
+          .page-content[data-loading="true"] {
             opacity: 0.7;
             pointer-events: none;
           }
@@ -72,11 +73,11 @@ export default function App() {
           button:active, .btn:active, [role='button']:active {
             transform: scale(0.98);
           }
-        `}</style>
+        `}} />
       </head>
       <body>
-        <div className={`page-loading-overlay ${isLoading ? 'active' : ''}`} />
-        <div className={`page-content ${isLoading ? 'loading' : ''}`}>
+        <div className="page-loading-overlay" data-loading={isLoading} />
+        <div className="page-content" data-loading={isLoading}>
           <Outlet />
         </div>
         <ScrollRestoration />

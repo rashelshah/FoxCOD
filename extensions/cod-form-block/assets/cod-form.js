@@ -121,13 +121,18 @@
         clickPress: dataContainer.dataset.clickPress === 'true',
         stickyOnMobile: dataContainer.dataset.stickyMobile === 'true',
         
-        // Quantity Offers Configuration
-        quantityOffers: safeJSONParse(dataContainer.dataset.quantityOffers, [])
+        // Quantity Offers Configuration - prefer window.FoxCod for reliability
+        quantityOffers: (window.FoxCod && window.FoxCod.quantityOffers) || safeJSONParse(dataContainer.dataset.quantityOffers, [])
       };
 
       // Debug: Log quantity offers data
-      console.log('[COD Form] Quantity Offers raw:', dataContainer.dataset.quantityOffers ? dataContainer.dataset.quantityOffers.substring(0, 200) + '...' : 'EMPTY');
-      console.log('[COD Form] Quantity Offers parsed:', config.quantityOffers);
+      console.log('[COD Form] Quantity offers payload:', {
+        fromWindow: window.FoxCod && window.FoxCod.quantityOffers ? window.FoxCod.quantityOffers.length + ' groups' : 'NOT AVAILABLE',
+        fromDataAttr: dataContainer.dataset.quantityOffers ? dataContainer.dataset.quantityOffers.substring(0, 100) + '...' : 'EMPTY',
+        finalCount: config.quantityOffers?.length || 0,
+        productId: productId,
+        productIdType: typeof productId
+      });
 
       console.log('[COD Form] Initialized for product:', productId, config);
       
@@ -382,14 +387,24 @@
     
     // Find offers applicable to this product
     var applicableGroup = null;
-    var currentProductId = String(config.productId); // Convert to string for comparison
+    // Normalize current product ID (strip GID prefix if present)
+    var currentProductId = String(config.productId).replace('gid://shopify/Product/', '');
+    
+    console.log('[COD Form] Normalized current product ID:', currentProductId);
     
     for (var i = 0; i < offers.length; i++) {
       var group = offers[i];
       // Handle both snake_case (from DB) and camelCase (from JS)
       var productIds = group.product_ids || group.productIds || [];
-      // Convert all product IDs to strings for comparison
-      var productIdStrings = productIds.map(function(id) { return String(id); });
+      // Convert all product IDs to strings and strip GID prefix if present
+      var productIdStrings = productIds.map(function(id) { return String(id).replace('gid://shopify/Product/', ''); });
+      
+      console.log('[COD Form] Product ID normalization:', {
+        groupName: group.name,
+        original: productIds,
+        normalized: productIdStrings,
+        currentProduct: currentProductId
+      });
       
       console.log('[COD Form] Checking group:', group.name, 'active:', group.active, 'productIds:', productIdStrings);
       
@@ -400,18 +415,29 @@
       }
     }
 
-    
     if (!applicableGroup || !applicableGroup.offers || !applicableGroup.offers.length) {
       console.log('[COD Form] No applicable group found for product:', currentProductId);
+      console.log('[COD Form] No matching offers. Debug info:', {
+        totalGroups: offers.length,
+        currentProductId: currentProductId,
+        allProductIds: offers.map(function(g) { return {
+          name: g.name,
+          active: g.active,
+          productIds: g.product_ids || g.productIds
+        }; })
+      });
       return null;
     }
     
     var design = applicableGroup.design || {};
     var template = design.template || 'modern';
     
+    console.log('[COD Form] Rendering offers with template:', template);
+    
     // Create offers container
     var offersContainer = document.createElement('div');
-    offersContainer.className = 'cod-quantity-offers' + (template === 'vertical' ? ' vertical' : '');
+    // Apply template class - this determines the visual style
+    offersContainer.className = 'cod-quantity-offers template-' + template;
     offersContainer.setAttribute('data-product-id', config.productId);
     
     // State: selected offer index
