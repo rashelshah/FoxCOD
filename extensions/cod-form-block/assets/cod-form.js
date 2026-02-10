@@ -78,6 +78,7 @@
         variantId: dataContainer.dataset.variantId,
         productTitle: dataContainer.dataset.productTitle,
         productPrice: parseFloat(dataContainer.dataset.productPrice),
+        productImage: dataContainer.dataset.productImage || '',
         shop: shop,
         proxyUrl: '/apps/fox-cod',
         maxQuantity: parseInt(dataContainer.dataset.maxQuantity) || 10,
@@ -456,16 +457,40 @@
       card.setAttribute('data-quantity', offer.quantity);
       card.setAttribute('data-discount', offer.discountPercent || 0);
       
+      // Force inline styles to ensure they override any CSS
+      card.style.border = '2px solid';
+      card.style.padding = '12px';
+      card.style.marginBottom = '8px';
+      card.style.cursor = 'pointer';
+      card.style.transition = 'all 0.2s ease';
+      
       // Apply design styles
       if (idx === selectedIndex) {
         card.style.background = design.selectedBgColor || 'rgba(99,102,241,0.08)';
         card.style.borderColor = design.selectedBorderColor || config.primaryColor;
         card.style.color = design.selectedTextColor || '#1f2937';
       } else {
-        card.style.background = design.unselectedBgColor || '#ffffff';
-        card.style.borderColor = design.unselectedBorderColor || '#e5e7eb';
+          card.style.background = design.unselectedBgColor || '#ffffff';
+          card.style.borderColor = design.unselectedBorderColor || '#e5e7eb';
+          card.style.color = '#6b7280';  // Unselected text color
       }
       card.style.borderRadius = (design.selectedBorderRadius || 10) + 'px';
+      
+      // Template classes in CSS will handle layout (modern/classic/vertical)
+      // No need for inline flex styles - they conflict with CSS
+      
+      // For classic and vertical templates, display product image
+      if ((template === 'classic' || template === 'vertical') && config.productImage) {
+          var img = document.createElement('img');
+          img.src = config.productImage;
+          img.alt = config.productTitle || 'Product';
+          // CSS handles sizing and spacing based on template class
+          card.appendChild(img);
+      }
+      
+      // Create content wrapper for text elements
+      var contentWrapper = document.createElement('div');
+      contentWrapper.style.flex = '1';
       
       // Badge (label)
       if (offer.label && (design.showMostPopularBadge !== false || offer.label !== 'Most Popular')) {
@@ -474,27 +499,33 @@
         badge.style.background = design.selectedTagBgColor || config.primaryColor;
         badge.style.color = design.selectedTagTextColor || '#ffffff';
         badge.textContent = offer.label;
-        card.appendChild(badge);
+        contentWrapper.appendChild(badge);
       }
       
       // Quantity text
       var qtyDiv = document.createElement('div');
       qtyDiv.className = 'cod-offer-quantity';
       qtyDiv.textContent = offer.quantity + (offer.quantity === 1 ? ' Unit' : ' Units');
-      card.appendChild(qtyDiv);
+      contentWrapper.appendChild(qtyDiv);
       
       // Discount text
       if (offer.discountPercent) {
         var discountDiv = document.createElement('div');
         discountDiv.className = 'cod-offer-discount';
         discountDiv.textContent = 'Save ' + offer.discountPercent + '%';
-        card.appendChild(discountDiv);
+        contentWrapper.appendChild(discountDiv);
       }
       
       // Price calculation
+      console.log('[COD Form] Price calculation - unitPrice:', config.productPrice, 'quantity:', offer.quantity, 'discount:', offer.discountPercent);
       var unitPrice = config.productPrice;
+      if (!unitPrice || isNaN(unitPrice)) {
+          console.error('[COD Form] Invalid unit price!', unitPrice);
+          unitPrice = 0;
+      }
       var discountedPrice = unitPrice * offer.quantity * (1 - (offer.discountPercent || 0) / 100);
       var originalPrice = unitPrice * offer.quantity;
+      console.log('[COD Form] Calculated prices - original:', originalPrice, 'discounted:', discountedPrice);
       
       var priceDiv = document.createElement('div');
       priceDiv.className = 'cod-offer-price';
@@ -503,7 +534,10 @@
         priceDiv.innerHTML += '<span class="cod-offer-original-price">' + 
           (design.currencySymbol || '₹') + originalPrice.toFixed(0) + '</span>';
       }
-      card.appendChild(priceDiv);
+      contentWrapper.appendChild(priceDiv);
+      
+      // Append content wrapper to card
+      card.appendChild(contentWrapper);
       
       // Click handler
       card.addEventListener('click', function() {
@@ -552,6 +586,32 @@
   }
   
   /**
+   * Hide product header when offers are shown
+   * Only hides product image, title, and price - NOT the order summary
+   */
+  function hideProductHeaderIfOffersActive(container) {
+      // Only hide product image, price, and title elements, NOT the order summary
+      var productImage = container.querySelector('.cod-product-image');
+      var productPrice = container.querySelector('.cod-product-price');
+      var productTitle = container.querySelector('.cod-product-title');
+      
+      if (productImage) {
+          productImage.style.display = 'none';
+          console.log('[COD Form] Product image hidden');
+      }
+      if (productPrice) {
+          productPrice.style.display = 'none';
+          console.log('[COD Form] Product price hidden');
+      }
+      if (productTitle) {
+          productTitle.style.display = 'none';
+          console.log('[COD Form] Product title hidden');
+      }
+      
+      console.log('[COD Form] Product header elements hidden - order summary remains visible');
+  }
+  
+  /**
    * Update price display based on selected offer
    */
   function updateOfferPrice(form, config, offer) {
@@ -586,6 +646,8 @@
     if (quantityOffersEl) {
         // Insert before the dynamic fields
         fieldsContainer.parentNode.insertBefore(quantityOffersEl, fieldsContainer);
+        // Hide product header when offers are shown
+        hideProductHeaderIfOffersActive(container);
     }
 
     // 2. Render Rate Card (Order Summary) if enabled
