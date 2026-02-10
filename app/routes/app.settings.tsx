@@ -113,12 +113,12 @@ async function ensureMetafieldDefinitions(admin: any) {
         { key: "animation_style", type: "single_line_text_field" },
         { key: "border_radius", type: "single_line_text_field" },
         { key: "form_type", type: "single_line_text_field" },
-        { key: "fields", type: "single_line_text_field" },  // Storing JSON as string
-        { key: "blocks", type: "single_line_text_field" },  // Storing JSON as string
-        { key: "custom_fields", type: "single_line_text_field" },  // Storing JSON as string
-        { key: "styles", type: "single_line_text_field" },  // Storing JSON as string
-        { key: "button_styles_json", type: "single_line_text_field" },  // Storing JSON as string
-        { key: "shipping_options", type: "single_line_text_field" },  // Storing JSON as string
+        { key: "fields", type: "json" },  // JSON type for complex data
+        { key: "blocks", type: "json" },  // JSON type for complex data
+        { key: "custom_fields", type: "json" },  // JSON type for complex data
+        { key: "styles", type: "json" },  // JSON type for complex data
+        { key: "button_styles_json", type: "json" },  // JSON type for complex data
+        { key: "shipping_options", type: "json" },  // JSON type for complex data
         // Partial COD settings
         { key: "partial_cod_enabled", type: "single_line_text_field" },
         { key: "partial_cod_advance_amount", type: "single_line_text_field" },

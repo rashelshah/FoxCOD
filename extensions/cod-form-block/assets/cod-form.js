@@ -214,11 +214,12 @@
         
         buttonsFound = true;
         
-        // Calculate Button Styles - prefer explicit data attrs for text color, border (synced from Liquid)
+        // Calculate Button Styles - use button_styles JSON as single source of truth
         var btnStyles = config.buttonStyles || {};
-        var textColor = config.buttonTextColor || btnStyles.textColor || '#ffffff';
-        var borderColor = config.buttonBorderColor || btnStyles.borderColor || config.primaryColor;
-        var borderWidth = config.buttonBorderWidth != null && !isNaN(config.buttonBorderWidth) ? config.buttonBorderWidth : (btnStyles.borderWidth ?? 0);
+        // Use button_styles as the ONLY source for customizations
+        var textColor = btnStyles.textColor || '#ffffff';
+        var borderColor = btnStyles.borderColor || config.primaryColor;
+        var borderWidth = btnStyles.borderWidth ?? 0;
         
         // Check if animations are enabled - don't set boxShadow inline if so (CSS handles it)
         var hasGlowAnim = config.animationPreset === 'glow';
@@ -233,7 +234,8 @@
         
         // For outline buttons, use primary color for text (like preview does)
         var finalTextColor = textColor;
-        var finalBgColor = btnStyles.backgroundColor || config.primaryColor;
+        // Always use primaryColor as background - this is the seller's main button color
+        var finalBgColor = config.primaryColor;
         if (isOutlineStyle) {
           finalBgColor = 'transparent';
           // If text color is white (default), use primary color instead for visibility
@@ -532,6 +534,9 @@
         
         // Update price display
         updateOfferPrice(form, config, offer);
+        
+        // Update order summary with new discount
+        updateOrderSummaryWithOffer(form, config);
       });
       
       offersContainer.appendChild(card);
@@ -977,8 +982,31 @@
       card.style.marginBottom = '16px';
       card.style.border = '1px solid #e5e7eb';
 
-      // Start with base price - handle undefined/null
+      // Check for selected quantity offer
+      var quantityOffersEl = form.closest('.cod-modal') ? form.closest('.cod-modal').querySelector('.cod-quantity-offers') : null;
+      var selectedOffer = null;
+      var quantity = 1;
+      
+      if (quantityOffersEl) {
+          try {
+              var offerData = quantityOffersEl.getAttribute('data-selected-offer');
+              if (offerData) {
+                  selectedOffer = JSON.parse(offerData);
+                  quantity = selectedOffer.quantity || 1;
+              }
+          } catch (e) {
+              console.warn('[COD Form] Failed to parse selected offer:', e);
+          }
+      }
+      
+      // Calculate subtotal with quantity and discount
       var subtotal = parseFloat(config.productPrice) || 0;
+      subtotal = subtotal * quantity;
+      
+      var discount = 0;
+      if (selectedOffer && selectedOffer.discountPercent) {
+          discount = subtotal * (selectedOffer.discountPercent / 100);
+      }
       
       // Calculate Shipping
       var shippingCost = 0;
@@ -988,7 +1016,7 @@
           if (defaultOpt) shippingCost = parseFloat(defaultOpt.price) || 0;
       }
 
-      var total = subtotal + shippingCost;
+      var total = subtotal - discount + shippingCost;
 
       card.innerHTML = `
         <div style="font-weight:600; margin-bottom:8px; display:flex; align-items:center;">
@@ -998,6 +1026,11 @@
            <span>Subtotal</span>
            <span id="cod-summary-subtotal">${formatMoney(subtotal)}</span>
         </div>
+        ${discount > 0 ? `
+        <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#10b981;">
+           <span>Bundle Discount (${selectedOffer.discountPercent}%)</span>
+           <span id="cod-summary-discount">-${formatMoney(discount)}</span>
+        </div>` : ''}
         <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#6b7280;">
            <span>Shipping</span>
            <span id="cod-summary-shipping">${shippingCost === 0 ? 'FREE' : formatMoney(shippingCost)}</span>
@@ -1249,6 +1282,18 @@
   function formatMoney(amount) {
       var num = parseFloat(amount) || 0;
       return '₹' + num.toFixed(2);
+  }
+
+  /**
+   * Update order summary when offer selection changes
+   */
+  function updateOrderSummaryWithOffer(form, config) {
+      var summaryEl = form.querySelector('.cod-order-summary');
+      if (!summaryEl) return;
+      
+      // Re-render the rate card with updated calculations
+      summaryEl.remove();
+      renderRateCard(form, config);
   }
 
   /**
