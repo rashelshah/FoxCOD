@@ -53,7 +53,10 @@
 
 {% comment %} Get product and variant info {% endcomment %}
 {% assign current_variant = product.selected_or_first_available_variant %}
-{% assign product_price = current_variant.price | money_without_trailing_zeros %}
+{% comment %} Use raw price in cents/paise for JavaScript calculations {% endcomment %}
+{% assign product_price_cents = current_variant.price %}
+{% assign product_price_display = current_variant.price | money_without_trailing_zeros %}
+{% assign product_price_numeric = product_price_cents | divided_by: 100.0 %}
 
 
 {% comment %} Read COD settings from metafields (synced from app dashboard) {% endcomment %}
@@ -107,6 +110,7 @@
      data-variant-id="{{ current_variant.id }}"
      data-product-title="{{ product.title | escape }}"
      data-product-price="{{ current_variant.price | divided_by: 100.0 }}"
+     data-product-image="{% if product.featured_image %}{{ product.featured_image | image_url: width: 300 }}{% endif %}"
      data-shop="{{ shop.permanent_domain }}"
      data-app-url="{{ cod_app_url }}"
      data-max-quantity="{{ cod_max_quantity }}"
@@ -182,7 +186,7 @@
     <div class="cod-product-details">
       <h3 class="cod-product-title">{{ product.title }}</h3>
       {% if cod_show_price == 'true' %}
-          <p class="cod-product-price" style="color: {{ cod_primary_color }};">{{ product_price }}</p>
+          <p class="cod-product-price" style="color: {{ cod_primary_color }};">{{ product_price_display }}</p>
       {% endif %}
       {% if current_variant.title != 'Default Title' %}
         <p class="cod-variant-title">{{ current_variant.title }}</p>
@@ -846,6 +850,51 @@
   }
   .btn-click-press:active {
       transform: scale(0.96) !important;
+  }
+  
+  /* ===========================
+     QUANTITY OFFERS TEMPLATES
+     =========================== */
+  
+  /* Modern Template - Vertical cards, no images */
+  .cod-quantity-offers.template-modern .cod-offer-card {
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: flex-start !important;
+  }
+  
+  .cod-quantity-offers.template-modern .cod-offer-card img {
+      display: none !important; /* Hide images in modern template */
+  }
+  
+  /* Classic Template - Horizontal with images on left */
+  .cod-quantity-offers.template-classic .cod-offer-card {
+      display: flex !important;
+      flex-direction: row !important;
+      align-items: center !important;
+      gap: 12px !important;
+  }
+  
+  .cod-quantity-offers.template-classic .cod-offer-card img {
+      width: 60px !important;
+      height: 60px !important;
+      margin-right: 0 !important; /* Gap handles spacing */
+      margin-bottom: 0 !important;
+  }
+  
+  /* Vertical Template - Stacked vertical cards, centered */
+  .cod-quantity-offers.template-vertical .cod-offer-card {
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: center !important;
+      text-align: center !important;
+  }
+  
+  .cod-quantity-offers.template-vertical .cod-offer-card img {
+      margin-right: 0 !important;
+      margin-bottom: 8px !important;
+      width: 80px !important;
+      height: 80px !important;
   }
   
   /* Ripple Effect */
