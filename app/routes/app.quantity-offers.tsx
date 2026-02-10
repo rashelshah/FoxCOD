@@ -100,7 +100,33 @@ async function syncOffersToMetafield(admin: any, offerGroups: any[]) {
     const shopId = shopData.data.shop.id;
 
     console.log('[Bundle Offers] Syncing offers to metafield:', offerGroups.length, 'groups');
-    console.log('[Bundle Offers] Offer data:', JSON.stringify(offerGroups, null, 2));
+
+    // Transform to include all necessary design settings for storefront
+    const storefrontData = offerGroups.map(group => ({
+        id: group.id,
+        name: group.name,
+        active: group.active,
+        product_ids: group.product_ids,
+        productIds: group.product_ids, // Duplicate for JS compatibility
+        offers: group.offers,
+        design: {
+            template: group.design?.template || 'modern',
+            selectedBgColor: group.design?.selectedBgColor || '#fff0ea',
+            selectedBorderColor: group.design?.selectedBorderColor || '#dc2626',
+            selectedTagBgColor: group.design?.selectedTagBgColor || '#ef4444',
+            selectedTagTextColor: group.design?.selectedTagTextColor || '#ffffff',
+            unselectedBgColor: group.design?.unselectedBgColor || '#ffffff',
+            unselectedBorderColor: group.design?.unselectedBorderColor || '#e5e7eb',
+            selectedBorderRadius: group.design?.selectedBorderRadius || 10,
+            currencySymbol: group.design?.currencySymbol || '₹',
+            showMostPopularBadge: group.design?.showMostPopularBadge !== false,
+            autoSelectBestValue: group.design?.autoSelectBestValue || false,
+            selectedTextColor: group.design?.selectedTextColor || '#1f2937'
+        },
+        placement: group.placement || 'inside_form'
+    }));
+
+    console.log('[Bundle Offers] Transformed data for storefront:', JSON.stringify(storefrontData, null, 2));
 
     const response = await admin.graphql(`
         mutation SetMetafield($metafields: [MetafieldsSetInput!]!) {
@@ -115,7 +141,7 @@ async function syncOffersToMetafield(admin: any, offerGroups: any[]) {
                 ownerId: shopId,
                 namespace: "fox_cod",
                 key: "quantity_offers_json",
-                value: JSON.stringify(offerGroups),
+                value: JSON.stringify(storefrontData),
                 type: "json"
             }]
         }
