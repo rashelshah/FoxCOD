@@ -856,18 +856,42 @@
      QUANTITY OFFERS TEMPLATES
      =========================== */
   
-  /* Modern Template - Vertical cards, no images */
-  .cod-quantity-offers.template-modern .cod-offer-card {
+  /* Base container - always stack vertically */
+  .cod-quantity-offers {
       display: flex !important;
       flex-direction: column !important;
-      align-items: flex-start !important;
+      gap: 8px !important;
+      width: 100% !important;
+      box-sizing: border-box !important;
+  }
+  
+  /* Base card styles */
+  .cod-offer-card {
+      width: 100% !important;
+      box-sizing: border-box !important;
+      margin-bottom: 8px !important;
+      border: 2px solid;
+      padding: 12px !important;
+      border-radius: 10px !important;
+      cursor: pointer !important;
+      transition: all 0.2s ease !important;
+      position: relative !important;
+  }
+  
+  /* Modern Template - Horizontal layout, no images */
+  .cod-quantity-offers.template-modern .cod-offer-card {
+      display: flex !important;
+      flex-direction: row !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      gap: 12px !important;
   }
   
   .cod-quantity-offers.template-modern .cod-offer-card img {
-      display: none !important; /* Hide images in modern template */
+      display: none !important;
   }
   
-  /* Classic Template - Horizontal with images on left */
+  /* Classic Template - Horizontal with images */
   .cod-quantity-offers.template-classic .cod-offer-card {
       display: flex !important;
       flex-direction: row !important;
@@ -878,11 +902,12 @@
   .cod-quantity-offers.template-classic .cod-offer-card img {
       width: 60px !important;
       height: 60px !important;
-      margin-right: 0 !important; /* Gap handles spacing */
-      margin-bottom: 0 !important;
+      flex-shrink: 0 !important;
+      border-radius: 8px !important;
+      object-fit: cover !important;
   }
   
-  /* Vertical Template - Stacked vertical cards, centered */
+  /* Vertical Template - Stacked centered */
   .cod-quantity-offers.template-vertical .cod-offer-card {
       display: flex !important;
       flex-direction: column !important;
@@ -891,10 +916,115 @@
   }
   
   .cod-quantity-offers.template-vertical .cod-offer-card img {
-      margin-right: 0 !important;
-      margin-bottom: 8px !important;
       width: 80px !important;
       height: 80px !important;
+      margin-bottom: 8px !important;
+      flex-shrink: 0 !important;
+      border-radius: 8px !important;
+      object-fit: cover !important;
+  }
+  
+  /* Content wrapper - holds quantity, badge, discount */
+  .cod-offer-card > div:first-of-type {
+      flex: 1 !important;
+      display: flex !important;
+      flex-direction: column !important;
+      gap: 4px !important;
+      min-width: 0 !important;
+      overflow: hidden !important;
+  }
+  
+  /* Quantity text */
+  .cod-offer-quantity {
+      font-size: 14px !important;
+      font-weight: 600 !important;
+      color: inherit !important;
+      white-space: nowrap !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+  }
+  
+  /* Badge styling */
+  .cod-offer-badge {
+      display: inline-block !important;
+      font-size: 10px !important;
+      font-weight: 600 !important;
+      padding: 2px 8px !important;
+      border-radius: 4px !important;
+      width: fit-content !important;
+      max-width: 100% !important;
+  }
+  
+  /* Discount text */
+  .cod-offer-discount {
+      font-size: 11px !important;
+      color: #10b981 !important;
+  }
+  
+  /* Price wrapper - right side */
+  .cod-offer-price-wrapper {
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: flex-end !important;
+      gap: 2px !important;
+      flex-shrink: 0 !important;
+      text-align: right !important;
+  }
+  
+  /* Price */
+  .cod-offer-price {
+      font-size: 16px !important;
+      font-weight: 700 !important;
+      color: inherit !important;
+      white-space: nowrap !important;
+  }
+  
+  /* Original/strikethrough price */
+  .cod-offer-original-price {
+      font-size: 12px !important;
+      text-decoration: line-through !important;
+      color: #9ca3af !important;
+  }
+  
+  /* Mobile Responsive Styles for Offers */
+  @media only screen and (max-width: 480px) {
+      .cod-quantity-offers {
+          gap: 6px !important;
+      }
+      
+      .cod-offer-card {
+          padding: 10px !important;
+          margin-bottom: 6px !important;
+      }
+      
+      /* Classic template - smaller images on mobile */
+      .cod-quantity-offers.template-classic .cod-offer-card img {
+          width: 48px !important;
+          height: 48px !important;
+      }
+      
+      /* Vertical template - smaller images on mobile */
+      .cod-quantity-offers.template-vertical .cod-offer-card img {
+          width: 60px !important;
+          height: 60px !important;
+      }
+      
+      .cod-offer-quantity {
+          font-size: 13px !important;
+      }
+      
+      .cod-offer-price {
+          font-size: 15px !important;
+      }
+      
+      .cod-offer-original-price {
+          font-size: 11px !important;
+      }
+      
+      .cod-offer-badge {
+          font-size: 9px !important;
+          padding: 2px 6px !important;
+      }
   }
   
   /* Ripple Effect */
