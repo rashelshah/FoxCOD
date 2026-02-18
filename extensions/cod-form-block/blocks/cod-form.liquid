@@ -924,6 +924,58 @@
       object-fit: cover !important;
   }
   
+  /* Minimal Template - Compact, clean */
+  .cod-quantity-offers.template-minimal .cod-offer-card {
+      display: flex !important;
+      flex-direction: row !important;
+      align-items: center !important;
+      gap: 8px !important;
+      border-width: 1px !important;
+      padding: 8px 12px !important;
+  }
+  
+  .cod-quantity-offers.template-minimal .cod-offer-card img {
+      display: none !important;
+  }
+  
+  .cod-quantity-offers.template-minimal .cod-offer-price-wrapper {
+      align-items: flex-end !important;
+      margin-left: auto !important;
+  }
+  
+  /* Cards Template - Grid layout with shadow */
+  .cod-quantity-offers.template-cards {
+      display: flex !important;
+      flex-direction: row !important;
+      flex-wrap: wrap !important;
+      gap: 8px !important;
+  }
+  
+  .cod-quantity-offers.template-cards .cod-offer-card {
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: center !important;
+      text-align: center !important;
+      flex: 1 !important;
+      min-width: 100px !important;
+      padding: 16px 12px !important;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05) !important;
+  }
+  
+  .cod-quantity-offers.template-cards .cod-offer-card img {
+      width: 60px !important;
+      height: 60px !important;
+      margin-bottom: 8px !important;
+      flex-shrink: 0 !important;
+      border-radius: 8px !important;
+      object-fit: cover !important;
+  }
+  
+  .cod-quantity-offers.template-cards .cod-offer-price-wrapper {
+      align-items: center !important;
+      width: 100% !important;
+  }
+  
   /* Content wrapper - holds quantity, badge, discount */
   .cod-offer-card > div:first-of-type {
       flex: 1 !important;

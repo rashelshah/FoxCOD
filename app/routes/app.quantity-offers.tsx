@@ -866,6 +866,22 @@ export default function QuantityOffersPage() {
                                                     </div>
                                                     <span>Vertical</span>
                                                 </div>
+                                                <div className={`template-opt ${activeGroup.design.template === 'minimal' ? 'selected' : ''}`}
+                                                    onClick={() => updateDesign({ template: 'minimal' })}>
+                                                    <div className="template-preview minimal">
+                                                        <div className="t-row minimal"><div className="t-dot"></div><div className="t-lines short"></div></div>
+                                                        <div className="t-row minimal"><div className="t-dot"></div><div className="t-lines short"></div></div>
+                                                    </div>
+                                                    <span>Minimal</span>
+                                                </div>
+                                                <div className={`template-opt ${activeGroup.design.template === 'cards' ? 'selected' : ''}`}
+                                                    onClick={() => updateDesign({ template: 'cards' })}>
+                                                    <div className="template-preview cards">
+                                                        <div className="t-card"><div className="t-img"></div><div className="t-badge"></div></div>
+                                                        <div className="t-card"><div className="t-img"></div><div className="t-badge"></div></div>
+                                                    </div>
+                                                    <span>Cards</span>
+                                                </div>
                                             </div>
                                         </div>
 
@@ -1047,39 +1063,62 @@ export default function QuantityOffersPage() {
 
                                             {/* Bundle Offers - At Top placement (immediately after subtitle) */}
                                             {activeGroup && activeGroup.placement === 'at_top' && (
-                                                <div className={`preview-offers template-${activeGroup.design.template || 'classic'}`} style={{ marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
+                                                <div className={`preview-offers template-${activeGroup.design.template || 'classic'}`} style={{ marginBottom: '16px', display: 'flex', gap: '8px', width: '100%' }}>
                                                     {activeGroup.offers.map((offer, i) => {
                                                         const total = samplePrice * offer.quantity * (1 - (offer.discountPercent || 0) / 100);
                                                         const original = samplePrice * offer.quantity;
                                                         const isSelected = offer.preselect || i === 0;
-                                                        const showImage = activeGroup.design.template !== 'modern';
-                                                        const isModern = activeGroup.design.template === 'modern';
-                                                        const isVertical = activeGroup.design.template === 'vertical';
+                                                        const template = activeGroup.design.template || 'classic';
+                                                        const showImage = template !== 'modern' && template !== 'minimal';
+                                                        const isModern = template === 'modern';
+                                                        const isVertical = template === 'vertical';
+                                                        const isMinimal = template === 'minimal';
+                                                        const isCards = template === 'cards';
                                                         const isMostPopular = offer.label?.toLowerCase().includes('most popular') || (i === activeGroup.offers.length - 1 && activeGroup.offers.length > 1);
                                                         const showDiscountTag = (offer.discountPercent || 0) > 0 && !isMostPopular;
+                                                        
+                                                        // Get border color based on selection - use actual saved colors
+                                                        const borderColor = isSelected 
+                                                            ? (activeGroup.design.selectedBorderColor || '#dc2626')
+                                                            : (activeGroup.design.unselectedBorderColor || '#e5e7eb');
 
                                                         return (
                                                             <div key={offer.id}
                                                                 className={`preview-offer ${isSelected ? 'selected' : ''}`}
                                                                 style={{
                                                                     background: isSelected ? (activeGroup.design.selectedBgColor || '#fff0ea') : (activeGroup.design.unselectedBgColor || '#ffffff'),
-                                                                    borderColor: isSelected ? (activeGroup.design.selectedBorderColor || '#dc2626') : (activeGroup.design.unselectedBorderColor || '#e5e7eb'),
+                                                                    borderStyle: 'solid',
+                                                                    borderWidth: isMinimal ? '1px' : '2px',
+                                                                    borderColor: borderColor,
                                                                     display: 'flex',
-                                                                    flexDirection: isVertical ? 'column' : 'row',
-                                                                    alignItems: isVertical ? 'center' : 'center',
-                                                                    justifyContent: isVertical ? 'center' : 'space-between',
-                                                                    gap: isVertical ? '8px' : '10px',
-                                                                    padding: '12px',
-                                                                    border: '2px solid',
-                                                                    borderRadius: '10px',
+                                                                    flexDirection: isVertical || isCards ? 'column' : 'row',
+                                                                    alignItems: isVertical || isCards ? 'center' : 'center',
+                                                                    justifyContent: isVertical || isCards ? 'center' : 'space-between',
+                                                                    gap: isVertical || isCards ? '8px' : (isMinimal ? '6px' : '10px'),
+                                                                    padding: isMinimal ? '8px 12px' : (isCards ? '10px 6px' : '12px'),
+                                                                    borderRadius: isCards ? '12px' : '10px',
                                                                     cursor: 'pointer',
-                                                                    width: '100%',
                                                                     boxSizing: 'border-box',
-                                                                    minWidth: 0,
-                                                                    textAlign: isVertical ? 'center' : 'left',
+                                                                    textAlign: isVertical || isCards ? 'center' : 'left',
                                                                     position: 'relative',
                                                                     overflow: 'visible',
+                                                                    boxShadow: isCards ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
                                                                 }}>
+                                                                {/* Radio indicator for cards template */}
+                                                                {isCards && (
+                                                                    <div className="radio-indicator" style={{
+                                                                        width: '20px',
+                                                                        height: '20px',
+                                                                        border: `2px solid ${isSelected ? borderColor : '#d1d5db'}`,
+                                                                        borderRadius: '50%',
+                                                                        marginBottom: '8px',
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        justifyContent: 'center',
+                                                                    }}>
+                                                                        {isSelected && <div style={{ width: '10px', height: '10px', background: borderColor, borderRadius: '50%' }} />}
+                                                                    </div>
+                                                                )}
                                                                 {/* Most Popular Ribbon Tag */}
                                                                 {isMostPopular && (
                                                                     <div style={{
@@ -1097,20 +1136,20 @@ export default function QuantityOffersPage() {
                                                                         whiteSpace: 'nowrap',
                                                                     }}>{offer.label || 'Most Popular'}</div>
                                                                 )}
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: isVertical ? '8px' : '10px', flex: isVertical ? '0 0 auto' : 1, minWidth: 0, flexDirection: isVertical ? 'column' : 'row', width: '100%' }}>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: isVertical || isCards ? '8px' : (isMinimal ? '6px' : '10px'), flex: isVertical || isCards ? '0 0 auto' : 1, minWidth: 0, flexDirection: isVertical || isCards ? 'column' : 'row', width: '100%' }}>
                                                                     {showImage && (
                                                                         productImage ? (
                                                                             <img 
                                                                                 src={productImage} 
                                                                                 alt="Product" 
-                                                                                style={{ flexShrink: 0, width: isVertical ? '60px' : '40px', height: isVertical ? '60px' : '40px', objectFit: 'cover', borderRadius: '8px' }} 
+                                                                                style={{ flexShrink: 0, width: isCards ? '40px' : (isVertical ? '50px' : '40px'), height: isCards ? '40px' : (isVertical ? '50px' : '40px'), objectFit: 'cover', borderRadius: '8px' }} 
                                                                             />
                                                                         ) : (
-                                                                            <div className="offer-thumb" style={{ flexShrink: 0, width: isVertical ? '60px' : '40px', height: isVertical ? '60px' : '40px', background: '#fef3c7', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>🎁</div>
+                                                                            <div className="offer-thumb" style={{ flexShrink: 0, width: isCards ? '40px' : (isVertical ? '50px' : '40px'), height: isCards ? '40px' : (isVertical ? '50px' : '40px'), background: '#fef3c7', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>🎁</div>
                                                                         )
                                                                     )}
-                                                                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, alignItems: isVertical ? 'center' : 'flex-start', width: '100%' }}>
-                                                                        <div style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
+                                                                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, alignItems: isVertical || isCards ? 'center' : 'flex-start', width: '100%' }}>
+                                                                        <div style={{ fontSize: isCards ? '12px' : '14px', fontWeight: 600, color: '#1f2937', whiteSpace: isCards ? 'normal' : 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', lineHeight: isCards ? '1.3' : '1.2', textAlign: 'center' }}>
                                                                             {offer.title || `${offer.quantity} Unit${offer.quantity !== 1 ? 's' : ''}`}
                                                                         </div>
                                                                         {/* Inline discount tag for non-most-popular */}
@@ -1118,7 +1157,7 @@ export default function QuantityOffersPage() {
                                                                             <span style={{
                                                                                 background: offer.tagBgColor || activeGroup.design.selectedTagBgColor,
                                                                                 color: activeGroup.design.selectedTagTextColor,
-                                                                                fontSize: '10px',
+                                                                                fontSize: '9px',
                                                                                 fontWeight: 600,
                                                                                 padding: '2px 6px',
                                                                                 borderRadius: '4px',
@@ -1128,11 +1167,11 @@ export default function QuantityOffersPage() {
                                                                         )}
                                                                     </div>
                                                                 </div>
-                                                                <div style={{ textAlign: isVertical ? 'center' : 'right', display: 'flex', flexDirection: 'column', alignItems: isVertical ? 'center' : 'flex-end', gap: '2px', flexShrink: 0, width: isVertical ? '100%' : 'auto' }}>
+                                                                <div style={{ textAlign: isVertical || isCards ? 'center' : 'right', display: 'flex', flexDirection: 'column', alignItems: isVertical || isCards ? 'center' : 'flex-end', gap: '2px', flexShrink: 0, width: isVertical || isCards ? '100%' : 'auto' }}>
                                                                     {offer.discountPercent ? (
-                                                                        <span style={{ fontSize: '11px', color: '#9ca3af', textDecoration: 'line-through' }}>₹{original.toFixed(0)}</span>
+                                                                        <span style={{ fontSize: isCards ? '10px' : '11px', color: '#9ca3af', textDecoration: 'line-through' }}>₹{original.toFixed(0)}</span>
                                                                     ) : null}
-                                                                    <span style={{ fontSize: '16px', fontWeight: 700, color: '#1f2937', whiteSpace: 'nowrap' }}>₹{total.toFixed(2)}</span>
+                                                                    <span style={{ fontSize: isCards ? '13px' : '16px', fontWeight: 700, color: '#1f2937', whiteSpace: 'nowrap' }}>₹{total.toFixed(2)}</span>
                                                                 </div>
                                                             </div>
                                                         );
@@ -1246,39 +1285,62 @@ export default function QuantityOffersPage() {
 
                                             {/* Bundle Offers - Above Button placement (after order summary, before submit button) */}
                                             {activeGroup && activeGroup.placement === 'above_button' && (
-                                                <div className={`preview-offers template-${activeGroup.design.template || 'classic'}`} style={{ marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
+                                                <div className={`preview-offers template-${activeGroup.design.template || 'classic'}`} style={{ marginBottom: '16px', display: 'flex', gap: '8px', width: '100%' }}>
                                                     {activeGroup.offers.map((offer, i) => {
                                                         const total = samplePrice * offer.quantity * (1 - (offer.discountPercent || 0) / 100);
                                                         const original = samplePrice * offer.quantity;
                                                         const isSelected = offer.preselect || i === 0;
-                                                        const showImage = activeGroup.design.template !== 'modern';
-                                                        const isModern = activeGroup.design.template === 'modern';
-                                                        const isVertical = activeGroup.design.template === 'vertical';
+                                                        const template = activeGroup.design.template || 'classic';
+                                                        const showImage = template !== 'modern' && template !== 'minimal';
+                                                        const isModern = template === 'modern';
+                                                        const isVertical = template === 'vertical';
+                                                        const isMinimal = template === 'minimal';
+                                                        const isCards = template === 'cards';
                                                         const isMostPopular = offer.label?.toLowerCase().includes('most popular') || (i === activeGroup.offers.length - 1 && activeGroup.offers.length > 1);
                                                         const showDiscountTag = (offer.discountPercent || 0) > 0 && !isMostPopular;
+                                                        
+                                                        // Get border color based on selection - use actual saved colors
+                                                        const borderColor = isSelected 
+                                                            ? (activeGroup.design.selectedBorderColor || '#dc2626')
+                                                            : (activeGroup.design.unselectedBorderColor || '#e5e7eb');
 
                                                         return (
                                                             <div key={offer.id}
                                                                 className={`preview-offer ${isSelected ? 'selected' : ''}`}
                                                                 style={{
                                                                     background: isSelected ? (activeGroup.design.selectedBgColor || '#fff0ea') : (activeGroup.design.unselectedBgColor || '#ffffff'),
-                                                                    borderColor: isSelected ? (activeGroup.design.selectedBorderColor || '#dc2626') : (activeGroup.design.unselectedBorderColor || '#e5e7eb'),
+                                                                    borderStyle: 'solid',
+                                                                    borderWidth: isMinimal ? '1px' : '2px',
+                                                                    borderColor: borderColor,
                                                                     display: 'flex',
-                                                                    flexDirection: isVertical ? 'column' : 'row',
-                                                                    alignItems: isVertical ? 'center' : 'center',
-                                                                    justifyContent: isVertical ? 'center' : 'space-between',
-                                                                    gap: isVertical ? '8px' : '10px',
-                                                                    padding: '12px',
-                                                                    border: '2px solid',
-                                                                    borderRadius: '10px',
+                                                                    flexDirection: isVertical || isCards ? 'column' : 'row',
+                                                                    alignItems: isVertical || isCards ? 'center' : 'center',
+                                                                    justifyContent: isVertical || isCards ? 'center' : 'space-between',
+                                                                    gap: isVertical || isCards ? '8px' : (isMinimal ? '6px' : '10px'),
+                                                                    padding: isMinimal ? '8px 12px' : (isCards ? '10px 6px' : '12px'),
+                                                                    borderRadius: isCards ? '12px' : '10px',
                                                                     cursor: 'pointer',
-                                                                    width: '100%',
                                                                     boxSizing: 'border-box',
-                                                                    minWidth: 0,
-                                                                    textAlign: isVertical ? 'center' : 'left',
+                                                                    textAlign: isVertical || isCards ? 'center' : 'left',
                                                                     position: 'relative',
                                                                     overflow: 'visible',
+                                                                    boxShadow: isCards ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
                                                                 }}>
+                                                                {/* Radio indicator for cards template */}
+                                                                {isCards && (
+                                                                    <div className="radio-indicator" style={{
+                                                                        width: '20px',
+                                                                        height: '20px',
+                                                                        border: `2px solid ${isSelected ? borderColor : '#d1d5db'}`,
+                                                                        borderRadius: '50%',
+                                                                        marginBottom: '8px',
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        justifyContent: 'center',
+                                                                    }}>
+                                                                        {isSelected && <div style={{ width: '10px', height: '10px', background: borderColor, borderRadius: '50%' }} />}
+                                                                    </div>
+                                                                )}
                                                                 {/* Most Popular Ribbon Tag */}
                                                                 {isMostPopular && (
                                                                     <div style={{
@@ -1296,20 +1358,20 @@ export default function QuantityOffersPage() {
                                                                         whiteSpace: 'nowrap',
                                                                     }}>{offer.label || 'Most Popular'}</div>
                                                                 )}
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: isVertical ? '8px' : '10px', flex: isVertical ? '0 0 auto' : 1, minWidth: 0, flexDirection: isVertical ? 'column' : 'row', width: '100%' }}>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: isVertical || isCards ? '8px' : (isMinimal ? '6px' : '10px'), flex: isVertical || isCards ? '0 0 auto' : 1, minWidth: 0, flexDirection: isVertical || isCards ? 'column' : 'row', width: '100%' }}>
                                                                     {showImage && (
                                                                         productImage ? (
                                                                             <img 
                                                                                 src={productImage} 
                                                                                 alt="Product" 
-                                                                                style={{ flexShrink: 0, width: isVertical ? '60px' : '40px', height: isVertical ? '60px' : '40px', objectFit: 'cover', borderRadius: '8px' }} 
+                                                                                style={{ flexShrink: 0, width: isCards ? '40px' : (isVertical ? '50px' : '40px'), height: isCards ? '40px' : (isVertical ? '50px' : '40px'), objectFit: 'cover', borderRadius: '8px' }} 
                                                                             />
                                                                         ) : (
-                                                                            <div className="offer-thumb" style={{ flexShrink: 0, width: isVertical ? '60px' : '40px', height: isVertical ? '60px' : '40px', background: '#fef3c7', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>🎁</div>
+                                                                            <div className="offer-thumb" style={{ flexShrink: 0, width: isCards ? '40px' : (isVertical ? '50px' : '40px'), height: isCards ? '40px' : (isVertical ? '50px' : '40px'), background: '#fef3c7', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>🎁</div>
                                                                         )
                                                                     )}
-                                                                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, alignItems: isVertical ? 'center' : 'flex-start', width: '100%' }}>
-                                                                        <div style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
+                                                                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, alignItems: isVertical || isCards ? 'center' : 'flex-start', width: '100%' }}>
+                                                                        <div style={{ fontSize: isCards ? '12px' : '14px', fontWeight: 600, color: '#1f2937', whiteSpace: isCards ? 'normal' : 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', lineHeight: isCards ? '1.3' : '1.2', textAlign: 'center' }}>
                                                                             {offer.title || `${offer.quantity} Unit${offer.quantity !== 1 ? 's' : ''}`}
                                                                         </div>
                                                                         {/* Inline discount tag for non-most-popular */}
@@ -1317,7 +1379,7 @@ export default function QuantityOffersPage() {
                                                                             <span style={{
                                                                                 background: offer.tagBgColor || activeGroup.design.selectedTagBgColor,
                                                                                 color: activeGroup.design.selectedTagTextColor,
-                                                                                fontSize: '10px',
+                                                                                fontSize: '9px',
                                                                                 fontWeight: 600,
                                                                                 padding: '2px 6px',
                                                                                 borderRadius: '4px',
@@ -1327,11 +1389,11 @@ export default function QuantityOffersPage() {
                                                                         )}
                                                                     </div>
                                                                 </div>
-                                                                <div style={{ textAlign: isVertical ? 'center' : 'right', display: 'flex', flexDirection: 'column', alignItems: isVertical ? 'center' : 'flex-end', gap: '2px', flexShrink: 0, width: isVertical ? '100%' : 'auto' }}>
+                                                                <div style={{ textAlign: isVertical || isCards ? 'center' : 'right', display: 'flex', flexDirection: 'column', alignItems: isVertical || isCards ? 'center' : 'flex-end', gap: '2px', flexShrink: 0, width: isVertical || isCards ? '100%' : 'auto' }}>
                                                                     {offer.discountPercent ? (
-                                                                        <span style={{ fontSize: '11px', color: '#9ca3af', textDecoration: 'line-through' }}>₹{original.toFixed(0)}</span>
+                                                                        <span style={{ fontSize: isCards ? '10px' : '11px', color: '#9ca3af', textDecoration: 'line-through' }}>₹{original.toFixed(0)}</span>
                                                                     ) : null}
-                                                                    <span style={{ fontSize: '16px', fontWeight: 700, color: '#1f2937', whiteSpace: 'nowrap' }}>₹{total.toFixed(2)}</span>
+                                                                    <span style={{ fontSize: isCards ? '13px' : '16px', fontWeight: 700, color: '#1f2937', whiteSpace: 'nowrap' }}>₹{total.toFixed(2)}</span>
                                                                 </div>
                                                             </div>
                                                         );
@@ -1587,10 +1649,18 @@ const styles = `
     .template-preview .t-img { width: 20px; height: 20px; background: #d1d5db; border-radius: 4px; }
     .template-preview .t-lines { flex: 1; height: 8px; background: #d1d5db; border-radius: 4px; }
     .template-preview .t-lines.full { width: 100%; }
+    .template-preview .t-lines.short { flex: 0 0 60%; }
+    .template-preview .t-dot { width: 12px; height: 12px; border-radius: 50%; background: #d1d5db; }
     .template-preview.vertical { flex-direction: row; }
     .template-preview.vertical .t-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
     .template-preview.vertical .t-img { width: 24px; height: 24px; }
     .template-preview.vertical .t-lines { width: 100%; height: 6px; }
+    .template-preview.minimal { gap: 4px; padding: 8px 12px; }
+    .template-preview.minimal .t-row { display: flex; gap: 6px; align-items: center; }
+    .template-preview.cards { flex-direction: row; gap: 8px; }
+    .template-preview.cards .t-card { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; background: #fff; border-radius: 6px; padding: 6px; }
+    .template-preview.cards .t-img { width: 20px; height: 20px; }
+    .template-preview.cards .t-badge { width: 80%; height: 6px; background: #9ca3af; border-radius: 3px; }
     .template-opt span { font-size: 12px; color: #6b7280; }
     .placement-opts { display: flex; gap: 20px; }
     .radio-opt { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
@@ -1637,19 +1707,88 @@ const styles = `
     .preview-header { background: #f9fafb; padding: 16px 20px; border-bottom: 1px solid #e5e7eb; border-radius: 16px 16px 0 0; }
     .preview-header h3 { margin: 0; font-size: 14px; font-weight: 600; }
     .preview-content { padding: 24px; }
-    .preview-phone { background: #1f2937; border-radius: 32px; padding: 6px; max-width: 300px; margin: 0 auto; }
-    .preview-phone-screen { background: white; border-radius: 24px; overflow-y: auto; max-height: 500px; padding: 16px; }
+    .preview-phone { background: #1f2937; border-radius: 32px; padding: 6px; max-width: 380px; margin: 0 auto; }
+    .preview-phone-screen { background: white; border-radius: 24px; overflow-y: auto; max-height: 600px; padding: 16px; }
     .preview-header-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f3f4f6; margin-bottom: 12px; }
     .preview-header-row span { font-size: 13px; font-weight: 500; }
     .preview-close { font-size: 18px; color: #9ca3af; cursor: pointer; }
     
     /* Preview Offers */
-    .preview-offers { padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+    .preview-offers { padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; width: 100%; box-sizing: border-box; }
     .preview-offers.template-vertical { flex-direction: row; flex-wrap: wrap; }
     .preview-offers.template-vertical .preview-offer { flex: 1; min-width: 120px; flex-direction: column; align-items: center; text-align: center; }
-    .preview-offer { display: flex; align-items: center; gap: 12px; padding: 12px; border: 2px solid #e5e7eb; border-radius: 10px; cursor: pointer; transition: 0.2s; }
+    
+    /* Minimal Template */
+    .preview-offers.template-minimal { gap: 6px; }
+    .preview-offers.template-minimal .preview-offer { padding: 8px 12px !important; border-width: 1px !important; }
+    .preview-offers.template-minimal .preview-offer img, 
+    .preview-offers.template-minimal .preview-offer .offer-thumb { display: none !important; }
+    
+    /* Cards Template - Match storefront exactly */
+    .preview-offers.template-cards { 
+        flex-direction: row !important; 
+        flex-wrap: nowrap !important; 
+        gap: 8px !important;
+        align-items: stretch !important;
+    }
+    .preview-offers.template-cards .preview-offer { 
+        flex: 1 1 0 !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        width: auto !important;
+        flex-direction: column !important; 
+        align-items: center !important; 
+        text-align: center !important; 
+        padding: 10px 6px !important; 
+        border-radius: 10px !important; 
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08) !important; 
+        position: relative !important;
+        cursor: pointer !important;
+        transition: all 0.2s ease !important;
+        box-sizing: border-box !important;
+        margin: 0 !important;
+        gap: 4px !important;
+    }
+    .preview-offers.template-cards .preview-offer img { 
+        width: 40px !important; 
+        height: 40px !important; 
+        margin-bottom: 4px !important; 
+        flex-shrink: 0 !important;
+        border-radius: 8px !important;
+        object-fit: cover !important;
+    }
+    .preview-offers.template-cards .radio-indicator { 
+        width: 18px !important; 
+        height: 18px !important; 
+        border: 2px solid #d1d5db; 
+        border-radius: 50%; 
+        margin-bottom: 4px; 
+        display: flex; 
+        align-items: center; 
+        justify-content: center;
+        flex-shrink: 0;
+    }
+    .preview-offers.template-cards .preview-offer > div:first-of-type {
+        flex: 1 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        gap: 4px !important;
+        min-width: 0 !important;
+        width: 100% !important;
+    }
+    .preview-offers.template-cards .preview-offer > div:last-of-type {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        gap: 2px !important;
+        flex-shrink: 0 !important;
+        width: 100% !important;
+        margin-top: 4px !important;
+    }
+    .preview-offer { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 10px; cursor: pointer; transition: 0.2s; }
     .preview-offer.selected { border-width: 2px; }
-    .offer-thumb { width: 40px; height: 40px; background: #fef3c7; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+    .offer-thumb { width: 40px; height: 40px; background: #fef3c7; border-radius: 8px; display: flex; align-items: center; justifyContent: center; font-size: 18px; flex-shrink: 0; }
     .offer-details { flex: 1; }
     .offer-qty { font-size: 14px; font-weight: 600; color: #1f2937; }
     .offer-tag { display: inline-block; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 4px; margin-top: 4px; }
