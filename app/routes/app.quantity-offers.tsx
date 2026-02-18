@@ -45,6 +45,12 @@ const COLOR_PRESETS = [
     { name: "Indigo", bg: "#eef2ff", border: "#4f46e5", tag: "#6366f1", tagText: "#ffffff" },
     { name: "Navy", bg: "#1e3a5f", border: "#1e3a5f", tag: "#0ea5e9", tagText: "#ffffff" },
     { name: "Slate", bg: "#1e293b", border: "#334155", tag: "#64748b", tagText: "#ffffff" },
+    { name: "Emerald", bg: "#ecfdf5", border: "#059669", tag: "#10b981", tagText: "#ffffff" },
+    { name: "Amber", bg: "#fffbeb", border: "#d97706", tag: "#f59e0b", tagText: "#ffffff" },
+    { name: "Purple", bg: "#faf5ff", border: "#7c3aed", tag: "#8b5cf6", tagText: "#ffffff" },
+    { name: "Pink", bg: "#fdf2f8", border: "#db2777", tag: "#ec4899", tagText: "#ffffff" },
+    { name: "Teal", bg: "#f0fdfa", border: "#0d9488", tag: "#14b8a6", tagText: "#ffffff" },
+    { name: "Orange", bg: "#fff7ed", border: "#ea580c", tag: "#f97316", tagText: "#ffffff" },
 ];
 
 // Loader
@@ -1049,6 +1055,8 @@ export default function QuantityOffersPage() {
                                                         const showImage = activeGroup.design.template !== 'modern';
                                                         const isModern = activeGroup.design.template === 'modern';
                                                         const isVertical = activeGroup.design.template === 'vertical';
+                                                        const isMostPopular = offer.label?.toLowerCase().includes('most popular') || (i === activeGroup.offers.length - 1 && activeGroup.offers.length > 1);
+                                                        const showDiscountTag = (offer.discountPercent || 0) > 0 && !isMostPopular;
 
                                                         return (
                                                             <div key={offer.id}
@@ -1069,7 +1077,26 @@ export default function QuantityOffersPage() {
                                                                     boxSizing: 'border-box',
                                                                     minWidth: 0,
                                                                     textAlign: isVertical ? 'center' : 'left',
+                                                                    position: 'relative',
+                                                                    overflow: 'visible',
                                                                 }}>
+                                                                {/* Most Popular Ribbon Tag */}
+                                                                {isMostPopular && (
+                                                                    <div style={{
+                                                                        position: 'absolute',
+                                                                        top: '-10px',
+                                                                        right: '-6px',
+                                                                        background: offer.tagBgColor || activeGroup.design.selectedTagBgColor || '#1f2937',
+                                                                        color: activeGroup.design.selectedTagTextColor || '#ffffff',
+                                                                        fontSize: '10px',
+                                                                        fontWeight: 700,
+                                                                        padding: '4px 10px',
+                                                                        borderRadius: '4px',
+                                                                        zIndex: 10,
+                                                                        boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+                                                                        whiteSpace: 'nowrap',
+                                                                    }}>{offer.label || 'Most Popular'}</div>
+                                                                )}
                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: isVertical ? '8px' : '10px', flex: isVertical ? '0 0 auto' : 1, minWidth: 0, flexDirection: isVertical ? 'column' : 'row', width: '100%' }}>
                                                                     {showImage && (
                                                                         productImage ? (
@@ -1086,7 +1113,8 @@ export default function QuantityOffersPage() {
                                                                         <div style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
                                                                             {offer.title || `${offer.quantity} Unit${offer.quantity !== 1 ? 's' : ''}`}
                                                                         </div>
-                                                                        {offer.label && (
+                                                                        {/* Inline discount tag for non-most-popular */}
+                                                                        {showDiscountTag && (
                                                                             <span style={{
                                                                                 background: offer.tagBgColor || activeGroup.design.selectedTagBgColor,
                                                                                 color: activeGroup.design.selectedTagTextColor,
@@ -1096,7 +1124,7 @@ export default function QuantityOffersPage() {
                                                                                 borderRadius: '4px',
                                                                                 display: 'inline-block',
                                                                                 width: 'fit-content',
-                                                                            }}>{offer.label || `Save ${offer.discountPercent || 0}%`}</span>
+                                                                            }}>Save {offer.discountPercent}%</span>
                                                                         )}
                                                                     </div>
                                                                 </div>
@@ -1226,6 +1254,8 @@ export default function QuantityOffersPage() {
                                                         const showImage = activeGroup.design.template !== 'modern';
                                                         const isModern = activeGroup.design.template === 'modern';
                                                         const isVertical = activeGroup.design.template === 'vertical';
+                                                        const isMostPopular = offer.label?.toLowerCase().includes('most popular') || (i === activeGroup.offers.length - 1 && activeGroup.offers.length > 1);
+                                                        const showDiscountTag = (offer.discountPercent || 0) > 0 && !isMostPopular;
 
                                                         return (
                                                             <div key={offer.id}
@@ -1246,7 +1276,26 @@ export default function QuantityOffersPage() {
                                                                     boxSizing: 'border-box',
                                                                     minWidth: 0,
                                                                     textAlign: isVertical ? 'center' : 'left',
+                                                                    position: 'relative',
+                                                                    overflow: 'visible',
                                                                 }}>
+                                                                {/* Most Popular Ribbon Tag */}
+                                                                {isMostPopular && (
+                                                                    <div style={{
+                                                                        position: 'absolute',
+                                                                        top: '-10px',
+                                                                        right: '-6px',
+                                                                        background: offer.tagBgColor || activeGroup.design.selectedTagBgColor || '#1f2937',
+                                                                        color: activeGroup.design.selectedTagTextColor || '#ffffff',
+                                                                        fontSize: '10px',
+                                                                        fontWeight: 700,
+                                                                        padding: '4px 10px',
+                                                                        borderRadius: '4px',
+                                                                        zIndex: 10,
+                                                                        boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+                                                                        whiteSpace: 'nowrap',
+                                                                    }}>{offer.label || 'Most Popular'}</div>
+                                                                )}
                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: isVertical ? '8px' : '10px', flex: isVertical ? '0 0 auto' : 1, minWidth: 0, flexDirection: isVertical ? 'column' : 'row', width: '100%' }}>
                                                                     {showImage && (
                                                                         productImage ? (
@@ -1263,7 +1312,8 @@ export default function QuantityOffersPage() {
                                                                         <div style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
                                                                             {offer.title || `${offer.quantity} Unit${offer.quantity !== 1 ? 's' : ''}`}
                                                                         </div>
-                                                                        {offer.label && (
+                                                                        {/* Inline discount tag for non-most-popular */}
+                                                                        {showDiscountTag && (
                                                                             <span style={{
                                                                                 background: offer.tagBgColor || activeGroup.design.selectedTagBgColor,
                                                                                 color: activeGroup.design.selectedTagTextColor,
@@ -1273,7 +1323,7 @@ export default function QuantityOffersPage() {
                                                                                 borderRadius: '4px',
                                                                                 display: 'inline-block',
                                                                                 width: 'fit-content',
-                                                                            }}>{offer.label || `Save ${offer.discountPercent || 0}%`}</span>
+                                                                            }}>Save {offer.discountPercent}%</span>
                                                                         )}
                                                                     </div>
                                                                 </div>

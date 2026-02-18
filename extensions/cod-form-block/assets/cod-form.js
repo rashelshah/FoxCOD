@@ -454,12 +454,19 @@
       card.setAttribute('data-quantity', offer.quantity);
       card.setAttribute('data-discount', offer.discountPercent || 0);
       
+      // Check if this is the "Most Popular" offer (last one with highest discount or last offer)
+      var isMostPopular = (offer.label && offer.label.toLowerCase().indexOf('most popular') !== -1) || 
+                          (idx === applicableGroup.offers.length - 1 && applicableGroup.offers.length > 1);
+      var showDiscountTag = (offer.discountPercent || 0) > 0 && !isMostPopular;
+      
       // Force inline styles to ensure they override any CSS
       card.style.border = '2px solid';
       card.style.padding = '12px';
       card.style.marginBottom = '8px';
       card.style.cursor = 'pointer';
       card.style.transition = 'all 0.2s ease';
+      card.style.position = 'relative';
+      card.style.overflow = 'visible';
       
       // Apply design styles
       if (idx === selectedIndex) {
@@ -473,6 +480,26 @@
       }
       card.style.borderRadius = (design.selectedBorderRadius || 10) + 'px';
       
+      // Most Popular Ribbon Tag - positioned at top-right
+      if (isMostPopular) {
+        var ribbon = document.createElement('div');
+        ribbon.className = 'cod-offer-ribbon';
+        ribbon.style.position = 'absolute';
+        ribbon.style.top = '-10px';
+        ribbon.style.right = '-6px';
+        ribbon.style.background = offer.tagBgColor || design.selectedTagBgColor || '#1f2937';
+        ribbon.style.color = design.selectedTagTextColor || '#ffffff';
+        ribbon.style.fontSize = '10px';
+        ribbon.style.fontWeight = '700';
+        ribbon.style.padding = '4px 10px';
+        ribbon.style.borderRadius = '4px';
+        ribbon.style.zIndex = '10';
+        ribbon.style.boxShadow = '0 2px 4px rgba(0,0,0,0.15)';
+        ribbon.style.whiteSpace = 'nowrap';
+        ribbon.textContent = offer.label || 'Most Popular';
+        card.appendChild(ribbon);
+      }
+      
       // For classic and vertical templates, display product image
       if ((template === 'classic' || template === 'vertical') && config.productImage) {
           var img = document.createElement('img');
@@ -484,28 +511,27 @@
       // Create content wrapper for text elements (quantity, badge, discount)
       var contentWrapper = document.createElement('div');
       
-      // Badge (label) - place first if exists
-      if (offer.label && (design.showMostPopularBadge !== false || offer.label !== 'Most Popular')) {
-        var badge = document.createElement('div');
-        badge.className = 'cod-offer-badge';
-        badge.style.background = design.selectedTagBgColor || config.primaryColor;
-        badge.style.color = design.selectedTagTextColor || '#ffffff';
-        badge.textContent = offer.label;
-        contentWrapper.appendChild(badge);
-      }
-      
       // Quantity text
       var qtyDiv = document.createElement('div');
       qtyDiv.className = 'cod-offer-quantity';
       qtyDiv.textContent = offer.quantity + (offer.quantity === 1 ? ' Unit' : ' Units');
       contentWrapper.appendChild(qtyDiv);
       
-      // Discount text
-      if (offer.discountPercent) {
-        var discountDiv = document.createElement('div');
-        discountDiv.className = 'cod-offer-discount';
-        discountDiv.textContent = 'Save ' + offer.discountPercent + '%';
-        contentWrapper.appendChild(discountDiv);
+      // Inline discount tag for non-most-popular offers
+      if (showDiscountTag) {
+        var discountTag = document.createElement('div');
+        discountTag.className = 'cod-offer-discount-tag';
+        discountTag.style.background = offer.tagBgColor || design.selectedTagBgColor || config.primaryColor;
+        discountTag.style.color = design.selectedTagTextColor || '#ffffff';
+        discountTag.style.fontSize = '10px';
+        discountTag.style.fontWeight = '600';
+        discountTag.style.padding = '2px 6px';
+        discountTag.style.borderRadius = '4px';
+        discountTag.style.display = 'inline-block';
+        discountTag.style.width = 'fit-content';
+        discountTag.style.marginTop = '4px';
+        discountTag.textContent = 'Save ' + offer.discountPercent + '%';
+        contentWrapper.appendChild(discountTag);
       }
       
       // Append content wrapper to card
