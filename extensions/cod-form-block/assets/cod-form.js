@@ -440,6 +440,14 @@
     offersContainer.className = 'cod-quantity-offers template-' + template;
     offersContainer.setAttribute('data-product-id', config.productId);
     
+    // Apply template-specific container styles
+    if (template === 'cards') {
+      offersContainer.style.display = 'flex';
+      offersContainer.style.flexDirection = 'row';
+      offersContainer.style.flexWrap = 'wrap';
+      offersContainer.style.gap = '8px';
+    }
+    
     // State: selected offer index
     var selectedIndex = design.autoSelectBestValue ? 
       applicableGroup.offers.reduce(function(maxIdx, offer, idx, arr) {
@@ -459,14 +467,41 @@
                           (idx === applicableGroup.offers.length - 1 && applicableGroup.offers.length > 1);
       var showDiscountTag = (offer.discountPercent || 0) > 0 && !isMostPopular;
       
+      // Template-specific styles
+      var isVertical = template === 'vertical';
+      var isCards = template === 'cards';
+      var isMinimal = template === 'minimal';
+      
       // Force inline styles to ensure they override any CSS
-      card.style.border = '2px solid';
-      card.style.padding = '12px';
+      card.style.border = isMinimal ? '1px solid' : '2px solid';
+      card.style.padding = isMinimal ? '8px 12px' : (isCards ? '16px 12px' : '12px');
       card.style.marginBottom = '8px';
       card.style.cursor = 'pointer';
       card.style.transition = 'all 0.2s ease';
       card.style.position = 'relative';
       card.style.overflow = 'visible';
+      
+      // Cards template - flex layout
+      if (isCards) {
+        card.style.flex = '1';
+        card.style.minWidth = '100px';
+        card.style.flexDirection = 'column';
+        card.style.alignItems = 'center';
+        card.style.textAlign = 'center';
+        card.style.boxShadow = '0 2px 8px rgba(0,0,0,0.05)';
+      }
+      
+      // Vertical/Cards template - column layout
+      if (isVertical || isCards) {
+        card.style.display = 'flex';
+        card.style.flexDirection = 'column';
+        card.style.alignItems = 'center';
+        card.style.textAlign = 'center';
+      } else if (isMinimal) {
+        card.style.display = 'flex';
+        card.style.alignItems = 'center';
+        card.style.gap = '6px';
+      }
       
       // Apply design styles
       if (idx === selectedIndex) {
@@ -500,16 +535,24 @@
         card.appendChild(ribbon);
       }
       
-      // For classic and vertical templates, display product image
-      if ((template === 'classic' || template === 'vertical') && config.productImage) {
+      // For classic, vertical, and cards templates, display product image (not modern or minimal)
+      if ((template === 'classic' || template === 'vertical' || template === 'cards') && config.productImage) {
           var img = document.createElement('img');
           img.src = config.productImage;
           img.alt = config.productTitle || 'Product';
+          if (isVertical || isCards) {
+            img.style.width = '60px';
+            img.style.height = '60px';
+          }
           card.appendChild(img);
       }
       
       // Create content wrapper for text elements (quantity, badge, discount)
       var contentWrapper = document.createElement('div');
+      if (isVertical || isCards) {
+        contentWrapper.style.textAlign = 'center';
+        contentWrapper.style.width = '100%';
+      }
       
       // Quantity text
       var qtyDiv = document.createElement('div');
@@ -548,6 +591,10 @@
       // Create price wrapper
       var priceWrapper = document.createElement('div');
       priceWrapper.className = 'cod-offer-price-wrapper';
+      if (isVertical || isCards) {
+        priceWrapper.style.textAlign = 'center';
+        priceWrapper.style.width = '100%';
+      }
       
       // Original price (strikethrough) if discount exists
       if (offer.discountPercent) {

@@ -26,7 +26,7 @@ export interface QuantityOffer {
  */
 export interface OfferDesignSettings {
     // Template
-    template: 'classic' | 'modern' | 'vertical';
+    template: 'classic' | 'modern' | 'vertical' | 'minimal' | 'cards';
 
     // Selected offer styles
     selectedBgColor: string;
