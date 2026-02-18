@@ -70,7 +70,7 @@ export interface QuantityOfferGroup {
     productIds: string[];
     offers: QuantityOffer[];
     design: OfferDesignSettings;
-    placement: 'inside_form' | 'above_button';
+    placement: 'at_top' | 'above_button';
     createdAt: string;
     updatedAt: string;
     selectedProducts?: any[];  // Temporarily holds selected products from ResourcePicker
@@ -133,6 +133,6 @@ export function createDefaultOfferGroup(): Omit<QuantityOfferGroup, 'id' | 'crea
         productIds: [],
         offers: DEFAULT_OFFERS,
         design: DEFAULT_OFFER_DESIGN,
-        placement: 'inside_form',
+        placement: 'at_top',
     };
 }

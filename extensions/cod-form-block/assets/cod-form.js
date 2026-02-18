@@ -374,18 +374,18 @@
   }
 
   /**
-   * Render Quantity Offers (Bundle/Volume Discounts)
+   * Render Quantity Offers and return both element and placement
    */
-  function renderQuantityOffers(container, config) {
+  function renderQuantityOffersWithPlacement(container, config) {
     var offers = config.quantityOffers || [];
     
-    console.log('[COD Form] renderQuantityOffers called with', offers.length, 'offer groups');
+    console.log('[COD Form] renderQuantityOffersWithPlacement called with', offers.length, 'offer groups');
     console.log('[COD Form] Current product ID:', config.productId, 'type:', typeof config.productId);
     
     // Check if current product has offers
     if (!offers.length) {
       console.log('[COD Form] No quantity offers available');
-      return null;
+      return { element: null, placement: 'at_top' };
     }
     
     // Find offers applicable to this product
@@ -402,17 +402,10 @@
       // Convert all product IDs to strings and strip GID prefix if present
       var productIdStrings = productIds.map(function(id) { return String(id).replace('gid://shopify/Product/', ''); });
       
-      console.log('[COD Form] Product ID normalization:', {
-        groupName: group.name,
-        original: productIds,
-        normalized: productIdStrings,
-        currentProduct: currentProductId
-      });
-      
-      console.log('[COD Form] Checking group:', group.name, 'active:', group.active, 'productIds:', productIdStrings);
+      console.log('[COD Form] Checking group:', group.name, 'active:', group.active, 'placement:', group.placement);
       
       if (group.active && productIdStrings.length > 0 && productIdStrings.includes(currentProductId)) {
-        console.log('[COD Form] Found matching group:', group.name);
+        console.log('[COD Form] Found matching group:', group.name, 'with placement:', group.placement);
         applicableGroup = group;
         break;
       }
@@ -420,18 +413,23 @@
 
     if (!applicableGroup || !applicableGroup.offers || !applicableGroup.offers.length) {
       console.log('[COD Form] No applicable group found for product:', currentProductId);
-      console.log('[COD Form] No matching offers. Debug info:', {
-        totalGroups: offers.length,
-        currentProductId: currentProductId,
-        allProductIds: offers.map(function(g) { return {
-          name: g.name,
-          active: g.active,
-          productIds: g.product_ids || g.productIds
-        }; })
-      });
-      return null;
+      return { element: null, placement: 'at_top' };
     }
     
+    // Get placement from the group (default to 'at_top')
+    var placement = applicableGroup.placement || 'at_top';
+    console.log('[COD Form] Using placement:', placement, 'from group:', applicableGroup.name);
+    
+    // Render the offers (reuse existing render logic)
+    var offersElement = renderQuantityOffersElement(container, config, applicableGroup);
+    
+    return { element: offersElement, placement: placement };
+  }
+
+  /**
+   * Render Quantity Offers element (extracted from original function)
+   */
+  function renderQuantityOffersElement(container, config, applicableGroup) {
     var design = applicableGroup.design || {};
     var template = design.template || 'modern';
     
@@ -439,7 +437,6 @@
     
     // Create offers container
     var offersContainer = document.createElement('div');
-    // Apply template class - this determines the visual style
     offersContainer.className = 'cod-quantity-offers template-' + template;
     offersContainer.setAttribute('data-product-id', config.productId);
     
@@ -472,27 +469,22 @@
       } else {
           card.style.background = design.unselectedBgColor || '#ffffff';
           card.style.borderColor = design.unselectedBorderColor || '#e5e7eb';
-          card.style.color = '#6b7280';  // Unselected text color
+          card.style.color = '#6b7280';
       }
       card.style.borderRadius = (design.selectedBorderRadius || 10) + 'px';
-      
-      // Template classes in CSS will handle layout (modern/classic/vertical)
-      // No need for inline flex styles - they conflict with CSS
       
       // For classic and vertical templates, display product image
       if ((template === 'classic' || template === 'vertical') && config.productImage) {
           var img = document.createElement('img');
           img.src = config.productImage;
           img.alt = config.productTitle || 'Product';
-          // CSS handles sizing and spacing based on template class
           card.appendChild(img);
       }
       
-      // Create content wrapper for text elements
+      // Create content wrapper for text elements (quantity, badge, discount)
       var contentWrapper = document.createElement('div');
-      contentWrapper.style.flex = '1';
       
-      // Badge (label)
+      // Badge (label) - place first if exists
       if (offer.label && (design.showMostPopularBadge !== false || offer.label !== 'Most Popular')) {
         var badge = document.createElement('div');
         badge.className = 'cod-offer-badge';
@@ -516,28 +508,37 @@
         contentWrapper.appendChild(discountDiv);
       }
       
+      // Append content wrapper to card
+      card.appendChild(contentWrapper);
+      
       // Price calculation
-      console.log('[COD Form] Price calculation - unitPrice:', config.productPrice, 'quantity:', offer.quantity, 'discount:', offer.discountPercent);
       var unitPrice = config.productPrice;
       if (!unitPrice || isNaN(unitPrice)) {
-          console.error('[COD Form] Invalid unit price!', unitPrice);
           unitPrice = 0;
       }
       var discountedPrice = unitPrice * offer.quantity * (1 - (offer.discountPercent || 0) / 100);
       var originalPrice = unitPrice * offer.quantity;
-      console.log('[COD Form] Calculated prices - original:', originalPrice, 'discounted:', discountedPrice);
       
+      // Create price wrapper
+      var priceWrapper = document.createElement('div');
+      priceWrapper.className = 'cod-offer-price-wrapper';
+      
+      // Original price (strikethrough) if discount exists
+      if (offer.discountPercent) {
+        var originalPriceSpan = document.createElement('span');
+        originalPriceSpan.className = 'cod-offer-original-price';
+        originalPriceSpan.textContent = (design.currencySymbol || '₹') + originalPrice.toFixed(0);
+        priceWrapper.appendChild(originalPriceSpan);
+      }
+      
+      // Discounted price
       var priceDiv = document.createElement('div');
       priceDiv.className = 'cod-offer-price';
       priceDiv.textContent = (design.currencySymbol || '₹') + discountedPrice.toFixed(0);
-      if (offer.discountPercent) {
-        priceDiv.innerHTML += '<span class="cod-offer-original-price">' + 
-          (design.currencySymbol || '₹') + originalPrice.toFixed(0) + '</span>';
-      }
-      contentWrapper.appendChild(priceDiv);
+      priceWrapper.appendChild(priceDiv);
       
-      // Append content wrapper to card
-      card.appendChild(contentWrapper);
+      // Append price wrapper to card
+      card.appendChild(priceWrapper);
       
       // Click handler
       card.addEventListener('click', function() {
@@ -556,7 +557,6 @@
         var qtyInput = form.querySelector('.cod-qty-input');
         if (qtyInput) {
           qtyInput.value = offer.quantity;
-          // Trigger change event for price update
           qtyInput.dispatchEvent(new Event('change', { bubbles: true }));
         }
         
@@ -642,17 +642,37 @@
     renderFields(fieldsContainer, config);
 
     // 1.5 Render Quantity Offers if applicable
-    var quantityOffersEl = renderQuantityOffers(container, config);
+    var quantityOffersResult = renderQuantityOffersWithPlacement(container, config);
+    var quantityOffersEl = quantityOffersResult.element;
+    var placement = quantityOffersResult.placement || 'at_top';
+    
     if (quantityOffersEl) {
-        // Insert before the dynamic fields
-        fieldsContainer.parentNode.insertBefore(quantityOffersEl, fieldsContainer);
+        console.log('[COD Form] Quantity offers placement:', placement);
+        
+        if (placement === 'above_button') {
+            // Insert before submit button (after all other form elements like order summary)
+            var submitBtn = form.querySelector('button[type="submit"]');
+            if (submitBtn) {
+                form.insertBefore(quantityOffersEl, submitBtn);
+            } else {
+                // Fallback: append to form
+                form.appendChild(quantityOffersEl);
+            }
+        } else {
+            // Default: at_top - insert before the dynamic fields container
+            fieldsContainer.parentNode.insertBefore(quantityOffersEl, fieldsContainer);
+        }
         // Hide product header when offers are shown
         hideProductHeaderIfOffersActive(container);
     }
 
     // 2. Render Rate Card (Order Summary) if enabled
+    console.log('[COD Form] Checking order summary - blocks:', config.blocks, 'order_summary:', config.blocks?.order_summary);
     if (config.blocks && config.blocks.order_summary) {
+        console.log('[COD Form] Rendering order summary');
         renderRateCard(form, config);
+    } else {
+        console.log('[COD Form] Order summary not rendered - blocks config:', config.blocks);
     }
 
     // 3. Render Shipping Options if enabled
@@ -1062,12 +1082,14 @@
       }
       
       // Calculate subtotal with quantity and discount
-      var subtotal = parseFloat(config.productPrice) || 0;
-      subtotal = subtotal * quantity;
+      var unitPrice = parseFloat(config.productPrice) || 0;
+      var subtotal = unitPrice * quantity;
       
       var discount = 0;
+      var discountPercent = 0;
       if (selectedOffer && selectedOffer.discountPercent) {
-          discount = subtotal * (selectedOffer.discountPercent / 100);
+          discountPercent = selectedOffer.discountPercent;
+          discount = subtotal * (discountPercent / 100);
       }
       
       // Calculate Shipping
@@ -1079,18 +1101,27 @@
       }
 
       var total = subtotal - discount + shippingCost;
+      
+      console.log('[COD Form] Order Summary Calculation:', {
+          unitPrice: unitPrice,
+          quantity: quantity,
+          subtotal: subtotal,
+          discount: discount,
+          shipping: shippingCost,
+          total: total
+      });
 
       card.innerHTML = `
         <div style="font-weight:600; margin-bottom:8px; display:flex; align-items:center;">
            🧾 Order Summary
         </div>
         <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#6b7280;">
-           <span>Subtotal</span>
+           <span>Subtotal (${quantity} ${quantity === 1 ? 'item' : 'items'})</span>
            <span id="cod-summary-subtotal">${formatMoney(subtotal)}</span>
         </div>
         ${discount > 0 ? `
         <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#10b981;">
-           <span>Bundle Discount (${selectedOffer.discountPercent}%)</span>
+           <span>Bundle Discount (${discountPercent}%)</span>
            <span id="cod-summary-discount">-${formatMoney(discount)}</span>
         </div>` : ''}
         <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#6b7280;">
@@ -1351,11 +1382,89 @@
    */
   function updateOrderSummaryWithOffer(form, config) {
       var summaryEl = form.querySelector('.cod-order-summary');
-      if (!summaryEl) return;
+      if (!summaryEl) {
+          console.log('[COD Form] No order summary to update');
+          return;
+      }
       
-      // Re-render the rate card with updated calculations
-      summaryEl.remove();
-      renderRateCard(form, config);
+      // Get current selected offer
+      var quantityOffersEl = form.closest('.cod-modal') ? form.closest('.cod-modal').querySelector('.cod-quantity-offers') : null;
+      var selectedOffer = null;
+      var quantity = 1;
+      
+      if (quantityOffersEl) {
+          try {
+              var offerData = quantityOffersEl.getAttribute('data-selected-offer');
+              if (offerData) {
+                  selectedOffer = JSON.parse(offerData);
+                  quantity = selectedOffer.quantity || 1;
+              }
+          } catch (e) {
+              console.warn('[COD Form] Failed to parse selected offer for summary update:', e);
+          }
+      }
+      
+      // Recalculate values
+      var unitPrice = parseFloat(config.productPrice) || 0;
+      var subtotal = unitPrice * quantity;
+      var discount = 0;
+      var discountPercent = 0;
+      
+      if (selectedOffer && selectedOffer.discountPercent) {
+          discountPercent = selectedOffer.discountPercent;
+          discount = subtotal * (discountPercent / 100);
+      }
+      
+      // Get current shipping
+      var shippingCost = 0;
+      var shippingEl = summaryEl.querySelector('#cod-summary-shipping');
+      if (shippingEl) {
+          var shippingText = shippingEl.textContent;
+          if (shippingText !== 'FREE') {
+              shippingCost = parseFloat(shippingText.replace(/[^0-9.]/g, '')) || 0;
+          }
+      }
+      
+      var total = subtotal - discount + shippingCost;
+      
+      console.log('[COD Form] Updating order summary:', {
+          quantity: quantity,
+          unitPrice: unitPrice,
+          subtotal: subtotal,
+          discount: discount,
+          shipping: shippingCost,
+          total: total
+      });
+      
+      // Update DOM elements
+      var subtotalEl = summaryEl.querySelector('#cod-summary-subtotal');
+      var discountEl = summaryEl.querySelector('#cod-summary-discount');
+      var totalEl = summaryEl.querySelector('#cod-summary-total');
+      
+      if (subtotalEl) subtotalEl.textContent = formatMoney(subtotal);
+      
+      // Handle discount display
+      var discountRow = discountEl ? discountEl.closest('div') : null;
+      if (discount > 0) {
+          if (discountEl) {
+              discountEl.textContent = '-' + formatMoney(discount);
+              discountEl.parentElement.style.display = 'flex';
+          } else if (!discountRow) {
+              // Create discount row if it doesn't exist
+              var shippingRow = summaryEl.querySelector('#cod-summary-shipping').closest('div');
+              var newDiscountRow = document.createElement('div');
+              newDiscountRow.style.cssText = 'display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#10b981;';
+              newDiscountRow.innerHTML = `<span>Bundle Discount (${discountPercent}%)</span><span id="cod-summary-discount">-${formatMoney(discount)}</span>`;
+              summaryEl.insertBefore(newDiscountRow, shippingRow);
+          }
+      } else if (discountRow) {
+          discountRow.style.display = 'none';
+      }
+      
+      if (totalEl) {
+          totalEl.textContent = formatMoney(total);
+          totalEl.style.color = config.primaryColor;
+      }
   }
 
   /**
