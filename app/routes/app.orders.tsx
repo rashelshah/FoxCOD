@@ -768,6 +768,21 @@ export default function OrdersPage() {
                                             <div className="product-cell">
                                                 <span className="product-title">{order.product_title || 'Product'}</span>
                                                 <span className="product-qty">Qty: {order.quantity}</span>
+                                                {order.customer_notes && order.customer_notes.includes('UPSELL ITEMS') && (() => {
+                                                    const lines = order.customer_notes.split('\n').filter((l: string) => l.trim().startsWith('-'));
+                                                    return lines.length > 0 ? (
+                                                        <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                                            {lines.map((line: string, idx: number) => {
+                                                                const m = line.match(/-\s*(.+?)\s*\(₹([\d.]+)\)/);
+                                                                return m ? (
+                                                                    <span key={idx} style={{ fontSize: '11px', padding: '2px 6px', borderRadius: '4px', background: '#ecfdf5', color: '#059669', fontWeight: 600, display: 'inline-block', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                                        + {m[1]} (₹{m[2]})
+                                                                    </span>
+                                                                ) : null;
+                                                            })}
+                                                        </div>
+                                                    ) : null;
+                                                })()}
                                             </div>
                                             <div className="amount-cell">
                                                 {formatCurrency(order.total_price)}

@@ -287,6 +287,23 @@ async function handleRegularOrder(data: any) {
         console.error('[Proxy] Customer save error:', custError);
     }
 
+    // Calculate prices including upsell items
+    const basePrice = parseFloat(data.price) * (parseInt(data.quantity) || 1);
+    const upsellItems = data.upsell_items || [];
+    const upsellTotal = upsellItems.reduce((sum: number, item: any) => sum + (parseFloat(item.price) * (parseInt(item.quantity) || 1)), 0);
+    const totalPrice = basePrice + upsellTotal;
+
+    // Build notes including upsell details
+    let orderNotes = data.notes || data.customerNotes || '';
+    if (upsellItems.length > 0) {
+        const upsellNotes = 'UPSELL ITEMS:\n' + upsellItems.map((item: any) =>
+            `  - ${item.title} (₹${item.price}) x${item.quantity} [${item.type}]`
+        ).join('\n');
+        orderNotes = orderNotes ? orderNotes + '\n\n' + upsellNotes : upsellNotes;
+    }
+
+    console.log('[Proxy] Base price:', basePrice, 'Upsell total:', upsellTotal, 'Total:', totalPrice, 'Upsell items:', upsellItems.length);
+
     // Create the order using logOrder
     const result = await logOrder({
         shop_domain: data.shop,
@@ -294,7 +311,7 @@ async function handleRegularOrder(data: any) {
         customer_phone: data.customerPhone || '',
         customer_address: data.customerAddress || '',
         customer_email: data.customerEmail || '',
-        notes: data.notes || data.customerNotes || '',
+        notes: orderNotes,
         city: data.customerCity || '',
         state: data.customerState || '',
         pincode: data.customerZipcode || '',
@@ -302,7 +319,7 @@ async function handleRegularOrder(data: any) {
         product_title: data.productTitle || 'Product',
         variant_id: data.variantId || '',
         quantity: parseInt(data.quantity) || 1,
-        price: (parseFloat(data.price) * (parseInt(data.quantity) || 1)).toString(),
+        price: totalPrice.toString(),
         shipping_label: data.shippingLabel || '',
         shipping_price: parseFloat(data.shippingPrice) || 0,
     });
@@ -322,7 +339,7 @@ async function handleRegularOrder(data: any) {
         pincode: data.customerZipcode || '',
         product: data.productTitle || 'Product',
         quantity: parseInt(data.quantity) || 1,
-        totalPrice: (parseFloat(data.price) * (parseInt(data.quantity) || 1)).toString(),
+        totalPrice: totalPrice.toString(),
         paymentMethod: 'full_cod',
     }).catch(err => {
         console.error('[Proxy] Google Sheets sync error (non-blocking):', err.message);

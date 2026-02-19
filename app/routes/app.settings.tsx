@@ -135,6 +135,8 @@ async function ensureMetafieldDefinitions(admin: any) {
         // Shipping rates settings - must have storefront access for Liquid templates
         { key: "shipping_rates_enabled", type: "single_line_text_field" },
         { key: "shipping_rates_json", type: "json" },
+        // Upsells & Downsells
+        { key: "upsells_downsells_json", type: "json" },
     ];
 
     console.log('[Settings] Ensuring metafield definitions (parallel)...');
