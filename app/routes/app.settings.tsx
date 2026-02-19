@@ -132,6 +132,9 @@ async function ensureMetafieldDefinitions(admin: any) {
         // Partial COD settings
         { key: "partial_cod_enabled", type: "single_line_text_field" },
         { key: "partial_cod_advance_amount", type: "single_line_text_field" },
+        // Shipping rates settings - must have storefront access for Liquid templates
+        { key: "shipping_rates_enabled", type: "single_line_text_field" },
+        { key: "shipping_rates_json", type: "json" },
     ];
 
     console.log('[Settings] Ensuring metafield definitions (parallel)...');
@@ -256,6 +259,36 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         console.warn('[Settings] Could not fetch products:', e);
     }
 
+    // Fetch collections from Shopify for the collection selector in shipping
+    let collections: any[] = [];
+    try {
+        const collectionsResponse = await admin.graphql(`
+            query GetCollections($first: Int!) {
+                collections(first: $first) {
+                    edges {
+                        node {
+                            id
+                            title
+                            handle
+                            productsCount {
+                                count
+                            }
+                        }
+                    }
+                }
+            }
+        `, { variables: { first: 100 } });
+        const collectionsData = await collectionsResponse.json();
+        collections = collectionsData.data?.collections?.edges?.map((edge: any) => ({
+            id: edge.node.id,
+            title: edge.node.title,
+            handle: edge.node.handle,
+            productsCount: edge.node.productsCount?.count || 0,
+        })) || [];
+    } catch (e) {
+        console.warn('[Settings] Could not fetch collections:', e);
+    }
+
     const [settings, shippingRates] = await Promise.all([
         getFormSettings(shopDomain),
         getShippingRates(shopDomain),
@@ -275,12 +308,44 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             button_styles: { ...DEFAULT_BUTTON_STYLES, ...(settings.button_styles || {}) },
         }
         : { ...defaultSettings, shop_domain: shopDomain };
-    return { shop: shopDomain, settings: merged, shippingRates, appUrl, products };
+    return { shop: shopDomain, settings: merged, shippingRates, appUrl, products, collections };
 };
 
 /**
  * Action: Save settings to Supabase AND Shopify Metafields
  */
+/**
+ * Resolve collection IDs to product IDs via Shopify GraphQL
+ */
+async function resolveCollectionProductIds(admin: any, collectionIds: string[]): Promise<string[]> {
+    const productIds: string[] = [];
+    for (const collectionId of collectionIds) {
+        try {
+            const response = await admin.graphql(`
+                query GetCollectionProducts($id: ID!) {
+                    collection(id: $id) {
+                        products(first: 250) {
+                            edges {
+                                node {
+                                    id
+                                }
+                            }
+                        }
+                    }
+                }
+            `, { variables: { id: collectionId } });
+            const result = await response.json();
+            const products = result.data?.collection?.products?.edges || [];
+            products.forEach((edge: any) => {
+                if (edge.node?.id) productIds.push(edge.node.id);
+            });
+        } catch (e) {
+            console.warn(`[Settings] Could not resolve products for collection ${collectionId}:`, e);
+        }
+    }
+    return [...new Set(productIds)]; // Deduplicate
+}
+
 export const action = async ({ request }: ActionFunctionArgs) => {
     const { session, admin } = await authenticate.admin(request);
     const shopDomain = session.shop;
@@ -292,6 +357,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     if (actionType === "create_shipping_rate") {
         try {
             const rateData = JSON.parse(formData.get("rate_data") as string);
+            // Resolve collections → product IDs if applying to collections
+            if (rateData.applies_to_collections && rateData.collection_ids?.length > 0) {
+                const collectionProductIds = await resolveCollectionProductIds(admin, rateData.collection_ids);
+                // Merge collection product IDs with any individually selected product IDs, deduplicating
+                const existingIds = rateData.product_ids || [];
+                rateData.product_ids = [...new Set([...existingIds, ...collectionProductIds])];
+                rateData.applies_to_products = true;
+            }
             const newRate = await createShippingRate({
                 ...rateData,
                 shop_domain: shopDomain,
@@ -309,6 +382,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         try {
             const rateId = formData.get("rate_id") as string;
             const rateData = JSON.parse(formData.get("rate_data") as string);
+            // Resolve collections → product IDs if applying to collections
+            if (rateData.applies_to_collections && rateData.collection_ids?.length > 0) {
+                const collectionProductIds = await resolveCollectionProductIds(admin, rateData.collection_ids);
+                const existingIds = rateData.product_ids || [];
+                rateData.product_ids = [...new Set([...existingIds, ...collectionProductIds])];
+                rateData.applies_to_products = true;
+            }
             const updatedRate = await updateShippingRate(rateId, rateData);
             // Sync shipping rates to metafields immediately
             await syncShippingRatesToMetafields(shopDomain, admin);
@@ -1052,6 +1132,7 @@ const SortableFieldItem = ({ field, onToggleVisibility, onToggleRequired, isCust
 interface ShippingRateModalProps {
     rate: ShippingRate | null;
     products: any[];
+    collections: any[];
     onClose: () => void;
     onSave: (rateData: Omit<ShippingRate, 'id' | 'shop_domain' | 'created_at' | 'updated_at'>) => void;
 }
@@ -1113,7 +1194,7 @@ const INDIAN_STATES = [
     { code: 'CH', name: 'Chandigarh' },
 ];
 
-const ShippingRateModal = ({ rate, products, onClose, onSave }: ShippingRateModalProps) => {
+const ShippingRateModal = ({ rate, products, collections, onClose, onSave }: ShippingRateModalProps) => {
     const [name, setName] = useState(rate?.name || '');
     const [description, setDescription] = useState(rate?.description || '');
     const [price, setPrice] = useState(rate?.price ?? 0);
@@ -1123,13 +1204,16 @@ const ShippingRateModal = ({ rate, products, onClose, onSave }: ShippingRateModa
     const [appliesToProducts, setAppliesToProducts] = useState(rate?.applies_to_products || false);
     const [appliesToCountries, setAppliesToCountries] = useState(rate?.applies_to_countries || false);
     const [appliesToStates, setAppliesToStates] = useState(rate?.applies_to_states || false);
+    const [appliesToCollections, setAppliesToCollections] = useState(rate?.applies_to_collections || false);
     const [isActive, setIsActive] = useState(rate?.is_active ?? true);
 
-    // State for selected products, countries, and states
+    // State for selected products, countries, states, and collections
     const [selectedProductIds, setSelectedProductIds] = useState<string[]>(rate?.product_ids || []);
     const [selectedCountryCodes, setSelectedCountryCodes] = useState<string[]>(rate?.country_codes || []);
     const [selectedStateCodes, setSelectedStateCodes] = useState<string[]>(rate?.state_codes || []);
+    const [selectedCollectionIds, setSelectedCollectionIds] = useState<string[]>(rate?.collection_ids || []);
     const [productSearch, setProductSearch] = useState('');
+    const [collectionSearch, setCollectionSearch] = useState('');
 
     const handleSave = () => {
         if (!name.trim()) return;
@@ -1146,6 +1230,8 @@ const ShippingRateModal = ({ rate, products, onClose, onSave }: ShippingRateModa
             country_codes: appliesToCountries ? selectedCountryCodes : [],
             applies_to_states: appliesToStates,
             state_codes: appliesToStates ? selectedStateCodes : [],
+            applies_to_collections: appliesToCollections,
+            collection_ids: appliesToCollections ? selectedCollectionIds : [],
             is_active: isActive,
         });
     };
@@ -1173,6 +1259,18 @@ const ShippingRateModal = ({ rate, products, onClose, onSave }: ShippingRateModa
                 : [...prev, stateCode]
         );
     };
+
+    const toggleCollection = (collectionId: string) => {
+        setSelectedCollectionIds(prev =>
+            prev.includes(collectionId)
+                ? prev.filter(id => id !== collectionId)
+                : [...prev, collectionId]
+        );
+    };
+
+    const filteredCollections = collections.filter(c =>
+        c.title.toLowerCase().includes(collectionSearch.toLowerCase())
+    );
 
     const filteredProducts = products.filter(p =>
         p.title.toLowerCase().includes(productSearch.toLowerCase())
@@ -1346,6 +1444,31 @@ const ShippingRateModal = ({ rate, products, onClose, onSave }: ShippingRateModa
                                 </div>
                             )}
                         </div>
+
+                        {/* Collections/Categories */}
+                        <div className="sr-restriction-item">
+                            <label className="sr-checkbox-row">
+                                <input type="checkbox" checked={appliesToCollections} onChange={(e) => setAppliesToCollections(e.target.checked)} />
+                                <span>Limit to specific collections / categories</span>
+                            </label>
+                            {appliesToCollections && (
+                                <div className="sr-restriction-content">
+                                    <div className="sr-search-wrap">
+                                        <svg className="sr-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+                                        <input type="text" value={collectionSearch} onChange={(e) => setCollectionSearch(e.target.value)} placeholder="Search collections..." className="sr-input sr-search-input" />
+                                    </div>
+                                    <div className="sr-tag-list">
+                                        {filteredCollections.map(collection => (
+                                            <label key={collection.id} className={`sr-tag-chip ${selectedCollectionIds.includes(collection.id) ? 'selected' : ''}`}>
+                                                <input type="checkbox" checked={selectedCollectionIds.includes(collection.id)} onChange={() => toggleCollection(collection.id)} style={{ display: 'none' }} />
+                                                <span>{collection.title} ({collection.productsCount})</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                    <span className="sr-hint" style={{ marginTop: '6px', display: 'block' }}>Products in selected collections will be automatically included for this rate.</span>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -1363,7 +1486,7 @@ const ShippingRateModal = ({ rate, products, onClose, onSave }: ShippingRateModa
                     </div>
                 </div>
             </div>
-        </div>
+        </div >
     );
 
 };
@@ -1414,7 +1537,7 @@ const ImportShippingModal = ({ onClose, onImport }: ImportShippingModalProps) =>
  * Settings Page Component - Premium Form Builder
  */
 export default function SettingsPage() {
-    const { shop, settings, shippingRates: initialShippingRates, products } = useLoaderData<typeof loader>();
+    const { shop, settings, shippingRates: initialShippingRates, products, collections } = useLoaderData<typeof loader>();
     const actionData = useActionData<typeof action>();
     const submit = useSubmit();
     const navigation = useNavigation();
@@ -3817,6 +3940,7 @@ export default function SettingsPage() {
                     <ShippingRateModal
                         rate={editingRate}
                         products={products}
+                        collections={collections}
                         onClose={() => {
                             setShowShippingRateModal(false);
                             setEditingRate(null);

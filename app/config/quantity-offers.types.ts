@@ -70,7 +70,7 @@ export interface QuantityOfferGroup {
     productIds: string[];
     offers: QuantityOffer[];
     design: OfferDesignSettings;
-    placement: 'at_top' | 'above_button';
+    placement: 'at_top' | 'above_button' | 'in_product_page';
     createdAt: string;
     updatedAt: string;
     selectedProducts?: any[];  // Temporarily holds selected products from ResourcePicker

@@ -30,6 +30,10 @@ export interface ShippingRate {
     applies_to_states: boolean;
     state_codes: string[];
 
+    // Collection/Category restrictions
+    applies_to_collections: boolean;
+    collection_ids: string[];
+
     is_active: boolean;
 
     created_at?: string;
@@ -93,6 +97,8 @@ export async function createShippingRate(rate: Omit<ShippingRate, 'id' | 'create
             country_codes: rate.country_codes ?? [],
             applies_to_states: rate.applies_to_states ?? false,
             state_codes: rate.state_codes ?? [],
+            applies_to_collections: rate.applies_to_collections ?? false,
+            collection_ids: rate.collection_ids ?? [],
             is_active: rate.is_active ?? true,
         })
         .select()
@@ -130,6 +136,8 @@ export async function updateShippingRate(
     if (updates.country_codes !== undefined) updateData.country_codes = updates.country_codes ?? [];
     if (updates.applies_to_states !== undefined) updateData.applies_to_states = updates.applies_to_states ?? false;
     if (updates.state_codes !== undefined) updateData.state_codes = updates.state_codes ?? [];
+    if (updates.applies_to_collections !== undefined) updateData.applies_to_collections = updates.applies_to_collections ?? false;
+    if (updates.collection_ids !== undefined) updateData.collection_ids = updates.collection_ids ?? [];
     if (updates.is_active !== undefined) updateData.is_active = updates.is_active ?? true;
 
     const { data, error } = await supabase
@@ -190,6 +198,8 @@ export async function bulkCreateShippingRates(
         country_codes: rate.country_codes ?? [],
         applies_to_states: rate.applies_to_states ?? false,
         state_codes: rate.state_codes ?? [],
+        applies_to_collections: rate.applies_to_collections ?? false,
+        collection_ids: rate.collection_ids ?? [],
         is_active: rate.is_active ?? true,
     }));
 
@@ -368,6 +378,8 @@ export async function importShippingRatesFromShopify(
             country_codes: [],
             applies_to_states: false,
             state_codes: [],
+            applies_to_collections: false,
+            collection_ids: [],
             is_active: true,
         }));
 
