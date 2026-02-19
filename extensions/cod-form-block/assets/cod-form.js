@@ -125,6 +125,10 @@
         clickPress: dataContainer.dataset.clickPress === 'true',
         stickyOnMobile: dataContainer.dataset.stickyMobile === 'true',
         
+        // Product Collection IDs - for collection-based shipping rate matching
+        productCollectionIds: (window.FoxCod && window.FoxCod.productCollectionIds) || 
+            (dataContainer.dataset.productCollectionIds ? dataContainer.dataset.productCollectionIds.split(',').filter(function(id) { return id.trim() !== ''; }) : []),
+        
         // Quantity Offers Configuration - prefer window.FoxCod for reliability
         quantityOffers: (window.FoxCod && window.FoxCod.quantityOffers) || safeJSONParse(dataContainer.dataset.quantityOffers, [])
       };
@@ -309,13 +313,79 @@
         codBtn.addEventListener('click', function(e) {
           e.preventDefault();
           e.stopPropagation();
-          openModal(productId);
+          openModal(productId, config);
         });
 
         // Insert COD button BEFORE the original button, then hide original
         btn.parentNode.insertBefore(codBtn, btn);
         btn.style.display = 'none';
         btn.dataset.codReplaced = 'true';
+        
+        // In Product Page placement: render offers above the COD button on the product page
+        if (!document.querySelector('.cod-product-page-offers[data-product-id="' + productId + '"]')) {
+          var offersResult = renderQuantityOffersWithPlacement(codBtn.parentNode, config);
+          if (offersResult.element && offersResult.placement === 'in_product_page') {
+            offersResult.element.classList.add('cod-product-page-offers');
+            offersResult.element.setAttribute('data-product-id', productId);
+            codBtn.parentNode.insertBefore(offersResult.element, codBtn);
+            console.log('[COD Form] Rendered in_product_page offers above COD button');
+            
+            // Set default selected offer data so modal can read it on open
+            var defaultSelectedCard = offersResult.element.querySelector('.cod-offer-card.selected');
+            if (defaultSelectedCard) {
+              var defaultOffer = {
+                quantity: parseInt(defaultSelectedCard.getAttribute('data-quantity')),
+                discountPercent: parseFloat(defaultSelectedCard.getAttribute('data-discount')) || 0
+              };
+              offersResult.element.setAttribute('data-selected-offer', JSON.stringify(defaultOffer));
+            }
+            
+            // Wire up click handlers to sync with modal
+            offersResult.element.querySelectorAll('.cod-offer-card').forEach(function(card) {
+              card.addEventListener('click', function() {
+                // Update visual selection on product page cards
+                offersResult.element.querySelectorAll('.cod-offer-card').forEach(function(c) {
+                  c.classList.remove('selected');
+                });
+                card.classList.add('selected');
+                
+                // Store selected offer on the product page offers container
+                var offer = {
+                  quantity: parseInt(card.getAttribute('data-quantity')),
+                  discountPercent: parseFloat(card.getAttribute('data-discount')) || 0
+                };
+                offersResult.element.setAttribute('data-selected-offer', JSON.stringify(offer));
+                
+                // Also sync to any modal offers container
+                var modalContainer = document.getElementById('cod-form-' + productId);
+                if (modalContainer) {
+                  var modalOffers = modalContainer.querySelector('.cod-quantity-offers');
+                  if (modalOffers) {
+                    modalOffers.setAttribute('data-selected-offer', JSON.stringify(offer));
+                    // Update visual selection in modal too
+                    modalOffers.querySelectorAll('.cod-offer-card').forEach(function(mc) {
+                      mc.classList.remove('selected');
+                    });
+                    var matchCard = modalOffers.querySelector('[data-quantity="' + offer.quantity + '"]');
+                    if (matchCard) matchCard.classList.add('selected');
+                  }
+                  // Update quantity input
+                  var qtyInput = modalContainer.querySelector('.cod-qty-input');
+                  if (qtyInput) {
+                    qtyInput.value = offer.quantity;
+                    qtyInput.dispatchEvent(new Event('change', { bubbles: true }));
+                  }
+                  // Update order summary
+                  var form = modalContainer.querySelector('form');
+                  if (form) {
+                    updateOfferPrice(form, config, offer);
+                    updateOrderSummaryWithOffer(form, config, offer);
+                  }
+                }
+              });
+            });
+          }
+        }
         
         // Create sticky button clone for mobile (separate button)
         if (config.stickyOnMobile && window.innerWidth <= 600) {
@@ -324,7 +394,7 @@
           stickyBtn.addEventListener('click', function(e) {
             e.preventDefault();
             e.stopPropagation();
-            openModal(productId);
+            openModal(productId, config);
           });
           
           // Append to body
@@ -703,46 +773,42 @@
   }
   
   /**
-   * Hide product header when offers are shown
-   * Only hides product image, title, and price - NOT the order summary
+   * Hide product header for at_top / above_button placements
+   * Hides the entire .cod-product-info section (image, title, price, variant)
    */
   function hideProductHeaderIfOffersActive(container) {
-      // Only hide product image, price, and title elements, NOT the order summary
-      var productImage = container.querySelector('.cod-product-image');
-      var productPrice = container.querySelector('.cod-product-price');
-      var productTitle = container.querySelector('.cod-product-title');
-      
-      if (productImage) {
-          productImage.style.display = 'none';
-          console.log('[COD Form] Product image hidden');
-      }
-      if (productPrice) {
-          productPrice.style.display = 'none';
-          console.log('[COD Form] Product price hidden');
-      }
-      if (productTitle) {
-          productTitle.style.display = 'none';
-          console.log('[COD Form] Product title hidden');
+      // Hide the entire product info section
+      var productInfo = container.querySelector('.cod-product-info');
+      if (productInfo) {
+          productInfo.style.display = 'none';
+          console.log('[COD Form] Product info section hidden');
       }
       
-      console.log('[COD Form] Product header elements hidden - order summary remains visible');
+      console.log('[COD Form] Product header hidden for non-in_product_page placement');
   }
   
   /**
    * Update price display based on selected offer
    */
   function updateOfferPrice(form, config, offer) {
-    var priceElement = form.querySelector('.cod-product-price');
-    if (!priceElement) return;
+    // .cod-product-price is in the modal container, NOT inside the form
+    var modal = form.closest('.cod-modal') || form.parentElement;
+    var priceElement = modal ? modal.querySelector('.cod-product-price') : form.querySelector('.cod-product-price');
+    if (!priceElement) {
+        console.log('[COD Form] updateOfferPrice: .cod-product-price not found');
+        return;
+    }
     
     var unitPrice = config.productPrice;
     var total = unitPrice * offer.quantity * (1 - (offer.discountPercent || 0) / 100);
     
-    priceElement.innerHTML = '₹' + total.toFixed(0);
+    priceElement.innerHTML = formatMoney(total);
     if (offer.discountPercent) {
-      priceElement.innerHTML += ' <span style="text-decoration:line-through;color:#9ca3af;font-size:14px;">₹' + 
-        (unitPrice * offer.quantity).toFixed(0) + '</span>';
+      priceElement.innerHTML += ' <span style="text-decoration:line-through;color:#9ca3af;font-size:14px;">' + 
+        formatMoney(unitPrice * offer.quantity) + '</span>';
     }
+    priceElement.style.display = ''; // Ensure it's visible
+    console.log('[COD Form] updateOfferPrice: updated to', total, 'with discount', offer.discountPercent + '%');
   }
 
   /**
@@ -766,7 +832,10 @@
     if (quantityOffersEl) {
         console.log('[COD Form] Quantity offers placement:', placement);
         
-        if (placement === 'above_button') {
+        if (placement === 'in_product_page') {
+            // Skip rendering inside modal - already rendered on product page via replaceBuyButtons
+            console.log('[COD Form] Skipping modal offers - in_product_page placement handled on product page');
+        } else if (placement === 'above_button') {
             // Insert before submit button (after all other form elements like order summary)
             var submitBtn = form.querySelector('button[type="submit"]');
             if (submitBtn) {
@@ -779,7 +848,11 @@
             // Default: at_top - insert before the dynamic fields container
             fieldsContainer.parentNode.insertBefore(quantityOffersEl, fieldsContainer);
         }
-        // Hide product header when offers are shown
+    }
+    
+    // Show product header (image + price) ONLY for in_product_page placement
+    // For at_top / above_button, always hide it since offers replace the header
+    if (placement !== 'in_product_page') {
         hideProductHeaderIfOffersActive(container);
     }
 
@@ -1200,6 +1273,22 @@
           }
       }
       
+      // For in_product_page placement, also check the product page offers container
+      if (!selectedOffer) {
+          var productPageOffers = document.querySelector('.cod-product-page-offers');
+          if (productPageOffers) {
+              try {
+                  var ppOfferData = productPageOffers.getAttribute('data-selected-offer');
+                  if (ppOfferData) {
+                      selectedOffer = JSON.parse(ppOfferData);
+                      quantity = selectedOffer.quantity || 1;
+                  }
+              } catch (e) {
+                  console.warn('[COD Form] Failed to parse product page offer:', e);
+              }
+          }
+      }
+      
       // Calculate subtotal with quantity and discount
       var unitPrice = parseFloat(config.productPrice) || 0;
       var subtotal = unitPrice * quantity;
@@ -1353,6 +1442,21 @@
               }
           }
       }
+      // Also check product page offers (for in_product_page placement)
+      var productPageOffers = document.querySelector('.cod-product-page-offers');
+      if (productPageOffers) {
+          try {
+              var ppOfferData = productPageOffers.getAttribute('data-selected-offer');
+              if (ppOfferData) {
+                  var ppOffer = JSON.parse(ppOfferData);
+                  if (ppOffer && ppOffer.quantity) {
+                      return ppOffer.quantity;
+                  }
+              }
+          } catch (e) {
+              console.warn('[COD Form] Failed to parse product page offer for quantity:', e);
+          }
+      }
       // Fallback to quantity input
       var qtyInput = form.querySelector('[name="quantity"]');
       return parseInt(qtyInput ? qtyInput.value : 1) || 1;
@@ -1405,6 +1509,39 @@
           });
           
           if (!productMatch) return false;
+      }
+      
+      // Check collection restrictions
+      if (rate.applies_to_collections && rate.collection_ids && rate.collection_ids.length > 0) {
+          var productCollections = config.productCollectionIds || [];
+          
+          if (productCollections.length === 0) {
+              console.log('[COD Form] Rate "' + rate.name + '" requires collections but product has no collection data');
+              return false;
+          }
+          
+          // Match collection IDs - handle both numeric and GID formats
+          var collectionMatch = rate.collection_ids.some(function(rateCollId) {
+              var rateCollIdStr = String(rateCollId);
+              return productCollections.some(function(prodCollId) {
+                  var prodCollIdStr = String(prodCollId).trim();
+                  // Direct match
+                  if (rateCollIdStr === prodCollIdStr) return true;
+                  // GID vs numeric match
+                  if (rateCollIdStr.includes(prodCollIdStr) || prodCollIdStr.includes(rateCollIdStr)) return true;
+                  // Build full GID for comparison
+                  var rateFullGid = rateCollIdStr.includes('gid://') ? rateCollIdStr : 'gid://shopify/Collection/' + rateCollIdStr;
+                  var prodFullGid = prodCollIdStr.includes('gid://') ? prodCollIdStr : 'gid://shopify/Collection/' + prodCollIdStr;
+                  return rateFullGid === prodFullGid;
+              });
+          });
+          
+          if (!collectionMatch) {
+              console.log('[COD Form] Rate "' + rate.name + '" collection restriction not met. Rate collections:', rate.collection_ids, 'Product collections:', productCollections);
+              return false;
+          }
+          
+          console.log('[COD Form] Rate "' + rate.name + '" matched by collection!');
       }
       
       // Country/state restrictions would be checked here if we had location data
@@ -1750,6 +1887,23 @@
           }
       }
       
+      // Also check product page offers (for in_product_page placement)
+      if (quantity === 1 && discountPercent === 0) {
+          var productPageOffers = document.querySelector('.cod-product-page-offers');
+          if (productPageOffers) {
+              try {
+                  var ppOfferData = productPageOffers.getAttribute('data-selected-offer');
+                  if (ppOfferData) {
+                      var ppOffer = JSON.parse(ppOfferData);
+                      quantity = ppOffer.quantity || 1;
+                      discountPercent = ppOffer.discountPercent || 0;
+                  }
+              } catch (e) {
+                  // Fallback
+              }
+          }
+      }
+      
       // Fallback: also check qty input if no offer found
       if (quantity === 1 && !quantityOffersEl) {
           var qtyInput = form.querySelector('[name="quantity"]');
@@ -1838,6 +1992,22 @@
                   }
               } catch (e) {
                   console.warn('[COD Form] Failed to parse selected offer:', e);
+              }
+          }
+          // Also check product page offers (for in_product_page placement)
+          if (quantity === 1 && discountPercent === 0) {
+              var productPageOffers = document.querySelector('.cod-product-page-offers');
+              if (productPageOffers) {
+                  try {
+                      var ppOfferData = productPageOffers.getAttribute('data-selected-offer');
+                      if (ppOfferData) {
+                          var ppOffer = JSON.parse(ppOfferData);
+                          quantity = ppOffer.quantity || 1;
+                          discountPercent = ppOffer.discountPercent || 0;
+                      }
+                  } catch (e) {
+                      console.warn('[COD Form] Failed to parse product page offer:', e);
+                  }
               }
           }
       }
@@ -2017,7 +2187,7 @@
     }
   }
 
-  function openModal(productId) {
+  function openModal(productId, config) {
     var modal = document.getElementById('cod-form-' + productId);
     var overlay = document.getElementById('cod-modal-overlay-' + productId);
     var form = document.getElementById('cod-order-form-' + productId);
@@ -2031,6 +2201,63 @@
     
     // Clear form on open so fields are empty on every modal open / page refresh
     if (form) form.reset();
+    
+    // Sync pre-selected offer from product page to the modal
+    if (config && form) {
+        setTimeout(function() {
+            var productPageOffers = document.querySelector('.cod-product-page-offers[data-product-id="' + productId + '"]');
+            var selectedOfferData = productPageOffers ? productPageOffers.getAttribute('data-selected-offer') : null;
+            
+            if (selectedOfferData) {
+                try {
+                    var offer = JSON.parse(selectedOfferData);
+                    console.log('[COD Form] Syncing product page offer to modal:', offer);
+                    
+                    // Update quantity input
+                    var qtyInput = form.querySelector('[name="quantity"]');
+                    if (qtyInput) {
+                        qtyInput.value = offer.quantity;
+                    }
+                    
+                    // Update the price in the product header
+                    updateOfferPrice(form, config, offer);
+                    
+                    // Also set data-selected-offer on modal offers container (for getEffectiveQuantity)
+                    var modalOffers = modal.querySelector('.cod-quantity-offers');
+                    if (modalOffers) {
+                        modalOffers.setAttribute('data-selected-offer', selectedOfferData);
+                        // Update visual selection in modal
+                        modalOffers.querySelectorAll('.cod-offer-card').forEach(function(mc) {
+                            mc.classList.remove('selected');
+                        });
+                        var matchCard = modalOffers.querySelector('[data-quantity="' + offer.quantity + '"]');
+                        if (matchCard) matchCard.classList.add('selected');
+                    }
+                    
+                    // Update order summary with the selected offer
+                    updateOrderSummaryWithOffer(form, config, offer);
+                    
+                    // Re-render shipping rates with new quantity so conditions are re-evaluated
+                    var shippingSection = form.querySelector('.cod-shipping-section');
+                    if (shippingSection) {
+                        shippingSection.remove();
+                    }
+                    var hasNewShippingRates = config.shippingRatesEnabled && config.shippingRates && config.shippingRates.length > 0;
+                    var hasOldShippingOptions = config.shippingOptions && config.shippingOptions.enabled;
+                    if (config.blocks && config.blocks.shipping_options && (hasNewShippingRates || hasOldShippingOptions)) {
+                        renderShippingOptions(form, config);
+                    }
+                    
+                    // Update order summary again after shipping re-render
+                    setTimeout(function() {
+                        updateOrderSummaryWithOffer(form, config, offer);
+                    }, 50);
+                } catch (e) {
+                    console.warn('[COD Form] Failed to sync product page offer to modal:', e);
+                }
+            }
+        }, 100); // Small delay to let form.reset() and DOM settle
+    }
   }
 
   function closeModal(productId) {

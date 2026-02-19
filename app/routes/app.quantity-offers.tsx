@@ -90,11 +90,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                             }
                         }
                     `).join('\n');
-                    
+
                     const query = `query GetProducts { ${productQueries} }`;
                     const response = await admin.graphql(query);
                     const result = await response.json();
-                    
+
                     // Transform GraphQL result to product objects
                     const products = Object.values(result.data || {})
                         .filter((p: any) => p !== null)
@@ -110,7 +110,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                                 image: e.node.image
                             })) || []
                         }));
-                    
+
                     return { ...group, selectedProducts: products };
                 } catch (e) {
                     console.error('[Bundle Offers] Failed to fetch products:', e);
@@ -899,6 +899,11 @@ export default function QuantityOffersPage() {
                                                         onChange={() => updateActiveGroup({ placement: 'above_button' })} />
                                                     <span>Above Buy Button</span>
                                                 </label>
+                                                <label className="radio-opt">
+                                                    <input type="radio" name="placement" checked={activeGroup.placement === 'in_product_page'}
+                                                        onChange={() => updateActiveGroup({ placement: 'in_product_page' })} />
+                                                    <span>In product page</span>
+                                                </label>
                                             </div>
                                         </div>
 
@@ -1021,48 +1026,18 @@ export default function QuantityOffersPage() {
                         </div>
                         <div className="preview-panel">
                             <div className="preview-header">
-                                <h3>Bundle Offers Preview</h3>
+                                <h3>{activeGroup?.placement === 'in_product_page' ? 'Product Page Preview' : 'Bundle Offers Preview'}</h3>
                             </div>
                             <div className="preview-content">
                                 <div className="preview-phone">
                                     <div className="preview-phone-screen">
-                                        <div className="preview-header-row">
-                                            <span>Please fill in the form to order</span>
-                                            <span className="preview-close">×</span>
-                                        </div>
-
-                                        {/* Form Modal Container - Matching Form Builder exactly */}
-                                        <div style={{
-                                            background: formSettings?.styles?.backgroundColor || '#ffffff',
-                                            borderRadius: (formSettings?.styles?.borderRadius || 12) + 'px',
-                                            padding: '16px',
-                                            boxShadow: formSettings?.styles?.shadow ? '0 4px 6px rgba(0,0,0,0.05)' : 'none',
-                                        }}>
-                                            {/* Form Title */}
-                                            <div style={{
-                                                fontWeight: 600,
-                                                fontSize: (formSettings?.styles?.textSize || 16) + 'px',
-                                                marginBottom: '4px',
-                                                color: formSettings?.styles?.textColor || '#111827',
-                                                textAlign: (formSettings?.styles?.labelAlignment || 'left') as any,
-                                            }}>
-                                                {formSettings?.form_title || 'Cash on Delivery Order'}
-                                            </div>
-                                            
-                                            {/* Form Subtitle */}
-                                            {formSettings?.form_subtitle && (
-                                                <div style={{
-                                                    fontSize: (formSettings?.styles?.textSize || 14) - 2 + 'px',
-                                                    color: '#6b7280',
-                                                    marginBottom: '16px',
-                                                    textAlign: (formSettings?.styles?.labelAlignment || 'left') as any,
-                                                }}>
-                                                    {formSettings.form_subtitle}
+                                        {/* In Product Page placement: show offers on the product page itself */}
+                                        {activeGroup && activeGroup.placement === 'in_product_page' ? (
+                                            <div style={{ padding: '16px' }}>
+                                                <div style={{ textAlign: 'center', marginBottom: '12px' }}>
+                                                    <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '8px' }}>Live preview:</div>
                                                 </div>
-                                            )}
-
-                                            {/* Bundle Offers - At Top placement (immediately after subtitle) */}
-                                            {activeGroup && activeGroup.placement === 'at_top' && (
+                                                {/* Bundle Offers on product page */}
                                                 <div className={`preview-offers template-${activeGroup.design.template || 'classic'}`} style={{ marginBottom: '16px', display: 'flex', gap: '8px', width: '100%' }}>
                                                     {activeGroup.offers.map((offer, i) => {
                                                         const total = samplePrice * offer.quantity * (1 - (offer.discountPercent || 0) / 100);
@@ -1070,15 +1045,12 @@ export default function QuantityOffersPage() {
                                                         const isSelected = offer.preselect || i === 0;
                                                         const template = activeGroup.design.template || 'classic';
                                                         const showImage = template !== 'modern' && template !== 'minimal';
-                                                        const isModern = template === 'modern';
                                                         const isVertical = template === 'vertical';
                                                         const isMinimal = template === 'minimal';
                                                         const isCards = template === 'cards';
                                                         const isMostPopular = offer.label?.toLowerCase().includes('most popular') || (i === activeGroup.offers.length - 1 && activeGroup.offers.length > 1);
                                                         const showDiscountTag = (offer.discountPercent || 0) > 0 && !isMostPopular;
-                                                        
-                                                        // Get border color based on selection - use actual saved colors
-                                                        const borderColor = isSelected 
+                                                        const borderColor = isSelected
                                                             ? (activeGroup.design.selectedBorderColor || '#dc2626')
                                                             : (activeGroup.design.unselectedBorderColor || '#e5e7eb');
 
@@ -1104,429 +1076,572 @@ export default function QuantityOffersPage() {
                                                                     overflow: 'visible',
                                                                     boxShadow: isCards ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
                                                                 }}>
-                                                                    {/* Most Popular Ribbon Tag */}
-                                                                    {isMostPopular && (
-                                                                        <div style={{
-                                                                            position: 'absolute',
-                                                                            top: '-10px',
-                                                                            right: '-6px',
-                                                                            background: offer.tagBgColor || activeGroup.design.selectedTagBgColor || '#1f2937',
-                                                                            color: activeGroup.design.selectedTagTextColor || '#ffffff',
-                                                                            fontSize: '10px',
-                                                                            fontWeight: 700,
-                                                                            padding: '4px 10px',
-                                                                            borderRadius: '4px',
-                                                                            zIndex: 10,
-                                                                            boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
-                                                                            whiteSpace: 'nowrap',
-                                                                        }}>{offer.label || 'Most Popular'}</div>
+                                                                {isMostPopular && (
+                                                                    <div style={{
+                                                                        position: 'absolute', top: '-10px', right: '-6px',
+                                                                        background: offer.tagBgColor || activeGroup.design.selectedTagBgColor || '#1f2937',
+                                                                        color: activeGroup.design.selectedTagTextColor || '#ffffff',
+                                                                        fontSize: '10px', fontWeight: 700, padding: '4px 10px', borderRadius: '4px',
+                                                                        zIndex: 10, boxShadow: '0 2px 4px rgba(0,0,0,0.15)', whiteSpace: 'nowrap',
+                                                                    }}>{offer.label || 'Most Popular'}</div>
+                                                                )}
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: isVertical || isCards ? '8px' : (isMinimal ? '6px' : '10px'), flex: isVertical || isCards ? '0 0 auto' : 1, minWidth: 0, flexDirection: isVertical || isCards ? 'column' : 'row', width: '100%' }}>
+                                                                    {showImage && (
+                                                                        productImage ? (
+                                                                            <img src={productImage} alt="Product" style={{ flexShrink: 0, width: isCards ? '60px' : (isVertical ? '50px' : '40px'), height: isCards ? '60px' : (isVertical ? '50px' : '40px'), objectFit: 'cover', borderRadius: '8px' }} />
+                                                                        ) : (
+                                                                            <div className="offer-thumb" style={{ flexShrink: 0, width: isCards ? '60px' : (isVertical ? '50px' : '40px'), height: isCards ? '60px' : (isVertical ? '50px' : '40px'), background: '#fef3c7', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>🎁</div>
+                                                                        )
                                                                     )}
-                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: isVertical || isCards ? '8px' : (isMinimal ? '6px' : '10px'), flex: isVertical || isCards ? '0 0 auto' : 1, minWidth: 0, flexDirection: isVertical || isCards ? 'column' : 'row', width: '100%' }}>
-                                                                        {showImage && (
-                                                                            productImage ? (
-                                                                                <img 
-                                                                                    src={productImage} 
-                                                                                    alt="Product" 
-                                                                                    style={{ flexShrink: 0, width: isCards ? '60px' : (isVertical ? '50px' : '40px'), height: isCards ? '60px' : (isVertical ? '50px' : '40px'), objectFit: 'cover', borderRadius: '8px' }} 
-                                                                                />
-                                                                            ) : (
-                                                                                <div className="offer-thumb" style={{ flexShrink: 0, width: isCards ? '60px' : (isVertical ? '50px' : '40px'), height: isCards ? '60px' : (isVertical ? '50px' : '40px'), background: '#fef3c7', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>🎁</div>
-                                                                            )
+                                                                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, alignItems: isVertical || isCards ? 'center' : 'flex-start', width: '100%' }}>
+                                                                        <div style={{ fontSize: isCards ? '12px' : '14px', fontWeight: 600, color: '#1f2937', whiteSpace: isCards ? 'normal' : 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', lineHeight: isCards ? '1.3' : '1.2', textAlign: 'center' }}>
+                                                                            {offer.title || `${offer.quantity} Unit${offer.quantity !== 1 ? 's' : ''}`}
+                                                                        </div>
+                                                                        {showDiscountTag && (
+                                                                            <span style={{
+                                                                                background: offer.tagBgColor || activeGroup.design.selectedTagBgColor,
+                                                                                color: activeGroup.design.selectedTagTextColor,
+                                                                                fontSize: '9px', fontWeight: 600, padding: '2px 6px',
+                                                                                borderRadius: '4px', display: 'inline-block', width: 'fit-content',
+                                                                            }}>Save {offer.discountPercent}%</span>
                                                                         )}
-                                                                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, alignItems: isVertical || isCards ? 'center' : 'flex-start', width: '100%' }}>
-                                                                            <div style={{ fontSize: isCards ? '12px' : '14px', fontWeight: 600, color: '#1f2937', whiteSpace: isCards ? 'normal' : 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', lineHeight: isCards ? '1.3' : '1.2', textAlign: 'center' }}>
-                                                                                {offer.title || `${offer.quantity} Unit${offer.quantity !== 1 ? 's' : ''}`}
-                                                                            </div>
-                                                                            {/* Inline discount tag for non-most-popular */}
-                                                                            {showDiscountTag && (
-                                                                                <span style={{
-                                                                                    background: offer.tagBgColor || activeGroup.design.selectedTagBgColor,
-                                                                                    color: activeGroup.design.selectedTagTextColor,
-                                                                                    fontSize: '9px',
-                                                                                    fontWeight: 600,
-                                                                                    padding: '2px 6px',
-                                                                                    borderRadius: '4px',
-                                                                                    display: 'inline-block',
-                                                                                    width: 'fit-content',
-                                                                                }}>Save {offer.discountPercent}%</span>
+                                                                    </div>
+                                                                </div>
+                                                                <div style={{ textAlign: isVertical || isCards ? 'center' : 'right', display: 'flex', flexDirection: 'column', alignItems: isVertical || isCards ? 'center' : 'flex-end', gap: '2px', flexShrink: 0, width: isVertical || isCards ? '100%' : 'auto' }}>
+                                                                    {offer.discountPercent ? (
+                                                                        <span style={{ fontSize: isCards ? '10px' : '11px', color: '#9ca3af', textDecoration: 'line-through' }}>₹{original.toFixed(0)}</span>
+                                                                    ) : null}
+                                                                    <span style={{ fontSize: isCards ? '13px' : '16px', fontWeight: 700, color: '#1f2937', whiteSpace: 'nowrap' }}>₹{total.toFixed(2)}</span>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                                {/* COD Button below offers */}
+                                                {(() => {
+                                                    const btn = buttonStyles || {};
+                                                    const buttonColor = primaryColor;
+                                                    const borderW = btn.borderWidth ?? 0;
+                                                    const borderCol = btn.borderColor || buttonColor;
+                                                    const btnBorderRadius = btn.borderRadius || 12;
+                                                    return (
+                                                        <button style={{
+                                                            width: '100%', padding: '14px 20px', borderRadius: btnBorderRadius + 'px',
+                                                            fontWeight: 600, fontSize: '15px', border: borderW ? `${borderW}px solid ${borderCol}` : 'none',
+                                                            cursor: 'pointer', color: btn.textColor || '#ffffff', background: buttonColor,
+                                                            boxShadow: btn.shadow ? '0 4px 6px rgba(0,0,0,0.1)' : 'none',
+                                                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                                                        }}>
+                                                            🔒 {formSettings?.button_text || 'Order Now (COD)'}
+                                                        </button>
+                                                    );
+                                                })()}
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <div className="preview-header-row">
+                                                    <span>Please fill in the form to order</span>
+                                                    <span className="preview-close">×</span>
+                                                </div>
+
+                                                {/* Form Modal Container - Matching Form Builder exactly */}
+                                                <div style={{
+                                                    background: formSettings?.styles?.backgroundColor || '#ffffff',
+                                                    borderRadius: (formSettings?.styles?.borderRadius || 12) + 'px',
+                                                    padding: '16px',
+                                                    boxShadow: formSettings?.styles?.shadow ? '0 4px 6px rgba(0,0,0,0.05)' : 'none',
+                                                }}>
+                                                    {/* Form Title */}
+                                                    <div style={{
+                                                        fontWeight: 600,
+                                                        fontSize: (formSettings?.styles?.textSize || 16) + 'px',
+                                                        marginBottom: '4px',
+                                                        color: formSettings?.styles?.textColor || '#111827',
+                                                        textAlign: (formSettings?.styles?.labelAlignment || 'left') as any,
+                                                    }}>
+                                                        {formSettings?.form_title || 'Cash on Delivery Order'}
+                                                    </div>
+
+                                                    {/* Form Subtitle */}
+                                                    {formSettings?.form_subtitle && (
+                                                        <div style={{
+                                                            fontSize: (formSettings?.styles?.textSize || 14) - 2 + 'px',
+                                                            color: '#6b7280',
+                                                            marginBottom: '16px',
+                                                            textAlign: (formSettings?.styles?.labelAlignment || 'left') as any,
+                                                        }}>
+                                                            {formSettings.form_subtitle}
+                                                        </div>
+                                                    )}
+
+                                                    {/* Bundle Offers - At Top placement (immediately after subtitle) */}
+                                                    {activeGroup && activeGroup.placement === 'at_top' && (
+                                                        <div className={`preview-offers template-${activeGroup.design.template || 'classic'}`} style={{ marginBottom: '16px', display: 'flex', gap: '8px', width: '100%' }}>
+                                                            {activeGroup.offers.map((offer, i) => {
+                                                                const total = samplePrice * offer.quantity * (1 - (offer.discountPercent || 0) / 100);
+                                                                const original = samplePrice * offer.quantity;
+                                                                const isSelected = offer.preselect || i === 0;
+                                                                const template = activeGroup.design.template || 'classic';
+                                                                const showImage = template !== 'modern' && template !== 'minimal';
+                                                                const isModern = template === 'modern';
+                                                                const isVertical = template === 'vertical';
+                                                                const isMinimal = template === 'minimal';
+                                                                const isCards = template === 'cards';
+                                                                const isMostPopular = offer.label?.toLowerCase().includes('most popular') || (i === activeGroup.offers.length - 1 && activeGroup.offers.length > 1);
+                                                                const showDiscountTag = (offer.discountPercent || 0) > 0 && !isMostPopular;
+
+                                                                // Get border color based on selection - use actual saved colors
+                                                                const borderColor = isSelected
+                                                                    ? (activeGroup.design.selectedBorderColor || '#dc2626')
+                                                                    : (activeGroup.design.unselectedBorderColor || '#e5e7eb');
+
+                                                                return (
+                                                                    <div key={offer.id}
+                                                                        className={`preview-offer ${isSelected ? 'selected' : ''}`}
+                                                                        style={{
+                                                                            background: isSelected ? (activeGroup.design.selectedBgColor || '#fff0ea') : (activeGroup.design.unselectedBgColor || '#ffffff'),
+                                                                            borderStyle: 'solid',
+                                                                            borderWidth: isMinimal ? '1px' : '2px',
+                                                                            borderColor: borderColor,
+                                                                            display: 'flex',
+                                                                            flexDirection: isVertical || isCards ? 'column' : 'row',
+                                                                            alignItems: isVertical || isCards ? 'center' : 'center',
+                                                                            justifyContent: isVertical || isCards ? 'center' : 'space-between',
+                                                                            gap: isVertical || isCards ? '8px' : (isMinimal ? '6px' : '10px'),
+                                                                            padding: isMinimal ? '8px 12px' : (isCards ? '16px 12px' : '12px'),
+                                                                            borderRadius: isCards ? '12px' : '10px',
+                                                                            cursor: 'pointer',
+                                                                            boxSizing: 'border-box',
+                                                                            textAlign: isVertical || isCards ? 'center' : 'left',
+                                                                            position: 'relative',
+                                                                            overflow: 'visible',
+                                                                            boxShadow: isCards ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+                                                                        }}>
+                                                                        {/* Most Popular Ribbon Tag */}
+                                                                        {isMostPopular && (
+                                                                            <div style={{
+                                                                                position: 'absolute',
+                                                                                top: '-10px',
+                                                                                right: '-6px',
+                                                                                background: offer.tagBgColor || activeGroup.design.selectedTagBgColor || '#1f2937',
+                                                                                color: activeGroup.design.selectedTagTextColor || '#ffffff',
+                                                                                fontSize: '10px',
+                                                                                fontWeight: 700,
+                                                                                padding: '4px 10px',
+                                                                                borderRadius: '4px',
+                                                                                zIndex: 10,
+                                                                                boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+                                                                                whiteSpace: 'nowrap',
+                                                                            }}>{offer.label || 'Most Popular'}</div>
+                                                                        )}
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: isVertical || isCards ? '8px' : (isMinimal ? '6px' : '10px'), flex: isVertical || isCards ? '0 0 auto' : 1, minWidth: 0, flexDirection: isVertical || isCards ? 'column' : 'row', width: '100%' }}>
+                                                                            {showImage && (
+                                                                                productImage ? (
+                                                                                    <img
+                                                                                        src={productImage}
+                                                                                        alt="Product"
+                                                                                        style={{ flexShrink: 0, width: isCards ? '60px' : (isVertical ? '50px' : '40px'), height: isCards ? '60px' : (isVertical ? '50px' : '40px'), objectFit: 'cover', borderRadius: '8px' }}
+                                                                                    />
+                                                                                ) : (
+                                                                                    <div className="offer-thumb" style={{ flexShrink: 0, width: isCards ? '60px' : (isVertical ? '50px' : '40px'), height: isCards ? '60px' : (isVertical ? '50px' : '40px'), background: '#fef3c7', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>🎁</div>
+                                                                                )
                                                                             )}
+                                                                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, alignItems: isVertical || isCards ? 'center' : 'flex-start', width: '100%' }}>
+                                                                                <div style={{ fontSize: isCards ? '12px' : '14px', fontWeight: 600, color: '#1f2937', whiteSpace: isCards ? 'normal' : 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', lineHeight: isCards ? '1.3' : '1.2', textAlign: 'center' }}>
+                                                                                    {offer.title || `${offer.quantity} Unit${offer.quantity !== 1 ? 's' : ''}`}
+                                                                                </div>
+                                                                                {/* Inline discount tag for non-most-popular */}
+                                                                                {showDiscountTag && (
+                                                                                    <span style={{
+                                                                                        background: offer.tagBgColor || activeGroup.design.selectedTagBgColor,
+                                                                                        color: activeGroup.design.selectedTagTextColor,
+                                                                                        fontSize: '9px',
+                                                                                        fontWeight: 600,
+                                                                                        padding: '2px 6px',
+                                                                                        borderRadius: '4px',
+                                                                                        display: 'inline-block',
+                                                                                        width: 'fit-content',
+                                                                                    }}>Save {offer.discountPercent}%</span>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                        <div style={{ textAlign: isVertical || isCards ? 'center' : 'right', display: 'flex', flexDirection: 'column', alignItems: isVertical || isCards ? 'center' : 'flex-end', gap: '2px', flexShrink: 0, width: isVertical || isCards ? '100%' : 'auto' }}>
+                                                                            {offer.discountPercent ? (
+                                                                                <span style={{ fontSize: isCards ? '10px' : '11px', color: '#9ca3af', textDecoration: 'line-through' }}>₹{original.toFixed(0)}</span>
+                                                                            ) : null}
+                                                                            <span style={{ fontSize: isCards ? '13px' : '16px', fontWeight: 700, color: '#1f2937', whiteSpace: 'nowrap' }}>₹{total.toFixed(2)}</span>
                                                                         </div>
                                                                     </div>
-                                                                    <div style={{ textAlign: isVertical || isCards ? 'center' : 'right', display: 'flex', flexDirection: 'column', alignItems: isVertical || isCards ? 'center' : 'flex-end', gap: '2px', flexShrink: 0, width: isVertical || isCards ? '100%' : 'auto' }}>
-                                                                        {offer.discountPercent ? (
-                                                                            <span style={{ fontSize: isCards ? '10px' : '11px', color: '#9ca3af', textDecoration: 'line-through' }}>₹{original.toFixed(0)}</span>
-                                                                        ) : null}
-                                                                        <span style={{ fontSize: isCards ? '13px' : '16px', fontWeight: 700, color: '#1f2937', whiteSpace: 'nowrap' }}>₹{total.toFixed(2)}</span>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
+
+                                                    {/* Dynamic Form Fields */}
+                                                    {(formSettings?.fields || [])
+                                                        .filter((f: any) => f.visible)
+                                                        .sort((a: any, b: any) => a.order - b.order)
+                                                        .map((field: any) => {
+                                                            const styles = formSettings?.styles || {};
+                                                            const labelColor = styles.labelColor || styles.textColor || '#374151';
+                                                            const textColor = styles.textColor || '#111827';
+                                                            const textSize = styles.textSize ?? 14;
+                                                            const fontStyle = styles.fontStyle || 'normal';
+                                                            const borderRadius = styles.borderRadius ?? 8;
+                                                            const borderColor = styles.borderColor || '#e5e7eb';
+                                                            const borderWidth = styles.borderWidth ?? 1;
+                                                            const fieldBg = styles.fieldBackgroundColor || '#ffffff';
+                                                            const iconColor = styles.iconColor || '#6b7280';
+
+                                                            const fieldIcons: Record<string, React.ReactNode> = {
+                                                                phone: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" /></svg>,
+                                                                name: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>,
+                                                                email: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg>,
+                                                                address: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>,
+                                                                notes: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14,2 14,8 20,8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10,9 9,9 8,9" /></svg>,
+                                                                quantity: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><line x1="9" y1="9" x2="15" y2="15" /><line x1="15" y1="9" x2="9" y2="15" /></svg>,
+                                                                state: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>,
+                                                                city: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>,
+                                                                zip: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>,
+                                                            };
+                                                            const icon = fieldIcons[field.id] || fieldIcons.name;
+                                                            const isTextarea = field.type === 'textarea';
+
+                                                            return (
+                                                                <div key={field.id} style={{ marginBottom: '10px' }}>
+                                                                    <label style={{
+                                                                        display: 'block',
+                                                                        fontSize: (styles.labelFontSize ?? textSize) + 'px',
+                                                                        fontWeight: fontStyle === 'bold' ? 700 : 600,
+                                                                        color: labelColor,
+                                                                        marginBottom: '4px',
+                                                                        textAlign: (styles.labelAlignment || 'left') as any,
+                                                                    }}>
+                                                                        {field.label} {field.required && <span style={{ color: '#ef4444' }}>*</span>}
+                                                                    </label>
+                                                                    <div style={{ position: 'relative' }}>
+                                                                        <span style={{
+                                                                            position: 'absolute',
+                                                                            left: '12px',
+                                                                            top: isTextarea ? '12px' : '50%',
+                                                                            transform: isTextarea ? 'none' : 'translateY(-50%)',
+                                                                            pointerEvents: 'none',
+                                                                            display: 'flex',
+                                                                            alignItems: 'center',
+                                                                        }}>{icon}</span>
+                                                                        {isTextarea ? (
+                                                                            <textarea
+                                                                                disabled
+                                                                                placeholder={field.id === 'address' ? (formSettings?.address_placeholder || 'Enter your delivery address') :
+                                                                                    field.id === 'notes' ? (formSettings?.notes_placeholder || 'Any special instructions?') :
+                                                                                        `Enter ${field.label.toLowerCase()}`}
+                                                                                style={{
+                                                                                    width: '100%',
+                                                                                    padding: '10px 12px 10px 40px',
+                                                                                    border: `${borderWidth}px solid ${borderColor}`,
+                                                                                    borderRadius: `${borderRadius}px`,
+                                                                                    fontSize: `${textSize}px`,
+                                                                                    fontWeight: fontStyle === 'bold' ? 700 : 400,
+                                                                                    fontStyle: fontStyle === 'italic' ? 'italic' : 'normal',
+                                                                                    color: textColor,
+                                                                                    backgroundColor: fieldBg,
+                                                                                    boxShadow: (styles as any).shadow ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
+                                                                                    boxSizing: 'border-box',
+                                                                                    height: '60px',
+                                                                                    resize: 'none',
+                                                                                }}
+                                                                                rows={field.id === 'address' ? 3 : 2}
+                                                                            />
+                                                                        ) : (
+                                                                            <input
+                                                                                type={field.type === 'tel' ? 'tel' : field.type === 'email' ? 'email' : 'text'}
+                                                                                disabled
+                                                                                placeholder={field.id === 'name' ? (formSettings?.name_placeholder || 'Enter your full name') :
+                                                                                    field.id === 'phone' ? (formSettings?.phone_placeholder || 'Enter your phone number') :
+                                                                                        field.id === 'email' ? 'email@example.com' :
+                                                                                            `Enter ${field.label.toLowerCase()}`}
+                                                                                style={{
+                                                                                    width: '100%',
+                                                                                    padding: '10px 12px 10px 40px',
+                                                                                    border: `${borderWidth}px solid ${borderColor}`,
+                                                                                    borderRadius: `${borderRadius}px`,
+                                                                                    fontSize: `${textSize}px`,
+                                                                                    fontWeight: fontStyle === 'bold' ? 700 : 400,
+                                                                                    fontStyle: fontStyle === 'italic' ? 'italic' : 'normal',
+                                                                                    color: textColor,
+                                                                                    backgroundColor: fieldBg,
+                                                                                    boxShadow: (styles as any).shadow ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
+                                                                                    boxSizing: 'border-box',
+                                                                                    height: '42px',
+                                                                                }}
+                                                                            />
+                                                                        )}
                                                                     </div>
                                                                 </div>
                                                             );
                                                         })}
-                                                    </div>
-                                                )}
 
-                                            {/* Dynamic Form Fields */}
-                                            {(formSettings?.fields || [])
-                                                .filter((f: any) => f.visible)
-                                                .sort((a: any, b: any) => a.order - b.order)
-                                                .map((field: any) => {
-                                                    const styles = formSettings?.styles || {};
-                                                    const labelColor = styles.labelColor || styles.textColor || '#374151';
-                                                    const textColor = styles.textColor || '#111827';
-                                                    const textSize = styles.textSize ?? 14;
-                                                    const fontStyle = styles.fontStyle || 'normal';
-                                                    const borderRadius = styles.borderRadius ?? 8;
-                                                    const borderColor = styles.borderColor || '#e5e7eb';
-                                                    const borderWidth = styles.borderWidth ?? 1;
-                                                    const fieldBg = styles.fieldBackgroundColor || '#ffffff';
-                                                    const iconColor = styles.iconColor || '#6b7280';
-                                                    
-                                                    const fieldIcons: Record<string, React.ReactNode> = {
-                                                        phone: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" /></svg>,
-                                                        name: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>,
-                                                        email: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg>,
-                                                        address: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>,
-                                                        notes: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14,2 14,8 20,8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10,9 9,9 8,9" /></svg>,
-                                                        quantity: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><line x1="9" y1="9" x2="15" y2="15" /><line x1="15" y1="9" x2="9" y2="15" /></svg>,
-                                                        state: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>,
-                                                        city: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>,
-                                                        zip: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>,
-                                                    };
-                                                    const icon = fieldIcons[field.id] || fieldIcons.name;
-                                                    const isTextarea = field.type === 'textarea';
-                                                    
-                                                    return (
-                                                        <div key={field.id} style={{ marginBottom: '10px' }}>
-                                                            <label style={{
-                                                                display: 'block',
-                                                                fontSize: (styles.labelFontSize ?? textSize) + 'px',
-                                                                fontWeight: fontStyle === 'bold' ? 700 : 600,
-                                                                color: labelColor,
-                                                                marginBottom: '4px',
-                                                                textAlign: (styles.labelAlignment || 'left') as any,
-                                                            }}>
-                                                                {field.label} {field.required && <span style={{ color: '#ef4444' }}>*</span>}
-                                                            </label>
-                                                            <div style={{ position: 'relative' }}>
-                                                                <span style={{
-                                                                    position: 'absolute',
-                                                                    left: '12px',
-                                                                    top: isTextarea ? '12px' : '50%',
-                                                                    transform: isTextarea ? 'none' : 'translateY(-50%)',
-                                                                    pointerEvents: 'none',
+                                                    {/* Bundle Offers - Above Button placement (after order summary, before submit button) */}
+                                                    {activeGroup && activeGroup.placement === 'above_button' && (
+                                                        <div className={`preview-offers template-${activeGroup.design.template || 'classic'}`} style={{ marginBottom: '16px', display: 'flex', gap: '8px', width: '100%' }}>
+                                                            {activeGroup.offers.map((offer, i) => {
+                                                                const total = samplePrice * offer.quantity * (1 - (offer.discountPercent || 0) / 100);
+                                                                const original = samplePrice * offer.quantity;
+                                                                const isSelected = offer.preselect || i === 0;
+                                                                const template = activeGroup.design.template || 'classic';
+                                                                const showImage = template !== 'modern' && template !== 'minimal';
+                                                                const isModern = template === 'modern';
+                                                                const isVertical = template === 'vertical';
+                                                                const isMinimal = template === 'minimal';
+                                                                const isCards = template === 'cards';
+                                                                const isMostPopular = offer.label?.toLowerCase().includes('most popular') || (i === activeGroup.offers.length - 1 && activeGroup.offers.length > 1);
+                                                                const showDiscountTag = (offer.discountPercent || 0) > 0 && !isMostPopular;
+
+                                                                // Get border color based on selection - use actual saved colors
+                                                                const borderColor = isSelected
+                                                                    ? (activeGroup.design.selectedBorderColor || '#dc2626')
+                                                                    : (activeGroup.design.unselectedBorderColor || '#e5e7eb');
+
+                                                                return (
+                                                                    <div key={offer.id}
+                                                                        className={`preview-offer ${isSelected ? 'selected' : ''}`}
+                                                                        style={{
+                                                                            background: isSelected ? (activeGroup.design.selectedBgColor || '#fff0ea') : (activeGroup.design.unselectedBgColor || '#ffffff'),
+                                                                            borderStyle: 'solid',
+                                                                            borderWidth: isMinimal ? '1px' : '2px',
+                                                                            borderColor: borderColor,
+                                                                            display: 'flex',
+                                                                            flexDirection: isVertical || isCards ? 'column' : 'row',
+                                                                            alignItems: isVertical || isCards ? 'center' : 'center',
+                                                                            justifyContent: isVertical || isCards ? 'center' : 'space-between',
+                                                                            gap: isVertical || isCards ? '8px' : (isMinimal ? '6px' : '10px'),
+                                                                            padding: isMinimal ? '8px 12px' : (isCards ? '16px 12px' : '12px'),
+                                                                            borderRadius: isCards ? '12px' : '10px',
+                                                                            cursor: 'pointer',
+                                                                            boxSizing: 'border-box',
+                                                                            textAlign: isVertical || isCards ? 'center' : 'left',
+                                                                            position: 'relative',
+                                                                            overflow: 'visible',
+                                                                            boxShadow: isCards ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+                                                                        }}>
+                                                                        {/* Most Popular Ribbon Tag */}
+                                                                        {isMostPopular && (
+                                                                            <div style={{
+                                                                                position: 'absolute',
+                                                                                top: '-10px',
+                                                                                right: '-6px',
+                                                                                background: offer.tagBgColor || activeGroup.design.selectedTagBgColor || '#1f2937',
+                                                                                color: activeGroup.design.selectedTagTextColor || '#ffffff',
+                                                                                fontSize: '10px',
+                                                                                fontWeight: 700,
+                                                                                padding: '4px 10px',
+                                                                                borderRadius: '4px',
+                                                                                zIndex: 10,
+                                                                                boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+                                                                                whiteSpace: 'nowrap',
+                                                                            }}>{offer.label || 'Most Popular'}</div>
+                                                                        )}
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: isVertical || isCards ? '8px' : (isMinimal ? '6px' : '10px'), flex: isVertical || isCards ? '0 0 auto' : 1, minWidth: 0, flexDirection: isVertical || isCards ? 'column' : 'row', width: '100%' }}>
+                                                                            {showImage && (
+                                                                                productImage ? (
+                                                                                    <img
+                                                                                        src={productImage}
+                                                                                        alt="Product"
+                                                                                        style={{ flexShrink: 0, width: isCards ? '60px' : (isVertical ? '50px' : '40px'), height: isCards ? '60px' : (isVertical ? '50px' : '40px'), objectFit: 'cover', borderRadius: '8px' }}
+                                                                                    />
+                                                                                ) : (
+                                                                                    <div className="offer-thumb" style={{ flexShrink: 0, width: isCards ? '60px' : (isVertical ? '50px' : '40px'), height: isCards ? '60px' : (isVertical ? '50px' : '40px'), background: '#fef3c7', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>🎁</div>
+                                                                                )
+                                                                            )}
+                                                                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, alignItems: isVertical || isCards ? 'center' : 'flex-start', width: '100%' }}>
+                                                                                <div style={{ fontSize: isCards ? '12px' : '14px', fontWeight: 600, color: '#1f2937', whiteSpace: isCards ? 'normal' : 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', lineHeight: isCards ? '1.3' : '1.2', textAlign: 'center' }}>
+                                                                                    {offer.title || `${offer.quantity} Unit${offer.quantity !== 1 ? 's' : ''}`}
+                                                                                </div>
+                                                                                {/* Inline discount tag for non-most-popular */}
+                                                                                {showDiscountTag && (
+                                                                                    <span style={{
+                                                                                        background: offer.tagBgColor || activeGroup.design.selectedTagBgColor,
+                                                                                        color: activeGroup.design.selectedTagTextColor,
+                                                                                        fontSize: '9px',
+                                                                                        fontWeight: 600,
+                                                                                        padding: '2px 6px',
+                                                                                        borderRadius: '4px',
+                                                                                        display: 'inline-block',
+                                                                                        width: 'fit-content',
+                                                                                    }}>Save {offer.discountPercent}%</span>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                        <div style={{ textAlign: isVertical || isCards ? 'center' : 'right', display: 'flex', flexDirection: 'column', alignItems: isVertical || isCards ? 'center' : 'flex-end', gap: '2px', flexShrink: 0, width: isVertical || isCards ? '100%' : 'auto' }}>
+                                                                            {offer.discountPercent ? (
+                                                                                <span style={{ fontSize: isCards ? '10px' : '11px', color: '#9ca3af', textDecoration: 'line-through' }}>₹{original.toFixed(0)}</span>
+                                                                            ) : null}
+                                                                            <span style={{ fontSize: isCards ? '13px' : '16px', fontWeight: 700, color: '#1f2937', whiteSpace: 'nowrap' }}>₹{total.toFixed(2)}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
+
+                                                    {/* Marketing Checkbox */}
+                                                    {formSettings?.blocks?.order_summary && (
+                                                        <div style={{
+                                                            background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                                                            borderRadius: '10px',
+                                                            padding: '12px',
+                                                            marginTop: '16px',
+                                                            marginBottom: '16px',
+                                                            border: '1px solid #e2e8f0',
+                                                        }}>
+                                                            <div style={{ fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                🧾 Order Summary
+                                                            </div>
+                                                            {(() => {
+                                                                // Get the selected offer (same logic as offer cards)
+                                                                if (!activeGroup?.offers?.length) return null;
+                                                                const selectedOffer = activeGroup.offers.find(o => o.preselect) || activeGroup.offers[0];
+                                                                const quantity = selectedOffer?.quantity || 1;
+                                                                const unitPrice = samplePrice; // This would be the actual product price
+                                                                const subtotal = unitPrice * quantity;
+                                                                const discountPercent = selectedOffer?.discountPercent || 0;
+                                                                const discount = subtotal * (discountPercent / 100);
+                                                                const shippingEnabled = formSettings?.shipping_options?.enabled;
+                                                                const shippingOption = formSettings?.shipping_options?.options?.find((o: any) => o.id === formSettings?.shipping_options?.defaultOption);
+                                                                const shippingCost = shippingEnabled ? (shippingOption?.price || 0) : 0;
+                                                                const total = subtotal - discount + shippingCost;
+
+                                                                return (
+                                                                    <>
+                                                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280', marginBottom: '6px' }}>
+                                                                            <span>Subtotal ({quantity} {quantity === 1 ? 'item' : 'items'})</span>
+                                                                            <span>₹{subtotal.toLocaleString()}</span>
+                                                                        </div>
+                                                                        {discount > 0 && (
+                                                                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#10b981', marginBottom: '6px' }}>
+                                                                                <span>Bundle Discount ({discountPercent}%)</span>
+                                                                                <span>-₹{discount.toFixed(0)}</span>
+                                                                            </div>
+                                                                        )}
+                                                                        {shippingEnabled && (
+                                                                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280', marginBottom: '8px' }}>
+                                                                                <span>Shipping</span>
+                                                                                <span>{shippingCost === 0 ? 'FREE' : `₹${shippingCost}`}</span>
+                                                                            </div>
+                                                                        )}
+                                                                        <div style={{
+                                                                            display: 'flex',
+                                                                            justifyContent: 'space-between',
+                                                                            fontSize: '13px',
+                                                                            fontWeight: 700,
+                                                                            color: '#111827',
+                                                                            paddingTop: '8px',
+                                                                            borderTop: '1px dashed #d1d5db',
+                                                                        }}>
+                                                                            <span>Total</span>
+                                                                            <span style={{ color: primaryColor }}>₹{total.toLocaleString()}</span>
+                                                                        </div>
+                                                                    </>
+                                                                );
+                                                            })()}
+                                                        </div>
+                                                    )}
+
+                                                    {/* Shipping Options */}
+                                                    {formSettings?.blocks?.shipping_options && formSettings?.shipping_options?.enabled && (
+                                                        <div style={{
+                                                            background: '#f8fafc',
+                                                            borderRadius: '8px',
+                                                            padding: '10px',
+                                                            marginBottom: '12px',
+                                                            border: '1px solid #e2e8f0',
+                                                        }}>
+                                                            <div style={{ fontSize: '11px', fontWeight: 600, color: '#374151', marginBottom: '8px' }}>
+                                                                🚚 Shipping
+                                                            </div>
+                                                            {formSettings?.shipping_options?.options?.slice(0, 2).map((opt: any) => (
+                                                                <div key={opt.id} style={{
                                                                     display: 'flex',
                                                                     alignItems: 'center',
-                                                                }}>{icon}</span>
-                                                                {isTextarea ? (
-                                                                    <textarea
-                                                                        disabled
-                                                                        placeholder={field.id === 'address' ? (formSettings?.address_placeholder || 'Enter your delivery address') :
-                                                                            field.id === 'notes' ? (formSettings?.notes_placeholder || 'Any special instructions?') :
-                                                                            `Enter ${field.label.toLowerCase()}`}
-                                                                        style={{
-                                                                            width: '100%',
-                                                                            padding: '10px 12px 10px 40px',
-                                                                            border: `${borderWidth}px solid ${borderColor}`,
-                                                                            borderRadius: `${borderRadius}px`,
-                                                                            fontSize: `${textSize}px`,
-                                                                            fontWeight: fontStyle === 'bold' ? 700 : 400,
-                                                                            fontStyle: fontStyle === 'italic' ? 'italic' : 'normal',
-                                                                            color: textColor,
-                                                                            backgroundColor: fieldBg,
-                                                                            boxShadow: (styles as any).shadow ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
-                                                                            boxSizing: 'border-box',
-                                                                            height: '60px',
-                                                                            resize: 'none',
-                                                                        }}
-                                                                        rows={field.id === 'address' ? 3 : 2}
-                                                                    />
-                                                                ) : (
-                                                                    <input
-                                                                        type={field.type === 'tel' ? 'tel' : field.type === 'email' ? 'email' : 'text'}
-                                                                        disabled
-                                                                        placeholder={field.id === 'name' ? (formSettings?.name_placeholder || 'Enter your full name') :
-                                                                            field.id === 'phone' ? (formSettings?.phone_placeholder || 'Enter your phone number') :
-                                                                            field.id === 'email' ? 'email@example.com' :
-                                                                            `Enter ${field.label.toLowerCase()}`}
-                                                                        style={{
-                                                                            width: '100%',
-                                                                            padding: '10px 12px 10px 40px',
-                                                                            border: `${borderWidth}px solid ${borderColor}`,
-                                                                            borderRadius: `${borderRadius}px`,
-                                                                            fontSize: `${textSize}px`,
-                                                                            fontWeight: fontStyle === 'bold' ? 700 : 400,
-                                                                            fontStyle: fontStyle === 'italic' ? 'italic' : 'normal',
-                                                                            color: textColor,
-                                                                            backgroundColor: fieldBg,
-                                                                            boxShadow: (styles as any).shadow ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
-                                                                            boxSizing: 'border-box',
-                                                                            height: '42px',
-                                                                        }}
-                                                                    />
-                                                                )}
-                                                            </div>
+                                                                    gap: '6px',
+                                                                    fontSize: '10px',
+                                                                    color: '#6b7280',
+                                                                    marginBottom: '4px',
+                                                                }}>
+                                                                    <input type="radio" name="shipping-preview" disabled checked={opt.id === formSettings?.shipping_options?.defaultOption} style={{ width: '12px', height: '12px' }} />
+                                                                    <span>{opt.label}</span>
+                                                                    <span style={{ marginLeft: 'auto', fontWeight: 600 }}>{opt.price === 0 ? 'Free' : `₹${opt.price}`}</span>
+                                                                </div>
+                                                            ))}
                                                         </div>
-                                                    );
-                                                })}
+                                                    )}
 
-                                            {/* Bundle Offers - Above Button placement (after order summary, before submit button) */}
-                                            {activeGroup && activeGroup.placement === 'above_button' && (
-                                                <div className={`preview-offers template-${activeGroup.design.template || 'classic'}`} style={{ marginBottom: '16px', display: 'flex', gap: '8px', width: '100%' }}>
-                                                    {activeGroup.offers.map((offer, i) => {
-                                                        const total = samplePrice * offer.quantity * (1 - (offer.discountPercent || 0) / 100);
-                                                        const original = samplePrice * offer.quantity;
-                                                        const isSelected = offer.preselect || i === 0;
-                                                        const template = activeGroup.design.template || 'classic';
-                                                        const showImage = template !== 'modern' && template !== 'minimal';
-                                                        const isModern = template === 'modern';
-                                                        const isVertical = template === 'vertical';
-                                                        const isMinimal = template === 'minimal';
-                                                        const isCards = template === 'cards';
-                                                        const isMostPopular = offer.label?.toLowerCase().includes('most popular') || (i === activeGroup.offers.length - 1 && activeGroup.offers.length > 1);
-                                                        const showDiscountTag = (offer.discountPercent || 0) > 0 && !isMostPopular;
-                                                        
-                                                        // Get border color based on selection - use actual saved colors
-                                                        const borderColor = isSelected 
-                                                            ? (activeGroup.design.selectedBorderColor || '#dc2626')
-                                                            : (activeGroup.design.unselectedBorderColor || '#e5e7eb');
+                                                    {/* Marketing Checkbox */}
+                                                    {formSettings?.blocks?.buyer_marketing && (
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', fontSize: '10px', color: '#6b7280' }}>
+                                                            <input type="checkbox" disabled style={{ width: '14px', height: '14px' }} />
+                                                            <span>Keep me updated with offers & news</span>
+                                                        </div>
+                                                    )}
 
-                                                        return (
-                                                            <div key={offer.id}
-                                                                className={`preview-offer ${isSelected ? 'selected' : ''}`}
-                                                                style={{
-                                                                    background: isSelected ? (activeGroup.design.selectedBgColor || '#fff0ea') : (activeGroup.design.unselectedBgColor || '#ffffff'),
-                                                                    borderStyle: 'solid',
-                                                                    borderWidth: isMinimal ? '1px' : '2px',
-                                                                    borderColor: borderColor,
-                                                                    display: 'flex',
-                                                                    flexDirection: isVertical || isCards ? 'column' : 'row',
-                                                                    alignItems: isVertical || isCards ? 'center' : 'center',
-                                                                    justifyContent: isVertical || isCards ? 'center' : 'space-between',
-                                                                    gap: isVertical || isCards ? '8px' : (isMinimal ? '6px' : '10px'),
-                                                                    padding: isMinimal ? '8px 12px' : (isCards ? '16px 12px' : '12px'),
-                                                                    borderRadius: isCards ? '12px' : '10px',
-                                                                    cursor: 'pointer',
-                                                                    boxSizing: 'border-box',
-                                                                    textAlign: isVertical || isCards ? 'center' : 'left',
-                                                                    position: 'relative',
-                                                                    overflow: 'visible',
-                                                                    boxShadow: isCards ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
-                                                                }}>
-                                                                    {/* Most Popular Ribbon Tag */}
-                                                                    {isMostPopular && (
-                                                                        <div style={{
-                                                                            position: 'absolute',
-                                                                            top: '-10px',
-                                                                            right: '-6px',
-                                                                            background: offer.tagBgColor || activeGroup.design.selectedTagBgColor || '#1f2937',
-                                                                            color: activeGroup.design.selectedTagTextColor || '#ffffff',
-                                                                            fontSize: '10px',
-                                                                            fontWeight: 700,
-                                                                            padding: '4px 10px',
-                                                                            borderRadius: '4px',
-                                                                            zIndex: 10,
-                                                                            boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
-                                                                            whiteSpace: 'nowrap',
-                                                                        }}>{offer.label || 'Most Popular'}</div>
-                                                                    )}
-                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: isVertical || isCards ? '8px' : (isMinimal ? '6px' : '10px'), flex: isVertical || isCards ? '0 0 auto' : 1, minWidth: 0, flexDirection: isVertical || isCards ? 'column' : 'row', width: '100%' }}>
-                                                                        {showImage && (
-                                                                            productImage ? (
-                                                                                <img 
-                                                                                    src={productImage} 
-                                                                                    alt="Product" 
-                                                                                    style={{ flexShrink: 0, width: isCards ? '60px' : (isVertical ? '50px' : '40px'), height: isCards ? '60px' : (isVertical ? '50px' : '40px'), objectFit: 'cover', borderRadius: '8px' }} 
-                                                                                />
-                                                                            ) : (
-                                                                                <div className="offer-thumb" style={{ flexShrink: 0, width: isCards ? '60px' : (isVertical ? '50px' : '40px'), height: isCards ? '60px' : (isVertical ? '50px' : '40px'), background: '#fef3c7', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>🎁</div>
-                                                                            )
-                                                                        )}
-                                                                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, alignItems: isVertical || isCards ? 'center' : 'flex-start', width: '100%' }}>
-                                                                            <div style={{ fontSize: isCards ? '12px' : '14px', fontWeight: 600, color: '#1f2937', whiteSpace: isCards ? 'normal' : 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%', lineHeight: isCards ? '1.3' : '1.2', textAlign: 'center' }}>
-                                                                                {offer.title || `${offer.quantity} Unit${offer.quantity !== 1 ? 's' : ''}`}
-                                                                            </div>
-                                                                            {/* Inline discount tag for non-most-popular */}
-                                                                            {showDiscountTag && (
-                                                                                <span style={{
-                                                                                    background: offer.tagBgColor || activeGroup.design.selectedTagBgColor,
-                                                                                    color: activeGroup.design.selectedTagTextColor,
-                                                                                    fontSize: '9px',
-                                                                                    fontWeight: 600,
-                                                                                    padding: '2px 6px',
-                                                                                    borderRadius: '4px',
-                                                                                    display: 'inline-block',
-                                                                                    width: 'fit-content',
-                                                                                }}>Save {offer.discountPercent}%</span>
-                                                                            )}
-                                                                        </div>
-                                                                    </div>
-                                                                    <div style={{ textAlign: isVertical || isCards ? 'center' : 'right', display: 'flex', flexDirection: 'column', alignItems: isVertical || isCards ? 'center' : 'flex-end', gap: '2px', flexShrink: 0, width: isVertical || isCards ? '100%' : 'auto' }}>
-                                                                        {offer.discountPercent ? (
-                                                                            <span style={{ fontSize: isCards ? '10px' : '11px', color: '#9ca3af', textDecoration: 'line-through' }}>₹{original.toFixed(0)}</span>
-                                                                        ) : null}
-                                                                        <span style={{ fontSize: isCards ? '13px' : '16px', fontWeight: 700, color: '#1f2937', whiteSpace: 'nowrap' }}>₹{total.toFixed(2)}</span>
-                                                                    </div>
-                                                                </div>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                )}
-
-                                            {/* Marketing Checkbox */}
-                                            {formSettings?.blocks?.order_summary && (
-                                                <div style={{
-                                                    background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-                                                    borderRadius: '10px',
-                                                    padding: '12px',
-                                                    marginTop: '16px',
-                                                    marginBottom: '16px',
-                                                    border: '1px solid #e2e8f0',
-                                                }}>
-                                                    <div style={{ fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                        🧾 Order Summary
-                                                    </div>
+                                                    {/* Submit Button - Styled exactly like Form Builder */}
                                                     {(() => {
-                                                        // Get the selected offer (same logic as offer cards)
-                                                        if (!activeGroup?.offers?.length) return null;
-                                                        const selectedOffer = activeGroup.offers.find(o => o.preselect) || activeGroup.offers[0];
-                                                        const quantity = selectedOffer?.quantity || 1;
-                                                        const unitPrice = samplePrice; // This would be the actual product price
-                                                        const subtotal = unitPrice * quantity;
-                                                        const discountPercent = selectedOffer?.discountPercent || 0;
-                                                        const discount = subtotal * (discountPercent / 100);
-                                                        const shippingEnabled = formSettings?.shipping_options?.enabled;
-                                                        const shippingOption = formSettings?.shipping_options?.options?.find((o: any) => o.id === formSettings?.shipping_options?.defaultOption);
-                                                        const shippingCost = shippingEnabled ? (shippingOption?.price || 0) : 0;
-                                                        const total = subtotal - discount + shippingCost;
-                                                        
+                                                        // Calculate button styles - matching Form Builder's getButtonStyle() exactly
+                                                        const btn = buttonStyles || {};
+                                                        const buttonColor = primaryColor;
+                                                        const borderCol = btn.borderColor || buttonColor;
+                                                        const borderW = btn.borderWidth ?? 0;
+                                                        const buttonSize = btn.buttonSize || 'medium';
+                                                        const borderRadius = btn.borderRadius || 12;
+                                                        const buttonStyle = btn.buttonStyle || 'solid';
+
+                                                        const base: any = {
+                                                            width: '100%',
+                                                            padding: buttonSize === 'small' ? '10px' : buttonSize === 'large' ? '16px' : '13px',
+                                                            borderRadius: borderRadius + 'px',
+                                                            fontWeight: btn.fontStyle === 'bold' ? 700 : 400,
+                                                            fontStyle: btn.fontStyle === 'italic' ? 'italic' : 'normal',
+                                                            fontSize: (btn.textSize ?? 15) + 'px',
+                                                            border: borderW ? `${borderW}px solid ${borderCol}` : 'none',
+                                                            cursor: 'pointer',
+                                                            transition: 'all 0.2s ease',
+                                                            color: btn.textColor || '#ffffff',
+                                                            background: buttonColor,
+                                                            boxShadow: btn.shadow ? '0 4px 6px rgba(0,0,0,0.1)' : 'none',
+                                                            marginTop: '4px',
+                                                            fontFamily: 'inherit',
+                                                        };
+
+                                                        if (buttonStyle === 'outline') {
+                                                            base.background = 'transparent';
+                                                            base.backgroundColor = 'transparent';
+                                                            base.border = borderW > 0 ? `${borderW}px solid ${buttonColor}` : 'none';
+                                                            const isWhite = (btn.textColor || '#ffffff').toLowerCase() === '#ffffff';
+                                                            base.color = isWhite ? buttonColor : btn.textColor;
+                                                            base.boxShadow = 'none';
+                                                        } else if (buttonStyle === 'gradient') {
+                                                            // Darken color helper
+                                                            const darkenColor = (hex: string, percent: number) => {
+                                                                const num = parseInt(hex.replace('#', ''), 16);
+                                                                const r = Math.max(0, (num >> 16) - Math.round(255 * percent / 100));
+                                                                const g = Math.max(0, ((num >> 8) & 0x00FF) - Math.round(255 * percent / 100));
+                                                                const b = Math.max(0, (num & 0x0000FF) - Math.round(255 * percent / 100));
+                                                                return `#${(r << 16 | g << 8 | b).toString(16).padStart(6, '0')}`;
+                                                            };
+                                                            const darkColor = darkenColor(buttonColor, 25);
+                                                            base.background = `linear-gradient(135deg, ${buttonColor} 0%, ${darkColor} 100%)`;
+                                                            base.boxShadow = btn.shadow ? '0 6px 12px rgba(0,0,0,0.2)' : 'none';
+                                                        }
+
                                                         return (
-                                                            <>
-                                                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280', marginBottom: '6px' }}>
-                                                                    <span>Subtotal ({quantity} {quantity === 1 ? 'item' : 'items'})</span>
-                                                                    <span>₹{subtotal.toLocaleString()}</span>
-                                                                </div>
-                                                                {discount > 0 && (
-                                                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#10b981', marginBottom: '6px' }}>
-                                                                        <span>Bundle Discount ({discountPercent}%)</span>
-                                                                        <span>-₹{discount.toFixed(0)}</span>
-                                                                    </div>
-                                                                )}
-                                                                {shippingEnabled && (
-                                                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280', marginBottom: '8px' }}>
-                                                                        <span>Shipping</span>
-                                                                        <span>{shippingCost === 0 ? 'FREE' : `₹${shippingCost}`}</span>
-                                                                    </div>
-                                                                )}
-                                                                <div style={{
-                                                                    display: 'flex',
-                                                                    justifyContent: 'space-between',
-                                                                    fontSize: '13px',
-                                                                    fontWeight: 700,
-                                                                    color: '#111827',
-                                                                    paddingTop: '8px',
-                                                                    borderTop: '1px dashed #d1d5db',
-                                                                }}>
-                                                                    <span>Total</span>
-                                                                    <span style={{ color: primaryColor }}>₹{total.toLocaleString()}</span>
-                                                                </div>
-                                                            </>
+                                                            <button style={base}>
+                                                                {formSettings?.submit_button_text || 'Place Order'}
+                                                            </button>
                                                         );
                                                     })()}
                                                 </div>
-                                            )}
-
-                                            {/* Shipping Options */}
-                                            {formSettings?.blocks?.shipping_options && formSettings?.shipping_options?.enabled && (
-                                                <div style={{
-                                                    background: '#f8fafc',
-                                                    borderRadius: '8px',
-                                                    padding: '10px',
-                                                    marginBottom: '12px',
-                                                    border: '1px solid #e2e8f0',
-                                                }}>
-                                                    <div style={{ fontSize: '11px', fontWeight: 600, color: '#374151', marginBottom: '8px' }}>
-                                                        🚚 Shipping
-                                                    </div>
-                                                    {formSettings?.shipping_options?.options?.slice(0, 2).map((opt: any) => (
-                                                        <div key={opt.id} style={{
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            gap: '6px',
-                                                            fontSize: '10px',
-                                                            color: '#6b7280',
-                                                            marginBottom: '4px',
-                                                        }}>
-                                                            <input type="radio" name="shipping-preview" disabled checked={opt.id === formSettings?.shipping_options?.defaultOption} style={{ width: '12px', height: '12px' }} />
-                                                            <span>{opt.label}</span>
-                                                            <span style={{ marginLeft: 'auto', fontWeight: 600 }}>{opt.price === 0 ? 'Free' : `₹${opt.price}`}</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-
-                                            {/* Marketing Checkbox */}
-                                            {formSettings?.blocks?.buyer_marketing && (
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', fontSize: '10px', color: '#6b7280' }}>
-                                                    <input type="checkbox" disabled style={{ width: '14px', height: '14px' }} />
-                                                    <span>Keep me updated with offers & news</span>
-                                                </div>
-                                            )}
-
-                                            {/* Submit Button - Styled exactly like Form Builder */}
-                                            {(() => {
-                                                // Calculate button styles - matching Form Builder's getButtonStyle() exactly
-                                                const btn = buttonStyles || {};
-                                                const buttonColor = primaryColor;
-                                                const borderCol = btn.borderColor || buttonColor;
-                                                const borderW = btn.borderWidth ?? 0;
-                                                const buttonSize = btn.buttonSize || 'medium';
-                                                const borderRadius = btn.borderRadius || 12;
-                                                const buttonStyle = btn.buttonStyle || 'solid';
-                                                
-                                                const base: any = {
-                                                    width: '100%',
-                                                    padding: buttonSize === 'small' ? '10px' : buttonSize === 'large' ? '16px' : '13px',
-                                                    borderRadius: borderRadius + 'px',
-                                                    fontWeight: btn.fontStyle === 'bold' ? 700 : 400,
-                                                    fontStyle: btn.fontStyle === 'italic' ? 'italic' : 'normal',
-                                                    fontSize: (btn.textSize ?? 15) + 'px',
-                                                    border: borderW ? `${borderW}px solid ${borderCol}` : 'none',
-                                                    cursor: 'pointer',
-                                                    transition: 'all 0.2s ease',
-                                                    color: btn.textColor || '#ffffff',
-                                                    background: buttonColor,
-                                                    boxShadow: btn.shadow ? '0 4px 6px rgba(0,0,0,0.1)' : 'none',
-                                                    marginTop: '4px',
-                                                    fontFamily: 'inherit',
-                                                };
-
-                                                if (buttonStyle === 'outline') {
-                                                    base.background = 'transparent';
-                                                    base.backgroundColor = 'transparent';
-                                                    base.border = borderW > 0 ? `${borderW}px solid ${buttonColor}` : 'none';
-                                                    const isWhite = (btn.textColor || '#ffffff').toLowerCase() === '#ffffff';
-                                                    base.color = isWhite ? buttonColor : btn.textColor;
-                                                    base.boxShadow = 'none';
-                                                } else if (buttonStyle === 'gradient') {
-                                                    // Darken color helper
-                                                    const darkenColor = (hex: string, percent: number) => {
-                                                        const num = parseInt(hex.replace('#', ''), 16);
-                                                        const r = Math.max(0, (num >> 16) - Math.round(255 * percent / 100));
-                                                        const g = Math.max(0, ((num >> 8) & 0x00FF) - Math.round(255 * percent / 100));
-                                                        const b = Math.max(0, (num & 0x0000FF) - Math.round(255 * percent / 100));
-                                                        return `#${(r << 16 | g << 8 | b).toString(16).padStart(6, '0')}`;
-                                                    };
-                                                    const darkColor = darkenColor(buttonColor, 25);
-                                                    base.background = `linear-gradient(135deg, ${buttonColor} 0%, ${darkColor} 100%)`;
-                                                    base.boxShadow = btn.shadow ? '0 6px 12px rgba(0,0,0,0.2)' : 'none';
-                                                }
-                                                
-                                                return (
-                                                    <button style={base}>
-                                                        {formSettings?.submit_button_text || 'Place Order'}
-                                                    </button>
-                                                );
-                                            })()}
-                                        </div>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
                             </div>
