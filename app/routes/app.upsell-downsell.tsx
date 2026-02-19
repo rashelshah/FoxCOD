@@ -10,6 +10,7 @@ import { authenticate } from "../shopify.server";
 import { getUpsellCampaigns, saveCampaign, deleteCampaign, toggleCampaignActive, syncUpsellsToMetafield } from "../services/upsell-offers.server";
 import { type UpsellCampaign, type UpsellType, type CampaignOffer, type CampaignDesign, type ButtonDesign, createDefaultCampaign, createDefaultOffer, DEFAULT_CAMPAIGN_DESIGN } from "../config/upsell-offers.types";
 import { ColorSelector, colorSelectorStyles } from "./ColorSelector";
+import { RangeSlider } from "@shopify/polaris";
 import { getFormSettings } from "../config/supabase.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -70,9 +71,9 @@ ${colorSelectorStyles}
 .btn-back{width:40px;height:40px;border-radius:10px;border:1px solid #e5e7eb;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;color:#374151;transition:all .15s ease}
 .btn-back:hover{background:#f3f4f6;border-color:#d1d5db}
 .toggle-pill{display:flex;align-items:center;gap:8px}
-.toggle-track{width:44px;height:24px;border-radius:12px;background:#d1d5db;cursor:pointer;position:relative;transition:.2s}
-.toggle-track.on{background:#10b981}
-.toggle-thumb{width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.toggle-track{width:44px;height:24px;border-radius:12px;background:var(--p-color-bg-surface-secondary-active, #dfe3e8);cursor:pointer;position:relative;transition:.2s cubic-bezier(.25,.1,.25,1)}
+.toggle-track.on{background:var(--p-color-bg-fill-inverse, #1a1a1a)}
+.toggle-thumb{width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:.2s cubic-bezier(.25,.1,.25,1);box-shadow:0 1px 3px rgba(0,0,0,.1),0 1px 2px rgba(0,0,0,.06)}
 .toggle-track.on .toggle-thumb{left:22px}
 .active-badge{padding:3px 12px;border-radius:12px;font-size:12px;font-weight:600}
 /* ==================== PILL TABS ==================== */
@@ -151,23 +152,23 @@ ${colorSelectorStyles}
 /* Toggle Option (Form Builder style) */
 .up-toggle-row{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#f9fafb;border-radius:10px;cursor:pointer;margin-bottom:8px}
 .up-toggle-row span{font-size:14px;font-weight:500;color:#374151}
-.up-mini-toggle{width:44px;height:24px;border-radius:12px;position:relative;transition:background .2s ease;flex-shrink:0}
-.up-mini-toggle::after{content:'';position:absolute;width:18px;height:18px;background:#fff;border-radius:50%;top:3px;transition:left .2s ease;box-shadow:0 1px 3px rgba(0,0,0,.2)}
-.up-mini-toggle.on{background:#10b981}
-.up-mini-toggle.on::after{left:23px}
-.up-mini-toggle.off{background:#d1d5db}
-.up-mini-toggle.off::after{left:3px}
+.up-mini-toggle{width:44px;height:24px;border-radius:12px;position:relative;transition:background .2s cubic-bezier(.25,.1,.25,1);flex-shrink:0;cursor:pointer}
+.up-mini-toggle::after{content:'';position:absolute;width:20px;height:20px;background:#fff;border-radius:50%;top:2px;transition:left .2s cubic-bezier(.25,.1,.25,1);box-shadow:0 1px 3px rgba(0,0,0,.1),0 1px 2px rgba(0,0,0,.06)}
+.up-mini-toggle.on{background:var(--p-color-bg-fill-inverse, #1a1a1a)}
+.up-mini-toggle.on::after{left:22px}
+.up-mini-toggle.off{background:var(--p-color-bg-surface-secondary-active, #dfe3e8)}
+.up-mini-toggle.off::after{left:2px}
 /* Checkbox row (for offer options) */
 .cb-row{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;margin-bottom:8px}
 .cb-row input{width:18px;height:18px;accent-color:#1f2937}
 /* Styled Slider (Form Builder exact match) */
 .up-slider-wrap{display:flex;align-items:center;gap:12px}
-.up-slider-wrap input[type="range"]{flex:1;-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:3px;outline:none;cursor:pointer;margin:0}
-.up-slider-wrap input[type="range"]::-webkit-slider-runnable-track{width:100%;height:6px;border-radius:3px;border:none}
-.up-slider-wrap input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#6366f1;cursor:pointer;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.15),0 0 0 1px rgba(99,102,241,.2);margin-top:-7px;transition:transform .1s ease,box-shadow .1s ease}
+.up-slider-wrap input[type="range"]{flex:1;-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:2px;outline:none;cursor:pointer;margin:0}
+.up-slider-wrap input[type="range"]::-webkit-slider-runnable-track{width:100%;height:4px;border-radius:2px;border:none}
+.up-slider-wrap input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:#6366f1;cursor:pointer;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,0.15),0 0 0 1px rgba(99,102,241,0.2);margin-top:-6px;transition:transform 0.1s ease,box-shadow 0.1s ease}
 .up-slider-wrap input[type="range"]::-webkit-slider-thumb:hover{transform:scale(1.1)}
-.up-slider-wrap input[type="range"]:focus::-webkit-slider-thumb{box-shadow:0 0 0 4px rgba(99,102,241,.2)}
-.up-slider-val{font-size:13px;font-weight:600;min-width:28px;text-align:center;color:#1f2937;background:#f3f4f6;padding:4px 8px;border-radius:6px}
+.up-slider-wrap input[type="range"]:focus::-webkit-slider-thumb{box-shadow:0 0 0 4px rgba(99,102,241,0.2)}
+.up-slider-val{font-size:13px;color:#4b5563;min-width:24px;text-align:right}
 /* Add Offer */
 .btn-add-offer{background:#fff;border:2px dashed #d1d5db;border-radius:12px;padding:12px;width:100%;cursor:pointer;font-size:14px;font-weight:600;color:#6b7280;text-align:center;transition:all .15s ease}
 .btn-add-offer:hover{border-color:#1f2937;color:#1f2937}
@@ -508,9 +509,16 @@ export default function UpsellDownsellPage() {
                                         </div>
                                         <div className="fg" style={{ marginTop: 12 }}>
                                             <label>Border Width (px)</label>
-                                            <div className="up-slider-wrap">
-                                                <input type="range" min="0" max="4" value={editing.design.acceptButton.borderWidth} onChange={e => updAccept({ borderWidth: parseInt(e.target.value) })} style={{ background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${(editing.design.acceptButton.borderWidth / 4) * 100}%, #e5e7eb ${(editing.design.acceptButton.borderWidth / 4) * 100}%, #e5e7eb 100%)` }} />
-                                                <span className="up-slider-val">{editing.design.acceptButton.borderWidth}</span>
+                                            <div style={{ padding: '0 8px', width: '100%' }}>
+                                                <RangeSlider
+                                                    labelHidden
+                                                    label="Border Width"
+                                                    min={0}
+                                                    max={4}
+                                                    value={editing.design.acceptButton.borderWidth}
+                                                    onChange={val => updAccept({ borderWidth: Number(val) })}
+                                                    output
+                                                />
                                             </div>
                                         </div>
                                         <div className="fg">
@@ -524,16 +532,30 @@ export default function UpsellDownsellPage() {
                                         </div>
                                         <div className="fg">
                                             <label>Rounded Corners (px)</label>
-                                            <div className="up-slider-wrap">
-                                                <input type="range" min="0" max="20" value={editing.design.acceptButton.borderRadius} onChange={e => updAccept({ borderRadius: parseInt(e.target.value) })} style={{ background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${(editing.design.acceptButton.borderRadius / 20) * 100}%, #e5e7eb ${(editing.design.acceptButton.borderRadius / 20) * 100}%, #e5e7eb 100%)` }} />
-                                                <span className="up-slider-val">{editing.design.acceptButton.borderRadius}</span>
+                                            <div style={{ padding: '0 8px', width: '100%' }}>
+                                                <RangeSlider
+                                                    labelHidden
+                                                    label="Rounded Corners"
+                                                    min={0}
+                                                    max={20}
+                                                    value={editing.design.acceptButton.borderRadius}
+                                                    onChange={val => updAccept({ borderRadius: Number(val) })}
+                                                    output
+                                                />
                                             </div>
                                         </div>
                                         <div className="fg">
                                             <label>Text Size (px)</label>
-                                            <div className="up-slider-wrap">
-                                                <input type="range" min="10" max="20" value={editing.design.headerTextSize} onChange={e => updDesign({ headerTextSize: parseInt(e.target.value) || 13 })} style={{ background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${((editing.design.headerTextSize - 10) / 10) * 100}%, #e5e7eb ${((editing.design.headerTextSize - 10) / 10) * 100}%, #e5e7eb 100%)` }} />
-                                                <span className="up-slider-val">{editing.design.headerTextSize}</span>
+                                            <div style={{ padding: '0 8px', width: '100%' }}>
+                                                <RangeSlider
+                                                    labelHidden
+                                                    label="Text Size"
+                                                    min={10}
+                                                    max={20}
+                                                    value={editing.design.headerTextSize}
+                                                    onChange={val => updDesign({ headerTextSize: Number(val) })}
+                                                    output
+                                                />
                                             </div>
                                         </div>
                                     </div>
@@ -986,9 +1008,16 @@ export default function UpsellDownsellPage() {
                                         <div className="fg"><label>Subheader</label><input value={editing.design.subheaderText} onChange={e => updDesign({ subheaderText: e.target.value })} /></div>
                                         <div className="fg">
                                             <label>Text Size (px)</label>
-                                            <div className="up-slider-wrap">
-                                                <input type="range" min="10" max="36" value={editing.design.headerTextSize} onChange={e => updDesign({ headerTextSize: parseInt(e.target.value) || 20 })} style={{ background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${((editing.design.headerTextSize - 10) / 26) * 100}%, #e5e7eb ${((editing.design.headerTextSize - 10) / 26) * 100}%, #e5e7eb 100%)` }} />
-                                                <span className="up-slider-val">{editing.design.headerTextSize}</span>
+                                            <div style={{ padding: '0 8px', width: '100%' }}>
+                                                <RangeSlider
+                                                    labelHidden
+                                                    label="Text Size"
+                                                    min={10}
+                                                    max={36}
+                                                    value={editing.design.headerTextSize}
+                                                    onChange={val => updDesign({ headerTextSize: Number(val) || 20 })}
+                                                    output
+                                                />
                                             </div>
                                         </div>
                                         <ColorSelector label="Text Color" value={editing.design.headerTextColor} onChange={c => updDesign({ headerTextColor: c })} />
@@ -1019,16 +1048,30 @@ export default function UpsellDownsellPage() {
                                         <ColorSelector label="Text Color" value={editing.design.discountTag.textColor} onChange={c => updDesign({ discountTag: { ...editing.design.discountTag, textColor: c } })} />
                                         <div className="fg">
                                             <label>Text Size (px)</label>
-                                            <div className="up-slider-wrap">
-                                                <input type="range" min="8" max="24" value={editing.design.discountTag.textSize} onChange={e => updDesign({ discountTag: { ...editing.design.discountTag, textSize: parseInt(e.target.value) || 14 } })} style={{ background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${((editing.design.discountTag.textSize - 8) / 16) * 100}%, #e5e7eb ${((editing.design.discountTag.textSize - 8) / 16) * 100}%, #e5e7eb 100%)` }} />
-                                                <span className="up-slider-val">{editing.design.discountTag.textSize}</span>
+                                            <div style={{ padding: '0 8px', width: '100%' }}>
+                                                <RangeSlider
+                                                    labelHidden
+                                                    label="Text Size"
+                                                    min={8}
+                                                    max={24}
+                                                    value={editing.design.discountTag.textSize}
+                                                    onChange={val => updDesign({ discountTag: { ...editing.design.discountTag, textSize: Number(val) || 14 } })}
+                                                    output
+                                                />
                                             </div>
                                         </div>
                                         <div className="fg">
                                             <label>Rounded Corners (px)</label>
-                                            <div className="up-slider-wrap">
-                                                <input type="range" min="0" max="30" value={editing.design.discountTag.borderRadius} onChange={e => updDesign({ discountTag: { ...editing.design.discountTag, borderRadius: parseInt(e.target.value) } })} style={{ background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${(editing.design.discountTag.borderRadius / 30) * 100}%, #e5e7eb ${(editing.design.discountTag.borderRadius / 30) * 100}%, #e5e7eb 100%)` }} />
-                                                <span className="up-slider-val">{editing.design.discountTag.borderRadius}</span>
+                                            <div style={{ padding: '0 8px', width: '100%' }}>
+                                                <RangeSlider
+                                                    labelHidden
+                                                    label="Rounded Corners"
+                                                    min={0}
+                                                    max={30}
+                                                    value={editing.design.discountTag.borderRadius}
+                                                    onChange={val => updDesign({ discountTag: { ...editing.design.discountTag, borderRadius: Number(val) } })}
+                                                    output
+                                                />
                                             </div>
                                         </div>
                                     </div>
@@ -1043,25 +1086,46 @@ export default function UpsellDownsellPage() {
                                         <ColorSelector label="Text Color" value={editing.design.acceptButton.textColor} onChange={c => updAccept({ textColor: c })} />
                                         <div className="fg">
                                             <label>Text Size (px)</label>
-                                            <div className="up-slider-wrap">
-                                                <input type="range" min="10" max="24" value={editing.design.acceptButton.textSize} onChange={e => updAccept({ textSize: parseInt(e.target.value) || 16 })} style={{ background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${((editing.design.acceptButton.textSize - 10) / 14) * 100}%, #e5e7eb ${((editing.design.acceptButton.textSize - 10) / 14) * 100}%, #e5e7eb 100%)` }} />
-                                                <span className="up-slider-val">{editing.design.acceptButton.textSize}</span>
+                                            <div style={{ padding: '0 8px', width: '100%' }}>
+                                                <RangeSlider
+                                                    labelHidden
+                                                    label="Text Size"
+                                                    min={10}
+                                                    max={24}
+                                                    value={editing.design.acceptButton.textSize}
+                                                    onChange={val => updAccept({ textSize: Number(val) || 16 })}
+                                                    output
+                                                />
                                             </div>
                                         </div>
                                         <div className="up-section-label">Border</div>
                                         <ColorSelector label="Border Color" value={editing.design.acceptButton.borderColor} onChange={c => updAccept({ borderColor: c })} />
                                         <div className="fg">
                                             <label>Border Width (px)</label>
-                                            <div className="up-slider-wrap">
-                                                <input type="range" min="0" max="5" value={editing.design.acceptButton.borderWidth} onChange={e => updAccept({ borderWidth: parseInt(e.target.value) })} style={{ background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${(editing.design.acceptButton.borderWidth / 5) * 100}%, #e5e7eb ${(editing.design.acceptButton.borderWidth / 5) * 100}%, #e5e7eb 100%)` }} />
-                                                <span className="up-slider-val">{editing.design.acceptButton.borderWidth}</span>
+                                            <div style={{ padding: '0 8px', width: '100%' }}>
+                                                <RangeSlider
+                                                    labelHidden
+                                                    label="Border Width"
+                                                    min={0}
+                                                    max={5}
+                                                    value={editing.design.acceptButton.borderWidth}
+                                                    onChange={val => updAccept({ borderWidth: Number(val) })}
+                                                    output
+                                                />
                                             </div>
                                         </div>
                                         <div className="fg">
                                             <label>Rounded Corners (px)</label>
-                                            <div className="up-slider-wrap">
-                                                <input type="range" min="0" max="30" value={editing.design.acceptButton.borderRadius} onChange={e => updAccept({ borderRadius: parseInt(e.target.value) })} style={{ background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${(editing.design.acceptButton.borderRadius / 30) * 100}%, #e5e7eb ${(editing.design.acceptButton.borderRadius / 30) * 100}%, #e5e7eb 100%)` }} />
-                                                <span className="up-slider-val">{editing.design.acceptButton.borderRadius}</span>
+                                            <div style={{ padding: '0 8px', width: '100%' }}>
+                                                <RangeSlider
+                                                    labelHidden
+                                                    label="Rounded Corners"
+                                                    min={0}
+                                                    max={30}
+                                                    value={editing.design.acceptButton.borderRadius}
+                                                    onChange={val => updAccept({ borderRadius: Number(val) })}
+                                                    output
+                                                />
                                             </div>
                                         </div>
                                         <div className="up-toggle-row" onClick={() => updAccept({ shadow: !editing.design.acceptButton.shadow })}>
@@ -1081,16 +1145,30 @@ export default function UpsellDownsellPage() {
                                         <ColorSelector label="Border Color" value={editing.design.rejectButton.borderColor} onChange={c => updReject({ borderColor: c })} />
                                         <div className="fg">
                                             <label>Border Width (px)</label>
-                                            <div className="up-slider-wrap">
-                                                <input type="range" min="0" max="5" value={editing.design.rejectButton.borderWidth} onChange={e => updReject({ borderWidth: parseInt(e.target.value) })} style={{ background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${(editing.design.rejectButton.borderWidth / 5) * 100}%, #e5e7eb ${(editing.design.rejectButton.borderWidth / 5) * 100}%, #e5e7eb 100%)` }} />
-                                                <span className="up-slider-val">{editing.design.rejectButton.borderWidth}</span>
+                                            <div style={{ padding: '0 8px', width: '100%' }}>
+                                                <RangeSlider
+                                                    labelHidden
+                                                    label="Border Width"
+                                                    min={0}
+                                                    max={5}
+                                                    value={editing.design.rejectButton.borderWidth}
+                                                    onChange={val => updReject({ borderWidth: Number(val) })}
+                                                    output
+                                                />
                                             </div>
                                         </div>
                                         <div className="fg">
                                             <label>Rounded Corners (px)</label>
-                                            <div className="up-slider-wrap">
-                                                <input type="range" min="0" max="30" value={editing.design.rejectButton.borderRadius} onChange={e => updReject({ borderRadius: parseInt(e.target.value) })} style={{ background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${(editing.design.rejectButton.borderRadius / 30) * 100}%, #e5e7eb ${(editing.design.rejectButton.borderRadius / 30) * 100}%, #e5e7eb 100%)` }} />
-                                                <span className="up-slider-val">{editing.design.rejectButton.borderRadius}</span>
+                                            <div style={{ padding: '0 8px', width: '100%' }}>
+                                                <RangeSlider
+                                                    labelHidden
+                                                    label="Rounded Corners"
+                                                    min={0}
+                                                    max={30}
+                                                    value={editing.design.rejectButton.borderRadius}
+                                                    onChange={val => updReject({ borderRadius: Number(val) })}
+                                                    output
+                                                />
                                             </div>
                                         </div>
                                         <div className="up-toggle-row" onClick={() => updReject({ shadow: !editing.design.rejectButton.shadow })}>

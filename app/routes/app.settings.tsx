@@ -9,6 +9,7 @@ import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
 import { useLoaderData, useSubmit, useNavigation, Link, useActionData } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
+import { RangeSlider } from "@shopify/polaris";
 import {
     DndContext,
     closestCenter,
@@ -1958,12 +1959,12 @@ export default function SettingsPage() {
                 .checkbox-option { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: #f9fafb; border-radius: 10px; cursor: pointer; }
                 .checkbox-option.checked { background: rgba(99, 102, 241, 0.1); }
                 .toggle-option { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; background: #f9fafb; border-radius: 10px; cursor: pointer; margin-bottom: 10px; }
-                .mini-toggle { width: 44px; height: 24px; border-radius: 12px; position: relative; transition: background 0.2s ease; }
-                .mini-toggle::after { content: ''; position: absolute; width: 18px; height: 18px; background: white; border-radius: 50%; top: 3px; transition: left 0.2s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
-                .mini-toggle.on { background: #10b981; }
-                .mini-toggle.on::after { left: 23px; }
-                .mini-toggle.off { background: #d1d5db; }
-                .mini-toggle.off::after { left: 3px; }
+                .mini-toggle { width: 44px; height: 24px; border-radius: 12px; position: relative; transition: background 0.2s cubic-bezier(0.25, 0.1, 0.25, 1); cursor: pointer; }
+                .mini-toggle::after { content: ''; position: absolute; width: 20px; height: 20px; background: white; border-radius: 50%; top: 2px; transition: left 0.2s cubic-bezier(0.25, 0.1, 0.25, 1); box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06); }
+                .mini-toggle.on { background: var(--p-color-bg-fill-inverse, #1a1a1a); }
+                .mini-toggle.on::after { left: 22px; }
+                .mini-toggle.off { background: var(--p-color-bg-surface-secondary-active, #dfe3e8); }
+                .mini-toggle.off::after { left: 2px; }
                 .input-field { width: 100%; padding: 16px; border: 1px solid #e5e7eb; border-radius: 12px; font-size: 15px; color: #111827; transition: all 0.2s ease; box-sizing: border-box; background: #f9fafb; font-weight: 500; }
                 .input-field:focus { border-color: #6366f1; background: white; outline: none; box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1); }
                 .color-presets { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
@@ -2101,12 +2102,12 @@ export default function SettingsPage() {
                 .main-toggle.enabled { background: rgba(16, 185, 129, 0.1); border: 2px solid #10b981; }
                 .main-toggle.disabled { background: #f9fafb; border: 2px solid #e5e7eb; }
                 .toggle-info h3 { font-size: 16px; font-weight: 600; color: #111827; margin: 0 0 4px 0; }
-                .toggle-switch { width: 56px; height: 32px; border-radius: 16px; position: relative; cursor: pointer; transition: background 0.2s ease; }
-                .toggle-switch.enabled { background: #10b981; }
-                .toggle-switch.disabled { background: #d1d5db; }
-                .toggle-switch::after { content: ''; position: absolute; width: 26px; height: 26px; background: white; border-radius: 50%; top: 3px; transition: left 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
-                .toggle-switch.enabled::after { left: 27px; }
-                .toggle-switch.disabled::after { left: 3px; }
+                .toggle-switch { width: 56px; height: 32px; border-radius: 16px; position: relative; cursor: pointer; transition: background 0.2s cubic-bezier(0.25, 0.1, 0.25, 1); }
+                .toggle-switch.enabled { background: var(--p-color-bg-fill-inverse, #1a1a1a); }
+                .toggle-switch.disabled { background: var(--p-color-bg-surface-secondary-active, #dfe3e8); }
+                .toggle-switch::after { content: ''; position: absolute; width: 28px; height: 28px; background: white; border-radius: 50%; top: 2px; transition: left 0.2s cubic-bezier(0.25, 0.1, 0.25, 1); box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06); }
+                .toggle-switch.enabled::after { left: 26px; }
+                .toggle-switch.disabled::after { left: 2px; }
                 .tabs { display: flex; gap: 8px; margin-bottom: 24px; background: #f3f4f6; padding: 6px; border-radius: 12px; }
                 .tab { flex: 1; padding: 14px 20px; border: none; background: transparent; border-radius: 8px; font-size: 14px; font-weight: 600; color: #6b7280; cursor: pointer; }
                 .tab.active { background: white; color: #111827; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
@@ -3132,16 +3133,16 @@ export default function SettingsPage() {
                                         </div>
                                         <div className="input-group" style={{ marginTop: 12 }}>
                                             <label className="input-label">Text Size (px)</label>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                                <input
-                                                    type="range"
-                                                    min="12"
-                                                    max="24"
+                                            <div style={{ padding: '0 8px', width: '100%' }}>
+                                                <RangeSlider
+                                                    labelHidden
+                                                    label="Text Size"
+                                                    min={12}
+                                                    max={24}
                                                     value={buttonStylesState?.textSize ?? 15}
-                                                    onChange={(e) => setButtonStylesState(s => ({ ...s, textSize: parseInt(e.target.value) }))}
-                                                    style={{ flex: 1, background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${((buttonStylesState?.textSize ?? 15) - 12) * 100 / (24 - 12)}%, #e5e7eb ${((buttonStylesState?.textSize ?? 15) - 12) * 100 / (24 - 12)}%, #e5e7eb 100%)` }}
+                                                    onChange={(val) => setButtonStylesState(s => ({ ...s, textSize: Number(val) }))}
+                                                    output
                                                 />
-                                                <span style={{ fontSize: 13, fontWeight: 600, minWidth: 28 }}>{buttonStylesState?.textSize ?? 15}</span>
                                             </div>
                                         </div>
                                         <div className="input-group" style={{ marginTop: 12 }}>
@@ -3167,16 +3168,30 @@ export default function SettingsPage() {
                                         </div>
                                         <div className="input-group" style={{ marginTop: 12 }}>
                                             <label className="input-label">Border Width (px)</label>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                                <input type="range" min="0" max="4" value={buttonStylesState?.borderWidth ?? 0} onChange={(e) => setButtonStylesState(s => ({ ...s, borderWidth: parseInt(e.target.value) }))} style={{ flex: 1, background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${((buttonStylesState?.borderWidth ?? 0) - 0) * 100 / (4 - 0)}%, #e5e7eb ${((buttonStylesState?.borderWidth ?? 0) - 0) * 100 / (4 - 0)}%, #e5e7eb 100%)` }} />
-                                                <span style={{ fontSize: 13, fontWeight: 600, minWidth: 20 }}>{buttonStylesState?.borderWidth ?? 0}</span>
+                                            <div style={{ padding: '0 8px', width: '100%' }}>
+                                                <RangeSlider
+                                                    labelHidden
+                                                    label="Border Width"
+                                                    min={0}
+                                                    max={4}
+                                                    value={buttonStylesState?.borderWidth ?? 0}
+                                                    onChange={(val) => setButtonStylesState(s => ({ ...s, borderWidth: Number(val) }))}
+                                                    output
+                                                />
                                             </div>
                                         </div>
                                         <div className="input-group" style={{ marginTop: 12 }}>
                                             <label className="input-label">Rounded Corners (px)</label>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                                <input type="range" min="0" max="24" value={buttonStylesState?.borderRadius ?? 12} onChange={(e) => setButtonStylesState(s => ({ ...s, borderRadius: parseInt(e.target.value) }))} style={{ flex: 1, background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${((buttonStylesState?.borderRadius ?? 12) - 0) * 100 / (24 - 0)}%, #e5e7eb ${((buttonStylesState?.borderRadius ?? 12) - 0) * 100 / (24 - 0)}%, #e5e7eb 100%)` }} />
-                                                <span style={{ fontSize: 13, fontWeight: 600, minWidth: 28 }}>{buttonStylesState?.borderRadius ?? 12}</span>
+                                            <div style={{ padding: '0 8px', width: '100%' }}>
+                                                <RangeSlider
+                                                    labelHidden
+                                                    label="Rounded Corners"
+                                                    min={0}
+                                                    max={24}
+                                                    value={buttonStylesState?.borderRadius ?? 12}
+                                                    onChange={(val) => setButtonStylesState(s => ({ ...s, borderRadius: Number(val) }))}
+                                                    output
+                                                />
                                             </div>
                                         </div>
                                         <div className="toggle-option" style={{ marginTop: 12 }} onClick={() => setButtonStylesState(s => ({ ...s, shadow: !s.shadow }))}>
@@ -3287,9 +3302,16 @@ export default function SettingsPage() {
                                         {buttonStylesState?.animationTrigger === 'inactivity' && (
                                             <div className="input-group" style={{ marginTop: 12 }}>
                                                 <label className="input-label">Inactivity Delay (seconds)</label>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                                    <input type="range" min="1" max="10" value={buttonStylesState?.inactivityDelay ?? 3} onChange={(e) => setButtonStylesState(s => ({ ...s, inactivityDelay: parseInt(e.target.value) }))} style={{ flex: 1, background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${((buttonStylesState?.inactivityDelay ?? 3) - 1) * 100 / (10 - 1)}%, #e5e7eb ${((buttonStylesState?.inactivityDelay ?? 3) - 1) * 100 / (10 - 1)}%, #e5e7eb 100%)` }} />
-                                                    <span style={{ fontSize: 13, fontWeight: 600, minWidth: 28 }}>{buttonStylesState?.inactivityDelay ?? 3}s</span>
+                                                <div style={{ padding: '0 8px', width: '100%' }}>
+                                                    <RangeSlider
+                                                        labelHidden
+                                                        label="Inactivity Delay"
+                                                        min={1}
+                                                        max={10}
+                                                        value={buttonStylesState?.inactivityDelay ?? 3}
+                                                        onChange={(val) => setButtonStylesState(s => ({ ...s, inactivityDelay: Number(val) }))}
+                                                        output
+                                                    />
                                                 </div>
                                             </div>
                                         )}
@@ -3393,9 +3415,16 @@ export default function SettingsPage() {
                                         </div>
                                         <div className="input-group" style={{ marginTop: 12 }}>
                                             <label className="input-label">Text Size (px)</label>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                                <input type="range" min="11" max="20" value={formStyles?.textSize ?? 14} onChange={(e) => setFormStyles(s => ({ ...s, textSize: parseInt(e.target.value) }))} style={{ flex: 1, background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${((formStyles?.textSize ?? 14) - 11) * 100 / (20 - 11)}%, #e5e7eb ${((formStyles?.textSize ?? 14) - 11) * 100 / (20 - 11)}%, #e5e7eb 100%)` }} />
-                                                <span style={{ fontSize: 13, fontWeight: 600, minWidth: 28 }}>{formStyles?.textSize ?? 14}</span>
+                                            <div style={{ padding: '0 8px', width: '100%' }}>
+                                                <RangeSlider
+                                                    labelHidden
+                                                    label="Text Size"
+                                                    min={11}
+                                                    max={20}
+                                                    value={formStyles?.textSize ?? 14}
+                                                    onChange={(val) => setFormStyles(s => ({ ...s, textSize: Number(val) }))}
+                                                    output
+                                                />
                                             </div>
                                         </div>
                                         <div className="input-group" style={{ marginTop: 12 }}>
@@ -3417,16 +3446,30 @@ export default function SettingsPage() {
                                         </div>
                                         <div className="input-group" style={{ marginTop: 12 }}>
                                             <label className="input-label">Border Width (px)</label>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                                <input type="range" min="0" max="3" value={formStyles?.borderWidth ?? 1} onChange={(e) => setFormStyles(s => ({ ...s, borderWidth: parseInt(e.target.value) }))} style={{ flex: 1, background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${((formStyles?.borderWidth ?? 1) - 0) * 100 / (3 - 0)}%, #e5e7eb ${((formStyles?.borderWidth ?? 1) - 0) * 100 / (3 - 0)}%, #e5e7eb 100%)` }} />
-                                                <span style={{ fontSize: 13, fontWeight: 600, minWidth: 20 }}>{formStyles?.borderWidth ?? 1}</span>
+                                            <div style={{ padding: '0 8px', width: '100%' }}>
+                                                <RangeSlider
+                                                    labelHidden
+                                                    label="Border Width"
+                                                    min={0}
+                                                    max={3}
+                                                    value={formStyles?.borderWidth ?? 1}
+                                                    onChange={(val) => setFormStyles(s => ({ ...s, borderWidth: Number(val) }))}
+                                                    output
+                                                />
                                             </div>
                                         </div>
                                         <div className="input-group" style={{ marginTop: 12 }}>
                                             <label className="input-label">Rounded Corners (px)</label>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                                <input type="range" min="0" max="20" value={formStyles?.borderRadius ?? 12} onChange={(e) => setFormStyles(s => ({ ...s, borderRadius: parseInt(e.target.value) }))} style={{ flex: 1, background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${((formStyles?.borderRadius ?? 12) - 0) * 100 / (20 - 0)}%, #e5e7eb ${((formStyles?.borderRadius ?? 12) - 0) * 100 / (20 - 0)}%, #e5e7eb 100%)` }} />
-                                                <span style={{ fontSize: 13, fontWeight: 600, minWidth: 28 }}>{formStyles?.borderRadius ?? 12}</span>
+                                            <div style={{ padding: '0 8px', width: '100%' }}>
+                                                <RangeSlider
+                                                    labelHidden
+                                                    label="Rounded Corners"
+                                                    min={0}
+                                                    max={20}
+                                                    value={formStyles?.borderRadius ?? 12}
+                                                    onChange={(val) => setFormStyles(s => ({ ...s, borderRadius: Number(val) }))}
+                                                    output
+                                                />
                                             </div>
                                         </div>
                                         <div className="toggle-option" style={{ marginTop: 12 }} onClick={() => setFormStyles(s => ({ ...s, shadow: !s.shadow }))}>
@@ -3487,16 +3530,16 @@ export default function SettingsPage() {
                                         </div>
                                         <div className="input-group" style={{ marginTop: 12 }}>
                                             <label className="input-label">Label Font Size (px)</label>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                                <input
-                                                    type="range"
-                                                    min="11"
-                                                    max="20"
+                                            <div style={{ padding: '0 8px', width: '100%' }}>
+                                                <RangeSlider
+                                                    labelHidden
+                                                    label="Label Font Size"
+                                                    min={11}
+                                                    max={20}
                                                     value={formStyles?.labelFontSize ?? 14}
-                                                    onChange={(e) => setFormStyles(s => ({ ...s, labelFontSize: parseInt(e.target.value) }))}
-                                                    style={{ flex: 1, background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${((formStyles?.labelFontSize ?? 14) - 11) * 100 / (20 - 11)}%, #e5e7eb ${((formStyles?.labelFontSize ?? 14) - 11) * 100 / (20 - 11)}%, #e5e7eb 100%)` }}
+                                                    onChange={(val) => setFormStyles(s => ({ ...s, labelFontSize: Number(val) }))}
+                                                    output
                                                 />
-                                                <span style={{ fontSize: 13, fontWeight: 600, minWidth: 28 }}>{formStyles?.labelFontSize ?? 14}</span>
                                             </div>
                                         </div>
                                         <button
@@ -3588,17 +3631,16 @@ export default function SettingsPage() {
                                         <h3 className="card-title"><span>📦</span> Order Settings</h3>
                                         <div className="input-group">
                                             <label className="input-label">Maximum Quantity per Order</label>
-                                            <div className="range-group" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                                                <input
-                                                    type="range"
-                                                    className="range-slider"
-                                                    min="1"
-                                                    max="50"
+                                            <div style={{ padding: '0 8px', width: '100%' }}>
+                                                <RangeSlider
+                                                    labelHidden
+                                                    label="Maximum Quantity"
+                                                    min={1}
+                                                    max={50}
                                                     value={maxQuantity}
-                                                    onChange={(e) => setMaxQuantity(parseInt(e.target.value))}
-                                                    style={{ flex: 1, background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${((maxQuantity - 1) * 100 / (50 - 1))}%, #e5e7eb ${((maxQuantity - 1) * 100 / (50 - 1))}%, #e5e7eb 100%)` }}
+                                                    onChange={(val) => setMaxQuantity(Number(val))}
+                                                    output
                                                 />
-                                                <span className="range-value">{maxQuantity}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -3859,17 +3901,16 @@ export default function SettingsPage() {
 
                                     <div className="settings-card">
                                         <h3 className="card-title"><span>⭕</span> Border Radius</h3>
-                                        <div className="range-group" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                                            <input
-                                                type="range"
-                                                className="range-slider"
-                                                min="0"
-                                                max="24"
+                                        <div style={{ padding: '0 8px', width: '100%' }}>
+                                            <RangeSlider
+                                                labelHidden
+                                                label="Border Radius"
+                                                min={0}
+                                                max={24}
                                                 value={borderRadius}
-                                                onChange={(e) => setBorderRadius(parseInt(e.target.value))}
-                                                style={{ flex: 1, background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${(borderRadius - 0) * 100 / (24 - 0)}%, #e5e7eb ${(borderRadius - 0) * 100 / (24 - 0)}%, #e5e7eb 100%)` }}
+                                                onChange={(val) => setBorderRadius(Number(val))}
+                                                output
                                             />
-                                            <span className="range-value">{borderRadius}px</span>
                                         </div>
                                     </div>
 
