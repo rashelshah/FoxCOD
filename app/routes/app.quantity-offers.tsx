@@ -1663,10 +1663,10 @@ const styles = `
     .qo-header-left h1 { margin: 0; font-size: 18px; font-weight: 600; }
     .btn-back { background: none; border: none; font-size: 18px; cursor: pointer; padding: 4px 8px; }
     .status-toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; }
-    .toggle-track { width: 40px; height: 22px; background: #e5e5e5; border-radius: 11px; position: relative; transition: 0.2s; }
-    .status-toggle.on .toggle-track { background: #10b981; }
-    .toggle-thumb { width: 18px; height: 18px; background: #fff; border-radius: 50%; position: absolute; top: 2px; left: 2px; transition: 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
-    .status-toggle.on .toggle-thumb { left: 20px; }
+    .toggle-track { width: 44px; height: 24px; background: var(--p-color-bg-surface-secondary-active, #dfe3e8); border-radius: 12px; position: relative; transition: 0.2s cubic-bezier(0.25, 0.1, 0.25, 1); }
+    .status-toggle.on .toggle-track { background: var(--p-color-bg-fill-inverse, #1a1a1a); }
+    .toggle-thumb { width: 20px; height: 20px; background: #fff; border-radius: 50%; position: absolute; top: 2px; left: 2px; transition: 0.2s cubic-bezier(0.25, 0.1, 0.25, 1); box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06); }
+    .status-toggle.on .toggle-thumb { left: 22px; }
     .status-toggle span { font-size: 12px; color: #10b981; background: #d1fae5; padding: 2px 8px; border-radius: 4px; }
     .status-toggle:not(.on) span { color: #6b7280; background: #f3f4f6; }
     .btn-save { background: #1f2937; color: #fff; border: none; padding: 10px 24px; border-radius: 8px; font-weight: 600; cursor: pointer; }
