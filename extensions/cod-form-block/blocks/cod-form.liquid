@@ -89,7 +89,9 @@
 {% assign cod_partial_enabled = shop.metafields.fox_cod.partial_cod_enabled | default: 'false' %}
 {% assign cod_partial_advance = shop.metafields.fox_cod.partial_cod_advance_amount | default: '100' %}
 
-{% comment %} Quantity Offers Settings {% endcomment %}
+{% comment %} Shipping Rates Settings {% endcomment %}
+{% assign cod_shipping_rates_enabled = shop.metafields.fox_cod.shipping_rates_enabled | default: 'false' %}
+{% assign cod_shipping_rates_json = shop.metafields.fox_cod.shipping_rates_json | default: '[]' %}
 {% assign cod_quantity_offers = shop.metafields.fox_cod.quantity_offers_json.value | default: '[]' %}
 
 {% comment %} DEBUG: Quantity offers metafield check {% endcomment %}
@@ -126,6 +128,8 @@
      data-button-border-color="{{ btn_styles.borderColor | default: cod_primary_color }}"
      data-button-border-width="{{ btn_styles.borderWidth | default: 0 }}"
      data-shipping-options="{{ cod_shipping_options | escape }}"
+     data-shipping-rates-enabled="{{ cod_shipping_rates_enabled }}"
+     data-shipping-rates="{{ cod_shipping_rates_json | escape }}"
      data-modal-style="{{ cod_modal_style }}"
      data-anim-style="{{ cod_anim_style }}"
      data-border-radius="{{ cod_border_radius }}"
@@ -147,7 +151,7 @@
      data-quantity-offers="{{ cod_quantity_offers | escape }}">
 </div>
 
-{% comment %} Inject quantity offers into global scope for reliable JavaScript access {% endcomment %}
+{% comment %} Inject settings into global scope for reliable JavaScript access {% endcomment %}
 <script>
   window.FoxCod = window.FoxCod || {};
   try {
@@ -155,10 +159,19 @@
     var offersData = {{ shop.metafields.fox_cod.quantity_offers_json.value | json }};
     window.FoxCod.quantityOffers = Array.isArray(offersData) ? offersData : (offersData ? [offersData] : []);
     window.FoxCod.productId = '{{ product.id }}';
+    
+    // Shipping rates
+    var shippingRatesData = {{ shop.metafields.fox_cod.shipping_rates_json.value | json }};
+    window.FoxCod.shippingRates = Array.isArray(shippingRatesData) ? shippingRatesData : (shippingRatesData ? [shippingRatesData] : []);
+    window.FoxCod.shippingRatesEnabled = {{ shop.metafields.fox_cod.shipping_rates_enabled.value | default: 'false' | json }};
+    
     console.log('[FoxCod] Offers injected:', window.FoxCod.quantityOffers?.length || 0, 'groups');
+    console.log('[FoxCod] Shipping rates injected:', window.FoxCod.shippingRates?.length || 0, 'rates');
   } catch (e) {
-    console.error('[FoxCod] Failed to parse quantity offers:', e);
+    console.error('[FoxCod] Failed to parse settings:', e);
     window.FoxCod.quantityOffers = [];
+    window.FoxCod.shippingRates = [];
+    window.FoxCod.shippingRatesEnabled = false;
   }
 </script>
 

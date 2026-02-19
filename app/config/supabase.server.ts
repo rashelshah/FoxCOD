@@ -160,6 +160,8 @@ export interface FormSettings {
     partial_cod_enabled?: boolean;
     partial_cod_advance_amount?: number;
     partial_cod_commission?: number;
+    // Shipping rates settings
+    shipping_rates_enabled?: boolean;
 }
 
 /**
@@ -229,6 +231,8 @@ export async function saveFormSettings(settings: FormSettings) {
                 partial_cod_enabled: settings.partial_cod_enabled ?? false,
                 partial_cod_advance_amount: settings.partial_cod_advance_amount ?? 100,
                 partial_cod_commission: settings.partial_cod_commission ?? 0,
+                // Shipping rates settings
+                shipping_rates_enabled: settings.shipping_rates_enabled ?? false,
             },
             { onConflict: 'shop_domain' }
         )
