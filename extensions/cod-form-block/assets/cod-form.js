@@ -130,7 +130,10 @@
             (dataContainer.dataset.productCollectionIds ? dataContainer.dataset.productCollectionIds.split(',').filter(function(id) { return id.trim() !== ''; }) : []),
         
         // Quantity Offers Configuration - prefer window.FoxCod for reliability
-        quantityOffers: (window.FoxCod && window.FoxCod.quantityOffers) || safeJSONParse(dataContainer.dataset.quantityOffers, [])
+        quantityOffers: (window.FoxCod && window.FoxCod.quantityOffers) || safeJSONParse(dataContainer.dataset.quantityOffers, []),
+        
+        // Upsell Offers Configuration
+        upsellOffers: (window.FoxCod && window.FoxCod.upsellOffers) || safeJSONParse(dataContainer.dataset.upsellOffers, { tick_upsells: [], click_upsells: [], downsells: [] })
       };
 
       // Debug: Log quantity offers data
@@ -881,6 +884,9 @@
     if (config.blocks && config.blocks.buyer_marketing) {
         renderMarketingCheckbox(form, config);
     }
+    
+    // 4.5 Render Tick Upsells if available
+    renderTickUpsells(form, config);
     
     // 5. Apply Modal Styles
     applyModalStyles(container, config);
@@ -1914,25 +1920,53 @@
       var shipping = parseFloat(shippingPrice) || 0;
       var subtotal = productPrice * quantity;
       var discount = subtotal * (discountPercent / 100);
-      var total = subtotal - discount + shipping;
+
+      // Calculate tick upsell total
+      var tickUpsellTotal = 0;
+      var tickUpsellItems = [];
+      var tickRows = form.querySelectorAll('.cod-tick-upsell-row');
+      tickRows.forEach(function(row) {
+          var cb = row.querySelector('input[type="checkbox"]');
+          if (cb && cb.checked) {
+              var price = parseFloat(row.getAttribute('data-offer-price')) || 0;
+              tickUpsellTotal += price;
+              // Get title from the row
+              var titleEl = row.querySelector('div[style*="font-weight"] div[style*="font-weight"]') || row.querySelector('div div');
+              var titleText = titleEl ? titleEl.textContent : 'Upsell';
+              tickUpsellItems.push({ title: titleText, price: price });
+          }
+      });
+
+      var total = subtotal - discount + shipping + tickUpsellTotal;
       
       var summaryEl = form.querySelector('.cod-order-summary') || modal.querySelector('.cod-order-summary');
       if (summaryEl) {
           // Re-render the full summary HTML to keep everything in sync
-          summaryEl.innerHTML = 
+          var html = 
             '<div style="font-weight:600; margin-bottom:8px; display:flex; align-items:center;">' +
             '   🧾 Order Summary' +
             '</div>' +
             '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#6b7280;">' +
             '   <span>Subtotal (' + quantity + ' ' + (quantity === 1 ? 'item' : 'items') + ')</span>' +
             '   <span id="cod-summary-subtotal">' + formatMoney(subtotal) + '</span>' +
-            '</div>' +
-            (discount > 0 ? 
-            '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#10b981;">' +
+            '</div>';
+          
+          if (discount > 0) {
+            html += '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#10b981;">' +
             '   <span>Bundle Discount (' + discountPercent + '%)</span>' +
             '   <span id="cod-summary-discount">-' + formatMoney(discount) + '</span>' +
-            '</div>' : '') +
-            '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#6b7280;">' +
+            '</div>';
+          }
+
+          // Add tick upsell line items
+          tickUpsellItems.forEach(function(item) {
+            html += '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#059669;">' +
+            '   <span>' + item.title + '</span>' +
+            '   <span>' + formatMoney(item.price) + '</span>' +
+            '</div>';
+          });
+
+          html += '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#6b7280;">' +
             '   <span>Shipping</span>' +
             '   <span id="cod-summary-shipping">' + (shipping === 0 ? 'FREE' : formatMoney(shipping)) + '</span>' +
             '</div>' +
@@ -1940,6 +1974,8 @@
             '   <span>Total</span>' +
             '   <span id="cod-summary-total" style="color:' + config.primaryColor + '">' + formatMoney(total) + '</span>' +
             '</div>';
+          
+          summaryEl.innerHTML = html;
       } else {
           // Fallback: update individual elements if summary container not found
           var shipEl = form.querySelector('#cod-summary-shipping');
@@ -1950,6 +1986,17 @@
           if (totalEl) totalEl.textContent = formatMoney(total);
           if (subEl) subEl.textContent = formatMoney(subtotal);
       }
+  }
+
+  // Separate function to update order summary with tick upsells (called from tick upsell change handlers)
+  function updateOrderSummaryWithTickUpsells(form, config) {
+      var sp = 0;
+      var sel = form.querySelector('input[name="shipping_method"]:checked');
+      if (sel && config.shippingOptions && config.shippingOptions.options) {
+          var o = config.shippingOptions.options.find(function(x) { return x.id === sel.value; });
+          if (o) sp = o.price;
+      }
+      updateTotalHelper(form, config, sp);
   }
 
   function formatMoney(amount) {
@@ -2271,6 +2318,339 @@
     document.body.style.overflow = '';
   }
 
+  // =============================================
+  // UPSELL RENDERING FUNCTIONS
+  // =============================================
+
+  /**
+   * Check if an upsell should show for the current product
+   */
+  function shouldShowUpsell(campaign, config) {
+      if (campaign.show_condition_type === 'always') return true;
+      if (campaign.show_condition_type === 'specific_products') {
+          var currentId = String(config.productId);
+          return (campaign.trigger_product_ids || []).some(function(tid) {
+              var tidStr = String(tid);
+              return tidStr === currentId || tidStr.includes(currentId) || currentId.includes(tidStr);
+          });
+      }
+      return true;
+  }
+
+  function getOfferPrice(offer) {
+      if (!offer) return 0;
+      var orig = offer.original_price || 0;
+      if (offer.discount_type === 'percentage') return Math.round((orig - orig * (offer.discount_value || 0) / 100) * 100) / 100;
+      return Math.max(0, orig - (offer.discount_value || 0));
+  }
+
+  function renderTickUpsells(form, config) {
+      var data = config.upsellOffers;
+      if (!data || !data.tick_upsells || data.tick_upsells.length === 0) return;
+      var campaigns = data.tick_upsells.filter(function(c) { return shouldShowUpsell(c, config); });
+      if (campaigns.length === 0) return;
+
+      var container = document.createElement('div');
+      container.className = 'cod-tick-upsells';
+      container.style.cssText = 'margin: 16px 0; display: flex; flex-direction: column; gap: 10px;';
+
+      // Inject marching ants animation CSS once
+      if (!document.getElementById('cod-tick-anim-css')) {
+          var animStyle = document.createElement('style');
+          animStyle.id = 'cod-tick-anim-css';
+          animStyle.textContent = '@keyframes cod-marching-ants{to{stroke-dashoffset:-20}}';
+          document.head.appendChild(animStyle);
+      }
+
+      campaigns.forEach(function(campaign) {
+          var design = campaign.design || {};
+          var acceptBtn = design.acceptButton || {};
+          (campaign.offers || []).forEach(function(offer) {
+              var offerPrice = offer.original_price || 0;
+              var borderStyle = acceptBtn.borderStyle || 'dashed';
+              var borderColor = acceptBtn.borderColor || acceptBtn.bgColor || '#10b981';
+              var borderWidth = acceptBtn.borderWidth || 2;
+              var borderRadius = acceptBtn.borderRadius || 10;
+
+              var row = document.createElement('label');
+              row.className = 'cod-tick-upsell-row';
+              row.setAttribute('data-campaign-id', campaign.id);
+              row.setAttribute('data-offer-id', offer.id);
+              row.setAttribute('data-offer-price', String(offerPrice));
+
+              var baseCss = 'display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: ' + borderRadius + 'px; background: ' + (design.bgColor || '#f0fdf4') + '; cursor: pointer; transition: all 0.2s; position: relative;';
+
+              if (borderStyle === 'none') {
+                  baseCss += ' border: none;';
+              } else if (borderStyle === 'dashed_animation') {
+                  baseCss += ' border: none; overflow: hidden;';
+              } else {
+                  baseCss += ' border: ' + borderWidth + 'px ' + borderStyle + ' ' + borderColor + ';';
+              }
+
+              row.style.cssText = baseCss;
+
+              // Add SVG overlay for dashed animation
+              if (borderStyle === 'dashed_animation') {
+                  var svgNS = 'http://www.w3.org/2000/svg';
+                  var svg = document.createElementNS(svgNS, 'svg');
+                  svg.style.cssText = 'position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none;';
+                  var rect = document.createElementNS(svgNS, 'rect');
+                  rect.setAttribute('x', '1');
+                  rect.setAttribute('y', '1');
+                  rect.setAttribute('width', 'calc(100% - 2px)');
+                  rect.setAttribute('height', 'calc(100% - 2px)');
+                  rect.setAttribute('rx', String(borderRadius));
+                  rect.setAttribute('ry', String(borderRadius));
+                  rect.setAttribute('fill', 'none');
+                  rect.setAttribute('stroke', borderColor);
+                  rect.setAttribute('stroke-width', String(borderWidth));
+                  rect.setAttribute('stroke-dasharray', '8 4');
+                  rect.style.animation = 'cod-marching-ants 0.4s linear infinite';
+                  svg.appendChild(rect);
+                  row.appendChild(svg);
+              }
+
+              var cb = document.createElement('input');
+              cb.type = 'checkbox'; cb.name = 'tick_upsell_' + campaign.id + '_' + offer.id;
+              cb.checked = campaign.checkbox_default_checked || false;
+              cb.style.cssText = 'width: 20px; height: 20px; accent-color: ' + (acceptBtn.bgColor || '#10b981') + '; flex-shrink: 0;';
+              row.appendChild(cb);
+
+              if (offer.upsell_product_image) {
+                  var img = document.createElement('img');
+                  img.src = offer.upsell_product_image;
+                  img.style.cssText = 'width: 44px; height: 44px; border-radius: 8px; object-fit: cover; flex-shrink: 0;';
+                  row.appendChild(img);
+              }
+
+              var info = document.createElement('div');
+              info.style.cssText = 'flex: 1; color: ' + (design.headerTextColor || '#1f2937') + ';';
+              var title = document.createElement('div');
+              title.style.cssText = 'font-weight: 600; font-size: ' + (design.headerTextSize || 14) + 'px; margin-bottom: 2px;';
+              // Resolve {{title}} and {{price}} placeholders
+              var headerText = design.headerText || ('Add ' + (offer.upsell_product_title || 'this product') + ' for ₹' + offerPrice);
+              headerText = headerText.replace('{{title}}', offer.upsell_product_title || 'this product');
+              headerText = headerText.replace('{{price}}', '₹' + offerPrice);
+              title.textContent = headerText;
+              info.appendChild(title);
+
+              var priceDiv = document.createElement('div');
+              priceDiv.style.cssText = 'font-size: 13px;';
+              priceDiv.innerHTML = '<strong style="color: #059669;">₹' + offerPrice + '</strong>';
+              info.appendChild(priceDiv);
+              row.appendChild(info);
+
+              cb.addEventListener('change', function() {
+                  row.style.borderColor = cb.checked ? (borderColor) : (borderColor) + '30';
+                  row.style.background = cb.checked ? (design.bgColor || '#f0fdf4') : '#fafafa';
+                  // Update order summary including tick upsells
+                  updateOrderSummaryWithTickUpsells(form, config);
+              });
+              container.appendChild(row);
+
+              // If default checked, trigger initial order summary update after rendering
+              if (campaign.checkbox_default_checked) {
+                  setTimeout(function() { updateOrderSummaryWithTickUpsells(form, config); }, 200);
+              }
+          });
+      });
+
+      var submitBtn = form.querySelector('button[type="submit"]');
+      if (submitBtn) submitBtn.parentNode.insertBefore(container, submitBtn);
+      else form.appendChild(container);
+      console.log('[COD Form] Rendered tick upsells');
+  }
+
+  function getCheckedTickUpsells(form, config) {
+      var items = [];
+      var data = config.upsellOffers;
+      if (!data || !data.tick_upsells) return items;
+      data.tick_upsells.forEach(function(campaign) {
+          (campaign.offers || []).forEach(function(offer) {
+              var cb = form.querySelector('input[name="tick_upsell_' + campaign.id + '_' + offer.id + '"]');
+              if (cb && cb.checked) {
+                  items.push({ product_id: offer.upsell_product_id, variant_id: offer.upsell_variant_id, title: offer.upsell_product_title, price: offer.original_price || 0, quantity: 1, type: 'tick_upsell' });
+              }
+          });
+      });
+      return items;
+  }
+
+  function buildUpsellModalHTML(campaign, offer, offerIndex) {
+      var design = campaign.design || {};
+      var timer = design.timer || {};
+      var discountTag = design.discountTag || {};
+      var acceptBtn = design.acceptButton || {};
+      var rejectBtn = design.rejectButton || {};
+      var offerPrice = getOfferPrice(offer);
+      var hasDiscount = offer.discount_value > 0;
+      var discountLabel = offer.discount_type === 'percentage' ? offer.discount_value + '%' : '₹' + offer.discount_value;
+
+      var html = '<div style="padding: 24px; text-align: center; background: ' + (design.bgColor || '#fff') + ';">';
+      html += '<h2 style="font-size: ' + (design.headerTextSize || 20) + 'px; color: ' + (design.headerTextColor || '#000') + '; font-weight: ' + (design.headerBold ? '700' : '400') + '; margin: 0 0 4px;">' + (design.headerText || "You've unlocked a special deal") + '</h2>';
+      html += '<p style="font-size: 14px; color: #6b7280; margin: 0 0 12px;">' + (design.subheaderText || 'Only for a limited time!') + '</p>';
+
+      if (timer.enabled) {
+          html += '<div class="cod-upsell-timer" style="background: ' + (timer.bgColor || '#fdf6f6') + '; color: ' + (timer.textColor || '#ef4444') + '; padding: 10px 20px; border-radius: 8px; margin: 0 0 16px; font-weight: 600; white-space: pre-line;" data-minutes="' + (timer.minutes || 10) + '">';
+          html += (timer.text || 'Hurry! sale ends in\n{time}').replace('{time}', '<span class="cod-timer-value">' + String(timer.minutes || 10).padStart(2, '0') + ':00</span>');
+          html += '</div>';
+      }
+
+      if (offer.upsell_product_image) {
+          html += '<div style="position: relative; margin: 0 0 12px;"><img src="' + offer.upsell_product_image + '" style="max-width: 200px; max-height: 200px; object-fit: contain;" /></div>';
+      }
+      html += '<div style="font-size: 14px; margin-bottom: 8px;">' + (offer.upsell_product_title || 'Product') + '</div>';
+
+      if (hasDiscount) {
+          html += '<div style="margin-bottom: 8px;"><span style="display: inline-block; padding: 4px 16px; border-radius: ' + (discountTag.borderRadius || 20) + 'px; background: ' + (discountTag.bgColor || '#ec4899') + '; color: ' + (discountTag.textColor || '#fff') + '; font-size: ' + (discountTag.textSize || 14) + 'px; font-weight: 700;">' + (discountTag.text || '- {discount}').replace('{discount}', discountLabel) + '</span></div>';
+      }
+
+      html += '<div style="margin-bottom: 20px;">';
+      if (hasDiscount) html += '<s style="color: #9ca3af; font-size: 14px; margin-right: 8px;">₹' + offer.original_price.toFixed(2) + '</s>';
+      html += '<strong style="font-size: 20px; color: #1f2937;">₹' + offerPrice.toFixed(2) + '</strong></div>';
+
+      // Determine animation class for accept button
+      var animClass = '';
+      if (acceptBtn.animation && acceptBtn.animation !== 'none') {
+          animClass = ' cod-upsell-anim-' + acceptBtn.animation;
+      }
+
+      // Inject animation keyframes CSS if needed
+      if (animClass) {
+          html += '<style>';
+          html += '@keyframes cod-up-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}';
+          html += '@keyframes cod-up-bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}';
+          html += '@keyframes cod-up-shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-3px)}40%{transform:translateX(3px)}60%{transform:translateX(-2px)}80%{transform:translateX(2px)}}';
+          html += '.cod-upsell-anim-pulse{animation:cod-up-pulse 1.5s ease-in-out infinite}';
+          html += '.cod-upsell-anim-bounce{animation:cod-up-bounce 1s ease-in-out infinite}';
+          html += '.cod-upsell-anim-shake{animation:cod-up-shake .5s ease-in-out infinite}';
+          html += '</style>';
+      }
+
+      html += '<button class="cod-upsell-accept' + animClass + '" style="display: block; width: 100%; padding: 14px; margin-bottom: 8px; background: ' + (acceptBtn.bgColor || '#000') + '; color: ' + (acceptBtn.textColor || '#fff') + '; font-size: ' + (acceptBtn.textSize || 16) + 'px; font-weight: ' + (acceptBtn.bold ? '700' : '400') + '; border: ' + (acceptBtn.borderWidth || 0) + 'px solid ' + (acceptBtn.borderColor || '#000') + '; border-radius: ' + (acceptBtn.borderRadius || 8) + 'px; cursor: pointer; box-shadow: ' + (acceptBtn.shadow ? '0 4px 12px rgba(0,0,0,.15)' : 'none') + ';">' + (acceptBtn.text || 'Yes, add to my order') + '</button>';
+      html += '<button class="cod-upsell-decline" style="display: block; width: 100%; padding: 12px; background: ' + (rejectBtn.bgColor || '#fff') + '; color: ' + (rejectBtn.textColor || '#000') + '; font-size: ' + (rejectBtn.textSize || 16) + 'px; border: ' + (rejectBtn.borderWidth || 1) + 'px solid ' + (rejectBtn.borderColor || '#000') + '; border-radius: ' + (rejectBtn.borderRadius || 8) + 'px; cursor: pointer; box-shadow: ' + (rejectBtn.shadow ? '0 4px 12px rgba(0,0,0,.15)' : 'none') + ';">' + (rejectBtn.text || 'No thanks') + '</button>';
+      html += '</div>';
+      return html;
+  }
+
+  function startUpsellTimer(overlay) {
+      var timerEl = overlay.querySelector('.cod-upsell-timer');
+      if (!timerEl) return;
+      var minutes = parseInt(timerEl.getAttribute('data-minutes')) || 10;
+      var totalSeconds = minutes * 60;
+      var valueEl = timerEl.querySelector('.cod-timer-value');
+      if (!valueEl) return;
+      var interval = setInterval(function() {
+          totalSeconds--;
+          if (totalSeconds <= 0) {
+              clearInterval(interval);
+              valueEl.textContent = '00:00';
+              timerEl.innerHTML = '<strong>⏰ Offer expired! Decide now before it\'s gone.</strong>';
+              return;
+          }
+          var m = Math.floor(totalSeconds / 60); var s = totalSeconds % 60;
+          valueEl.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+      }, 1000);
+      overlay._timerInterval = interval;
+  }
+
+  function showClickUpsellModal(form, config, productId, onComplete) {
+      var data = config.upsellOffers;
+      if (!data || !data.click_upsells || data.click_upsells.length === 0) { onComplete([]); return false; }
+      var campaigns = data.click_upsells.filter(function(c) { return shouldShowUpsell(c, config); });
+      if (campaigns.length === 0) { onComplete([]); return false; }
+
+      var campaign = campaigns[0];
+      var offers = campaign.offers || [];
+      if (offers.length === 0) { onComplete([]); return false; }
+
+      var acceptedItems = [];
+      showOfferSequence(form, config, productId, campaign, offers, 0, acceptedItems, onComplete);
+      return true;
+  }
+
+  function showOfferSequence(form, config, productId, campaign, offers, offerIndex, acceptedItems, onComplete) {
+      if (offerIndex >= offers.length) {
+          // All offers shown, check for linked downsell if last was declined
+          onComplete(acceptedItems);
+          return;
+      }
+      var offer = offers[offerIndex];
+
+      var overlay = document.createElement('div');
+      overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100000; display: flex; align-items: center; justify-content: center; padding: 20px;';
+      var modal = document.createElement('div');
+      modal.style.cssText = 'background: #fff; border-radius: 12px; max-width: 420px; width: 100%; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.2);';
+      modal.innerHTML = buildUpsellModalHTML(campaign, offer, offerIndex);
+      overlay.appendChild(modal);
+      document.body.appendChild(overlay);
+      startUpsellTimer(overlay);
+
+      modal.querySelector('.cod-upsell-accept').addEventListener('click', function() {
+          if (overlay._timerInterval) clearInterval(overlay._timerInterval);
+          console.log('[COD Form] Upsell offer accepted:', offer.upsell_product_title);
+          acceptedItems.push({ product_id: offer.upsell_product_id, variant_id: offer.upsell_variant_id, title: offer.upsell_product_title, price: getOfferPrice(offer), quantity: 1, type: 'click_upsell' });
+          overlay.remove();
+          if (offerIndex + 1 < offers.length) {
+              showOfferSequence(form, config, productId, campaign, offers, offerIndex + 1, acceptedItems, onComplete);
+          } else {
+              onComplete(acceptedItems);
+          }
+      });
+
+      modal.querySelector('.cod-upsell-decline').addEventListener('click', function() {
+          if (overlay._timerInterval) clearInterval(overlay._timerInterval);
+          overlay.remove();
+          if (offerIndex + 1 < offers.length) {
+              showOfferSequence(form, config, productId, campaign, offers, offerIndex + 1, acceptedItems, onComplete);
+          } else if (campaign.linked_downsell_id && config.upsellOffers.downsells) {
+              var ds = config.upsellOffers.downsells.find(function(d) { return d.id === campaign.linked_downsell_id; });
+              if (ds) {
+                  showDownsellModal(form, config, productId, ds, acceptedItems, onComplete);
+              } else {
+                  onComplete(acceptedItems);
+              }
+          } else {
+              onComplete(acceptedItems);
+          }
+      });
+  }
+
+  function showDownsellModal(form, config, productId, dsCampaign, acceptedItems, onComplete) {
+      var offers = dsCampaign.offers || [];
+      if (offers.length === 0) { onComplete(acceptedItems); return; }
+      var offer = offers[0];
+
+      var overlay = document.createElement('div');
+      overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100000; display: flex; align-items: center; justify-content: center; padding: 20px;';
+      var modal = document.createElement('div');
+      modal.style.cssText = 'background: #fff; border-radius: 12px; max-width: 420px; width: 100%; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.2);';
+      modal.innerHTML = buildUpsellModalHTML(dsCampaign, offer, 0);
+      overlay.appendChild(modal);
+      document.body.appendChild(overlay);
+      startUpsellTimer(overlay);
+
+      modal.querySelector('.cod-upsell-accept').addEventListener('click', function() {
+          if (overlay._timerInterval) clearInterval(overlay._timerInterval);
+          console.log('[COD Form] Downsell accepted:', offer.upsell_product_title);
+          acceptedItems.push({ product_id: offer.upsell_product_id, variant_id: offer.upsell_variant_id, title: offer.upsell_product_title, price: getOfferPrice(offer), quantity: 1, type: 'downsell' });
+          overlay.remove();
+          onComplete(acceptedItems);
+      });
+
+      modal.querySelector('.cod-upsell-decline').addEventListener('click', function() {
+          if (overlay._timerInterval) clearInterval(overlay._timerInterval);
+          overlay.remove();
+          onComplete(acceptedItems);
+      });
+  }
+
+  function submitUpsellItem(config, item, originalOrder) {
+      console.log('[COD Form] Recording upsell item for order:', originalOrder.orderId, item);
+  }
+
+
   /**
    * Handle Form Submission
    */
@@ -2303,7 +2683,8 @@
           price: parseFloat(config.productPrice),
           productTitle: config.productTitle,
           shippingLabel: '',
-          shippingPrice: 0
+          shippingPrice: 0,
+          upsell_items: getCheckedTickUpsells(form, config)
       };
       
       // Get selected shipping option
@@ -2321,10 +2702,22 @@
       var selectedPaymentMethod = paymentMethodRadio ? paymentMethodRadio.value : 'full_cod';
       var isPartialCod = selectedPaymentMethod === 'partial_cod';
 
-      console.log('[COD Form] Submitting order:', payload, 'Payment method:', selectedPaymentMethod);
+      console.log('[COD Form] Preparing order:', payload, 'Payment method:', selectedPaymentMethod);
 
-      // Route based on payment method
-      if (isPartialCod && config.partialCodEnabled) {
+      // Check for 1-click upsells BEFORE placing the order
+      var hasClickUpsells = config.upsellOffers && config.upsellOffers.click_upsells && config.upsellOffers.click_upsells.length > 0;
+      var applicableUpsells = hasClickUpsells ? config.upsellOffers.click_upsells.filter(function(c) { return shouldShowUpsell(c, config); }) : [];
+
+      if (applicableUpsells.length > 0 && !isPartialCod) {
+          // Show upsell modal FIRST, then submit the order with accepted items
+          showClickUpsellModal(form, config, productId, function(acceptedUpsellItems) {
+              // Merge accepted click upsell items into the payload
+              payload.upsell_items = (payload.upsell_items || []).concat(acceptedUpsellItems);
+              console.log('[COD Form] Upsell flow complete. Accepted items:', acceptedUpsellItems.length, 'Submitting order...');
+              submitFullCodOrder(form, config, productId, payload, submitBtn, originalBtnText);
+          });
+          return; // STOP HERE - do NOT fall through to submitFullCodOrder
+      } else if (isPartialCod && config.partialCodEnabled) {
           // Partial COD: Call create-checkout endpoint and redirect to Shopify checkout  
           var partialCodPayload = {
               ...payload,
@@ -2373,6 +2766,16 @@
 
           return; // Exit - partial COD handling complete
       }
+
+      // Full COD with no upsells: Submit directly
+      submitFullCodOrder(form, config, productId, payload, submitBtn, originalBtnText);
+  }
+
+  /**
+   * Submit Full COD Order (called after upsell flow completes)
+   */
+  function submitFullCodOrder(form, config, productId, payload, submitBtn, originalBtnText) {
+      console.log('[COD Form] Submitting full COD order with upsell_items:', payload.upsell_items);
 
       // Full COD: Send to regular backend
       fetch(config.proxyUrl + '/api/orders/', {

@@ -463,6 +463,34 @@ export default function OrderDetailPage() {
                         </div>
                     </div>
 
+                    {/* Upsell Items */}
+                    {order.customer_notes && order.customer_notes.includes('UPSELL ITEMS') && (
+                        <div className="order-card">
+                            <div className="order-card-header">
+                                <h2>🎯 Upsell Items</h2>
+                            </div>
+                            <div className="order-card-body">
+                                {order.customer_notes.split('\n').filter((line: string) => line.trim().startsWith('-')).map((line: string, idx: number) => {
+                                    const match = line.match(/-\s*(.+?)\s*\(₹([\d.]+)\)\s*x(\d+)\s*\[(.+?)\]/);
+                                    if (!match) return null;
+                                    const [, title, price, qty, type] = match;
+                                    return (
+                                        <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: '10px', background: '#f0fdf4', marginBottom: idx < order.customer_notes.split('\n').filter((l: string) => l.trim().startsWith('-')).length - 1 ? '8px' : '0', border: '1px solid #d1fae5' }}>
+                                            <div>
+                                                <div style={{ fontWeight: 600, fontSize: '14px', color: '#111827' }}>{title}</div>
+                                                <span style={{ display: 'inline-block', marginTop: '4px', padding: '2px 8px', borderRadius: '6px', background: type === 'click_upsell' ? '#dbeafe' : type === 'downsell' ? '#fef3c7' : '#e0e7ff', color: type === 'click_upsell' ? '#1d4ed8' : type === 'downsell' ? '#92400e' : '#4338ca', fontSize: '11px', fontWeight: 600 }}>{type === 'click_upsell' ? '1-Click Upsell' : type === 'downsell' ? 'Downsell' : 'Tick Upsell'}</span>
+                                            </div>
+                                            <div style={{ textAlign: 'right' }}>
+                                                <div style={{ fontWeight: 700, fontSize: '16px', color: '#059669' }}>{formatCurrency(parseFloat(price))}</div>
+                                                <div style={{ fontSize: '12px', color: '#6b7280' }}>x{qty}</div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Update Status */}
                     <div className="order-card">
                         <div className="order-card-header">

@@ -93,6 +93,7 @@
 {% assign cod_shipping_rates_enabled = shop.metafields.fox_cod.shipping_rates_enabled | default: 'false' %}
 {% assign cod_shipping_rates_json = shop.metafields.fox_cod.shipping_rates_json | default: '[]' %}
 {% assign cod_quantity_offers = shop.metafields.fox_cod.quantity_offers_json.value | default: '[]' %}
+{% assign cod_upsell_offers = shop.metafields.fox_cod.upsells_downsells_json | default: '{}' %}
 
 {% comment %} Build product collection IDs for shipping rate collection matching {% endcomment %}
 {% assign product_collection_ids = '' %}
@@ -159,7 +160,8 @@
      data-click-press="{{ btn_styles.clickPress | default: false }}"
      data-sticky-mobile="{{ btn_styles.stickyOnMobile | default: false }}"
      data-quantity-offers="{{ cod_quantity_offers | escape }}"
-     data-product-collection-ids="{{ product_collection_ids }}">
+     data-product-collection-ids="{{ product_collection_ids }}"
+     data-upsell-offers="{{ cod_upsell_offers | escape }}">
 </div>
 
 {% comment %} Inject settings into global scope for reliable JavaScript access {% endcomment %}
@@ -182,6 +184,11 @@
     console.log('[FoxCod] Offers injected:', window.FoxCod.quantityOffers?.length || 0, 'groups');
     console.log('[FoxCod] Shipping rates injected:', window.FoxCod.shippingRates?.length || 0, 'rates');
     console.log('[FoxCod] Product collection IDs:', window.FoxCod.productCollectionIds);
+    
+    // Upsell offers
+    var upsellData = {{ shop.metafields.fox_cod.upsells_downsells_json.value | json }};
+    window.FoxCod.upsellOffers = upsellData || { tick_upsells: [], click_upsells: [], downsells: [] };
+    console.log('[FoxCod] Upsell offers injected:', window.FoxCod.upsellOffers);
   } catch (e) {
     console.error('[FoxCod] Failed to parse settings:', e);
     window.FoxCod.quantityOffers = [];

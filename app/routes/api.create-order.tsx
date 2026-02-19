@@ -33,6 +33,14 @@ interface OrderRequestBody {
     quantity: number;
     price: number;
     productTitle: string;
+    upsell_items?: Array<{
+        product_id: string;
+        variant_id: string;
+        title: string;
+        price: number;
+        quantity: number;
+        type: string;
+    }>;
 }
 
 /**
@@ -153,6 +161,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         // Generate order name
         const orderName = generateOrderName();
 
+        // Calculate total price including upsells
+        const basePrice = body.price * body.quantity;
+        const upsellTotal = (body.upsell_items || []).reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        const totalPrice = basePrice + upsellTotal;
+
+        // Build notes with upsell details
+        let orderNotes = '';
+        if (body.upsell_items && body.upsell_items.length > 0) {
+            orderNotes = 'UPSELL ITEMS:\n' + body.upsell_items.map(item =>
+                `  - ${item.title} (₹${item.price}) x${item.quantity} [${item.type}]`
+            ).join('\n');
+        }
+
         // Log order in Supabase - this is the primary order storage
         const orderLog = await logOrder({
             shop_domain: body.shop,
@@ -163,7 +184,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             product_title: body.productTitle,
             variant_id: body.variantId,
             quantity: body.quantity,
-            price: (body.price * body.quantity).toString(),
+            price: totalPrice.toString(),
+            notes: orderNotes || undefined,
         });
 
         console.log("[COD Order] Order logged successfully:", orderLog.id, orderName);
