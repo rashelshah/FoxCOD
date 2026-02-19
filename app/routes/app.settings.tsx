@@ -1192,168 +1192,175 @@ const ShippingRateModal = ({ rate, products, onClose, onSave }: ShippingRateModa
     return (
         <div className="modal-overlay" onClick={onClose}>
             <div className="sr-modal" onClick={(e) => e.stopPropagation()}>
-                {/* Clean Header */}
+                {/* Unique Header - dark with accent */}
                 <div className="sr-modal-header">
-                    <h3>{rate ? 'Edit rate' : 'Add rate'}</h3>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div className="sr-header-icon">📦</div>
+                        <div>
+                            <h3 style={{ margin: 0 }}>{rate ? 'Edit Shipping Rate' : 'New Shipping Rate'}</h3>
+                            <span style={{ fontSize: '12px', opacity: 0.7 }}>Configure pricing, conditions and restrictions</span>
+                        </div>
+                    </div>
                     <button className="sr-close-btn" onClick={onClose}>
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                     </button>
                 </div>
 
                 <div className="sr-modal-body">
-                    {/* Rate name + description side by side */}
-                    <div className="sr-row">
-                        <div className="sr-field" style={{ flex: 1 }}>
-                            <label className="sr-label">Rate name</label>
-                            <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Free Shipping" className="sr-input" />
-                            <span className="sr-hint">Customers will see this at checkout.</span>
+                    {/* Section: Basic Info */}
+                    <div className="sr-section">
+                        <div className="sr-section-title">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                            Rate Details
                         </div>
-                        <div className="sr-field" style={{ flex: 1 }}>
-                            <label className="sr-label">Rate description</label>
-                            <input type="text" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Subtitle, Ex: 2-3 days" className="sr-input" />
-                        </div>
-                    </div>
-
-                    {/* Price */}
-                    <div className="sr-field">
-                        <label className="sr-label">Price</label>
-                        <div className="sr-price-row">
-                            <div className="sr-price-input-wrap">
-                                <span className="sr-currency">₹</span>
-                                <input type="number" value={price} onChange={(e) => setPrice(Number(e.target.value))} min="0" placeholder="0" className="sr-input sr-price-input" />
+                        <div className="sr-row">
+                            <div className="sr-field" style={{ flex: 1 }}>
+                                <label className="sr-label">Name <span style={{ color: '#ef4444' }}>*</span></label>
+                                <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Standard Shipping" className="sr-input" />
                             </div>
-                            <button type="button" className={`sr-free-btn ${price === 0 ? 'active' : ''}`} onClick={() => setPrice(0)}>Free</button>
+                            <div className="sr-field" style={{ flex: 1 }}>
+                                <label className="sr-label">Description</label>
+                                <input type="text" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g., Delivers in 2-3 days" className="sr-input" />
+                            </div>
+                        </div>
+                        <div className="sr-field">
+                            <label className="sr-label">Price</label>
+                            <div className="sr-price-row">
+                                <div className="sr-price-input-wrap">
+                                    <span className="sr-currency">₹</span>
+                                    <input type="number" value={price} onChange={(e) => setPrice(Number(e.target.value))} min="0" placeholder="0" className="sr-input sr-price-input" />
+                                </div>
+                                <button type="button" className={`sr-free-btn ${price === 0 ? 'active' : ''}`} onClick={() => setPrice(0)}>Free shipping</button>
+                            </div>
                         </div>
                     </div>
 
-                    <div className="sr-divider" />
-
-                    {/* Add conditions */}
-                    <div>
+                    {/* Section: Conditions */}
+                    <div className="sr-section">
+                        <div className="sr-section-title">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
+                            Conditions
+                        </div>
                         {!showConditions ? (
                             <button className="sr-add-conditions-btn" onClick={() => { setShowConditions(true); if (conditionType === 'none') setConditionType('order_price'); }}>
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" /></svg>
-                                Add conditions
+                                + Add conditions to this rate
                             </button>
                         ) : (
                             <div className="sr-conditions-panel">
                                 <div className="sr-conditions-header">
-                                    <span style={{ fontWeight: 600, fontSize: '14px', color: '#1f2937' }}>Conditions</span>
-                                    <button className="sr-remove-link" onClick={() => { setShowConditions(false); setConditionType('none'); setMinValue(''); setMaxValue(''); }}>Remove</button>
+                                    <label className="sr-label" style={{ marginBottom: 0 }}>Based on</label>
+                                    <button className="sr-remove-link" onClick={() => { setShowConditions(false); setConditionType('none'); setMinValue(''); setMaxValue(''); }}>✕ Remove</button>
                                 </div>
-                                <div className="sr-field" style={{ marginBottom: '12px' }}>
-                                    <label className="sr-label">Based on</label>
-                                    <select value={conditionType === 'none' ? 'order_price' : conditionType} onChange={(e) => setConditionType(e.target.value as any)} className="sr-select">
-                                        <option value="order_price">Order price (₹)</option>
-                                        <option value="order_quantity">Order quantity (items)</option>
-                                        <option value="order_weight">Order weight (kg)</option>
-                                    </select>
-                                </div>
+                                <select value={conditionType === 'none' ? 'order_price' : conditionType} onChange={(e) => setConditionType(e.target.value as any)} className="sr-select" style={{ marginBottom: '12px' }}>
+                                    <option value="order_price">Order price (₹)</option>
+                                    <option value="order_quantity">Order quantity (items)</option>
+                                    <option value="order_weight">Order weight (kg)</option>
+                                </select>
                                 <div className="sr-row">
                                     <div className="sr-field" style={{ flex: 1, marginBottom: 0 }}>
-                                        <label className="sr-label">Minimum</label>
-                                        <input type="number" value={minValue} onChange={(e) => setMinValue(e.target.value)} placeholder="No minimum" className="sr-input" />
+                                        <label className="sr-label">Min value</label>
+                                        <input type="number" value={minValue} onChange={(e) => setMinValue(e.target.value)} placeholder="0" className="sr-input" />
                                     </div>
                                     <div className="sr-field" style={{ flex: 1, marginBottom: 0 }}>
-                                        <label className="sr-label">Maximum</label>
-                                        <input type="number" value={maxValue} onChange={(e) => setMaxValue(e.target.value)} placeholder="No maximum" className="sr-input" />
+                                        <label className="sr-label">Max value</label>
+                                        <input type="number" value={maxValue} onChange={(e) => setMaxValue(e.target.value)} placeholder="No limit" className="sr-input" />
                                     </div>
                                 </div>
+                                <span className="sr-hint" style={{ marginTop: '6px', display: 'block' }}>Set max to 0 for no upper limit.</span>
                             </div>
                         )}
                     </div>
 
-                    <div className="sr-divider" />
+                    {/* Section: Restrictions */}
+                    <div className="sr-section">
+                        <div className="sr-section-title">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+                            Restrictions
+                        </div>
 
-                    {/* Restrictions as checkboxes */}
-                    <div className="sr-restrictions">
                         {/* Countries */}
-                        <label className="sr-checkbox-row">
-                            <input type="checkbox" checked={appliesToCountries} onChange={(e) => setAppliesToCountries(e.target.checked)} />
-                            <span>Apply this rate for certain countries only</span>
-                        </label>
-                        {appliesToCountries && (
-                            <div className="sr-restriction-content">
-                                <div className="sr-search-wrap">
-                                    <svg className="sr-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-                                    <input type="text" value={countrySearch} onChange={(e) => setCountrySearch(e.target.value)} placeholder="Shipping to" className="sr-input sr-search-input" />
+                        <div className="sr-restriction-item">
+                            <label className="sr-checkbox-row">
+                                <input type="checkbox" checked={appliesToCountries} onChange={(e) => setAppliesToCountries(e.target.checked)} />
+                                <span>Limit to specific countries</span>
+                            </label>
+                            {appliesToCountries && (
+                                <div className="sr-restriction-content">
+                                    <div className="sr-search-wrap">
+                                        <svg className="sr-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+                                        <input type="text" value={countrySearch} onChange={(e) => setCountrySearch(e.target.value)} placeholder="Search countries..." className="sr-input sr-search-input" />
+                                    </div>
+                                    <div className="sr-tag-list">
+                                        {COUNTRIES.filter(c => !countrySearch || c.name.toLowerCase().includes(countrySearch.toLowerCase())).map(c => (
+                                            <label key={c.code} className={`sr-tag-chip ${selectedCountryCodes.includes(c.code) ? 'selected' : ''}`}>
+                                                <input type="checkbox" checked={selectedCountryCodes.includes(c.code)} onChange={() => toggleCountry(c.code)} style={{ display: 'none' }} />
+                                                <span>{c.name}</span>
+                                            </label>
+                                        ))}
+                                    </div>
                                 </div>
-                                <div className="sr-tag-list">
-                                    {COUNTRIES.map(c => (
-                                        <label key={c.code} className="sr-tag-item">
-                                            <input type="checkbox" checked={selectedCountryCodes.includes(c.code)} onChange={() => toggleCountry(c.code)} />
-                                            <span>{c.name}</span>
-                                        </label>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
+                            )}
+                        </div>
 
                         {/* States */}
-                        <label className="sr-checkbox-row">
-                            <input type="checkbox" checked={appliesToStates} onChange={(e) => setAppliesToStates(e.target.checked)} />
-                            <span>Apply this rate for certain provinces / states only</span>
-                        </label>
-                        {appliesToStates && (
-                            <div className="sr-restriction-content">
-                                <div className="sr-search-wrap">
-                                    <svg className="sr-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
-                                    <input type="text" value={stateSearch} onChange={(e) => setStateSearch(e.target.value)} placeholder="Shipping to" className="sr-input sr-search-input" />
+                        <div className="sr-restriction-item">
+                            <label className="sr-checkbox-row">
+                                <input type="checkbox" checked={appliesToStates} onChange={(e) => setAppliesToStates(e.target.checked)} />
+                                <span>Limit to specific states / provinces</span>
+                            </label>
+                            {appliesToStates && (
+                                <div className="sr-restriction-content">
+                                    <div className="sr-search-wrap">
+                                        <svg className="sr-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+                                        <input type="text" value={stateSearch} onChange={(e) => setStateSearch(e.target.value)} placeholder="Search states..." className="sr-input sr-search-input" />
+                                    </div>
+                                    <div className="sr-tag-list">
+                                        {INDIAN_STATES.filter(s => !stateSearch || s.name.toLowerCase().includes(stateSearch.toLowerCase())).map(s => (
+                                            <label key={s.code} className={`sr-tag-chip ${selectedStateCodes.includes(s.code) ? 'selected' : ''}`}>
+                                                <input type="checkbox" checked={selectedStateCodes.includes(s.code)} onChange={() => toggleState(s.code)} style={{ display: 'none' }} />
+                                                <span>{s.name}</span>
+                                            </label>
+                                        ))}
+                                    </div>
                                 </div>
-                                <div className="sr-tag-list">
-                                    {INDIAN_STATES.map(s => (
-                                        <label key={s.code} className="sr-tag-item">
-                                            <input type="checkbox" checked={selectedStateCodes.includes(s.code)} onChange={() => toggleState(s.code)} />
-                                            <span>{s.name}</span>
-                                        </label>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="sr-divider" />
+                            )}
+                        </div>
 
                         {/* Products */}
-                        <label className="sr-checkbox-row">
-                            <input type="checkbox" checked={appliesToProducts} onChange={(e) => setAppliesToProducts(e.target.checked)} />
-                            <span>Apply this rate for certain products only</span>
-                        </label>
-                        {appliesToProducts && (
-                            <div className="sr-restriction-content">
-                                <input type="text" value={productSearch} onChange={(e) => setProductSearch(e.target.value)} placeholder="Search products..." className="sr-input" style={{ marginBottom: '8px' }} />
-                                <div className="sr-tag-list">
-                                    {filteredProducts.map(product => (
-                                        <label key={product.id} className="sr-tag-item">
-                                            <input type="checkbox" checked={selectedProductIds.includes(product.id)} onChange={() => toggleProduct(product.id)} />
-                                            <span>{product.title}</span>
-                                        </label>
-                                    ))}
+                        <div className="sr-restriction-item">
+                            <label className="sr-checkbox-row">
+                                <input type="checkbox" checked={appliesToProducts} onChange={(e) => setAppliesToProducts(e.target.checked)} />
+                                <span>Limit to specific products</span>
+                            </label>
+                            {appliesToProducts && (
+                                <div className="sr-restriction-content">
+                                    <input type="text" value={productSearch} onChange={(e) => setProductSearch(e.target.value)} placeholder="Search products..." className="sr-input" style={{ marginBottom: '8px' }} />
+                                    <div className="sr-tag-list">
+                                        {filteredProducts.map(product => (
+                                            <label key={product.id} className={`sr-tag-chip ${selectedProductIds.includes(product.id) ? 'selected' : ''}`}>
+                                                <input type="checkbox" checked={selectedProductIds.includes(product.id)} onChange={() => toggleProduct(product.id)} style={{ display: 'none' }} />
+                                                <span>{product.title}</span>
+                                            </label>
+                                        ))}
+                                    </div>
                                 </div>
-                                {selectedProductIds.length > 0 && (
-                                    <button type="button" className="sr-select-products-btn">Select products ({selectedProductIds.length} selected)</button>
-                                )}
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="sr-divider" />
-
-                    {/* Rate summary */}
-                    <div className="sr-rate-summary">
-                        <div className="sr-rate-summary-row">
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <div className={`sr-radio-dot ${isActive ? 'active' : ''}`} onClick={() => setIsActive(!isActive)} />
-                                <span style={{ fontWeight: 500, fontSize: '14px', color: '#1f2937' }}>{name || 'Untitled Rate'}</span>
-                            </div>
-                            <span style={{ fontWeight: 600, fontSize: '14px', color: '#1f2937' }}>₹{price.toFixed(2)}</span>
+                            )}
                         </div>
                     </div>
                 </div>
 
-                {/* Footer */}
+                {/* Footer with status toggle */}
                 <div className="sr-modal-footer">
-                    <button className="sr-btn-cancel" onClick={onClose}>Cancel</button>
-                    <button className="sr-btn-done" onClick={handleSave} disabled={!name.trim()}>Done</button>
+                    <div className="sr-footer-left">
+                        <label className="sr-status-toggle" onClick={() => setIsActive(!isActive)}>
+                            <div className={`mini-toggle ${isActive ? 'on' : 'off'}`} />
+                            <span style={{ fontSize: '13px', color: isActive ? '#10b981' : '#9ca3af', fontWeight: 500 }}>{isActive ? 'Active' : 'Inactive'}</span>
+                        </label>
+                    </div>
+                    <div className="sr-footer-right">
+                        <button className="sr-btn-cancel" onClick={onClose}>Cancel</button>
+                        <button className="sr-btn-done" onClick={handleSave} disabled={!name.trim()}>{rate ? 'Save Changes' : 'Create Rate'}</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1558,7 +1565,9 @@ export default function SettingsPage() {
         // Reset pending shipping operations and restore original rates
         setPendingShippingOps([]);
         setShippingRates(initialShippingRates || []);
-    }, [savedSettingsString, initialShippingRates]);
+        // Explicitly hide save bar immediately
+        try { shopify.saveBar.hide('form-builder-save-bar'); } catch (e) { }
+    }, [savedSettingsString, initialShippingRates, shopify]);
 
     // Handle successful save - only process each actionData once
     useEffect(() => {
@@ -1825,7 +1834,7 @@ export default function SettingsPage() {
                 .checkbox-option.checked { background: rgba(99, 102, 241, 0.1); }
                 .toggle-option { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; background: #f9fafb; border-radius: 10px; cursor: pointer; margin-bottom: 10px; }
                 .mini-toggle { width: 44px; height: 24px; border-radius: 12px; position: relative; transition: background 0.2s ease; }
-                .mini-toggle::after { position: absolute; width: 18px; height: 18px; background: white; border-radius: 50%; top: 3px; transition: left 0.2s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+                .mini-toggle::after { content: ''; position: absolute; width: 18px; height: 18px; background: white; border-radius: 50%; top: 3px; transition: left 0.2s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
                 .mini-toggle.on { background: #10b981; }
                 .mini-toggle.on::after { left: 23px; }
                 .mini-toggle.off { background: #d1d5db; }
@@ -1970,7 +1979,7 @@ export default function SettingsPage() {
                 .toggle-switch { width: 56px; height: 32px; border-radius: 16px; position: relative; cursor: pointer; transition: background 0.2s ease; }
                 .toggle-switch.enabled { background: #10b981; }
                 .toggle-switch.disabled { background: #d1d5db; }
-                .toggle-switch::after { position: absolute; width: 26px; height: 26px; background: white; border-radius: 50%; top: 3px; transition: left 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+                .toggle-switch::after { content: ''; position: absolute; width: 26px; height: 26px; background: white; border-radius: 50%; top: 3px; transition: left 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
                 .toggle-switch.enabled::after { left: 27px; }
                 .toggle-switch.disabled::after { left: 3px; }
                 .tabs { display: flex; gap: 8px; margin-bottom: 24px; background: #f3f4f6; padding: 6px; border-radius: 12px; }
@@ -2129,13 +2138,13 @@ export default function SettingsPage() {
                 /* ==================== SHIPPING RATE MODAL (sr-*) ==================== */
                 .sr-modal {
                     background: white;
-                    border-radius: 14px;
+                    border-radius: 16px;
                     width: 95%;
-                    max-width: 700px;
+                    max-width: 680px;
                     max-height: 90vh;
                     display: flex;
                     flex-direction: column;
-                    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+                    box-shadow: 0 25px 80px rgba(0, 0, 0, 0.3);
                     overflow: hidden;
                 }
                 .sr-modal-header {
@@ -2143,28 +2152,40 @@ export default function SettingsPage() {
                     align-items: center;
                     justify-content: space-between;
                     padding: 18px 24px;
-                    border-bottom: 1px solid #e5e7eb;
+                    background: #1f2937;
+                    color: white;
                 }
                 .sr-modal-header h3 {
                     margin: 0;
                     font-size: 16px;
                     font-weight: 600;
-                    color: #1f2937;
+                    color: white;
+                }
+                .sr-header-icon {
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 10px;
+                    background: rgba(255,255,255,0.15);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 18px;
+                    flex-shrink: 0;
                 }
                 .sr-close-btn {
                     width: 32px;
                     height: 32px;
                     border-radius: 8px;
                     border: none;
-                    background: transparent;
+                    background: rgba(255,255,255,0.12);
                     cursor: pointer;
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    color: #6b7280;
+                    color: rgba(255,255,255,0.7);
                     transition: all 0.15s ease;
                 }
-                .sr-close-btn:hover { background: #f3f4f6; color: #1f2937; }
+                .sr-close-btn:hover { background: rgba(255,255,255,0.2); color: white; }
                 .sr-modal-body {
                     padding: 20px 24px;
                     overflow-y: auto;
@@ -2173,28 +2194,64 @@ export default function SettingsPage() {
                 .sr-modal-body::-webkit-scrollbar { width: 5px; }
                 .sr-modal-body::-webkit-scrollbar-track { background: transparent; }
                 .sr-modal-body::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+                .sr-section {
+                    background: #f9fafb;
+                    border: 1px solid #e5e7eb;
+                    border-radius: 12px;
+                    padding: 16px 18px;
+                    margin-bottom: 14px;
+                }
+                .sr-section-title {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    font-size: 13px;
+                    font-weight: 600;
+                    color: #6b7280;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                    margin-bottom: 14px;
+                    padding-bottom: 10px;
+                    border-bottom: 1px solid #e5e7eb;
+                }
                 .sr-modal-footer {
                     padding: 14px 24px;
                     border-top: 1px solid #e5e7eb;
                     display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    background: #fafafa;
+                }
+                .sr-footer-left {
+                    display: flex;
+                    align-items: center;
+                }
+                .sr-footer-right {
+                    display: flex;
                     gap: 10px;
-                    justify-content: flex-end;
+                }
+                .sr-status-toggle {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    cursor: pointer;
                 }
                 .sr-row {
                     display: flex;
-                    gap: 16px;
-                    margin-bottom: 16px;
+                    gap: 14px;
+                    margin-bottom: 12px;
                 }
                 .sr-field {
                     display: flex;
                     flex-direction: column;
                     gap: 4px;
-                    margin-bottom: 14px;
+                    margin-bottom: 12px;
                 }
                 .sr-label {
                     font-size: 13px;
                     font-weight: 500;
                     color: #374151;
+                    margin-bottom: 2px;
                 }
                 .sr-hint {
                     font-size: 12px;
@@ -2245,6 +2302,7 @@ export default function SettingsPage() {
                     border: 1px solid #d1d5db;
                     border-radius: 8px;
                     overflow: hidden;
+                    background: white;
                 }
                 .sr-price-input-wrap {
                     display: flex;
@@ -2267,46 +2325,44 @@ export default function SettingsPage() {
                     padding: 0 16px;
                     border: none;
                     border-left: 1px solid #d1d5db;
-                    background: #f9fafb;
+                    background: #f3f4f6;
                     color: #6b7280;
                     font-size: 13px;
                     font-weight: 500;
                     cursor: pointer;
                     transition: all 0.15s ease;
+                    white-space: nowrap;
                 }
-                .sr-free-btn:hover { background: #f3f4f6; }
-                .sr-free-btn.active { background: #1f2937; color: white; }
-                .sr-divider {
-                    height: 1px;
-                    background: #e5e7eb;
-                    margin: 16px 0;
-                }
+                .sr-free-btn:hover { background: #e5e7eb; }
+                .sr-free-btn.active { background: #10b981; color: white; }
                 .sr-add-conditions-btn {
                     display: flex;
                     align-items: center;
-                    gap: 8px;
-                    padding: 0;
-                    border: none;
-                    background: none;
-                    color: #1f2937;
-                    font-size: 14px;
+                    gap: 6px;
+                    padding: 10px 14px;
+                    border: 1px dashed #d1d5db;
+                    border-radius: 8px;
+                    background: white;
+                    color: #6b7280;
+                    font-size: 13px;
                     font-weight: 500;
                     cursor: pointer;
-                    transition: color 0.15s ease;
+                    transition: all 0.15s ease;
+                    width: 100%;
+                    justify-content: center;
                 }
-                .sr-add-conditions-btn:hover { color: #4b5563; }
-                .sr-add-conditions-btn svg { color: #1f2937; }
+                .sr-add-conditions-btn:hover { border-color: #1f2937; color: #1f2937; background: #f9fafb; }
                 .sr-conditions-panel {
-                    background: #f9fafb;
+                    background: white;
                     border: 1px solid #e5e7eb;
                     border-radius: 10px;
-                    padding: 16px;
+                    padding: 14px;
                 }
                 .sr-conditions-header {
                     display: flex;
                     align-items: center;
                     justify-content: space-between;
-                    margin-bottom: 12px;
+                    margin-bottom: 10px;
                 }
                 .sr-remove-link {
                     border: none;
@@ -2318,10 +2374,8 @@ export default function SettingsPage() {
                     padding: 0;
                 }
                 .sr-remove-link:hover { text-decoration: underline; }
-                .sr-restrictions {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 10px;
+                .sr-restriction-item {
+                    margin-bottom: 8px;
                 }
                 .sr-checkbox-row {
                     display: flex;
@@ -2330,7 +2384,7 @@ export default function SettingsPage() {
                     font-size: 14px;
                     color: #374151;
                     cursor: pointer;
-                    padding: 2px 0;
+                    padding: 6px 0;
                 }
                 .sr-checkbox-row input[type=checkbox] {
                     width: 16px;
@@ -2341,8 +2395,8 @@ export default function SettingsPage() {
                 }
                 .sr-restriction-content {
                     margin-left: 26px;
-                    margin-top: 4px;
-                    margin-bottom: 4px;
+                    margin-top: 6px;
+                    margin-bottom: 6px;
                 }
                 .sr-search-wrap {
                     position: relative;
@@ -2359,73 +2413,33 @@ export default function SettingsPage() {
                     padding-left: 32px !important;
                 }
                 .sr-tag-list {
-                    max-height: 120px;
+                    max-height: 140px;
                     overflow-y: auto;
-                    border: 1px solid #e5e7eb;
-                    border-radius: 8px;
-                    padding: 6px 10px;
-                    background: white;
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 6px;
+                    padding: 4px 0;
                 }
                 .sr-tag-list::-webkit-scrollbar { width: 4px; }
                 .sr-tag-list::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 2px; }
-                .sr-tag-item {
-                    display: flex;
+                .sr-tag-chip {
+                    display: inline-flex;
                     align-items: center;
-                    gap: 8px;
-                    padding: 4px 0;
-                    font-size: 13px;
-                    color: #374151;
-                    cursor: pointer;
-                }
-                .sr-tag-item input[type=checkbox] {
-                    accent-color: #1f2937;
-                    width: 14px;
-                    height: 14px;
-                }
-                .sr-select-products-btn {
-                    margin-top: 8px;
-                    padding: 6px 14px;
-                    border-radius: 6px;
-                    border: none;
-                    background: #1f2937;
-                    color: white;
-                    font-size: 12px;
-                    font-weight: 600;
-                    cursor: pointer;
-                }
-                .sr-rate-summary {
-                    background: #f9fafb;
+                    padding: 5px 12px;
+                    border-radius: 20px;
                     border: 1px solid #e5e7eb;
-                    border-radius: 10px;
-                    padding: 14px 18px;
-                }
-                .sr-rate-summary-row {
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                }
-                .sr-radio-dot {
-                    width: 18px;
-                    height: 18px;
-                    border-radius: 50%;
-                    border: 2px solid #d1d5db;
+                    background: white;
+                    font-size: 12px;
+                    color: #6b7280;
                     cursor: pointer;
                     transition: all 0.15s ease;
-                    position: relative;
-                    flex-shrink: 0;
+                    user-select: none;
                 }
-                .sr-radio-dot.active {
-                    border-color: #1f2937;
-                }
-                .sr-radio-dot.active::after {
-                    content: '';
-                    position: absolute;
-                    top: 3px;
-                    left: 3px;
-                    width: 8px;
-                    height: 8px;
-                    border-radius: 50%;
+                .sr-tag-chip:hover { border-color: #9ca3af; }
+                .sr-tag-chip.selected {
                     background: #1f2937;
+                    color: white;
+                    border-color: #1f2937;
                 }
                 .sr-btn-cancel {
                     padding: 8px 18px;

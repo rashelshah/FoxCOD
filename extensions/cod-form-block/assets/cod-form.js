@@ -1383,10 +1383,8 @@
       container.style.marginBottom = '16px';
       
       var title = document.createElement('div');
-      title.textContent = 'Shipping Method';
-      title.style.fontWeight = '600';
-      title.style.marginBottom = '8px';
-      title.style.fontSize = '14px';
+      title.style.cssText = 'font-weight:600;margin-bottom:10px;font-size:14px;color:#374151;display:flex;align-items:center;gap:6px;';
+      title.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg> Shipping Method';
       container.appendChild(title);
 
       // Get current quantity for condition evaluation (uses bundle offer if available)
@@ -1412,60 +1410,71 @@
       }
 
       applicableRates.forEach(function(rate, index) {
-          var row = document.createElement('div');
-          row.style.display = 'flex';
-          row.style.alignItems = 'center';
-          row.style.marginBottom = '6px';
-          row.style.cursor = 'pointer';
+          var card = document.createElement('label');
+          card.style.cssText = 'display:flex;align-items:center;gap:12px;padding:12px 14px;border:2px solid ' + (index === 0 ? (config.primaryColor || '#6366f1') : '#e5e7eb') + ';border-radius:10px;cursor:pointer;margin-bottom:8px;background:' + (index === 0 ? 'rgba(99,102,241,0.04)' : '#fff') + ';transition:all 0.2s ease;';
           
           var radio = document.createElement('input');
           radio.type = 'radio';
           radio.name = 'shipping_method';
           radio.value = rate.id;
-          radio.checked = index === 0; // Select first by default
-          radio.style.marginRight = '8px';
+          radio.checked = index === 0;
+          radio.style.cssText = 'accent-color:' + (config.primaryColor || '#6366f1') + ';width:18px;height:18px;flex-shrink:0;cursor:pointer;margin:0;';
           
-          // Add change listener to update total
+          // Add change listener to update total and card styles
           radio.addEventListener('change', function() {
               updateTotalHelper(form, config, rate.price);
+              // Update all card styles
+              var allCards = container.querySelectorAll('label');
+              allCards.forEach(function(c) {
+                  var r = c.querySelector('input[type="radio"]');
+                  if (r && r.checked) {
+                      c.style.borderColor = config.primaryColor || '#6366f1';
+                      c.style.background = 'rgba(99,102,241,0.04)';
+                  } else {
+                      c.style.borderColor = '#e5e7eb';
+                      c.style.background = '#fff';
+                  }
+              });
           });
 
-          var label = document.createElement('span');
-          var priceText = rate.price === 0 ? 'FREE' : formatMoney(rate.price);
+          // Text content area
+          var textDiv = document.createElement('div');
+          textDiv.style.cssText = 'flex:1;min-width:0;';
           
-          // Build label with conditions info
-          var labelText = rate.name + ' (' + priceText + ')';
+          var nameEl = document.createElement('div');
+          nameEl.style.cssText = 'font-weight:600;font-size:14px;color:#1f2937;margin-bottom:2px;';
+          nameEl.textContent = rate.name;
+          textDiv.appendChild(nameEl);
+          
+          // Show description as delivery info with icon
           if (rate.description) {
-              labelText += ' - ' + rate.description;
+              var descEl = document.createElement('div');
+              descEl.style.cssText = 'font-size:12px;color:#6b7280;display:flex;align-items:center;gap:4px;';
+              descEl.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> ' + rate.description;
+              textDiv.appendChild(descEl);
           }
           
-          // Add condition indicator
-          if (rate.condition_type && rate.condition_type !== 'none') {
-              var conditionText = '';
-              if (rate.min_value !== undefined && rate.min_value !== null && 
-                  rate.max_value !== undefined && rate.max_value !== null) {
-                  conditionText = ' [' + rate.min_value + '-' + rate.max_value + ']';
-              } else if (rate.min_value !== undefined && rate.min_value !== null) {
-                  conditionText = ' [min ' + rate.min_value + ']';
-              } else if (rate.max_value !== undefined && rate.max_value !== null) {
-                  conditionText = ' [max ' + rate.max_value + ']';
-              }
-              labelText += conditionText;
+          // Price badge on the right
+          var priceEl = document.createElement('div');
+          priceEl.style.cssText = 'flex-shrink:0;text-align:right;';
+          if (rate.price === 0) {
+              priceEl.innerHTML = '<span style="background:#10b981;color:white;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600;">FREE</span>';
+          } else {
+              priceEl.innerHTML = '<span style="font-weight:700;font-size:15px;color:#1f2937;">' + formatMoney(rate.price) + '</span>';
           }
-          
-          label.innerHTML = labelText;
-          label.style.fontSize = '14px';
 
-          row.appendChild(radio);
-          row.appendChild(label);
-          container.appendChild(row);
+          card.appendChild(radio);
+          card.appendChild(textDiv);
+          card.appendChild(priceEl);
+          container.appendChild(card);
           
-          row.onclick = function() { 
-              if (!radio.checked) {
-                  radio.checked = true; 
-                  radio.dispatchEvent(new Event('change')); 
-              }
-          };
+          // Hover effects
+          card.addEventListener('mouseenter', function() {
+              if (!radio.checked) { card.style.borderColor = '#c7d2fe'; card.style.background = '#fafaff'; }
+          });
+          card.addEventListener('mouseleave', function() {
+              if (!radio.checked) { card.style.borderColor = '#e5e7eb'; card.style.background = '#fff'; }
+          });
       });
 
       // Insert before submit button (or Order Summary if present)
