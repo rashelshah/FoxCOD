@@ -28,6 +28,14 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { getFormSettings, saveFormSettings, type FormSettings } from "../config/supabase.server";
 import {
+    getShippingRates,
+    createShippingRate,
+    updateShippingRate,
+    deleteShippingRate,
+    importShippingRatesFromShopify,
+    type ShippingRate,
+} from "../services/shipping-rates.server";
+import {
     type FormField,
     type ContentBlocks,
     type FormStyles,
@@ -80,6 +88,8 @@ const defaultSettings: Omit<FormSettings, "shop_domain"> = {
     partial_cod_enabled: false,
     partial_cod_advance_amount: 100,
     partial_cod_commission: 0,
+    // New Shipping Rates settings
+    shipping_rates_enabled: false,
 };
 
 /**
@@ -150,13 +160,106 @@ async function ensureMetafieldDefinitions(admin: any) {
 }
 
 /**
+ * Helper: Sync shipping rates to Shopify metafields
+ * Called after create/update/delete shipping rate operations
+ */
+async function syncShippingRatesToMetafields(shopDomain: string, admin: any) {
+    try {
+        // Fetch current shipping rates
+        const { getShippingRates } = await import("../services/shipping-rates.server");
+        const shippingRates = await getShippingRates(shopDomain);
+
+        // Fetch current settings to get shipping_rates_enabled flag
+        const { getFormSettings } = await import("../config/supabase.server");
+        const settings = await getFormSettings(shopDomain);
+        const shippingRatesEnabled = settings?.shipping_rates_enabled ?? false;
+
+        // Get shop GID
+        const shopRes = await admin.graphql(`query { shop { id } }`);
+        const shopGid = (await shopRes.json()).data.shop.id;
+
+        // Sync to metafields
+        await admin.graphql(`
+            mutation SetMetafields($metafields: [MetafieldsSetInput!]!) {
+                metafieldsSet(metafields: $metafields) {
+                    metafields { key }
+                    userErrors { field message }
+                }
+            }
+        `, {
+            variables: {
+                metafields: [
+                    {
+                        ownerId: shopGid,
+                        namespace: "fox_cod",
+                        key: "shipping_rates_enabled",
+                        value: String(shippingRatesEnabled),
+                        type: "single_line_text_field"
+                    },
+                    {
+                        ownerId: shopGid,
+                        namespace: "fox_cod",
+                        key: "shipping_rates_json",
+                        value: JSON.stringify(shippingRates || []),
+                        type: "json"
+                    },
+                ]
+            }
+        });
+
+        console.log('[Settings] Synced', shippingRates.length, 'shipping rates to metafields');
+    } catch (error) {
+        console.error('[Settings] Error syncing shipping rates to metafields:', error);
+        // Don't throw - allow the operation to complete even if metafield sync fails
+    }
+}
+
+/**
  * Loader: Fetch current settings from Supabase
  */
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-    const { session } = await authenticate.admin(request);
+    const { session, admin } = await authenticate.admin(request);
     const shopDomain = session.shop;
 
-    const settings = await getFormSettings(shopDomain);
+    // Fetch products from Shopify for the product selector
+    let products: any[] = [];
+    try {
+        const productsResponse = await admin.graphql(`
+            query GetProducts($first: Int!) {
+                products(first: $first) {
+                    edges {
+                        node {
+                            id
+                            title
+                            handle
+                            variants(first: 1) {
+                                edges {
+                                    node {
+                                        id
+                                        price
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        `, { variables: { first: 50 } });
+        const productsData = await productsResponse.json();
+        products = productsData.data?.products?.edges?.map((edge: any) => ({
+            id: edge.node.id,
+            title: edge.node.title,
+            handle: edge.node.handle,
+            variantId: edge.node.variants?.edges?.[0]?.node?.id,
+        })) || [];
+    } catch (e) {
+        console.warn('[Settings] Could not fetch products:', e);
+    }
+
+    const [settings, shippingRates] = await Promise.all([
+        getFormSettings(shopDomain),
+        getShippingRates(shopDomain),
+    ]);
 
     let appUrl = process.env.SHOPIFY_APP_URL || '';
     if (!appUrl) {
@@ -172,7 +275,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             button_styles: { ...DEFAULT_BUTTON_STYLES, ...(settings.button_styles || {}) },
         }
         : { ...defaultSettings, shop_domain: shopDomain };
-    return { shop: shopDomain, settings: merged, appUrl };
+    return { shop: shopDomain, settings: merged, shippingRates, appUrl, products };
 };
 
 /**
@@ -183,6 +286,64 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const shopDomain = session.shop;
 
     const formData = await request.formData();
+    const actionType = formData.get("action_type") as string;
+
+    // Handle shipping rates specific actions
+    if (actionType === "create_shipping_rate") {
+        try {
+            const rateData = JSON.parse(formData.get("rate_data") as string);
+            const newRate = await createShippingRate({
+                ...rateData,
+                shop_domain: shopDomain,
+            });
+            // Sync shipping rates to metafields immediately
+            await syncShippingRatesToMetafields(shopDomain, admin);
+            return { success: true, shippingRate: newRate };
+        } catch (error: any) {
+            console.error('[Settings] Error creating shipping rate:', error);
+            return { success: false, error: error.message || 'Failed to create shipping rate' };
+        }
+    }
+
+    if (actionType === "update_shipping_rate") {
+        try {
+            const rateId = formData.get("rate_id") as string;
+            const rateData = JSON.parse(formData.get("rate_data") as string);
+            const updatedRate = await updateShippingRate(rateId, rateData);
+            // Sync shipping rates to metafields immediately
+            await syncShippingRatesToMetafields(shopDomain, admin);
+            return { success: true, shippingRate: updatedRate };
+        } catch (error: any) {
+            console.error('[Settings] Error updating shipping rate:', error);
+            return { success: false, error: error.message || 'Failed to update shipping rate' };
+        }
+    }
+
+    if (actionType === "delete_shipping_rate") {
+        try {
+            const rateId = formData.get("rate_id") as string;
+            await deleteShippingRate(rateId);
+            // Sync shipping rates to metafields immediately
+            await syncShippingRatesToMetafields(shopDomain, admin);
+            return { success: true, deletedRateId: rateId };
+        } catch (error: any) {
+            console.error('[Settings] Error deleting shipping rate:', error);
+            return { success: false, error: error.message || 'Failed to delete shipping rate' };
+        }
+    }
+
+    if (actionType === "import_shopify_shipping") {
+        try {
+            const replaceExisting = formData.get("replace_existing") === "true";
+            const result = await importShippingRatesFromShopify(shopDomain, admin, replaceExisting);
+            // Sync shipping rates to metafields immediately
+            await syncShippingRatesToMetafields(shopDomain, admin);
+            return { success: true, imported: result.imported, shippingRates: result.rates };
+        } catch (error: any) {
+            console.error('[Settings] Error importing shipping rates:', error);
+            return { success: false, error: error.message || 'Failed to import shipping rates' };
+        }
+    }
 
     // Parse all form data including new JSONB fields
     const settings: FormSettings = {
@@ -224,12 +385,31 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         partial_cod_enabled: formData.get("partial_cod_enabled") === "true",
         partial_cod_advance_amount: parseInt(formData.get("partial_cod_advance_amount") as string) || defaultSettings.partial_cod_advance_amount,
         partial_cod_commission: parseFloat(formData.get("partial_cod_commission") as string) || defaultSettings.partial_cod_commission,
+        // Shipping rates enabled setting
+        shipping_rates_enabled: formData.get("shipping_rates_enabled") === "true",
     };
 
     // Save to Supabase
-    await saveFormSettings(settings);
+    try {
+        await saveFormSettings(settings);
+    } catch (dbError: any) {
+        console.error('[Settings] Database error:', dbError);
+        // Check for missing column error
+        if (dbError.message?.includes('shipping_rates_enabled')) {
+            return { success: false, error: 'Database migration needed: Run migration_v9_add_shipping_rates_enabled.sql in Supabase' };
+        }
+        return { success: false, error: dbError.message || 'Failed to save to database' };
+    }
 
-    // Get app URL for metafields - auto-detect from request
+    // Get shipping rates to sync to metafields
+    let shippingRatesForMetafield: any[] = [];
+    try {
+        const { getShippingRates } = await import("../services/shipping-rates.server");
+        shippingRatesForMetafield = await getShippingRates(shopDomain);
+        console.log('[Settings] Fetched shipping rates for metafield sync:', shippingRatesForMetafield.length);
+    } catch (e) {
+        console.warn('[Settings] Could not fetch shipping rates for metafield sync:', e);
+    }
     // This handles the dynamic ngrok URLs in development
     let appUrl = '';
 
@@ -323,6 +503,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     // Partial COD settings
                     { ownerId: shopGid, namespace: "fox_cod", key: "partial_cod_enabled", value: String(settings.partial_cod_enabled ?? false), type: "single_line_text_field" },
                     { ownerId: shopGid, namespace: "fox_cod", key: "partial_cod_advance_amount", value: String(settings.partial_cod_advance_amount ?? 100), type: "single_line_text_field" },
+                    // Shipping rates - sync to metafields for storefront
+                    { ownerId: shopGid, namespace: "fox_cod", key: "shipping_rates_enabled", value: String(settings.shipping_rates_enabled ?? false), type: "single_line_text_field" },
+                    { ownerId: shopGid, namespace: "fox_cod", key: "shipping_rates_json", value: JSON.stringify(shippingRatesForMetafield || []), type: "json" },
                 ]
             }
         });
@@ -368,7 +551,7 @@ const PreviewDisplay = memo(({
     namePlaceholder, phonePlaceholder, addressPlaceholder,
     notesPlaceholder, submitButtonText,
     primaryColor, buttonStyle, buttonSize, borderRadius, modalStyle, animationStyle,
-    fields, formStyles, buttonStylesState, blocks, shippingOpts, activeTab
+    fields, formStyles, buttonStylesState, blocks, shippingOpts, shippingRates, shippingRatesEnabled, activeTab
 }: any) => {
 
     // Calculate button styles - sync with storefront
@@ -546,7 +729,18 @@ const PreviewDisplay = memo(({
     // Sample price values for rate card
     const subtotal = 1999;
     const discount = 200;
-    const shippingCost = shippingOpts?.enabled ? (shippingOpts.options?.find((o: any) => o.id === shippingOpts.defaultOption)?.price || 0) : 0;
+
+    // Calculate shipping cost using new shipping rates system
+    let shippingCost = 0;
+    if (shippingRatesEnabled && shippingRates?.length > 0) {
+        // Find first applicable rate (simplified for preview)
+        const applicableRate = shippingRates.find((rate: any) => rate.is_active);
+        shippingCost = applicableRate?.price || 0;
+    } else if (shippingOpts?.enabled) {
+        // Fallback to old shipping options
+        shippingCost = shippingOpts.options?.find((o: any) => o.id === shippingOpts.defaultOption)?.price || 0;
+    }
+
     const total = subtotal - discount + shippingCost;
 
     // Use formStyles directly for immediate feedback
@@ -689,8 +883,52 @@ const PreviewDisplay = memo(({
                                         </div>
                                     )}
 
-                                    {/* Shipping Options */}
-                                    {blocks?.shipping_options && shippingOpts?.enabled && (
+                                    {/* Shipping Options - New Shipping Rates System */}
+                                    {blocks?.shipping_options && shippingRatesEnabled && shippingRates?.length > 0 && (
+                                        <div style={{
+                                            background: '#f8fafc',
+                                            borderRadius: '8px',
+                                            padding: '10px',
+                                            marginBottom: '10px',
+                                            border: '1px solid #e2e8f0'
+                                        }}>
+                                            <div style={{ fontSize: '11px', fontWeight: 600, color: '#374151', marginBottom: '8px' }}>
+                                                🚚 Shipping
+                                            </div>
+                                            {shippingRates.filter((r: any) => r.is_active).slice(0, 3).map((rate: any, idx: number) => {
+                                                // Build condition indicator
+                                                let conditionText = '';
+                                                if (rate.condition_type && rate.condition_type !== 'none') {
+                                                    if (rate.min_value !== undefined && rate.min_value !== null &&
+                                                        rate.max_value !== undefined && rate.max_value !== null) {
+                                                        conditionText = ` [${rate.min_value}-${rate.max_value}]`;
+                                                    } else if (rate.min_value !== undefined && rate.min_value !== null) {
+                                                        conditionText = ` [min ${rate.min_value}]`;
+                                                    } else if (rate.max_value !== undefined && rate.max_value !== null) {
+                                                        conditionText = ` [max ${rate.max_value}]`;
+                                                    }
+                                                }
+
+                                                return (
+                                                    <div key={rate.id} style={{
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '6px',
+                                                        fontSize: '10px',
+                                                        color: '#6b7280',
+                                                        marginBottom: '4px'
+                                                    }}>
+                                                        <input type="radio" name="shipping-preview" disabled checked={idx === 0} style={{ width: '12px', height: '12px' }} />
+                                                        <span>{rate.name}{conditionText}</span>
+                                                        <span style={{ marginLeft: 'auto', fontWeight: 600 }}>{rate.price === 0 ? 'Free' : `₹${rate.price}`}</span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+
+                                    {/* Shipping Options - Fallback to old system */}
+                                    {blocks?.shipping_options && shippingOpts?.enabled && (!shippingRatesEnabled || !shippingRates?.length) && (
                                         <div style={{
                                             background: '#f8fafc',
                                             borderRadius: '8px',
@@ -809,20 +1047,378 @@ const SortableFieldItem = ({ field, onToggleVisibility, onToggleRequired, isCust
 };
 
 /**
+ * Shipping Rate Modal Component
+ */
+interface ShippingRateModalProps {
+    rate: ShippingRate | null;
+    products: any[];
+    onClose: () => void;
+    onSave: (rateData: Omit<ShippingRate, 'id' | 'shop_domain' | 'created_at' | 'updated_at'>) => void;
+}
+
+// Common countries with their codes
+const COUNTRIES = [
+    { code: 'IN', name: 'India' },
+    { code: 'US', name: 'United States' },
+    { code: 'CA', name: 'Canada' },
+    { code: 'GB', name: 'United Kingdom' },
+    { code: 'AU', name: 'Australia' },
+    { code: 'DE', name: 'Germany' },
+    { code: 'FR', name: 'France' },
+    { code: 'IT', name: 'Italy' },
+    { code: 'ES', name: 'Spain' },
+    { code: 'NL', name: 'Netherlands' },
+    { code: 'AE', name: 'United Arab Emirates' },
+    { code: 'SG', name: 'Singapore' },
+    { code: 'JP', name: 'Japan' },
+    { code: 'KR', name: 'South Korea' },
+    { code: 'BR', name: 'Brazil' },
+    { code: 'MX', name: 'Mexico' },
+];
+
+// Indian states with codes
+const INDIAN_STATES = [
+    { code: 'AP', name: 'Andhra Pradesh' },
+    { code: 'AR', name: 'Arunachal Pradesh' },
+    { code: 'AS', name: 'Assam' },
+    { code: 'BR', name: 'Bihar' },
+    { code: 'CG', name: 'Chhattisgarh' },
+    { code: 'GA', name: 'Goa' },
+    { code: 'GJ', name: 'Gujarat' },
+    { code: 'HR', name: 'Haryana' },
+    { code: 'HP', name: 'Himachal Pradesh' },
+    { code: 'JH', name: 'Jharkhand' },
+    { code: 'KA', name: 'Karnataka' },
+    { code: 'KL', name: 'Kerala' },
+    { code: 'MP', name: 'Madhya Pradesh' },
+    { code: 'MH', name: 'Maharashtra' },
+    { code: 'MN', name: 'Manipur' },
+    { code: 'ML', name: 'Meghalaya' },
+    { code: 'MZ', name: 'Mizoram' },
+    { code: 'NL', name: 'Nagaland' },
+    { code: 'OD', name: 'Odisha' },
+    { code: 'PB', name: 'Punjab' },
+    { code: 'RJ', name: 'Rajasthan' },
+    { code: 'SK', name: 'Sikkim' },
+    { code: 'TN', name: 'Tamil Nadu' },
+    { code: 'TG', name: 'Telangana' },
+    { code: 'TR', name: 'Tripura' },
+    { code: 'UP', name: 'Uttar Pradesh' },
+    { code: 'UK', name: 'Uttarakhand' },
+    { code: 'WB', name: 'West Bengal' },
+    { code: 'DL', name: 'Delhi' },
+    { code: 'JK', name: 'Jammu & Kashmir' },
+    { code: 'LA', name: 'Ladakh' },
+    { code: 'PY', name: 'Puducherry' },
+    { code: 'CH', name: 'Chandigarh' },
+];
+
+const ShippingRateModal = ({ rate, products, onClose, onSave }: ShippingRateModalProps) => {
+    const [name, setName] = useState(rate?.name || '');
+    const [description, setDescription] = useState(rate?.description || '');
+    const [price, setPrice] = useState(rate?.price ?? 0);
+    const [conditionType, setConditionType] = useState<ShippingRate['condition_type']>(rate?.condition_type || 'none');
+    const [minValue, setMinValue] = useState(rate?.min_value ?? '');
+    const [maxValue, setMaxValue] = useState(rate?.max_value ?? '');
+    const [appliesToProducts, setAppliesToProducts] = useState(rate?.applies_to_products || false);
+    const [appliesToCountries, setAppliesToCountries] = useState(rate?.applies_to_countries || false);
+    const [appliesToStates, setAppliesToStates] = useState(rate?.applies_to_states || false);
+    const [isActive, setIsActive] = useState(rate?.is_active ?? true);
+
+    // State for selected products, countries, and states
+    const [selectedProductIds, setSelectedProductIds] = useState<string[]>(rate?.product_ids || []);
+    const [selectedCountryCodes, setSelectedCountryCodes] = useState<string[]>(rate?.country_codes || []);
+    const [selectedStateCodes, setSelectedStateCodes] = useState<string[]>(rate?.state_codes || []);
+    const [productSearch, setProductSearch] = useState('');
+
+    const handleSave = () => {
+        if (!name.trim()) return;
+        onSave({
+            name: name.trim(),
+            description: description.trim(),
+            price: Number(price) || 0,
+            condition_type: conditionType,
+            min_value: (minValue === '' || minValue === null || minValue === undefined) ? null as any : Number(minValue),
+            max_value: (maxValue === '' || maxValue === null || maxValue === undefined) ? null as any : Number(maxValue),
+            applies_to_products: appliesToProducts,
+            product_ids: appliesToProducts ? selectedProductIds : [],
+            applies_to_countries: appliesToCountries,
+            country_codes: appliesToCountries ? selectedCountryCodes : [],
+            applies_to_states: appliesToStates,
+            state_codes: appliesToStates ? selectedStateCodes : [],
+            is_active: isActive,
+        });
+    };
+
+    const toggleProduct = (productId: string) => {
+        setSelectedProductIds(prev =>
+            prev.includes(productId)
+                ? prev.filter(id => id !== productId)
+                : [...prev, productId]
+        );
+    };
+
+    const toggleCountry = (countryCode: string) => {
+        setSelectedCountryCodes(prev =>
+            prev.includes(countryCode)
+                ? prev.filter(code => code !== countryCode)
+                : [...prev, countryCode]
+        );
+    };
+
+    const toggleState = (stateCode: string) => {
+        setSelectedStateCodes(prev =>
+            prev.includes(stateCode)
+                ? prev.filter(code => code !== stateCode)
+                : [...prev, stateCode]
+        );
+    };
+
+    const filteredProducts = products.filter(p =>
+        p.title.toLowerCase().includes(productSearch.toLowerCase())
+    );
+    const [showConditions, setShowConditions] = useState(conditionType !== 'none');
+    const [excludeProducts, setExcludeProducts] = useState(false);
+    const [countrySearch, setCountrySearch] = useState('');
+    const [stateSearch, setStateSearch] = useState('');
+
+    const filteredCountries = COUNTRIES.filter(c =>
+        c.name.toLowerCase().includes(countrySearch.toLowerCase())
+    );
+    const filteredStates = INDIAN_STATES.filter(s =>
+        s.name.toLowerCase().includes(stateSearch.toLowerCase())
+    );
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="sr-modal" onClick={(e) => e.stopPropagation()}>
+                {/* Clean Header */}
+                <div className="sr-modal-header">
+                    <h3>{rate ? 'Edit rate' : 'Add rate'}</h3>
+                    <button className="sr-close-btn" onClick={onClose}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                    </button>
+                </div>
+
+                <div className="sr-modal-body">
+                    {/* Rate name + description side by side */}
+                    <div className="sr-row">
+                        <div className="sr-field" style={{ flex: 1 }}>
+                            <label className="sr-label">Rate name</label>
+                            <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Free Shipping" className="sr-input" />
+                            <span className="sr-hint">Customers will see this at checkout.</span>
+                        </div>
+                        <div className="sr-field" style={{ flex: 1 }}>
+                            <label className="sr-label">Rate description</label>
+                            <input type="text" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Subtitle, Ex: 2-3 days" className="sr-input" />
+                        </div>
+                    </div>
+
+                    {/* Price */}
+                    <div className="sr-field">
+                        <label className="sr-label">Price</label>
+                        <div className="sr-price-row">
+                            <div className="sr-price-input-wrap">
+                                <span className="sr-currency">₹</span>
+                                <input type="number" value={price} onChange={(e) => setPrice(Number(e.target.value))} min="0" placeholder="0" className="sr-input sr-price-input" />
+                            </div>
+                            <button type="button" className={`sr-free-btn ${price === 0 ? 'active' : ''}`} onClick={() => setPrice(0)}>Free</button>
+                        </div>
+                    </div>
+
+                    <div className="sr-divider" />
+
+                    {/* Add conditions */}
+                    <div>
+                        {!showConditions ? (
+                            <button className="sr-add-conditions-btn" onClick={() => { setShowConditions(true); if (conditionType === 'none') setConditionType('order_price'); }}>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" /></svg>
+                                Add conditions
+                            </button>
+                        ) : (
+                            <div className="sr-conditions-panel">
+                                <div className="sr-conditions-header">
+                                    <span style={{ fontWeight: 600, fontSize: '14px', color: '#1f2937' }}>Conditions</span>
+                                    <button className="sr-remove-link" onClick={() => { setShowConditions(false); setConditionType('none'); setMinValue(''); setMaxValue(''); }}>Remove</button>
+                                </div>
+                                <div className="sr-field" style={{ marginBottom: '12px' }}>
+                                    <label className="sr-label">Based on</label>
+                                    <select value={conditionType === 'none' ? 'order_price' : conditionType} onChange={(e) => setConditionType(e.target.value as any)} className="sr-select">
+                                        <option value="order_price">Order price (₹)</option>
+                                        <option value="order_quantity">Order quantity (items)</option>
+                                        <option value="order_weight">Order weight (kg)</option>
+                                    </select>
+                                </div>
+                                <div className="sr-row">
+                                    <div className="sr-field" style={{ flex: 1, marginBottom: 0 }}>
+                                        <label className="sr-label">Minimum</label>
+                                        <input type="number" value={minValue} onChange={(e) => setMinValue(e.target.value)} placeholder="No minimum" className="sr-input" />
+                                    </div>
+                                    <div className="sr-field" style={{ flex: 1, marginBottom: 0 }}>
+                                        <label className="sr-label">Maximum</label>
+                                        <input type="number" value={maxValue} onChange={(e) => setMaxValue(e.target.value)} placeholder="No maximum" className="sr-input" />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="sr-divider" />
+
+                    {/* Restrictions as checkboxes */}
+                    <div className="sr-restrictions">
+                        {/* Countries */}
+                        <label className="sr-checkbox-row">
+                            <input type="checkbox" checked={appliesToCountries} onChange={(e) => setAppliesToCountries(e.target.checked)} />
+                            <span>Apply this rate for certain countries only</span>
+                        </label>
+                        {appliesToCountries && (
+                            <div className="sr-restriction-content">
+                                <div className="sr-search-wrap">
+                                    <svg className="sr-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+                                    <input type="text" value={countrySearch} onChange={(e) => setCountrySearch(e.target.value)} placeholder="Shipping to" className="sr-input sr-search-input" />
+                                </div>
+                                <div className="sr-tag-list">
+                                    {COUNTRIES.map(c => (
+                                        <label key={c.code} className="sr-tag-item">
+                                            <input type="checkbox" checked={selectedCountryCodes.includes(c.code)} onChange={() => toggleCountry(c.code)} />
+                                            <span>{c.name}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* States */}
+                        <label className="sr-checkbox-row">
+                            <input type="checkbox" checked={appliesToStates} onChange={(e) => setAppliesToStates(e.target.checked)} />
+                            <span>Apply this rate for certain provinces / states only</span>
+                        </label>
+                        {appliesToStates && (
+                            <div className="sr-restriction-content">
+                                <div className="sr-search-wrap">
+                                    <svg className="sr-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+                                    <input type="text" value={stateSearch} onChange={(e) => setStateSearch(e.target.value)} placeholder="Shipping to" className="sr-input sr-search-input" />
+                                </div>
+                                <div className="sr-tag-list">
+                                    {INDIAN_STATES.map(s => (
+                                        <label key={s.code} className="sr-tag-item">
+                                            <input type="checkbox" checked={selectedStateCodes.includes(s.code)} onChange={() => toggleState(s.code)} />
+                                            <span>{s.name}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="sr-divider" />
+
+                        {/* Products */}
+                        <label className="sr-checkbox-row">
+                            <input type="checkbox" checked={appliesToProducts} onChange={(e) => setAppliesToProducts(e.target.checked)} />
+                            <span>Apply this rate for certain products only</span>
+                        </label>
+                        {appliesToProducts && (
+                            <div className="sr-restriction-content">
+                                <input type="text" value={productSearch} onChange={(e) => setProductSearch(e.target.value)} placeholder="Search products..." className="sr-input" style={{ marginBottom: '8px' }} />
+                                <div className="sr-tag-list">
+                                    {filteredProducts.map(product => (
+                                        <label key={product.id} className="sr-tag-item">
+                                            <input type="checkbox" checked={selectedProductIds.includes(product.id)} onChange={() => toggleProduct(product.id)} />
+                                            <span>{product.title}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                                {selectedProductIds.length > 0 && (
+                                    <button type="button" className="sr-select-products-btn">Select products ({selectedProductIds.length} selected)</button>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="sr-divider" />
+
+                    {/* Rate summary */}
+                    <div className="sr-rate-summary">
+                        <div className="sr-rate-summary-row">
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <div className={`sr-radio-dot ${isActive ? 'active' : ''}`} onClick={() => setIsActive(!isActive)} />
+                                <span style={{ fontWeight: 500, fontSize: '14px', color: '#1f2937' }}>{name || 'Untitled Rate'}</span>
+                            </div>
+                            <span style={{ fontWeight: 600, fontSize: '14px', color: '#1f2937' }}>₹{price.toFixed(2)}</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Footer */}
+                <div className="sr-modal-footer">
+                    <button className="sr-btn-cancel" onClick={onClose}>Cancel</button>
+                    <button className="sr-btn-done" onClick={handleSave} disabled={!name.trim()}>Done</button>
+                </div>
+            </div>
+        </div>
+    );
+
+};
+/**
+ * Import Shipping Modal Component
+ */
+interface ImportShippingModalProps {
+    onClose: () => void;
+    onImport: (replaceExisting: boolean) => void;
+}
+
+const ImportShippingModal = ({ onClose, onImport }: ImportShippingModalProps) => {
+    const [replaceExisting, setReplaceExisting] = useState(false);
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                    <h3>Import from Shopify</h3>
+                </div>
+                <div className="modal-body">
+                    <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '16px' }}>
+                        Import shipping rates from your Shopify store's delivery profiles.
+                    </p>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '12px', background: '#f9fafb', borderRadius: '8px' }}>
+                        <input
+                            type="checkbox"
+                            checked={replaceExisting}
+                            onChange={(e) => setReplaceExisting(e.target.checked)}
+                        />
+                        <span style={{ fontSize: '14px', color: '#374151' }}>
+                            Replace all existing rates (otherwise, imported rates will be added)
+                        </span>
+                    </label>
+                </div>
+                <div className="modal-actions">
+                    <button className="modal-btn cancel" onClick={onClose}>Cancel</button>
+                    <button className="modal-btn confirm" onClick={() => onImport(replaceExisting)}>
+                        Import Rates
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+/**
  * Settings Page Component - Premium Form Builder
  */
 export default function SettingsPage() {
-    const { shop, settings } = useLoaderData<typeof loader>();
+    const { shop, settings, shippingRates: initialShippingRates, products } = useLoaderData<typeof loader>();
     const actionData = useActionData<typeof action>();
     const submit = useSubmit();
     const navigation = useNavigation();
     const shopify = useAppBridge();
 
     const isSubmitting = navigation.state === "submitting";
-    const [activeTab, setActiveTab] = useState<'button' | 'form' | 'style'>('button');
+    const [activeTab, setActiveTab] = useState<'button' | 'form' | 'style' | 'shipping'>('button');
 
     // Local state for all form fields
-    const [enabled, setEnabled] = useState(settings.enabled);
+    // Defensive: ensure enabled is always a boolean (not an object from DB)
+    const [enabled, setEnabled] = useState(!!settings.enabled);
     const [buttonText, setButtonText] = useState(settings.button_text);
     const [primaryColor, setPrimaryColor] = useState(settings.primary_color);
     const [requiredFields, setRequiredFields] = useState<string[]>(settings.required_fields);
@@ -865,6 +1461,21 @@ export default function SettingsPage() {
     const [partialCodAdvanceAmount, setPartialCodAdvanceAmount] = useState(settings.partial_cod_advance_amount ?? 100);
     const [partialCodCommission, setPartialCodCommission] = useState(settings.partial_cod_commission ?? 0);
 
+    // Shipping Rates state
+    const [shippingRates, setShippingRates] = useState<ShippingRate[]>(initialShippingRates || []);
+    const [shippingRatesEnabled, setShippingRatesEnabled] = useState(settings.shipping_rates_enabled ?? false);
+    // Queue for pending shipping rate operations (processed on save bar click)
+    const [pendingShippingOps, setPendingShippingOps] = useState<Array<{ type: 'create' | 'update' | 'delete', rateData?: any, rateId?: string }>>([]);
+    const [showShippingRateModal, setShowShippingRateModal] = useState(false);
+    const [editingRate, setEditingRate] = useState<ShippingRate | null>(null);
+    const [isImportingShipping, setIsImportingShipping] = useState(false);
+
+    // Client-side mounted state for save bar (prevents hydration mismatch)
+    const [isMounted, setIsMounted] = useState(false);
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
+
     // Custom hex color input state
     const [customHexInput, setCustomHexInput] = useState(settings.primary_color || '#6366f1');
     const [hexError, setHexError] = useState('');
@@ -877,6 +1488,8 @@ export default function SettingsPage() {
 
     // Track the last processed actionData to prevent duplicate processing
     const lastProcessedActionRef = useRef<any>(null);
+    // Track save errors for display
+    const [saveError, setSaveError] = useState<string | null>(null);
 
     // Compute current settings state for comparison
     const hasUnsavedChanges = useMemo(() => {
@@ -890,22 +1503,23 @@ export default function SettingsPage() {
             notes_placeholder: notesPlaceholder, modal_style: modalStyle, animation_style: animationStyle, border_radius: borderRadius,
             form_type: formType, fields, blocks, custom_fields: customFields, styles: formStyles, button_styles: buttonStylesState,
             shipping_options: shippingOpts, partial_cod_enabled: partialCodEnabled, partial_cod_advance_amount: partialCodAdvanceAmount,
-            partial_cod_commission: partialCodCommission
+            partial_cod_commission: partialCodCommission, shipping_rates_enabled: shippingRatesEnabled
         };
-        return JSON.stringify(current) !== savedSettingsString;
+        const settingsChanged = JSON.stringify(current) !== savedSettingsString;
+        return settingsChanged || pendingShippingOps.length > 0;
     }, [
         enabled, buttonText, primaryColor, requiredFields, maxQuantity, buttonStyle, buttonSize, buttonPosition,
         formTitle, formSubtitle, successMessage, submitButtonText, showProductImage, showPrice, showQuantitySelector,
         showEmailField, showNotesField, emailRequired, namePlaceholder, phonePlaceholder, addressPlaceholder,
         notesPlaceholder, modalStyle, animationStyle, borderRadius, formType, fields, blocks, customFields,
         formStyles, buttonStylesState, shippingOpts, partialCodEnabled, partialCodAdvanceAmount, partialCodCommission,
-        savedSettingsString
+        shippingRatesEnabled, savedSettingsString, pendingShippingOps
     ]);
 
     // Discard handler - reset all fields to saved values
     const handleDiscard = useCallback(() => {
         const orig = JSON.parse(savedSettingsString);
-        setEnabled(orig.enabled);
+        setEnabled(!!orig.enabled);
         setButtonText(orig.button_text);
         setPrimaryColor(orig.primary_color);
         setRequiredFields(orig.required_fields);
@@ -940,42 +1554,47 @@ export default function SettingsPage() {
         setPartialCodEnabled(orig.partial_cod_enabled ?? false);
         setPartialCodAdvanceAmount(orig.partial_cod_advance_amount ?? 100);
         setPartialCodCommission(orig.partial_cod_commission ?? 0);
-    }, [savedSettingsString]);
-
-    // Show/hide native Shopify save bar based on unsaved changes
-    useEffect(() => {
-        const saveBarId = 'form-builder-save-bar';
-        if (hasUnsavedChanges) {
-            shopify.saveBar.show(saveBarId);
-        } else {
-            shopify.saveBar.hide(saveBarId);
-        }
-    }, [hasUnsavedChanges, shopify]);
+        setShippingRatesEnabled(orig.shipping_rates_enabled ?? false);
+        // Reset pending shipping operations and restore original rates
+        setPendingShippingOps([]);
+        setShippingRates(initialShippingRates || []);
+    }, [savedSettingsString, initialShippingRates]);
 
     // Handle successful save - only process each actionData once
     useEffect(() => {
-        if (actionData?.success && actionData !== lastProcessedActionRef.current) {
+        if (actionData && actionData !== lastProcessedActionRef.current) {
             lastProcessedActionRef.current = actionData;
-            const currentSettings = {
-                enabled, button_text: buttonText, primary_color: primaryColor, required_fields: requiredFields,
-                max_quantity: maxQuantity, button_style: buttonStyle, button_size: buttonSize, button_position: buttonPosition,
-                form_title: formTitle, form_subtitle: formSubtitle, success_message: successMessage, submit_button_text: submitButtonText,
-                show_product_image: showProductImage, show_price: showPrice, show_quantity_selector: showQuantitySelector,
-                show_email_field: showEmailField, show_notes_field: showNotesField, email_required: emailRequired,
-                name_placeholder: namePlaceholder, phone_placeholder: phonePlaceholder, address_placeholder: addressPlaceholder,
-                notes_placeholder: notesPlaceholder, modal_style: modalStyle, animation_style: animationStyle, border_radius: borderRadius,
-                form_type: formType, fields, blocks, custom_fields: customFields, styles: formStyles, button_styles: buttonStylesState,
-                shipping_options: shippingOpts, partial_cod_enabled: partialCodEnabled, partial_cod_advance_amount: partialCodAdvanceAmount,
-                partial_cod_commission: partialCodCommission
-            };
-            setSavedSettingsString(JSON.stringify(currentSettings));
-            shopify.toast.show('Settings saved!', { duration: 3000 });
+
+            if (actionData.success) {
+                const currentSettings = {
+                    enabled, button_text: buttonText, primary_color: primaryColor, required_fields: requiredFields,
+                    max_quantity: maxQuantity, button_style: buttonStyle, button_size: buttonSize, button_position: buttonPosition,
+                    form_title: formTitle, form_subtitle: formSubtitle, success_message: successMessage, submit_button_text: submitButtonText,
+                    show_product_image: showProductImage, show_price: showPrice, show_quantity_selector: showQuantitySelector,
+                    show_email_field: showEmailField, show_notes_field: showNotesField, email_required: emailRequired,
+                    name_placeholder: namePlaceholder, phone_placeholder: phonePlaceholder, address_placeholder: addressPlaceholder,
+                    notes_placeholder: notesPlaceholder, modal_style: modalStyle, animation_style: animationStyle, border_radius: borderRadius,
+                    form_type: formType, fields, blocks, custom_fields: customFields, styles: formStyles, button_styles: buttonStylesState,
+                    shipping_options: shippingOpts, partial_cod_enabled: partialCodEnabled, partial_cod_advance_amount: partialCodAdvanceAmount,
+                    partial_cod_commission: partialCodCommission, shipping_rates_enabled: shippingRatesEnabled
+                };
+                setSavedSettingsString(JSON.stringify(currentSettings));
+                setSaveError(null); // Clear any previous errors
+                shopify.toast.show('Settings saved!', { duration: 3000 });
+            } else if (actionData.error) {
+                // Handle error case - actionData.error might be an object or string
+                const errorMsg = typeof actionData.error === 'string'
+                    ? actionData.error
+                    : 'Failed to save settings. Please try again.';
+                setSaveError(errorMsg);
+                shopify.toast.show('Error saving settings', { duration: 3000, isError: true });
+            }
         }
     }, [actionData, enabled, buttonText, primaryColor, requiredFields, maxQuantity, buttonStyle, buttonSize, buttonPosition,
         formTitle, formSubtitle, successMessage, submitButtonText, showProductImage, showPrice, showQuantitySelector,
         showEmailField, showNotesField, emailRequired, namePlaceholder, phonePlaceholder, addressPlaceholder,
         notesPlaceholder, modalStyle, animationStyle, borderRadius, formType, fields, blocks, customFields,
-        formStyles, buttonStylesState, shippingOpts, partialCodEnabled, partialCodAdvanceAmount, partialCodCommission, shopify]);
+        formStyles, buttonStylesState, shippingOpts, partialCodEnabled, partialCodAdvanceAmount, partialCodCommission, shippingRatesEnabled, shopify]);
 
     // Hex validation helpers
     const isValidHex = (hex: string): boolean => {
@@ -1092,8 +1711,30 @@ export default function SettingsPage() {
         formData.append("partial_cod_enabled", partialCodEnabled.toString());
         formData.append("partial_cod_advance_amount", partialCodAdvanceAmount.toString());
         formData.append("partial_cod_commission", partialCodCommission.toString());
+        // Shipping rates enabled setting
+        formData.append("shipping_rates_enabled", shippingRatesEnabled.toString());
 
         submit(formData, { method: "post" });
+
+        // Process pending shipping rate operations
+        if (pendingShippingOps.length > 0) {
+            for (const op of pendingShippingOps) {
+                const opFormData = new FormData();
+                if (op.type === 'create') {
+                    opFormData.append("action_type", "create_shipping_rate");
+                    opFormData.append("rate_data", JSON.stringify(op.rateData));
+                } else if (op.type === 'update') {
+                    opFormData.append("action_type", "update_shipping_rate");
+                    opFormData.append("rate_id", op.rateId!);
+                    opFormData.append("rate_data", JSON.stringify(op.rateData));
+                } else if (op.type === 'delete') {
+                    opFormData.append("action_type", "delete_shipping_rate");
+                    opFormData.append("rate_id", op.rateId!);
+                }
+                submit(opFormData, { method: "post" });
+            }
+            setPendingShippingOps([]);
+        }
         // Note: savedSettingsString is updated in useEffect after action success
     }, [
         enabled, buttonText, primaryColor, requiredFields, maxQuantity,
@@ -1104,8 +1745,46 @@ export default function SettingsPage() {
         modalStyle, animationStyle, borderRadius, formType, fields, blocks,
         customFields, formStyles, buttonStylesState, shippingOpts,
         partialCodEnabled, partialCodAdvanceAmount, partialCodCommission,
-        submit, shopify
+        shippingRatesEnabled, submit, shopify, pendingShippingOps
     ]);
+
+    // Show/hide native Shopify save bar based on unsaved changes
+    useEffect(() => {
+        // Only control save bar after client-side mount when element exists
+        if (!isMounted) return;
+
+        const saveBarId = 'form-builder-save-bar';
+
+        // Longer delay to ensure ui-save-bar web component is fully registered in DOM
+        // and App Bridge has initialized
+        const timeout = setTimeout(() => {
+            try {
+                // Check if element exists in DOM before trying to control it
+                const element = document.getElementById(saveBarId);
+                if (!element) {
+                    console.warn('[Form Builder] Save bar element not found in DOM');
+                    return;
+                }
+
+                if (hasUnsavedChanges) {
+                    shopify.saveBar.show(saveBarId);
+                } else {
+                    shopify.saveBar.hide(saveBarId);
+                }
+            } catch (e) {
+                console.warn('[Form Builder] SaveBar control failed:', e);
+            }
+        }, 500);
+
+        return () => {
+            clearTimeout(timeout);
+            try {
+                shopify.saveBar.hide(saveBarId);
+            } catch (e) {
+                // Ignore cleanup errors
+            }
+        };
+    }, [hasUnsavedChanges, isMounted, shopify]);
 
     // Color presets
     const colorPresets = [
@@ -1115,15 +1794,16 @@ export default function SettingsPage() {
 
     return (
         <>
-            <style>{`
+            {/* All styles - render client-only to prevent hydration mismatch */}
+            {isMounted && (
+                <style dangerouslySetInnerHTML={{
+                    __html: `
                 /* Prevent horizontal scrolling globally */
                 html, body { overflow-x: clip !important; max-width: 100vw !important; }
                 
                 .form-builder {
-                    /* Removed max-width and margin from here as they are handled by builder-page now */
                     padding: 0; 
                     box-sizing: border-box; 
-                    /* overflow-x: hidden; REMOVED per instruction */
                 }
                 
                 .builder-header {
@@ -1136,7 +1816,7 @@ export default function SettingsPage() {
                 }
                 .builder-header-left { display: flex; align-items: center; gap: 16px; }
                 .back-btn { width: 44px; height: 44px; border-radius: 12px; border: 1px solid #e5e7eb; background: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; text-decoration: none; color: #374151; transition: all 0.2s ease; }
-                .save-btn { padding: 14px 28px; border-radius: 12px; font-weight: 600; font-size: 14px; border: none; cursor: pointer; transition: all 0.2s ease; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; }
+                .save-btn { padding: 14px 28px; border-radius: 12px; font-weight: 600; font-size: 14px; border: none; cursor: pointer; transition: all 0.2s ease; background: #1f2937; color: white; }
                 .style-options { display: flex; gap: 12px; flex-wrap: wrap; }
                 .style-option { padding: 12px 20px; border-radius: 12px; border: 1px solid #e5e7eb; background: white; font-size: 14px; font-weight: 600; color: #6b7280; cursor: pointer; transition: all 0.2s ease; flex: 1; text-align: center; }
                 .style-option:hover { border-color: #c7d2fe; color: #4f46e5; background: #eaexf8; }
@@ -1145,7 +1825,7 @@ export default function SettingsPage() {
                 .checkbox-option.checked { background: rgba(99, 102, 241, 0.1); }
                 .toggle-option { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; background: #f9fafb; border-radius: 10px; cursor: pointer; margin-bottom: 10px; }
                 .mini-toggle { width: 44px; height: 24px; border-radius: 12px; position: relative; transition: background 0.2s ease; }
-                .mini-toggle::after { content: ''; position: absolute; width: 18px; height: 18px; background: white; border-radius: 50%; top: 3px; transition: left 0.2s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+                .mini-toggle::after { position: absolute; width: 18px; height: 18px; background: white; border-radius: 50%; top: 3px; transition: left 0.2s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
                 .mini-toggle.on { background: #10b981; }
                 .mini-toggle.on::after { left: 23px; }
                 .mini-toggle.off { background: #d1d5db; }
@@ -1194,7 +1874,7 @@ export default function SettingsPage() {
                 }
                 .color-divider::before,
                 .color-divider::after {
-                    content: '';
+                    content: none;
                     flex: 1;
                     height: 1px;
                     background: #e5e7eb;
@@ -1283,10 +1963,16 @@ export default function SettingsPage() {
                     transform: scale(1.1);
                 }
                 .builder-title p { font-size: 14px; color: #6b7280; margin: 0; }
-                .main-toggle { background: ${enabled ? 'rgba(16, 185, 129, 0.1)' : '#f9fafb'}; border: 2px solid ${enabled ? '#10b981' : '#e5e7eb'}; border-radius: 16px; padding: 20px 24px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between; }
+                .main-toggle { border-radius: 16px; padding: 20px 24px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between; transition: all 0.2s ease; }
+                .main-toggle.enabled { background: rgba(16, 185, 129, 0.1); border: 2px solid #10b981; }
+                .main-toggle.disabled { background: #f9fafb; border: 2px solid #e5e7eb; }
                 .toggle-info h3 { font-size: 16px; font-weight: 600; color: #111827; margin: 0 0 4px 0; }
-                .toggle-switch { width: 56px; height: 32px; background: ${enabled ? '#10b981' : '#d1d5db'}; border-radius: 16px; position: relative; cursor: pointer; transition: background 0.2s ease; }
-                .toggle-switch::after { content: ''; position: absolute; width: 26px; height: 26px; background: white; border-radius: 50%; top: 3px; left: ${enabled ? '27px' : '3px'}; transition: left 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+                .toggle-switch { width: 56px; height: 32px; border-radius: 16px; position: relative; cursor: pointer; transition: background 0.2s ease; }
+                .toggle-switch.enabled { background: #10b981; }
+                .toggle-switch.disabled { background: #d1d5db; }
+                .toggle-switch::after { position: absolute; width: 26px; height: 26px; background: white; border-radius: 50%; top: 3px; transition: left 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+                .toggle-switch.enabled::after { left: 27px; }
+                .toggle-switch.disabled::after { left: 3px; }
                 .tabs { display: flex; gap: 8px; margin-bottom: 24px; background: #f3f4f6; padding: 6px; border-radius: 12px; }
                 .tab { flex: 1; padding: 14px 20px; border: none; background: transparent; border-radius: 8px; font-size: 14px; font-weight: 600; color: #6b7280; cursor: pointer; }
                 .tab.active { background: white; color: #111827; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
@@ -1438,7 +2124,444 @@ export default function SettingsPage() {
                     border: none;
                 }
                 .modal-btn.cancel { background: #f3f4f6; color: #6b7280; }
-                .modal-btn.confirm { background: #6366f1; color: white; }
+                .modal-btn.confirm { background: #1f2937; color: white; }
+
+                /* ==================== SHIPPING RATE MODAL (sr-*) ==================== */
+                .sr-modal {
+                    background: white;
+                    border-radius: 14px;
+                    width: 95%;
+                    max-width: 700px;
+                    max-height: 90vh;
+                    display: flex;
+                    flex-direction: column;
+                    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+                    overflow: hidden;
+                }
+                .sr-modal-header {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    padding: 18px 24px;
+                    border-bottom: 1px solid #e5e7eb;
+                }
+                .sr-modal-header h3 {
+                    margin: 0;
+                    font-size: 16px;
+                    font-weight: 600;
+                    color: #1f2937;
+                }
+                .sr-close-btn {
+                    width: 32px;
+                    height: 32px;
+                    border-radius: 8px;
+                    border: none;
+                    background: transparent;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    color: #6b7280;
+                    transition: all 0.15s ease;
+                }
+                .sr-close-btn:hover { background: #f3f4f6; color: #1f2937; }
+                .sr-modal-body {
+                    padding: 20px 24px;
+                    overflow-y: auto;
+                    flex: 1;
+                }
+                .sr-modal-body::-webkit-scrollbar { width: 5px; }
+                .sr-modal-body::-webkit-scrollbar-track { background: transparent; }
+                .sr-modal-body::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+                .sr-modal-footer {
+                    padding: 14px 24px;
+                    border-top: 1px solid #e5e7eb;
+                    display: flex;
+                    gap: 10px;
+                    justify-content: flex-end;
+                }
+                .sr-row {
+                    display: flex;
+                    gap: 16px;
+                    margin-bottom: 16px;
+                }
+                .sr-field {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 4px;
+                    margin-bottom: 14px;
+                }
+                .sr-label {
+                    font-size: 13px;
+                    font-weight: 500;
+                    color: #374151;
+                }
+                .sr-hint {
+                    font-size: 12px;
+                    color: #9ca3af;
+                }
+                .sr-input {
+                    padding: 9px 12px;
+                    border: 1px solid #d1d5db;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    color: #1f2937;
+                    outline: none;
+                    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+                    background: white;
+                    width: 100%;
+                    box-sizing: border-box;
+                }
+                .sr-input:focus {
+                    border-color: #1f2937;
+                    box-shadow: 0 0 0 2px rgba(31, 41, 55, 0.08);
+                }
+                .sr-input::placeholder { color: #d1d5db; }
+                .sr-select {
+                    padding: 9px 12px;
+                    border: 1px solid #d1d5db;
+                    border-radius: 8px;
+                    font-size: 14px;
+                    color: #1f2937;
+                    outline: none;
+                    background: white;
+                    width: 100%;
+                    box-sizing: border-box;
+                    cursor: pointer;
+                    appearance: none;
+                    background-image: url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+                    background-repeat: no-repeat;
+                    background-position: right 12px center;
+                    padding-right: 32px;
+                }
+                .sr-select:focus {
+                    border-color: #1f2937;
+                    box-shadow: 0 0 0 2px rgba(31, 41, 55, 0.08);
+                }
+                .sr-price-row {
+                    display: flex;
+                    align-items: stretch;
+                    gap: 0;
+                    border: 1px solid #d1d5db;
+                    border-radius: 8px;
+                    overflow: hidden;
+                }
+                .sr-price-input-wrap {
+                    display: flex;
+                    align-items: center;
+                    flex: 1;
+                }
+                .sr-currency {
+                    padding: 0 8px 0 12px;
+                    font-size: 14px;
+                    color: #6b7280;
+                    font-weight: 500;
+                }
+                .sr-price-input {
+                    border: none !important;
+                    border-radius: 0 !important;
+                    box-shadow: none !important;
+                }
+                .sr-price-input:focus { box-shadow: none !important; }
+                .sr-free-btn {
+                    padding: 0 16px;
+                    border: none;
+                    border-left: 1px solid #d1d5db;
+                    background: #f9fafb;
+                    color: #6b7280;
+                    font-size: 13px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: all 0.15s ease;
+                }
+                .sr-free-btn:hover { background: #f3f4f6; }
+                .sr-free-btn.active { background: #1f2937; color: white; }
+                .sr-divider {
+                    height: 1px;
+                    background: #e5e7eb;
+                    margin: 16px 0;
+                }
+                .sr-add-conditions-btn {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    padding: 0;
+                    border: none;
+                    background: none;
+                    color: #1f2937;
+                    font-size: 14px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    transition: color 0.15s ease;
+                }
+                .sr-add-conditions-btn:hover { color: #4b5563; }
+                .sr-add-conditions-btn svg { color: #1f2937; }
+                .sr-conditions-panel {
+                    background: #f9fafb;
+                    border: 1px solid #e5e7eb;
+                    border-radius: 10px;
+                    padding: 16px;
+                }
+                .sr-conditions-header {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    margin-bottom: 12px;
+                }
+                .sr-remove-link {
+                    border: none;
+                    background: none;
+                    color: #ef4444;
+                    font-size: 13px;
+                    font-weight: 500;
+                    cursor: pointer;
+                    padding: 0;
+                }
+                .sr-remove-link:hover { text-decoration: underline; }
+                .sr-restrictions {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 10px;
+                }
+                .sr-checkbox-row {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    font-size: 14px;
+                    color: #374151;
+                    cursor: pointer;
+                    padding: 2px 0;
+                }
+                .sr-checkbox-row input[type=checkbox] {
+                    width: 16px;
+                    height: 16px;
+                    accent-color: #1f2937;
+                    cursor: pointer;
+                    flex-shrink: 0;
+                }
+                .sr-restriction-content {
+                    margin-left: 26px;
+                    margin-top: 4px;
+                    margin-bottom: 4px;
+                }
+                .sr-search-wrap {
+                    position: relative;
+                    margin-bottom: 6px;
+                }
+                .sr-search-icon {
+                    position: absolute;
+                    left: 10px;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    pointer-events: none;
+                }
+                .sr-search-input {
+                    padding-left: 32px !important;
+                }
+                .sr-tag-list {
+                    max-height: 120px;
+                    overflow-y: auto;
+                    border: 1px solid #e5e7eb;
+                    border-radius: 8px;
+                    padding: 6px 10px;
+                    background: white;
+                }
+                .sr-tag-list::-webkit-scrollbar { width: 4px; }
+                .sr-tag-list::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 2px; }
+                .sr-tag-item {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    padding: 4px 0;
+                    font-size: 13px;
+                    color: #374151;
+                    cursor: pointer;
+                }
+                .sr-tag-item input[type=checkbox] {
+                    accent-color: #1f2937;
+                    width: 14px;
+                    height: 14px;
+                }
+                .sr-select-products-btn {
+                    margin-top: 8px;
+                    padding: 6px 14px;
+                    border-radius: 6px;
+                    border: none;
+                    background: #1f2937;
+                    color: white;
+                    font-size: 12px;
+                    font-weight: 600;
+                    cursor: pointer;
+                }
+                .sr-rate-summary {
+                    background: #f9fafb;
+                    border: 1px solid #e5e7eb;
+                    border-radius: 10px;
+                    padding: 14px 18px;
+                }
+                .sr-rate-summary-row {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                }
+                .sr-radio-dot {
+                    width: 18px;
+                    height: 18px;
+                    border-radius: 50%;
+                    border: 2px solid #d1d5db;
+                    cursor: pointer;
+                    transition: all 0.15s ease;
+                    position: relative;
+                    flex-shrink: 0;
+                }
+                .sr-radio-dot.active {
+                    border-color: #1f2937;
+                }
+                .sr-radio-dot.active::after {
+                    content: '';
+                    position: absolute;
+                    top: 3px;
+                    left: 3px;
+                    width: 8px;
+                    height: 8px;
+                    border-radius: 50%;
+                    background: #1f2937;
+                }
+                .sr-btn-cancel {
+                    padding: 8px 18px;
+                    border-radius: 8px;
+                    font-weight: 500;
+                    font-size: 14px;
+                    cursor: pointer;
+                    border: 1px solid #d1d5db;
+                    background: white;
+                    color: #374151;
+                    transition: all 0.15s ease;
+                }
+                .sr-btn-cancel:hover { background: #f3f4f6; }
+                .sr-btn-done {
+                    padding: 8px 24px;
+                    border-radius: 8px;
+                    font-weight: 600;
+                    font-size: 14px;
+                    cursor: pointer;
+                    border: none;
+                    background: #1f2937;
+                    color: white;
+                    transition: all 0.15s ease;
+                }
+                .sr-btn-done:hover { background: #111827; }
+                .sr-btn-done:disabled { opacity: 0.4; cursor: not-allowed; }
+
+                /* ==================== SHIPPING TAB TABLE STYLES ==================== */
+                .shipping-action-btn {
+                    flex: 1;
+                    padding: 10px 16px;
+                    border-radius: 10px;
+                    font-weight: 600;
+                    font-size: 13px;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 8px;
+                    transition: all 0.2s ease;
+                    border: none;
+                }
+                .shipping-action-btn.primary {
+                    background: #1f2937;
+                    color: white;
+                }
+                .shipping-action-btn.primary:hover { background: #111827; }
+                .shipping-action-btn.secondary {
+                    background: #f3f4f6;
+                    color: #374151;
+                    border: 1px solid #d1d5db;
+                }
+                .shipping-action-btn.secondary:hover { background: #e5e7eb; }
+                .shipping-action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+                .shipping-table-wrapper {
+                    border: 1px solid #e5e7eb;
+                    border-radius: 12px;
+                    overflow: hidden;
+                }
+                .shipping-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    font-size: 13px;
+                }
+                .shipping-table thead th {
+                    background: #f8fafc;
+                    padding: 10px 14px;
+                    text-align: left;
+                    font-weight: 600;
+                    font-size: 11px;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                    color: #6b7280;
+                    border-bottom: 1px solid #e5e7eb;
+                }
+                .shipping-table tbody td {
+                    padding: 12px 14px;
+                    border-bottom: 1px solid #f3f4f6;
+                    vertical-align: middle;
+                }
+                .shipping-table tbody tr:last-child td { border-bottom: none; }
+                .shipping-table tbody tr:hover { background: #fafafa; }
+                .shipping-price-badge {
+                    font-weight: 700;
+                    font-size: 13px;
+                    color: #1f2937;
+                }
+                .shipping-price-badge.free {
+                    color: #10b981;
+                    background: rgba(16, 185, 129, 0.1);
+                    padding: 2px 8px;
+                    border-radius: 6px;
+                    font-size: 11px;
+                }
+                .shipping-condition-badge {
+                    font-size: 11px;
+                    color: #1f2937;
+                    background: #f3f4f6;
+                    padding: 3px 8px;
+                    border-radius: 6px;
+                    white-space: nowrap;
+                }
+                .shipping-status-dot {
+                    font-size: 11px;
+                    font-weight: 600;
+                    padding: 3px 8px;
+                    border-radius: 6px;
+                }
+                .shipping-status-dot.active { color: #10b981; background: rgba(16, 185, 129, 0.1); }
+                .shipping-status-dot.inactive { color: #9ca3af; background: #f3f4f6; }
+                .shipping-icon-btn {
+                    width: 32px;
+                    height: 32px;
+                    border-radius: 8px;
+                    border: none;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    transition: all 0.15s ease;
+                }
+                .shipping-icon-btn.edit {
+                    background: #f3f4f6;
+                    color: #6b7280;
+                }
+                .shipping-icon-btn.edit:hover {
+                    background: #e5e7eb;
+                    color: #1f2937;
+                }
+                .shipping-icon-btn.delete {
+                    background: rgba(239, 68, 68, 0.06);
+                    color: #ef4444;
+                }
+                .shipping-icon-btn.delete:hover {
+                    background: rgba(239, 68, 68, 0.14);
+                }
 
                 /* Content Blocks */
                 .content-blocks { margin-top: 20px; }
@@ -1547,7 +2670,6 @@ export default function SettingsPage() {
                     overflow: hidden;
                 }
                 .btn-anim-shimmer::after {
-                    content: '';
                     position: absolute;
                     top: 0;
                     left: -100%;
@@ -1611,7 +2733,6 @@ export default function SettingsPage() {
                     overflow: hidden;
                 }
                 .btn-click-ripple::before {
-                    content: '';
                     position: absolute;
                     top: 50%;
                     left: 50%;
@@ -1643,17 +2764,21 @@ export default function SettingsPage() {
                         animation: none !important;
                     }
                 }
-            `}</style>
+            `}} />
+            )}
 
             <s-page heading="">
-                {/* Native Shopify Save Bar */}
-                <ui-save-bar id="form-builder-save-bar">
-                    <button variant="primary" onClick={handleSave} disabled={isSubmitting}>
-                        {isSubmitting ? 'Saving...' : 'Save'}
-                    </button>
-                    <button onClick={handleDiscard} disabled={isSubmitting}>Discard</button>
-                </ui-save-bar>
-
+                {/* Native Shopify Save Bar - only render client-side to prevent hydration mismatch */}
+                {isMounted && (
+                    <ui-save-bar id="form-builder-save-bar">
+                        <button variant="primary" onClick={handleSave} disabled={isSubmitting}>
+                            {isSubmitting ? 'Saving...' : 'Save'}
+                        </button>
+                        <button onClick={handleDiscard} disabled={isSubmitting}>
+                            Discard
+                        </button>
+                    </ui-save-bar>
+                )}
                 <div className="form-builder">
                     {/* Header */}
                     <div className="builder-header">
@@ -1664,18 +2789,32 @@ export default function SettingsPage() {
                                 <p>Customize your COD checkout form</p>
                             </div>
                         </div>
+                        {/* Error message display */}
+                        {saveError && (
+                            <div style={{
+                                background: '#fef2f2',
+                                border: '1px solid #ef4444',
+                                borderRadius: '8px',
+                                padding: '12px 16px',
+                                fontSize: '13px',
+                                color: '#dc2626',
+                                maxWidth: '300px'
+                            }}>
+                                ⚠️ {saveError}
+                            </div>
+                        )}
                     </div>
 
                     {/* Main Toggle */}
-                    <div className="main-toggle">
+                    <div className={`main-toggle ${enabled ? 'enabled' : 'disabled'}`}>
                         <div className="toggle-info">
                             <h3>
-                                {enabled ? '✅' : '⚪'} COD Form Status
+                                <span>{enabled ? '✅' : '⚪'}</span> COD Form Status
                             </h3>
                             <p>{enabled ? 'Your COD form is live on product pages' : 'Enable to show COD form on your store'}</p>
                         </div>
                         <div
-                            className="toggle-switch"
+                            className={`toggle-switch ${enabled ? 'enabled' : 'disabled'}`}
                             onClick={() => setEnabled(!enabled)}
                         />
                     </div>
@@ -1700,10 +2839,16 @@ export default function SettingsPage() {
                         >
                             ✨ Style
                         </button>
+                        <button
+                            className={`tab ${activeTab === 'shipping' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('shipping')}
+                        >
+                            🚚 Shipping
+                        </button>
                     </div>
 
                     {/* Layout */}
-                    <div className="builder-page">
+                    <div className="builder-page" style={activeTab === 'shipping' ? { gridTemplateColumns: '1fr', maxWidth: '900px' } : undefined}>
                         <div className="builder-left">
                             {/* Button Tab */}
                             {activeTab === 'button' && (
@@ -2247,104 +3392,6 @@ export default function SettingsPage() {
                                         </div>
                                     </div>
 
-                                    {/* Shipping Options */}
-                                    <div className="settings-card">
-                                        <h3 className="card-title"><span>🚚</span> Shipping Options</h3>
-                                        <div className="toggle-options">
-                                            <div className="toggle-option" onClick={() => setShippingOpts({ ...shippingOpts, enabled: !shippingOpts.enabled })}>
-                                                <span className="toggle-option-label">Enable Shipping Options</span>
-                                                <div className={`mini-toggle ${shippingOpts.enabled ? 'on' : 'off'}`} />
-                                            </div>
-                                        </div>
-                                        {shippingOpts.enabled && (
-                                            <div style={{ marginTop: '16px' }}>
-                                                {/* Shipping Options List */}
-                                                {shippingOpts.options.map((opt, idx) => (
-                                                    <div key={opt.id} style={{
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: '8px',
-                                                        padding: '12px',
-                                                        background: shippingOpts.defaultOption === opt.id ? 'rgba(16, 185, 129, 0.1)' : '#f9fafb',
-                                                        border: shippingOpts.defaultOption === opt.id ? '2px solid #10b981' : '1px solid #e5e7eb',
-                                                        borderRadius: '10px',
-                                                        marginBottom: '8px'
-                                                    }}>
-                                                        {/* Default Radio */}
-                                                        <input
-                                                            type="radio"
-                                                            name="defaultShipping"
-                                                            checked={shippingOpts.defaultOption === opt.id}
-                                                            onChange={() => setShippingOpts({ ...shippingOpts, defaultOption: opt.id })}
-                                                            style={{ cursor: 'pointer' }}
-                                                        />
-                                                        {/* Label Input */}
-                                                        <input
-                                                            type="text"
-                                                            value={opt.label}
-                                                            onChange={(e) => {
-                                                                const newOptions = [...shippingOpts.options];
-                                                                newOptions[idx] = { ...opt, label: e.target.value };
-                                                                setShippingOpts({ ...shippingOpts, options: newOptions });
-                                                            }}
-                                                            placeholder="Shipping name"
-                                                            style={{ flex: 1, padding: '8px 12px', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '14px' }}
-                                                        />
-                                                        {/* Price Input */}
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                            <span style={{ fontSize: '14px', color: '#6b7280' }}>₹</span>
-                                                            <input
-                                                                type="number"
-                                                                value={opt.price}
-                                                                onChange={(e) => {
-                                                                    const newOptions = [...shippingOpts.options];
-                                                                    newOptions[idx] = { ...opt, price: parseFloat(e.target.value) || 0 };
-                                                                    setShippingOpts({ ...shippingOpts, options: newOptions });
-                                                                }}
-                                                                placeholder="0"
-                                                                min="0"
-                                                                style={{ width: '70px', padding: '8px', border: '1px solid #e5e7eb', borderRadius: '6px', fontSize: '14px' }}
-                                                            />
-                                                        </div>
-                                                        {/* Delete Button */}
-                                                        {shippingOpts.options.length > 1 && (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    const newOptions = shippingOpts.options.filter((_, i) => i !== idx);
-                                                                    const newDefault = shippingOpts.defaultOption === opt.id
-                                                                        ? newOptions[0]?.id || ''
-                                                                        : shippingOpts.defaultOption;
-                                                                    setShippingOpts({ ...shippingOpts, options: newOptions, defaultOption: newDefault });
-                                                                }}
-                                                                style={{ padding: '6px 10px', background: '#fee2e2', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#dc2626', fontSize: '14px' }}
-                                                            >
-                                                                ✕
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                ))}
-                                                {/* Add New Option Button */}
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        const newId = 'shipping_' + Date.now();
-                                                        setShippingOpts({
-                                                            ...shippingOpts,
-                                                            options: [...shippingOpts.options, { id: newId, label: 'New Shipping', price: 0 }]
-                                                        });
-                                                    }}
-                                                    style={{ width: '100%', padding: '12px', background: 'rgba(99, 102, 241, 0.1)', border: '1px dashed #6366f1', borderRadius: '8px', color: '#6366f1', fontWeight: 600, cursor: 'pointer', fontSize: '14px' }}
-                                                >
-                                                    + Add Shipping Option
-                                                </button>
-                                                <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '12px' }}>
-                                                    ⓘ Select the radio button to set the default option. Set price to 0 for free shipping.
-                                                </p>
-                                            </div>
-                                        )}
-                                    </div>
-
                                     {/* Partial Cash on Delivery */}
                                     <div className="settings-card">
                                         <h3 className="card-title"><span>💳</span> Partial Cash on Delivery</h3>
@@ -2491,6 +3538,153 @@ export default function SettingsPage() {
                                 </>
                             )}
 
+                            {/* Shipping Tab */}
+                            {
+                                activeTab === 'shipping' && (
+                                    <>
+                                        {/* Shipping Rates Enable Toggle */}
+                                        <div className="settings-card">
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                                                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#1f2937', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>⚙️</div>
+                                                <div>
+                                                    <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#1f2937' }}>Shipping Rates</h3>
+                                                    <p style={{ margin: 0, fontSize: '12px', color: '#9ca3af' }}>Configure rates with conditions and restrictions</p>
+                                                </div>
+                                            </div>
+                                            <div className="toggle-option" onClick={() => setShippingRatesEnabled(!shippingRatesEnabled)}>
+                                                <span className="toggle-option-label">Enable Shipping Rates</span>
+                                                <div className={`mini-toggle ${shippingRatesEnabled ? 'on' : 'off'}`} />
+                                            </div>
+                                        </div>
+
+                                        {shippingRatesEnabled && (
+                                            <>
+                                                {/* Action Buttons */}
+                                                <div className="settings-card">
+                                                    <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setIsImportingShipping(true)}
+                                                            disabled={isImportingShipping}
+                                                            className="shipping-action-btn secondary"
+                                                        >
+                                                            {isImportingShipping ? (
+                                                                <><span className="spinner" style={{ width: '14px', height: '14px', border: '2px solid #6366f1', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} /> Importing...</>
+                                                            ) : (
+                                                                <>📥 Import from Shopify</>
+                                                            )}
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => { setEditingRate(null); setShowShippingRateModal(true); }}
+                                                            className="shipping-action-btn primary"
+                                                        >
+                                                            + Add Rate
+                                                        </button>
+                                                    </div>
+
+                                                    {/* Shipping Rates Table */}
+                                                    {shippingRates.length === 0 ? (
+                                                        <div style={{ textAlign: 'center', padding: '40px 20px', background: '#f9fafb', borderRadius: '12px', border: '1px dashed #d1d5db' }}>
+                                                            <div style={{ fontSize: '32px', marginBottom: '12px' }}>📦</div>
+                                                            <p style={{ fontSize: '14px', color: '#6b7280', margin: '0 0 4px 0' }}>No shipping rates yet</p>
+                                                            <p style={{ fontSize: '13px', color: '#9ca3af', margin: 0 }}>Add rates manually or import from Shopify</p>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="shipping-table-wrapper">
+                                                            <table className="shipping-table">
+                                                                <thead>
+                                                                    <tr>
+                                                                        <th>Rate Name</th>
+                                                                        <th>Price</th>
+                                                                        <th>Condition</th>
+                                                                        <th>Status</th>
+                                                                        <th style={{ width: '80px', textAlign: 'center' }}>Actions</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody>
+                                                                    {shippingRates.map((rate) => (
+                                                                        <tr key={rate.id} style={{ opacity: rate.is_active ? 1 : 0.6 }}>
+                                                                            <td>
+                                                                                <div style={{ fontWeight: 600, fontSize: '13px', color: '#1f2937' }}>{rate.name}</div>
+                                                                                {rate.description && <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>{rate.description}</div>}
+                                                                            </td>
+                                                                            <td>
+                                                                                <span className={`shipping-price-badge ${rate.price === 0 ? 'free' : ''}`}>
+                                                                                    {rate.price === 0 ? 'FREE' : `₹${rate.price}`}
+                                                                                </span>
+                                                                            </td>
+                                                                            <td>
+                                                                                {rate.condition_type === 'none' ? (
+                                                                                    <span style={{ fontSize: '12px', color: '#9ca3af' }}>—</span>
+                                                                                ) : (
+                                                                                    <span className="shipping-condition-badge">
+                                                                                        {rate.condition_type === 'order_price' ? '💰 Price' : rate.condition_type === 'order_quantity' ? '📦 Qty' : '⚖️ Weight'}
+                                                                                        {rate.min_value != null && ` ≥ ${rate.min_value}`}
+                                                                                        {rate.max_value != null && ` ≤ ${rate.max_value}`}
+                                                                                    </span>
+                                                                                )}
+                                                                            </td>
+                                                                            <td>
+                                                                                <span className={`shipping-status-dot ${rate.is_active ? 'active' : 'inactive'}`}>
+                                                                                    {rate.is_active ? 'Active' : 'Inactive'}
+                                                                                </span>
+                                                                            </td>
+                                                                            <td>
+                                                                                <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        className="shipping-icon-btn edit"
+                                                                                        title="Edit rate"
+                                                                                        onClick={() => { setEditingRate(rate); setShowShippingRateModal(true); }}
+                                                                                    >
+                                                                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                                                                                    </button>
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        className="shipping-icon-btn delete"
+                                                                                        title="Delete rate"
+                                                                                        onClick={() => {
+                                                                                            if (confirm(`Delete "${rate.name}"?`)) {
+                                                                                                // Queue delete for save bar (don't submit immediately)
+                                                                                                setPendingShippingOps(prev => [...prev, { type: 'delete', rateId: rate.id! }]);
+                                                                                                // Optimistically remove from UI
+                                                                                                setShippingRates(prev => prev.filter(r => r.id !== rate.id));
+                                                                                            }
+                                                                                        }}
+                                                                                    >
+                                                                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></svg>
+                                                                                    </button>
+                                                                                </div>
+                                                                            </td>
+                                                                        </tr>
+                                                                    ))}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Info Card */}
+                                                <div className="settings-card" style={{ background: 'rgba(59, 130, 246, 0.05)', borderColor: 'rgba(59, 130, 246, 0.2)' }}>
+                                                    <div style={{ display: 'flex', gap: '12px' }}>
+                                                        <div style={{ fontSize: '24px' }}>💡</div>
+                                                        <div>
+                                                            <h4 style={{ fontSize: '14px', fontWeight: 600, color: '#1e40af', margin: '0 0 4px 0' }}>How Shipping Rates Work</h4>
+                                                            <p style={{ fontSize: '13px', color: '#3b82f6', margin: 0, lineHeight: '1.5' }}>
+                                                                The first applicable shipping rate will be automatically selected based on order conditions.
+                                                                Set conditions like minimum order value or restrict to specific products/countries.
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </>
+                                        )}
+                                    </>
+                                )
+                            }
+
+
                             {/* Style Tab */}
                             {activeTab === 'style' && (
                                 <>
@@ -2572,8 +3766,8 @@ export default function SettingsPage() {
                             )}
                         </div>
 
-                        {/* Preview Panel - Memoized */}
-                        <div className="builder-right">
+                        {/* Preview Panel - Hidden on Shipping tab */}
+                        <div className="builder-right" style={activeTab === 'shipping' ? { display: 'none' } : undefined}>
                             <PreviewDisplay
                                 showProductImage={showProductImage}
                                 showPrice={showPrice}
@@ -2595,12 +3789,62 @@ export default function SettingsPage() {
                                 buttonStylesState={buttonStylesState}
                                 blocks={blocks}
                                 shippingOpts={shippingOpts}
+                                shippingRates={shippingRates}
+                                shippingRatesEnabled={shippingRatesEnabled}
                                 activeTab={activeTab}
                             />
                         </div>
 
                     </div>
                 </div>
+
+                {/* Shipping Rate Modal */}
+                {showShippingRateModal && (
+                    <ShippingRateModal
+                        rate={editingRate}
+                        products={products}
+                        onClose={() => {
+                            setShowShippingRateModal(false);
+                            setEditingRate(null);
+                        }}
+                        onSave={(rateData) => {
+                            // Queue operation for save bar (don't submit immediately)
+                            if (editingRate?.id) {
+                                setPendingShippingOps(prev => [...prev, { type: 'update', rateId: editingRate.id, rateData }]);
+                                // Optimistically update UI
+                                setShippingRates(prev => prev.map(r => r.id === editingRate.id ? { ...r, ...rateData, id: r.id } : r));
+                            } else {
+                                const tempId = `temp_${Date.now()}`;
+                                setPendingShippingOps(prev => [...prev, { type: 'create', rateData, rateId: tempId }]);
+                                // Optimistically update UI
+                                const newRate: ShippingRate = {
+                                    ...rateData,
+                                    id: tempId,
+                                    shop_domain: shop,
+                                    created_at: new Date().toISOString(),
+                                    updated_at: new Date().toISOString(),
+                                };
+                                setShippingRates(prev => [newRate, ...prev]);
+                            }
+                            setShowShippingRateModal(false);
+                            setEditingRate(null);
+                        }}
+                    />
+                )}
+
+                {/* Import from Shopify Modal */}
+                {isImportingShipping && (
+                    <ImportShippingModal
+                        onClose={() => setIsImportingShipping(false)}
+                        onImport={async (replaceExisting) => {
+                            const formData = new FormData();
+                            formData.append("action_type", "import_shopify_shipping");
+                            formData.append("replace_existing", replaceExisting.toString());
+                            submit(formData, { method: "post" });
+                            setIsImportingShipping(false);
+                        }}
+                    />
+                )}
             </s-page>
         </>
     );

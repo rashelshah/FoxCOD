@@ -97,6 +97,9 @@
         buttonBorderColor: dataContainer.dataset.buttonBorderColor || null,
         buttonBorderWidth: dataContainer.dataset.buttonBorderWidth != null ? parseInt(dataContainer.dataset.buttonBorderWidth, 10) : null,
         shippingOptions: safeJSONParse(dataContainer.dataset.shippingOptions, {}),
+        // New Shipping Rates Configuration - prefer window.FoxCod for reliability
+        shippingRates: (window.FoxCod && window.FoxCod.shippingRates) || safeJSONParse(dataContainer.dataset.shippingRates, []),
+        shippingRatesEnabled: dataContainer.dataset.shippingRatesEnabled === 'true' || (window.FoxCod && window.FoxCod.shippingRatesEnabled) === true,
         
         // Legacy/Direct props
         modalStyle: dataContainer.dataset.modalStyle || 'modern',
@@ -748,8 +751,10 @@
         console.log('[COD Form] Order summary not rendered - blocks config:', config.blocks);
     }
 
-    // 3. Render Shipping Options if enabled
-    if (config.blocks && config.blocks.shipping_options && config.shippingOptions && config.shippingOptions.enabled) {
+    // 3. Render Shipping Options if enabled (new rates system OR old options system)
+    var hasNewShippingRates = config.shippingRatesEnabled && config.shippingRates && config.shippingRates.length > 0;
+    var hasOldShippingOptions = config.shippingOptions && config.shippingOptions.enabled;
+    if (config.blocks && config.blocks.shipping_options && (hasNewShippingRates || hasOldShippingOptions)) {
         renderShippingOptions(form, config);
     }
 
@@ -1165,11 +1170,22 @@
           discount = subtotal * (discountPercent / 100);
       }
       
-      // Calculate Shipping
+      // Calculate Shipping using new shipping rates system
       var shippingCost = 0;
-      if (config.shippingOptions && config.shippingOptions.enabled) {
-          // Find default
-          var defaultOpt = config.shippingOptions.options.find(o => o.id === config.shippingOptions.defaultOption);
+      if (config.shippingRatesEnabled && config.shippingRates && config.shippingRates.length > 0) {
+          // Find first applicable active rate using condition matching
+          var currentQty = getEffectiveQuantity(form);
+          var applicableRate = config.shippingRates.find(function(rate) { 
+              return isRateApplicable(rate, config, currentQty); 
+          });
+          if (applicableRate) {
+              shippingCost = parseFloat(applicableRate.price) || 0;
+          }
+      } else if (config.shippingOptions && config.shippingOptions.enabled) {
+          // Fallback to old shipping options
+          var defaultOpt = config.shippingOptions.options.find(function(o) { 
+              return o.id === config.shippingOptions.defaultOption; 
+          });
           if (defaultOpt) shippingCost = parseFloat(defaultOpt.price) || 0;
       }
 
@@ -1214,6 +1230,13 @@
    * Render Shipping Options
    */
   function renderShippingOptions(form, config) {
+      // Check for new shipping rates system first
+      if (config.shippingRatesEnabled && config.shippingRates && config.shippingRates.length > 0) {
+          renderNewShippingRates(form, config);
+          return;
+      }
+      
+      // Fallback to old shipping options
       if (!config.shippingOptions || !config.shippingOptions.options) return;
 
       var container = document.createElement('div');
@@ -1263,6 +1286,235 @@
           form.insertBefore(container, summary);
       } else {
          form.insertBefore(container, form.querySelector('button[type="submit"]'));
+      }
+  }
+
+  /**
+   * Get the effective quantity considering bundle offers
+   * Priority: bundle offer selection > quantity input > default 1
+   */
+  function getEffectiveQuantity(form) {
+      // Check for bundle offer selection first
+      var modal = form.closest('.cod-modal');
+      if (modal) {
+          var quantityOffersEl = modal.querySelector('.cod-quantity-offers');
+          if (quantityOffersEl) {
+              try {
+                  var offerData = quantityOffersEl.getAttribute('data-selected-offer');
+                  if (offerData) {
+                      var selectedOffer = JSON.parse(offerData);
+                      if (selectedOffer && selectedOffer.quantity) {
+                          return selectedOffer.quantity;
+                      }
+                  }
+              } catch (e) {
+                  console.warn('[COD Form] Failed to parse offer for quantity:', e);
+              }
+          }
+      }
+      // Fallback to quantity input
+      var qtyInput = form.querySelector('[name="quantity"]');
+      return parseInt(qtyInput ? qtyInput.value : 1) || 1;
+  }
+
+  /**
+   * Check if a shipping rate's conditions are met
+   */
+  function isRateApplicable(rate, config, quantity) {
+      var orderPrice = (config.productPrice || 0) * quantity;
+      
+      // Check if rate is active
+      if (!rate.is_active) return false;
+      
+      // Check conditions
+      if (rate.condition_type && rate.condition_type !== 'none') {
+          var value;
+          switch (rate.condition_type) {
+              case 'order_price':
+                  value = orderPrice;
+                  break;
+              case 'order_quantity':
+                  value = quantity;
+                  break;
+              case 'order_weight':
+                  // Default product weight is 0.5kg if not specified
+                  value = (quantity * 0.5);
+                  break;
+              default:
+                  value = orderPrice;
+          }
+          
+          if (rate.min_value !== undefined && rate.min_value !== null && rate.min_value > 0 && value < rate.min_value) {
+              return false;
+          }
+          if (rate.max_value !== undefined && rate.max_value !== null && rate.max_value > 0 && value > rate.max_value) {
+              return false;
+          }
+      }
+      
+      // Check product restrictions
+      if (rate.applies_to_products && rate.product_ids && rate.product_ids.length > 0) {
+          // Convert config.productId to full gid format if needed
+          var currentProductId = config.productId;
+          var fullProductId = currentProductId.includes('gid://') ? currentProductId : 'gid://shopify/Product/' + currentProductId;
+          
+          var productMatch = rate.product_ids.some(function(pid) {
+              return pid === currentProductId || pid === fullProductId || 
+                     pid.includes(currentProductId) || currentProductId.includes(pid);
+          });
+          
+          if (!productMatch) return false;
+      }
+      
+      // Country/state restrictions would be checked here if we had location data
+      // For now, we assume they pass (customer can select shipping then we validate on server)
+      
+      return true;
+  }
+
+  /**
+   * Render New Shipping Rates (from shipping_rates table)
+   */
+  function renderNewShippingRates(form, config) {
+      if (!config.shippingRates || config.shippingRates.length === 0) return;
+
+      var container = document.createElement('div');
+      container.className = 'cod-shipping-section';
+      container.style.marginBottom = '16px';
+      
+      var title = document.createElement('div');
+      title.textContent = 'Shipping Method';
+      title.style.fontWeight = '600';
+      title.style.marginBottom = '8px';
+      title.style.fontSize = '14px';
+      container.appendChild(title);
+
+      // Get current quantity for condition evaluation (uses bundle offer if available)
+      var quantity = getEffectiveQuantity(form);
+
+      // Filter active and applicable rates based on conditions
+      var applicableRates = config.shippingRates.filter(function(rate) {
+          return isRateApplicable(rate, config, quantity);
+      });
+      
+      if (applicableRates.length === 0) {
+          console.log('[COD Form] No applicable shipping rates found for current order');
+          // Show message when no rates match
+          var noRatesMsg = document.createElement('div');
+          noRatesMsg.textContent = 'No shipping options available for this order';
+          noRatesMsg.style.fontSize = '13px';
+          noRatesMsg.style.color = '#6b7280';
+          noRatesMsg.style.fontStyle = 'italic';
+          container.appendChild(noRatesMsg);
+          
+          form.insertBefore(container, form.querySelector('.cod-order-summary') || form.querySelector('button[type="submit"]'));
+          return;
+      }
+
+      applicableRates.forEach(function(rate, index) {
+          var row = document.createElement('div');
+          row.style.display = 'flex';
+          row.style.alignItems = 'center';
+          row.style.marginBottom = '6px';
+          row.style.cursor = 'pointer';
+          
+          var radio = document.createElement('input');
+          radio.type = 'radio';
+          radio.name = 'shipping_method';
+          radio.value = rate.id;
+          radio.checked = index === 0; // Select first by default
+          radio.style.marginRight = '8px';
+          
+          // Add change listener to update total
+          radio.addEventListener('change', function() {
+              updateTotalHelper(form, config, rate.price);
+          });
+
+          var label = document.createElement('span');
+          var priceText = rate.price === 0 ? 'FREE' : formatMoney(rate.price);
+          
+          // Build label with conditions info
+          var labelText = rate.name + ' (' + priceText + ')';
+          if (rate.description) {
+              labelText += ' - ' + rate.description;
+          }
+          
+          // Add condition indicator
+          if (rate.condition_type && rate.condition_type !== 'none') {
+              var conditionText = '';
+              if (rate.min_value !== undefined && rate.min_value !== null && 
+                  rate.max_value !== undefined && rate.max_value !== null) {
+                  conditionText = ' [' + rate.min_value + '-' + rate.max_value + ']';
+              } else if (rate.min_value !== undefined && rate.min_value !== null) {
+                  conditionText = ' [min ' + rate.min_value + ']';
+              } else if (rate.max_value !== undefined && rate.max_value !== null) {
+                  conditionText = ' [max ' + rate.max_value + ']';
+              }
+              labelText += conditionText;
+          }
+          
+          label.innerHTML = labelText;
+          label.style.fontSize = '14px';
+
+          row.appendChild(radio);
+          row.appendChild(label);
+          container.appendChild(row);
+          
+          row.onclick = function() { 
+              if (!radio.checked) {
+                  radio.checked = true; 
+                  radio.dispatchEvent(new Event('change')); 
+              }
+          };
+      });
+
+      // Insert before submit button (or Order Summary if present)
+      var summary = form.querySelector('.cod-order-summary');
+      if (summary) {
+          form.insertBefore(container, summary);
+      } else {
+         form.insertBefore(container, form.querySelector('button[type="submit"]'));
+      }
+      
+      // Update total with first rate's price
+      if (applicableRates.length > 0) {
+          updateTotalHelper(form, config, applicableRates[0].price);
+      }
+      
+      console.log('[COD Form] Rendered new shipping rates:', applicableRates.length, 'of', config.shippingRates.length);
+      
+      // Re-render shipping options when quantity changes
+      var qtyInput = form.querySelector('[name="quantity"]');
+      if (qtyInput) {
+          qtyInput.addEventListener('change', function() {
+              // Remove existing shipping section and re-render
+              var existingSection = form.querySelector('.cod-shipping-section');
+              if (existingSection) {
+                  existingSection.remove();
+              }
+              renderNewShippingRates(form, config);
+          });
+      }
+
+      // Re-render shipping options when bundle offer selection changes
+      var modal = form.closest('.cod-modal');
+      if (modal) {
+          var quantityOffersEl = modal.querySelector('.cod-quantity-offers');
+          if (quantityOffersEl) {
+              var observer = new MutationObserver(function(mutations) {
+                  mutations.forEach(function(mutation) {
+                      if (mutation.type === 'attributes' && mutation.attributeName === 'data-selected-offer') {
+                          console.log('[COD Form] Bundle offer changed, re-rendering shipping rates');
+                          var existingSection = form.querySelector('.cod-shipping-section');
+                          if (existingSection) {
+                              existingSection.remove();
+                          }
+                          renderNewShippingRates(form, config);
+                      }
+                  });
+              });
+              observer.observe(quantityOffersEl, { attributes: true, attributeFilter: ['data-selected-offer'] });
+          }
       }
   }
 
