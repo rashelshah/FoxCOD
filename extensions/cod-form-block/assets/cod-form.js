@@ -444,11 +444,19 @@
     offersContainer.setAttribute('data-product-id', config.productId);
     
     // Apply template-specific container styles
+    offersContainer.style.display = 'flex';
+    offersContainer.style.width = '100%';
+    offersContainer.style.boxSizing = 'border-box';
+    offersContainer.style.gap = '8px';
     if (template === 'cards') {
-      offersContainer.style.display = 'flex';
       offersContainer.style.flexDirection = 'row';
       offersContainer.style.flexWrap = 'wrap';
-      offersContainer.style.gap = '8px';
+    } else if (template === 'vertical') {
+      offersContainer.style.flexDirection = 'row';
+      offersContainer.style.flexWrap = 'wrap';
+    } else {
+      // Classic, Modern, Minimal - stack cards vertically
+      offersContainer.style.flexDirection = 'column';
     }
     
     // State: selected offer index
@@ -478,11 +486,12 @@
       // Force inline styles to ensure they override any CSS
       card.style.border = isMinimal ? '1px solid' : '2px solid';
       card.style.padding = isMinimal ? '8px 12px' : (isCards ? '16px 12px' : '12px');
-      card.style.marginBottom = '8px';
       card.style.cursor = 'pointer';
       card.style.transition = 'all 0.2s ease';
       card.style.position = 'relative';
       card.style.overflow = 'visible';
+      card.style.boxSizing = 'border-box';
+      card.style.display = 'flex';
       
       // Cards template - flex layout
       if (isCards) {
@@ -492,18 +501,25 @@
         card.style.alignItems = 'center';
         card.style.textAlign = 'center';
         card.style.boxShadow = '0 2px 8px rgba(0,0,0,0.05)';
-      }
-      
-      // Vertical/Cards template - column layout
-      if (isVertical || isCards) {
-        card.style.display = 'flex';
+      } else if (isVertical) {
+        // Vertical template - column layout, centered
+        card.style.flex = '1';
+        card.style.minWidth = '120px';
         card.style.flexDirection = 'column';
         card.style.alignItems = 'center';
         card.style.textAlign = 'center';
       } else if (isMinimal) {
-        card.style.display = 'flex';
+        // Minimal template - horizontal, compact
+        card.style.flexDirection = 'row';
         card.style.alignItems = 'center';
+        card.style.justifyContent = 'space-between';
         card.style.gap = '6px';
+      } else {
+        // Classic & Modern - horizontal row, text left, price right
+        card.style.flexDirection = 'row';
+        card.style.alignItems = 'center';
+        card.style.justifyContent = 'space-between';
+        card.style.gap = '10px';
       }
       
       // Apply design styles
@@ -543,18 +559,34 @@
           var img = document.createElement('img');
           img.src = config.productImage;
           img.alt = config.productTitle || 'Product';
+          img.style.objectFit = 'cover';
+          img.style.borderRadius = '8px';
+          img.style.flexShrink = '0';
           if (isVertical || isCards) {
             img.style.width = '60px';
             img.style.height = '60px';
+          } else {
+            // Classic template - smaller inline image
+            img.style.width = '40px';
+            img.style.height = '40px';
           }
           card.appendChild(img);
       }
       
       // Create content wrapper for text elements (quantity, badge, discount)
       var contentWrapper = document.createElement('div');
+      contentWrapper.style.display = 'flex';
+      contentWrapper.style.flexDirection = 'column';
+      contentWrapper.style.gap = '2px';
+      contentWrapper.style.minWidth = '0';
       if (isVertical || isCards) {
         contentWrapper.style.textAlign = 'center';
         contentWrapper.style.width = '100%';
+        contentWrapper.style.alignItems = 'center';
+      } else {
+        // Classic, Modern, Minimal - text left-aligned, take remaining space
+        contentWrapper.style.flex = '1';
+        contentWrapper.style.alignItems = 'flex-start';
       }
       
       // Quantity text
@@ -594,9 +626,18 @@
       // Create price wrapper
       var priceWrapper = document.createElement('div');
       priceWrapper.className = 'cod-offer-price-wrapper';
+      priceWrapper.style.display = 'flex';
+      priceWrapper.style.flexDirection = 'column';
+      priceWrapper.style.gap = '2px';
+      priceWrapper.style.flexShrink = '0';
       if (isVertical || isCards) {
         priceWrapper.style.textAlign = 'center';
         priceWrapper.style.width = '100%';
+        priceWrapper.style.alignItems = 'center';
+      } else {
+        // Classic, Modern, Minimal - price right-aligned
+        priceWrapper.style.textAlign = 'right';
+        priceWrapper.style.alignItems = 'flex-end';
       }
       
       // Original price (strikethrough) if discount exists
@@ -645,8 +686,8 @@
         // Update price display
         updateOfferPrice(form, config, offer);
         
-        // Update order summary with new discount
-        updateOrderSummaryWithOffer(form, config);
+        // Update order summary with new discount - pass offer directly
+        updateOrderSummaryWithOffer(form, config, offer);
       });
       
       offersContainer.appendChild(card);
@@ -1690,20 +1731,71 @@
   }
 
   function updateTotalHelper(form, config, shippingPrice) {
-      var qtyInput = form.querySelector('[name="quantity"]');
-      var qty = parseInt(qtyInput ? qtyInput.value : 1) || 1;
+      // Read quantity and discount from bundle offer if available
+      var quantity = 1;
+      var discountPercent = 0;
+      
+      var modal = form.closest('.cod-modal') || form;
+      var quantityOffersEl = modal.querySelector('.cod-quantity-offers');
+      if (quantityOffersEl) {
+          try {
+              var offerData = quantityOffersEl.getAttribute('data-selected-offer');
+              if (offerData) {
+                  var selectedOffer = JSON.parse(offerData);
+                  quantity = selectedOffer.quantity || 1;
+                  discountPercent = selectedOffer.discountPercent || 0;
+              }
+          } catch (e) {
+              // Fallback to quantity input
+          }
+      }
+      
+      // Fallback: also check qty input if no offer found
+      if (quantity === 1 && !quantityOffersEl) {
+          var qtyInput = form.querySelector('[name="quantity"]');
+          quantity = parseInt(qtyInput ? qtyInput.value : 1) || 1;
+      }
+      
       var productPrice = parseFloat(config.productPrice) || 0;
       var shipping = parseFloat(shippingPrice) || 0;
-      var subtotal = productPrice * qty;
-      var total = subtotal + shipping;
+      var subtotal = productPrice * quantity;
+      var discount = subtotal * (discountPercent / 100);
+      var total = subtotal - discount + shipping;
       
-      var shipEl = form.querySelector('#cod-summary-shipping');
-      var totalEl = form.querySelector('#cod-summary-total');
-      var subEl = form.querySelector('#cod-summary-subtotal');
-      
-      if (shipEl) shipEl.textContent = shipping === 0 ? 'FREE' : formatMoney(shipping);
-      if (totalEl) totalEl.textContent = formatMoney(total);
-      if (subEl) subEl.textContent = formatMoney(subtotal);
+      var summaryEl = form.querySelector('.cod-order-summary') || modal.querySelector('.cod-order-summary');
+      if (summaryEl) {
+          // Re-render the full summary HTML to keep everything in sync
+          summaryEl.innerHTML = 
+            '<div style="font-weight:600; margin-bottom:8px; display:flex; align-items:center;">' +
+            '   🧾 Order Summary' +
+            '</div>' +
+            '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#6b7280;">' +
+            '   <span>Subtotal (' + quantity + ' ' + (quantity === 1 ? 'item' : 'items') + ')</span>' +
+            '   <span id="cod-summary-subtotal">' + formatMoney(subtotal) + '</span>' +
+            '</div>' +
+            (discount > 0 ? 
+            '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#10b981;">' +
+            '   <span>Bundle Discount (' + discountPercent + '%)</span>' +
+            '   <span id="cod-summary-discount">-' + formatMoney(discount) + '</span>' +
+            '</div>' : '') +
+            '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#6b7280;">' +
+            '   <span>Shipping</span>' +
+            '   <span id="cod-summary-shipping">' + (shipping === 0 ? 'FREE' : formatMoney(shipping)) + '</span>' +
+            '</div>' +
+            '<div style="display:flex; justify-content:space-between; margin-top:8px; padding-top:8px; border-top:1px dashed #d1d5db; font-weight:700; color:#111827;">' +
+            '   <span>Total</span>' +
+            '   <span id="cod-summary-total" style="color:' + config.primaryColor + '">' + formatMoney(total) + '</span>' +
+            '</div>';
+      } else {
+          // Fallback: update individual elements if summary container not found
+          var shipEl = form.querySelector('#cod-summary-shipping');
+          var totalEl = form.querySelector('#cod-summary-total');
+          var subEl = form.querySelector('#cod-summary-subtotal');
+          
+          if (shipEl) shipEl.textContent = shipping === 0 ? 'FREE' : formatMoney(shipping);
+          if (totalEl) totalEl.textContent = formatMoney(total);
+          if (subEl) subEl.textContent = formatMoney(subtotal);
+      }
   }
 
   function formatMoney(amount) {
@@ -1711,45 +1803,51 @@
       return '₹' + num.toFixed(2);
   }
 
-  /**
-   * Update order summary when offer selection changes
-   */
-  function updateOrderSummaryWithOffer(form, config) {
+  function updateOrderSummaryWithOffer(form, config, offer) {
       var summaryEl = form.querySelector('.cod-order-summary');
       if (!summaryEl) {
-          console.log('[COD Form] No order summary to update');
-          return;
+          // Also try looking up from the modal container
+          var modal = form.closest('.cod-modal');
+          if (modal) {
+              summaryEl = modal.querySelector('.cod-order-summary');
+          }
+          if (!summaryEl) {
+              console.log('[COD Form] No order summary to update');
+              return;
+          }
       }
       
-      // Get current selected offer
-      var quantityOffersEl = form.closest('.cod-modal') ? form.closest('.cod-modal').querySelector('.cod-quantity-offers') : null;
-      var selectedOffer = null;
+      // Use the offer directly if provided, otherwise try to read from DOM
       var quantity = 1;
+      var discountPercent = 0;
       
-      if (quantityOffersEl) {
-          try {
-              var offerData = quantityOffersEl.getAttribute('data-selected-offer');
-              if (offerData) {
-                  selectedOffer = JSON.parse(offerData);
-                  quantity = selectedOffer.quantity || 1;
+      if (offer) {
+          quantity = offer.quantity || 1;
+          discountPercent = offer.discountPercent || 0;
+      } else {
+          // Fallback: read from data attribute
+          var modal = form.closest('.cod-modal') || form;
+          var quantityOffersEl = modal.querySelector('.cod-quantity-offers');
+          if (quantityOffersEl) {
+              try {
+                  var offerData = quantityOffersEl.getAttribute('data-selected-offer');
+                  if (offerData) {
+                      var selectedOffer = JSON.parse(offerData);
+                      quantity = selectedOffer.quantity || 1;
+                      discountPercent = selectedOffer.discountPercent || 0;
+                  }
+              } catch (e) {
+                  console.warn('[COD Form] Failed to parse selected offer:', e);
               }
-          } catch (e) {
-              console.warn('[COD Form] Failed to parse selected offer for summary update:', e);
           }
       }
       
       // Recalculate values
       var unitPrice = parseFloat(config.productPrice) || 0;
       var subtotal = unitPrice * quantity;
-      var discount = 0;
-      var discountPercent = 0;
+      var discount = subtotal * (discountPercent / 100);
       
-      if (selectedOffer && selectedOffer.discountPercent) {
-          discountPercent = selectedOffer.discountPercent;
-          discount = subtotal * (discountPercent / 100);
-      }
-      
-      // Get current shipping
+      // Get current shipping cost
       var shippingCost = 0;
       var shippingEl = summaryEl.querySelector('#cod-summary-shipping');
       if (shippingEl) {
@@ -1765,39 +1863,39 @@
           quantity: quantity,
           unitPrice: unitPrice,
           subtotal: subtotal,
+          discountPercent: discountPercent,
           discount: discount,
           shipping: shippingCost,
           total: total
       });
       
-      // Update DOM elements
-      var subtotalEl = summaryEl.querySelector('#cod-summary-subtotal');
-      var discountEl = summaryEl.querySelector('#cod-summary-discount');
-      var totalEl = summaryEl.querySelector('#cod-summary-total');
-      
-      if (subtotalEl) subtotalEl.textContent = formatMoney(subtotal);
-      
-      // Handle discount display
-      var discountRow = discountEl ? discountEl.closest('div') : null;
-      if (discount > 0) {
-          if (discountEl) {
-              discountEl.textContent = '-' + formatMoney(discount);
-              discountEl.parentElement.style.display = 'flex';
-          } else if (!discountRow) {
-              // Create discount row if it doesn't exist
-              var shippingRow = summaryEl.querySelector('#cod-summary-shipping').closest('div');
-              var newDiscountRow = document.createElement('div');
-              newDiscountRow.style.cssText = 'display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#10b981;';
-              newDiscountRow.innerHTML = `<span>Bundle Discount (${discountPercent}%)</span><span id="cod-summary-discount">-${formatMoney(discount)}</span>`;
-              summaryEl.insertBefore(newDiscountRow, shippingRow);
-          }
-      } else if (discountRow) {
-          discountRow.style.display = 'none';
-      }
-      
-      if (totalEl) {
-          totalEl.textContent = formatMoney(total);
-          totalEl.style.color = config.primaryColor;
+      // Re-render the full order summary HTML for reliability
+      summaryEl.innerHTML = 
+        '<div style="font-weight:600; margin-bottom:8px; display:flex; align-items:center;">' +
+        '   🧾 Order Summary' +
+        '</div>' +
+        '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#6b7280;">' +
+        '   <span>Subtotal (' + quantity + ' ' + (quantity === 1 ? 'item' : 'items') + ')</span>' +
+        '   <span id="cod-summary-subtotal">' + formatMoney(subtotal) + '</span>' +
+        '</div>' +
+        (discount > 0 ? 
+        '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#10b981;">' +
+        '   <span>Bundle Discount (' + discountPercent + '%)</span>' +
+        '   <span id="cod-summary-discount">-' + formatMoney(discount) + '</span>' +
+        '</div>' : '') +
+        '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#6b7280;">' +
+        '   <span>Shipping</span>' +
+        '   <span id="cod-summary-shipping">' + (shippingCost === 0 ? 'FREE' : formatMoney(shippingCost)) + '</span>' +
+        '</div>' +
+        '<div style="display:flex; justify-content:space-between; margin-top:8px; padding-top:8px; border-top:1px dashed #d1d5db; font-weight:700; color:#111827;">' +
+        '   <span>Total</span>' +
+        '   <span id="cod-summary-total" style="color:' + config.primaryColor + '">' + formatMoney(total) + '</span>' +
+        '</div>';
+
+      // Also update the Liquid-rendered total price if it exists
+      var codTotalPrice = form.querySelector('.cod-total-price');
+      if (codTotalPrice) {
+          codTotalPrice.textContent = formatMoney(total);
       }
   }
 
