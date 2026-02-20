@@ -702,7 +702,6 @@ const PreviewDisplay = memo(({
 
         // Hover effects
         if (btn.hoverLift) classes.push('btn-hover-lift');
-        if (btn.hoverGlow) classes.push('btn-hover-glow');
 
         // Click effects
         if (btn.clickRipple) classes.push('btn-click-ripple');
@@ -857,8 +856,13 @@ const PreviewDisplay = memo(({
                             {activeTab === 'button' && (
                                 <button
                                     className={getButtonAnimationClasses()}
-                                    style={{ ...getButtonStyle(), maxWidth: '200px', width: '100%' }}
+                                    style={{ ...getButtonStyle(), maxWidth: '200px', width: '100%', position: 'relative', '--btn-border-color': buttonStylesState?.borderColor || primaryColor || '#6366f1' } as any}
                                 >
+                                    {buttonStylesState?.borderEffect === 'dashed-moving' && (
+                                        <svg className="marching-ants-svg" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
+                                            <rect x="1" y="1" width="calc(100% - 2px)" height="calc(100% - 2px)" rx={buttonStylesState?.borderRadius ?? 12} ry={buttonStylesState?.borderRadius ?? 12} />
+                                        </svg>
+                                    )}
                                     {buttonText || 'Buy with COD'}
                                 </button>
                             )}
@@ -1636,7 +1640,7 @@ export default function SettingsPage() {
             show_email_field: showEmailField, show_notes_field: showNotesField, email_required: emailRequired,
             name_placeholder: namePlaceholder, phone_placeholder: phonePlaceholder, address_placeholder: addressPlaceholder,
             notes_placeholder: notesPlaceholder, modal_style: modalStyle, animation_style: animationStyle, border_radius: borderRadius,
-            form_type: formType, fields, blocks, custom_fields: customFields, styles: formStyles, button_styles: buttonStylesState,
+            form_type: formType, fields, blocks, custom_fields: customFields, styles: formStyles, button_styles: { ...buttonStylesState, backgroundColor: primaryColor },
             shipping_options: shippingOpts, partial_cod_enabled: partialCodEnabled, partial_cod_advance_amount: partialCodAdvanceAmount,
             partial_cod_commission: partialCodCommission, shipping_rates_enabled: shippingRatesEnabled
         };
@@ -1711,7 +1715,7 @@ export default function SettingsPage() {
                     show_email_field: showEmailField, show_notes_field: showNotesField, email_required: emailRequired,
                     name_placeholder: namePlaceholder, phone_placeholder: phonePlaceholder, address_placeholder: addressPlaceholder,
                     notes_placeholder: notesPlaceholder, modal_style: modalStyle, animation_style: animationStyle, border_radius: borderRadius,
-                    form_type: formType, fields, blocks, custom_fields: customFields, styles: formStyles, button_styles: buttonStylesState,
+                    form_type: formType, fields, blocks, custom_fields: customFields, styles: formStyles, button_styles: { ...buttonStylesState, backgroundColor: primaryColor },
                     shipping_options: shippingOpts, partial_cod_enabled: partialCodEnabled, partial_cod_advance_amount: partialCodAdvanceAmount,
                     partial_cod_commission: partialCodCommission, shipping_rates_enabled: shippingRatesEnabled
                 };
@@ -1842,7 +1846,7 @@ export default function SettingsPage() {
         formData.append("blocks", JSON.stringify(blocks));
         formData.append("custom_fields", JSON.stringify(customFields));
         formData.append("styles", JSON.stringify(formStyles));
-        formData.append("button_styles", JSON.stringify(buttonStylesState));
+        formData.append("button_styles", JSON.stringify({ ...buttonStylesState, backgroundColor: primaryColor }));
         formData.append("shipping_options", JSON.stringify(shippingOpts));
         // Partial COD settings
         formData.append("partial_cod_enabled", partialCodEnabled.toString());
@@ -1938,7 +1942,34 @@ export default function SettingsPage() {
                 /* Prevent horizontal scrolling globally */
                 html, body { overflow-x: clip !important; max-width: 100vw !important; }
                 
+                /* Override Polaris accent color to black for form builder */
+                .form-builder select:focus,
+                .form-builder input[type="text"]:focus,
+                .form-builder input[type="number"]:focus,
+                .form-builder textarea:focus {
+                    outline-color: #000 !important;
+                    border-color: #000 !important;
+                    box-shadow: 0 0 0 1px #000 !important;
+                }
+                .form-builder select {
+                    accent-color: #000;
+                }
+                .form-builder input[type="range"] {
+                    accent-color: #000 !important;
+                }
+                .form-builder .Polaris-RangeSlider-SingleThumb__Input::-webkit-slider-thumb {
+                    background: #000 !important;
+                    border-color: #000 !important;
+                }
+                .form-builder .Polaris-RangeSlider-SingleThumb__Input::-moz-range-thumb {
+                    background: #000 !important;
+                    border-color: #000 !important;
+                }
                 .form-builder {
+                    --p-color-bg-fill-brand: #000 !important;
+                    --p-color-bg-fill-brand-hover: #333 !important;
+                    --p-color-bg-fill-brand-selected: #000 !important;
+                    --p-color-bg-surface-brand-selected: #000 !important;
                     padding: 0; 
                     box-sizing: border-box; 
                 }
@@ -1956,10 +1987,10 @@ export default function SettingsPage() {
                 .save-btn { padding: 14px 28px; border-radius: 12px; font-weight: 600; font-size: 14px; border: none; cursor: pointer; transition: all 0.2s ease; background: #1f2937; color: white; }
                 .style-options { display: flex; gap: 12px; flex-wrap: wrap; }
                 .style-option { padding: 12px 20px; border-radius: 12px; border: 1px solid #e5e7eb; background: white; font-size: 14px; font-weight: 600; color: #6b7280; cursor: pointer; transition: all 0.2s ease; flex: 1; text-align: center; }
-                .style-option:hover { border-color: #c7d2fe; color: #4f46e5; background: #eaexf8; }
-                .style-option.active { border-color: #6366f1; background: #e0e7ff; color: #4338ca; box-shadow: 0 0 0 1px #6366f1; }
+                .style-option:hover { border-color: #999; color: #111; background: #f5f5f5; }
+                .style-option.active { border-color: #000; background: #f0f0f0; color: #000; box-shadow: 0 0 0 1px #000; }
                 .checkbox-option { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: #f9fafb; border-radius: 10px; cursor: pointer; }
-                .checkbox-option.checked { background: rgba(99, 102, 241, 0.1); }
+                .checkbox-option.checked { background: rgba(0, 0, 0, 0.06); }
                 .toggle-option { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; background: #f9fafb; border-radius: 10px; cursor: pointer; margin-bottom: 10px; }
                 .mini-toggle { width: 44px; height: 24px; border-radius: 12px; position: relative; transition: background 0.2s cubic-bezier(0.25, 0.1, 0.25, 1); cursor: pointer; }
                 .mini-toggle::after { content: ''; position: absolute; width: 20px; height: 20px; background: white; border-radius: 50%; top: 2px; transition: left 0.2s cubic-bezier(0.25, 0.1, 0.25, 1); box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06); }
@@ -2845,14 +2876,36 @@ export default function SettingsPage() {
                 }
                 .btn-border-animated-gradient { animation: border-gradient 3s linear infinite; }
                 
-                /* Dashed Moving Border */
+                /* Dashed Moving Border (Marching Ants) */
                 @keyframes border-dash {
                     0% { stroke-dashoffset: 0; }
-                    100% { stroke-dashoffset: 16; }
+                    100% { stroke-dashoffset: -20; }
                 }
                 .btn-border-dashed-moving {
-                    border-style: dashed !important;
-                    animation: none; /* Dashed effect is static but visible */
+                    border: none !important;
+                    position: relative;
+                    overflow: visible;
+                }
+                .btn-border-dashed-moving .marching-ants-svg {
+                    position: absolute;
+                    inset: 0;
+                    width: 100%;
+                    height: 100%;
+                    pointer-events: none;
+                    z-index: 1;
+                }
+                .btn-border-dashed-moving .marching-ants-svg rect {
+                    fill: none;
+                    stroke: var(--btn-border-color, #6366f1);
+                    stroke-width: 2;
+                    stroke-dasharray: 8 4;
+                    animation: border-dash 0.6s linear infinite;
+                }
+                .btn-border-dashed-moving.intensity-low .marching-ants-svg rect {
+                    animation-duration: 1s;
+                }
+                .btn-border-dashed-moving.intensity-high .marching-ants-svg rect {
+                    animation-duration: 0.3s;
                 }
                 
                 /* =========================
@@ -2862,9 +2915,7 @@ export default function SettingsPage() {
                     transform: translateY(-3px);
                     box-shadow: 0 8px 20px rgba(0,0,0,0.15);
                 }
-                .btn-hover-glow:hover {
-                    box-shadow: 0 0 20px rgba(99, 102, 241, 0.6);
-                }
+
                 .btn-click-press:active {
                     transform: scale(0.96);
                 }
@@ -2875,6 +2926,7 @@ export default function SettingsPage() {
                     overflow: hidden;
                 }
                 .btn-click-ripple::before {
+                    content: '';
                     position: absolute;
                     top: 50%;
                     left: 50%;
@@ -3217,9 +3269,6 @@ export default function SettingsPage() {
                                                 <option value="shake">Subtle Shake</option>
                                                 <option value="pulse">Pulse</option>
                                                 <option value="bounce">Bounce</option>
-                                                <option value="glow">Glow</option>
-                                                <option value="gradient-flow">Gradient Flow</option>
-                                                <option value="shimmer">Shimmer Sweep</option>
                                             </select>
                                         </div>
                                         <div className="input-group" style={{ marginTop: 12 }}>
@@ -3242,8 +3291,6 @@ export default function SettingsPage() {
                                             <div className="style-options" style={{ flexWrap: 'wrap' }}>
                                                 {([
                                                     { value: 'static', label: 'Static' },
-                                                    { value: 'glowing', label: 'Glowing' },
-                                                    { value: 'animated-gradient', label: 'Gradient' },
                                                     { value: 'dashed-moving', label: 'Dashed' }
                                                 ] as const).map((effect) => (
                                                     <button key={effect.value} type="button" className={`style-option ${(buttonStylesState?.borderEffect || 'static') === effect.value ? 'active' : ''}`} onClick={() => setButtonStylesState(s => ({ ...s, borderEffect: effect.value }))}>
@@ -3271,10 +3318,7 @@ export default function SettingsPage() {
                                             <span className="toggle-option-label">Hover Lift + Shadow</span>
                                             <div className={`mini-toggle ${buttonStylesState?.hoverLift ? 'on' : 'off'}`} />
                                         </div>
-                                        <div className="toggle-option" style={{ marginTop: 10 }} onClick={() => setButtonStylesState(s => ({ ...s, hoverGlow: !s.hoverGlow }))}>
-                                            <span className="toggle-option-label">Glow on Hover</span>
-                                            <div className={`mini-toggle ${buttonStylesState?.hoverGlow ? 'on' : 'off'}`} />
-                                        </div>
+
                                         <div className="toggle-option" style={{ marginTop: 10 }} onClick={() => setButtonStylesState(s => ({ ...s, clickRipple: !s.clickRipple }))}>
                                             <span className="toggle-option-label">Ripple Effect on Click</span>
                                             <div className={`mini-toggle ${buttonStylesState?.clickRipple ? 'on' : 'off'}`} />

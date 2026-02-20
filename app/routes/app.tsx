@@ -24,7 +24,6 @@ export default function App() {
     <PolarisAppProvider i18n={enTranslations}>
       <AppProvider embedded apiKey={apiKey}>
         <s-app-nav>
-          <s-link href="/app">Home</s-link>
           <s-link href="/app/settings">Form Builder</s-link>
           <s-link href="/app/quantity-offers">Bundle Offers</s-link>
           <s-link href="/app/upsell-downsell">Upsells & Downsells</s-link>

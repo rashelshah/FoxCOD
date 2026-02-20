@@ -366,7 +366,6 @@
     
     // Hover effects
     if (config.hoverLift) classes.push('btn-hover-lift');
-    if (config.hoverGlow) classes.push('btn-hover-glow');
     
     // Click effects
     if (config.clickRipple) classes.push('btn-click-ripple');
@@ -484,8 +483,24 @@
         codBtn.style.cssText = styleString;
         codBtn.dataset.codOpen = productId;
 
+        // Inject marching-ants SVG if dashed-moving border effect is active
+        if (config.borderEffect === 'dashed-moving') {
+            codBtn.style.position = 'relative';
+            var svgNS = 'http://www.w3.org/2000/svg';
+            var svg = document.createElementNS(svgNS, 'svg');
+            svg.setAttribute('class', 'marching-ants-svg');
+            svg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;';
+            var rect = document.createElementNS(svgNS, 'rect');
+            rect.setAttribute('x', '1'); rect.setAttribute('y', '1');
+            rect.setAttribute('width', 'calc(100% - 2px)'); rect.setAttribute('height', 'calc(100% - 2px)');
+            var radius = config.borderRadius || 12;
+            rect.setAttribute('rx', String(radius)); rect.setAttribute('ry', String(radius));
+            svg.appendChild(rect);
+            codBtn.appendChild(svg);
+        }
+
         // Only apply default hover if no custom effects defined
-        var hasCustomHover = config.hoverLift || config.hoverGlow;
+        var hasCustomHover = config.hoverLift;
         var hasCustomClick = config.clickPress || config.clickRipple;
         var hasAnimation = config.animationPreset && config.animationPreset !== 'none';
         var hasBorderEffect = config.borderEffect && config.borderEffect !== 'static';
@@ -2139,6 +2154,21 @@
           } catch(e) {}
       }
 
+      // Calculate pre-purchase upsell total
+      var preUpsellTotal = 0;
+      var preUpsellItems = [];
+      var preItemsAttr = form.getAttribute('data-pre-upsell-items');
+      if (preItemsAttr) {
+          try {
+              var preArr = JSON.parse(preItemsAttr);
+              preArr.forEach(function(pi) {
+                  var pPrice = parseFloat(pi.price) || 0;
+                  preUpsellTotal += pPrice;
+                  preUpsellItems.push({ title: pi.title || 'Upsell item', price: pPrice });
+              });
+          } catch(e) {}
+      }
+
       // When downsell is active, the downsell price REPLACES the original subtotal
       var displaySubtotal = subtotal;
       var downsellSavings = 0;
@@ -2147,7 +2177,7 @@
           downsellSavings = subtotal - downsellTotal;
       }
 
-      var total = displaySubtotal - discount + shipping + tickUpsellTotal;
+      var total = displaySubtotal - discount + shipping + tickUpsellTotal + preUpsellTotal;
       
       var summaryEl = form.querySelector('.cod-order-summary') || modal.querySelector('.cod-order-summary');
       if (summaryEl) {
@@ -2179,6 +2209,14 @@
           tickUpsellItems.forEach(function(item) {
             html += '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#059669;">' +
             '   <span>' + item.title + '</span>' +
+            '   <span>' + formatMoney(item.price) + '</span>' +
+            '</div>';
+          });
+
+          // Add pre-purchase upsell line items
+          preUpsellItems.forEach(function(item) {
+            html += '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#059669;">' +
+            '   <span>✓ ' + item.title + '</span>' +
             '   <span>' + formatMoney(item.price) + '</span>' +
             '</div>';
           });
@@ -2520,6 +2558,78 @@
         });
     }
 
+    // ── Pre-purchase click upsells: show BEFORE customer fills the form ──
+    if (config && config.upsellOffers && config.upsellOffers.click_upsells && config.upsellOffers.click_upsells.length > 0) {
+        var prePurchaseCampaigns = config.upsellOffers.click_upsells.filter(function(c) {
+            return c.upsell_mode === 'pre_purchase' && shouldShowUpsell(c, config);
+        });
+        if (prePurchaseCampaigns.length > 0) {
+            // Small delay so the form modal is visible first
+            setTimeout(function() {
+                var preCampaign = prePurchaseCampaigns[0];
+                var preOffers = preCampaign.offers || [];
+                if (preOffers.length > 0) {
+                    var preAccepted = [];
+                    showOfferSequence(form, config, productId, preCampaign, preOffers, 0, preAccepted, function(acceptedItems) {
+                        if (acceptedItems.length > 0) {
+                            // Store pre-purchase accepted items on the form for later inclusion in order
+                            var existing = [];
+                            try { existing = JSON.parse(form.getAttribute('data-pre-upsell-items') || '[]'); } catch(e) {}
+                            var merged = existing.concat(acceptedItems);
+                            form.setAttribute('data-pre-upsell-items', JSON.stringify(merged));
+                            console.log('[COD Form] Pre-purchase upsell accepted:', acceptedItems.length, 'items');
+
+                            // Render accepted items in the form with image & price
+                            var submitBtn = form.querySelector('.cod-submit-btn');
+                            var container = form.querySelector('.cod-pre-upsell-items');
+                            if (!container) {
+                                container = document.createElement('div');
+                                container.className = 'cod-pre-upsell-items';
+                                container.style.cssText = 'margin:12px 0;display:flex;flex-direction:column;gap:8px;';
+                                if (submitBtn) submitBtn.parentNode.insertBefore(container, submitBtn);
+                                else form.appendChild(container);
+                            }
+
+                            acceptedItems.forEach(function(item) {
+                                var row = document.createElement('div');
+                                row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;border:1px solid #e5e7eb;background:#f9fafb;';
+                                var imgHtml = item.image ? '<img src="' + item.image + '" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:8px;flex-shrink:0;">' : '';
+                                var price = parseFloat(item.price || 0);
+                                row.innerHTML = imgHtml +
+                                    '<div style="flex:1;min-width:0;">' +
+                                        '<div style="font-size:13px;font-weight:600;color:#1f2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (item.title || 'Upsell Product') + '</div>' +
+                                        '<div style="font-size:11px;color:#10b981;font-weight:500;">✓ Pre-purchase upsell added</div>' +
+                                    '</div>' +
+                                    '<div style="font-size:14px;font-weight:700;color:#1f2937;flex-shrink:0;">₹' + price.toFixed(2) + '</div>' +
+                                    '<button style="background:none;border:none;font-size:16px;color:#9ca3af;cursor:pointer;padding:2px 6px;" data-remove-pre-upsell="' + (item.variant_id || item.product_id) + '">×</button>';
+
+                                // Remove button handler
+                                var removeBtn = row.querySelector('[data-remove-pre-upsell]');
+                                if (removeBtn) {
+                                    removeBtn.addEventListener('click', function() {
+                                        var idToRemove = this.getAttribute('data-remove-pre-upsell');
+                                        row.remove();
+                                        // Update stored pre-upsell items
+                                        var items = [];
+                                        try { items = JSON.parse(form.getAttribute('data-pre-upsell-items') || '[]'); } catch(e) {}
+                                        items = items.filter(function(i) { return (i.variant_id || i.product_id) !== idToRemove; });
+                                        form.setAttribute('data-pre-upsell-items', JSON.stringify(items));
+                                        updateOrderSummaryWithTickUpsells(form, config);
+                                    });
+                                }
+
+                                container.appendChild(row);
+                            });
+
+                            // Update order summary to include pre-purchase upsells
+                            updateOrderSummaryWithTickUpsells(form, config);
+                        }
+                    });
+                }
+            }, 400);
+        }
+    }
+
     // ── If downsell is active, hide bundle offers and skip offer syncing ──
     var isDownsellActive = form && form.getAttribute('data-downsell-active') === 'true';
     if (isDownsellActive && modal) {
@@ -2789,6 +2899,14 @@
               return tidStr === currentId || tidStr.includes(currentId) || currentId.includes(tidStr);
           });
       }
+      if (campaign.show_condition_type === 'order_value') {
+          var orderTotal = parseFloat(config.productPrice || 0) * parseInt(config.quantity || 1);
+          var min = parseFloat(campaign.min_order_value) || 0;
+          var max = parseFloat(campaign.max_order_value) || 0;
+          if (min > 0 && orderTotal < min) return false;
+          if (max > 0 && orderTotal > max) return false;
+          return true;
+      }
       return true;
   }
 
@@ -2955,7 +3073,10 @@
       var hasDiscount = offer.discount_value > 0;
       var discountLabel = offer.discount_type === 'percentage' ? offer.discount_value + '%' : '₹' + offer.discount_value;
 
-      var html = '<div style="padding: 24px; text-align: center; background: ' + (design.bgColor || '#fff') + ';">';
+      var bgStyle = design.bgImage
+          ? 'background-image: url(' + design.bgImage + '); background-size: cover; background-position: center;'
+          : 'background: ' + (design.bgColor || '#fff') + ';';
+      var html = '<div style="padding: 24px; text-align: center; ' + bgStyle + '">';
       html += '<h2 style="font-size: ' + (design.headerTextSize || 20) + 'px; color: ' + (design.headerTextColor || '#000') + '; font-weight: ' + (design.headerBold ? '700' : '400') + '; margin: 0 0 4px;">' + (design.headerText || "You've unlocked a special deal") + '</h2>';
       html += '<p style="font-size: 14px; color: #6b7280; margin: 0 0 12px;">' + (design.subheaderText || 'Only for a limited time!') + '</p>';
 
@@ -3327,9 +3448,20 @@
 
       console.log('[COD Form] Preparing order:', payload, 'Payment method:', selectedPaymentMethod);
 
-      // Check for 1-click upsells BEFORE placing the order
+      // Include any pre-purchase upsell items that were accepted when the form opened
+      var preUpsellItems = [];
+      try { preUpsellItems = JSON.parse(form.getAttribute('data-pre-upsell-items') || '[]'); } catch(e) {}
+      if (preUpsellItems.length > 0) {
+          payload.upsell_items = (payload.upsell_items || []).concat(preUpsellItems);
+          console.log('[COD Form] Including pre-purchase upsell items:', preUpsellItems.length);
+      }
+
+      // Check for post-purchase 1-click upsells BEFORE placing the order
       var hasClickUpsells = config.upsellOffers && config.upsellOffers.click_upsells && config.upsellOffers.click_upsells.length > 0;
-      var applicableUpsells = hasClickUpsells ? config.upsellOffers.click_upsells.filter(function(c) { return shouldShowUpsell(c, config); }) : [];
+      var applicableUpsells = hasClickUpsells ? config.upsellOffers.click_upsells.filter(function(c) {
+          // Only show post-purchase campaigns here (pre-purchase already shown at modal open)
+          return (c.upsell_mode !== 'pre_purchase') && shouldShowUpsell(c, config);
+      }) : [];
 
       if (applicableUpsells.length > 0 && !isPartialCod) {
           // Show upsell modal FIRST, then submit the order with accepted items
