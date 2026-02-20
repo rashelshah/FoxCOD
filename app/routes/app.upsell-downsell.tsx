@@ -10,7 +10,7 @@ import { authenticate } from "../shopify.server";
 import { getUpsellCampaigns, saveCampaign, deleteCampaign, toggleCampaignActive, syncUpsellsToMetafield } from "../services/upsell-offers.server";
 import { type UpsellCampaign, type UpsellType, type CampaignOffer, type CampaignDesign, type ButtonDesign, createDefaultCampaign, createDefaultOffer, DEFAULT_CAMPAIGN_DESIGN } from "../config/upsell-offers.types";
 import { ColorSelector, colorSelectorStyles } from "./ColorSelector";
-import { RangeSlider } from "@shopify/polaris";
+import { Page, Layout, Tabs, Card, Button, Badge, EmptyState, Text, InlineStack, BlockStack, Box, Divider, TextField, Select, ButtonGroup, Banner, LegacyCard, RangeSlider } from "@shopify/polaris";
 import { getFormSettings } from "../config/supabase.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -352,8 +352,17 @@ export default function UpsellDownsellPage() {
     const activeOfferPrice = activeOffer ? getOfferPrice(activeOffer) : 0;
 
     const tabLabels: Record<UpsellType, string> = { tick_upsell: '1-Tick Upsell', click_upsell: '1-Click Upsell', downsell: 'Downsell' };
+    const tabTypes: UpsellType[] = ['tick_upsell', 'click_upsell', 'downsell'];
     const tabCounts = useMemo(() => ({ tick_upsell: (initialCampaigns || []).filter((c: any) => c.type === 'tick_upsell').length, click_upsell: (initialCampaigns || []).filter((c: any) => c.type === 'click_upsell').length, downsell: (initialCampaigns || []).filter((c: any) => c.type === 'downsell').length }), [initialCampaigns]);
     const availableDownsells = useMemo(() => (initialCampaigns || []).filter((c: any) => c.type === 'downsell'), [initialCampaigns]);
+
+    const polarisTabs = tabTypes.map(t => ({
+        id: t,
+        content: tabLabels[t],
+        badge: String(tabCounts[t]),
+        panelID: `${t}-panel`,
+    }));
+    const selectedTabIndex = tabTypes.indexOf(activeTab);
 
     return (
         <>
@@ -362,67 +371,75 @@ export default function UpsellDownsellPage() {
                 <button variant="primary" onClick={handleSave} disabled={isSaving}>{isSaving ? 'Saving...' : 'Save'}</button>
                 <button onClick={handleDiscard} disabled={isSaving}>Discard</button>
             </ui-save-bar>
-            <div className="up-page">
-                <div className="up-header">
-                    {editing && <button className="btn-back" onClick={() => { setEditing(null); setSavedStr(null); }}>←</button>}
-                    <h1>{editing ? (editing.campaign_name || 'New Upsell') : 'Upsells & Downsells'}</h1>
-                    {editing && (
-                        <div className="toggle-pill">
-                            <div className={`toggle-track ${editing.active ? 'on' : ''}`} onClick={() => upd({ active: !editing.active })}>
+
+            <Page
+                title={editing ? (editing.campaign_name || 'New Upsell') : 'Upsells & Downsells'}
+                backAction={editing ? { content: 'Back', onAction: () => { setEditing(null); setSavedStr(null); } } : undefined}
+                primaryAction={editing ? undefined : { content: `+ Create ${tabLabels[activeTab]}`, onAction: handleCreate }}
+                titleMetadata={editing ? (
+                    <InlineStack gap="200" align="center">
+                        <div onClick={() => upd({ active: !editing.active })} style={{ cursor: 'pointer' }}>
+                            <div className={`toggle-track ${editing.active ? 'on' : ''}`}>
                                 <div className="toggle-thumb" />
                             </div>
-                            <span className="active-badge" style={{ background: editing.active ? '#dcfce7' : '#fee2e2', color: editing.active ? '#166534' : '#991b1b' }}>
-                                {editing.active ? 'Active' : 'Inactive'}
-                            </span>
                         </div>
-                    )}
-                </div>
-
+                        <Badge tone={editing.active ? 'success' : 'critical'}>{editing.active ? 'Active' : 'Inactive'}</Badge>
+                    </InlineStack>
+                ) : undefined}
+            >
                 {!editing ? (
-                    <>
-                        <div className="up-tabs">
-                            {(['tick_upsell', 'click_upsell', 'downsell'] as UpsellType[]).map(t => (
-                                <button key={t} className={`up-tab ${activeTab === t ? 'active' : ''}`} onClick={() => setActiveTab(t)}>
-                                    {tabLabels[t]}<span className="cnt">{tabCounts[t]}</span>
-                                </button>
-                            ))}
-                        </div>
-                        {filtered.length === 0 ? (
-                            <div className="up-empty">
-                                <h3>No {tabLabels[activeTab]} campaigns yet</h3>
-                                <p>Create your first campaign to boost your average order value.</p>
-                                <button className="btn-create" onClick={handleCreate}>+ Create {tabLabels[activeTab]}</button>
-                            </div>
-                        ) : (
-                            <>
-                                <div style={{ marginBottom: 16, textAlign: 'right' }}><button className="btn-create" onClick={handleCreate}>+ Create {tabLabels[activeTab]}</button></div>
-                                <div className="up-list">
-                                    {filtered.map((c: any) => {
-                                        const firstOffer = c.offers?.[0];
-                                        return (
-                                            <div key={c.id} className="up-card" onClick={() => handleEdit(c)}>
-                                                <div className="up-card-img">{firstOffer?.upsell_product_image ? <img src={firstOffer.upsell_product_image} alt="" /> : '🎁'}</div>
-                                                <div className="up-card-info">
-                                                    <div className="up-card-name">{c.campaign_name || 'Untitled'}</div>
-                                                    <div className="up-card-meta">
-                                                        <span>{c.offers?.length || 0} offer{c.offers?.length !== 1 ? 's' : ''}</span>
-                                                        {firstOffer?.discount_value > 0 && <span className="up-card-badge">{firstOffer.discount_type === 'percentage' ? `${firstOffer.discount_value}%` : `₹${firstOffer.discount_value}`} OFF</span>}
+                    <BlockStack gap="400">
+                        <Tabs tabs={polarisTabs} selected={selectedTabIndex} onSelect={(idx) => setActiveTab(tabTypes[idx])}>
+                            <Box paddingBlockStart="400">
+                                {filtered.length === 0 ? (
+                                    <Card>
+                                        <EmptyState
+                                            heading={`No ${tabLabels[activeTab]} campaigns yet`}
+                                            action={{ content: `Create ${tabLabels[activeTab]}`, onAction: handleCreate }}
+                                            image=""
+                                        >
+                                            <p>Create your first campaign to boost your average order value.</p>
+                                        </EmptyState>
+                                    </Card>
+                                ) : (
+                                    <BlockStack gap="300">
+                                        {filtered.map((c: any) => {
+                                            const firstOffer = c.offers?.[0];
+                                            return (
+                                                <Card key={c.id}>
+                                                    <div style={{ cursor: 'pointer' }} onClick={() => handleEdit(c)}>
+                                                        <InlineStack align="space-between" blockAlign="center" gap="400">
+                                                            <InlineStack gap="400" blockAlign="center">
+                                                                <div className="up-card-img">{firstOffer?.upsell_product_image ? <img src={firstOffer.upsell_product_image} alt="" /> : '🎁'}</div>
+                                                                <BlockStack gap="100">
+                                                                    <Text variant="bodyMd" fontWeight="semibold" as="span">{c.campaign_name || 'Untitled'}</Text>
+                                                                    <InlineStack gap="200" align="start">
+                                                                        <Text variant="bodySm" tone="subdued" as="span">{c.offers?.length || 0} offer{c.offers?.length !== 1 ? 's' : ''}</Text>
+                                                                        {firstOffer?.discount_value > 0 && (
+                                                                            <Badge tone="success">{`${firstOffer.discount_type === 'percentage' ? `${firstOffer.discount_value}%` : `₹${firstOffer.discount_value}`} OFF`}</Badge>
+                                                                        )}
+                                                                    </InlineStack>
+                                                                </BlockStack>
+                                                            </InlineStack>
+                                                            <InlineStack gap="200" blockAlign="center">
+                                                                <div onClick={e => e.stopPropagation()}>
+                                                                    <div className={`toggle-track ${c.active ? 'on' : ''}`} onClick={e => handleToggle(c.id, !c.active, e)}><div className="toggle-thumb" /></div>
+                                                                </div>
+                                                                <div onClick={e => { e.stopPropagation(); handleDelete(c.id, e); }}>
+                                                                    <Button tone="critical" variant="plain">🗑</Button>
+                                                                </div>
+                                                                <Text variant="bodySm" fontWeight="bold" as="span">Edit →</Text>
+                                                            </InlineStack>
+                                                        </InlineStack>
                                                     </div>
-                                                </div>
-                                                <div className="up-card-actions">
-                                                    <div onClick={e => e.stopPropagation()}>
-                                                        <div className={`toggle-track ${c.active ? 'on' : ''}`} onClick={e => handleToggle(c.id, !c.active, e)}><div className="toggle-thumb" /></div>
-                                                    </div>
-                                                    <button className="up-icon-btn delete" onClick={e => handleDelete(c.id, e)} title="Delete">🗑</button>
-                                                    <span className="up-edit-cta">Edit →</span>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </>
-                        )}
-                    </>
+                                                </Card>
+                                            );
+                                        })}
+                                    </BlockStack>
+                                )}
+                            </Box>
+                        </Tabs>
+                    </BlockStack>
                 ) : (
                     <div className="up-editor">
                         {editing.type === 'tick_upsell' ? (
@@ -430,135 +447,106 @@ export default function UpsellDownsellPage() {
                             <>
                                 <div>
                                     {/* Name */}
-                                    <div className="sec">
-                                        <div className="fg"><label>Name</label><input value={editing.campaign_name} placeholder="New 1-Tick Upsell" onChange={e => upd({ campaign_name: e.target.value })} /></div>
-                                    </div>
+                                    <LegacyCard sectioned>
+                                        <TextField label="Name" value={editing.campaign_name} placeholder="New 1-Tick Upsell" onChange={val => upd({ campaign_name: val })} autoComplete="off" />
+                                    </LegacyCard>
 
                                     {/* Where to show */}
-                                    <div className="sec">
-                                        <h3><span className="icon">🛒</span> Where you want to show this upsell?</h3>
-                                        <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 12 }}>This upsell will show up on the products you choose below, you can show it on all products or specific</div>
-                                        <div className="mode-toggle">
-                                            <button className={`mode-btn ${editing.show_condition_type === 'always' ? 'active' : ''}`} onClick={() => upd({ show_condition_type: 'always' as any })}>All products</button>
-                                            <button className={`mode-btn ${editing.show_condition_type === 'specific_products' ? 'active' : ''}`} onClick={() => upd({ show_condition_type: 'specific_products' as any })}>Specific products</button>
-                                        </div>
-                                        {editing.show_condition_type === 'specific_products' && (
-                                            <>
-                                                <button className="btn-pick" onClick={pickTrigger}>Select products ({editing.trigger_product_ids?.length || 0} selected)</button>
-                                                {editing._triggerProducts?.map((p: any) => (
-                                                    <div key={p.id} className="prod-row">
-                                                        {p.images?.[0] && <img src={p.images[0].originalSrc || p.images[0].url} alt="" />}
-                                                        <div className="prod-row-info"><div className="name">{p.title}</div><div className="vid">{p.id.replace('gid://shopify/Product/', '')}</div></div>
-                                                        <button className="prod-x" onClick={() => upd({ trigger_product_ids: editing.trigger_product_ids.filter(id => id !== p.id.replace('gid://shopify/Product/', '')), _triggerProducts: editing._triggerProducts?.filter((tp: any) => tp.id !== p.id) })}>×</button>
-                                                    </div>
-                                                ))}
-                                            </>
-                                        )}
-                                    </div>
+                                    <LegacyCard title="🛒 Where you want to show this upsell?" sectioned>
+                                        <BlockStack gap="300">
+                                            <Text variant="bodySm" tone="subdued" as="p">This upsell will show up on the products you choose below, you can show it on all products or specific</Text>
+                                            <ButtonGroup variant="segmented">
+                                                <Button pressed={editing.show_condition_type === 'always'} onClick={() => upd({ show_condition_type: 'always' as any })}>All products</Button>
+                                                <Button pressed={editing.show_condition_type === 'specific_products'} onClick={() => upd({ show_condition_type: 'specific_products' as any })}>Specific products</Button>
+                                            </ButtonGroup>
+                                            {editing.show_condition_type === 'specific_products' && (
+                                                <BlockStack gap="200">
+                                                    <Button onClick={pickTrigger}>{`Select products (${editing.trigger_product_ids?.length || 0} selected)`}</Button>
+                                                    {editing._triggerProducts?.map((p: any) => (
+                                                        <div key={p.id} className="prod-row">
+                                                            {p.images?.[0] && <img src={p.images[0].originalSrc || p.images[0].url} alt="" />}
+                                                            <div className="prod-row-info"><div className="name">{p.title}</div><div className="vid">{p.id.replace('gid://shopify/Product/', '')}</div></div>
+                                                            <button className="prod-x" onClick={() => upd({ trigger_product_ids: editing.trigger_product_ids.filter(id => id !== p.id.replace('gid://shopify/Product/', '')), _triggerProducts: editing._triggerProducts?.filter((tp: any) => tp.id !== p.id) })}>×</button>
+                                                        </div>
+                                                    ))}
+                                                </BlockStack>
+                                            )}
+                                        </BlockStack>
+                                    </LegacyCard>
 
                                     {/* Configure 1-Tick Offer */}
-                                    <div className="sec">
-                                        <h3><span className="icon">⚡</span> Configure 1-Tick Offer</h3>
+                                    <LegacyCard title="⚡ Configure 1-Tick Offer" sectioned>
                                         {editing.offers[0] && (() => {
                                             const offer = editing.offers[0];
                                             return (
-                                                <>
-                                                    <div className="fr">
-                                                        <div className="fg"><label>Offer title</label><input value={offer.upsell_product_title || ''} placeholder="Shipping protection" onChange={e => updOffer(offer.id, { upsell_product_title: e.target.value })} /></div>
-                                                        <div className="fg"><label>Offer price</label><input value={offer.original_price || ''} placeholder="USD 0.99" type="number" min="0" step="0.01" onChange={e => updOffer(offer.id, { original_price: parseFloat(e.target.value) || 0 })} /></div>
-                                                    </div>
-                                                    <div className="fg"><label>Select upsell product (optional)</label></div>
+                                                <BlockStack gap="300">
+                                                    <InlineStack gap="300" wrap={false}>
+                                                        <div style={{ flex: 1 }}>
+                                                            <TextField label="Offer title" value={offer.upsell_product_title || ''} placeholder="Shipping protection" onChange={val => updOffer(offer.id, { upsell_product_title: val })} autoComplete="off" />
+                                                        </div>
+                                                        <div style={{ flex: 1 }}>
+                                                            <TextField label="Offer price" value={String(offer.original_price || '')} placeholder="USD 0.99" type="number" min={0 as any} step={0.01 as any} onChange={val => updOffer(offer.id, { original_price: parseFloat(val) || 0 })} autoComplete="off" />
+                                                        </div>
+                                                    </InlineStack>
+                                                    <Text variant="bodySm" fontWeight="semibold" as="span">Select upsell product (optional)</Text>
                                                     {offer.upsell_product_id ? (
                                                         <div className="prod-row">
                                                             {offer.upsell_product_image && <img src={offer.upsell_product_image} alt="" />}
                                                             <div className="prod-row-info"><div className="name">{offer.upsell_product_title}</div><div className="vid">{offer.upsell_product_id}</div></div>
-                                                            <button className="btn-pick" onClick={() => pickProduct(offer.id)}>Change</button>
+                                                            <Button size="slim" onClick={() => pickProduct(offer.id)}>Change</Button>
                                                         </div>
                                                     ) : (
-                                                        <button className="btn-pick" onClick={() => pickProduct(offer.id)}>Link to a product</button>
+                                                        <Button onClick={() => pickProduct(offer.id)}>Link to a product</Button>
                                                     )}
-                                                    <div className="fg" style={{ marginTop: 14 }}>
-                                                        <label>Offer text</label>
-                                                        <textarea value={editing.design.headerText || ''} placeholder={`🔥 Add {{title}} for only {{price}}`} onChange={e => updDesign({ headerText: e.target.value })} style={{ minHeight: 60 }} />
-                                                        <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 4 }}>You can use {'{{title}}'} and {'{{price}}'} to dynamically replace the values</div>
-                                                    </div>
-                                                </>
+                                                    <TextField
+                                                        label="Offer text"
+                                                        value={editing.design.headerText || ''}
+                                                        placeholder={`🔥 Add {{title}} for only {{price}}`}
+                                                        onChange={val => updDesign({ headerText: val })}
+                                                        multiline={2}
+                                                        helpText="You can use {{title}} and {{price}} to dynamically replace the values"
+                                                        autoComplete="off"
+                                                    />
+                                                </BlockStack>
                                             );
                                         })()}
-                                    </div>
+                                    </LegacyCard>
 
                                     {/* Settings */}
-                                    <div className="sec">
-                                        <h3><span className="icon">⚙️</span> Settings</h3>
+                                    <LegacyCard title="⚙️ Settings" sectioned>
                                         <div className="up-toggle-row" onClick={() => upd({ checkbox_default_checked: !editing.checkbox_default_checked })}>
                                             <span>Ticked by default</span>
                                             <div className={`up-mini-toggle ${editing.checkbox_default_checked ? 'on' : 'off'}`} />
                                         </div>
-                                    </div>
+                                    </LegacyCard>
 
                                     {/* Style */}
-                                    <div className="sec">
-                                        <h3><span className="icon">🎨</span> Style</h3>
-                                        <div className="fr">
-                                            <ColorSelector label="Tick Color" value={editing.design.acceptButton.bgColor} onChange={c => updAccept({ bgColor: c })} />
-                                            <ColorSelector label="Background color" value={editing.design.bgColor} onChange={c => updDesign({ bgColor: c })} />
-                                        </div>
-                                        <div className="fr" style={{ marginTop: 12 }}>
-                                            <ColorSelector label="Text Color" value={editing.design.headerTextColor} onChange={c => updDesign({ headerTextColor: c })} />
-                                            <ColorSelector label="Border color" value={editing.design.acceptButton.borderColor} onChange={c => updAccept({ borderColor: c })} />
-                                        </div>
-                                        <div className="fg" style={{ marginTop: 12 }}>
-                                            <label>Border Width (px)</label>
-                                            <div style={{ padding: '0 8px', width: '100%' }}>
-                                                <RangeSlider
-                                                    labelHidden
-                                                    label="Border Width"
-                                                    min={0}
-                                                    max={4}
-                                                    value={editing.design.acceptButton.borderWidth}
-                                                    onChange={val => updAccept({ borderWidth: Number(val) })}
-                                                    output
-                                                />
-                                            </div>
-                                        </div>
-                                        <div className="fg">
-                                            <label>Border style</label>
-                                            <select value={editing.design.acceptButton.borderStyle || 'dashed'} onChange={e => updAccept({ borderStyle: e.target.value })}>
-                                                <option value="none">None</option>
-                                                <option value="solid">Solid</option>
-                                                <option value="dashed">Dashed</option>
-                                                <option value="dashed_animation">Dashed (Animation)</option>
-                                            </select>
-                                        </div>
-                                        <div className="fg">
-                                            <label>Rounded Corners (px)</label>
-                                            <div style={{ padding: '0 8px', width: '100%' }}>
-                                                <RangeSlider
-                                                    labelHidden
-                                                    label="Rounded Corners"
-                                                    min={0}
-                                                    max={20}
-                                                    value={editing.design.acceptButton.borderRadius}
-                                                    onChange={val => updAccept({ borderRadius: Number(val) })}
-                                                    output
-                                                />
-                                            </div>
-                                        </div>
-                                        <div className="fg">
-                                            <label>Text Size (px)</label>
-                                            <div style={{ padding: '0 8px', width: '100%' }}>
-                                                <RangeSlider
-                                                    labelHidden
-                                                    label="Text Size"
-                                                    min={10}
-                                                    max={20}
-                                                    value={editing.design.headerTextSize}
-                                                    onChange={val => updDesign({ headerTextSize: Number(val) })}
-                                                    output
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
+                                    <LegacyCard title="🎨 Style" sectioned>
+                                        <BlockStack gap="400">
+                                            <InlineStack gap="300" wrap={false}>
+                                                <div style={{ flex: 1 }}><ColorSelector label="Tick Color" value={editing.design.acceptButton.bgColor} onChange={c => updAccept({ bgColor: c })} /></div>
+                                                <div style={{ flex: 1 }}><ColorSelector label="Background color" value={editing.design.bgColor} onChange={c => updDesign({ bgColor: c })} /></div>
+                                            </InlineStack>
+                                            <InlineStack gap="300" wrap={false}>
+                                                <div style={{ flex: 1 }}><ColorSelector label="Text Color" value={editing.design.headerTextColor} onChange={c => updDesign({ headerTextColor: c })} /></div>
+                                                <div style={{ flex: 1 }}><ColorSelector label="Border color" value={editing.design.acceptButton.borderColor} onChange={c => updAccept({ borderColor: c })} /></div>
+                                            </InlineStack>
+                                            <RangeSlider label="Border Width (px)" min={0} max={4} value={editing.design.acceptButton.borderWidth} onChange={val => updAccept({ borderWidth: Number(val) })} output />
+                                            <Select
+                                                label="Border style"
+                                                value={editing.design.acceptButton.borderStyle || 'dashed'}
+                                                onChange={val => updAccept({ borderStyle: val })}
+                                                options={[
+                                                    { label: 'None', value: 'none' },
+                                                    { label: 'Solid', value: 'solid' },
+                                                    { label: 'Dashed', value: 'dashed' },
+                                                    { label: 'Dashed (Animation)', value: 'dashed_animation' },
+                                                ]}
+                                            />
+                                            <RangeSlider label="Rounded Corners (px)" min={0} max={20} value={editing.design.acceptButton.borderRadius} onChange={val => updAccept({ borderRadius: Number(val) })} output />
+                                            <RangeSlider label="Text Size (px)" min={10} max={20} value={editing.design.headerTextSize} onChange={val => updDesign({ headerTextSize: Number(val) })} output />
+                                        </BlockStack>
+                                    </LegacyCard>
                                 </div>
 
                                 {/* Tick Upsell Live Preview */}
@@ -908,43 +896,42 @@ export default function UpsellDownsellPage() {
                             <>
                                 <div>
                                     {/* Name + Active */}
-                                    <div className="sec">
-                                        <div className="fr">
-                                            <div className="fg"><label>Name</label><input value={editing.campaign_name} placeholder="New Downsell" onChange={e => upd({ campaign_name: e.target.value })} /></div>
-                                        </div>
-                                    </div>
+                                    <LegacyCard sectioned>
+                                        <TextField label="Name" value={editing.campaign_name} placeholder="New Downsell" onChange={val => upd({ campaign_name: val })} autoComplete="off" />
+                                    </LegacyCard>
 
                                     {/* 1 - Display the downsell for */}
-                                    <div className="sec">
-                                        <h3>1- Display the downsell for</h3>
-                                        <div className="mode-toggle">
-                                            <button className={`mode-btn ${editing.show_condition_type === 'always' ? 'active' : ''}`} onClick={() => upd({ show_condition_type: 'always' as any })}>✅ All products</button>
-                                            <button className={`mode-btn ${editing.show_condition_type === 'specific_products' ? 'active' : ''}`} onClick={() => upd({ show_condition_type: 'specific_products' as any })}>Specific products</button>
-                                        </div>
-                                        {editing.show_condition_type === 'specific_products' && (
-                                            <>
-                                                <button className="btn-pick" onClick={pickTrigger}>Select products ({editing.trigger_product_ids?.length || 0} selected)</button>
-                                                {editing._triggerProducts?.map((p: any) => (
-                                                    <div key={p.id} className="prod-row">
-                                                        {p.images?.[0] && <img src={p.images[0].originalSrc || p.images[0].url} alt="" />}
-                                                        <div className="prod-row-info"><div className="name">{p.title}</div><div className="vid">{p.id.replace('gid://shopify/Product/', '')}</div></div>
-                                                        <button className="prod-x" onClick={() => upd({ trigger_product_ids: editing.trigger_product_ids.filter(id => id !== p.id.replace('gid://shopify/Product/', '')), _triggerProducts: editing._triggerProducts?.filter((tp: any) => tp.id !== p.id) })}>×</button>
-                                                    </div>
-                                                ))}
-                                            </>
-                                        )}
-                                        <div style={{ marginTop: 16 }}>
-                                            <div className="fg"><label>How many times should the form be closed before displaying the downsell?</label></div>
-                                            <div style={{ display: 'flex', gap: 24 }}>
-                                                {[1, 2, 3, 4].map(n => (
-                                                    <label key={n} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 14, fontWeight: 500, color: '#374151' }}>
-                                                        <input type="radio" name="form-close-count" checked={editing.form_close_count === n} onChange={() => upd({ form_close_count: n })} style={{ accentColor: '#1f2937', width: 18, height: 18 }} />
-                                                        {n}
-                                                    </label>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </div>
+                                    <LegacyCard title="1- Display the downsell for" sectioned>
+                                        <BlockStack gap="300">
+                                            <ButtonGroup variant="segmented">
+                                                <Button pressed={editing.show_condition_type === 'always'} onClick={() => upd({ show_condition_type: 'always' as any })}>✅ All products</Button>
+                                                <Button pressed={editing.show_condition_type === 'specific_products'} onClick={() => upd({ show_condition_type: 'specific_products' as any })}>Specific products</Button>
+                                            </ButtonGroup>
+                                            {editing.show_condition_type === 'specific_products' && (
+                                                <BlockStack gap="200">
+                                                    <Button onClick={pickTrigger}>{`Select products (${editing.trigger_product_ids?.length || 0} selected)`}</Button>
+                                                    {editing._triggerProducts?.map((p: any) => (
+                                                        <div key={p.id} className="prod-row">
+                                                            {p.images?.[0] && <img src={p.images[0].originalSrc || p.images[0].url} alt="" />}
+                                                            <div className="prod-row-info"><div className="name">{p.title}</div><div className="vid">{p.id.replace('gid://shopify/Product/', '')}</div></div>
+                                                            <button className="prod-x" onClick={() => upd({ trigger_product_ids: editing.trigger_product_ids.filter(id => id !== p.id.replace('gid://shopify/Product/', '')), _triggerProducts: editing._triggerProducts?.filter((tp: any) => tp.id !== p.id) })}>×</button>
+                                                        </div>
+                                                    ))}
+                                                </BlockStack>
+                                            )}
+                                            <BlockStack gap="200">
+                                                <Text variant="bodySm" fontWeight="semibold" as="span">How many times should the form be closed before displaying the downsell?</Text>
+                                                <InlineStack gap="400">
+                                                    {[1, 2, 3, 4].map(n => (
+                                                        <label key={n} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 14, fontWeight: 500, color: '#374151' }}>
+                                                            <input type="radio" name="form-close-count" checked={editing.form_close_count === n} onChange={() => upd({ form_close_count: n })} style={{ accentColor: '#1f2937', width: 18, height: 18 }} />
+                                                            {n}
+                                                        </label>
+                                                    ))}
+                                                </InlineStack>
+                                            </BlockStack>
+                                        </BlockStack>
+                                    </LegacyCard>
 
                                     {/* 2 - Discount value */}
                                     <div className="sec">
@@ -1359,21 +1346,22 @@ export default function UpsellDownsellPage() {
                             <>
                                 <div>
                                     {/* Name */}
-                                    <div className="sec">
-                                        <div className="fg"><label>Name</label><input value={editing.campaign_name} placeholder="New Upsell" onChange={e => upd({ campaign_name: e.target.value })} /></div>
-                                    </div>
+                                    <LegacyCard sectioned>
+                                        <TextField label="Name" value={editing.campaign_name} placeholder="New Upsell" onChange={val => upd({ campaign_name: val })} autoComplete="off" />
+                                    </LegacyCard>
 
                                     {/* Upsell Mode */}
-                                    <div className="sec">
-                                        <h3>Upsell Mode</h3>
-                                        <div className="mode-toggle">
-                                            <button className={`mode-btn ${editing.upsell_mode === 'post_purchase' ? 'active' : ''}`} onClick={() => upd({ upsell_mode: 'post_purchase' })}>Post-Purchase</button>
-                                            <button className={`mode-btn ${editing.upsell_mode === 'pre_purchase' ? 'active' : ''}`} onClick={() => upd({ upsell_mode: 'pre_purchase' })}>Pre-Purchase</button>
-                                        </div>
-                                        <div style={{ fontSize: 13, color: '#6b7280' }}>
-                                            {editing.upsell_mode === 'post_purchase' ? 'ℹ️ The upsell appears immediately after customers submit the order form.' : 'ℹ️ The upsell appears before customers submit the order form.'}
-                                        </div>
-                                    </div>
+                                    <LegacyCard title="Upsell Mode" sectioned>
+                                        <BlockStack gap="300">
+                                            <ButtonGroup variant="segmented">
+                                                <Button pressed={editing.upsell_mode === 'post_purchase'} onClick={() => upd({ upsell_mode: 'post_purchase' })}>Post-Purchase</Button>
+                                                <Button pressed={editing.upsell_mode === 'pre_purchase'} onClick={() => upd({ upsell_mode: 'pre_purchase' })}>Pre-Purchase</Button>
+                                            </ButtonGroup>
+                                            <Banner tone="info">
+                                                {editing.upsell_mode === 'post_purchase' ? 'The upsell appears immediately after customers submit the order form.' : 'The upsell appears before customers submit the order form.'}
+                                            </Banner>
+                                        </BlockStack>
+                                    </LegacyCard>
 
                                     {/* Trigger Rules */}
                                     <div className="sec">
@@ -1696,7 +1684,7 @@ export default function UpsellDownsellPage() {
                         )}
                     </div>
                 )}
-            </div >
+            </Page>
         </>
     );
 }

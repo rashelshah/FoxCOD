@@ -547,9 +547,9 @@
       card.setAttribute('data-discount', offer.discountPercent || 0);
       
       // Check if this is the "Most Popular" offer (last one with highest discount or last offer)
-      var isMostPopular = (offer.label && offer.label.toLowerCase().indexOf('most popular') !== -1) || 
-                          (idx === applicableGroup.offers.length - 1 && applicableGroup.offers.length > 1);
-      var showDiscountTag = (offer.discountPercent || 0) > 0 && !isMostPopular;
+      var isMostPopular = (offer.label && offer.label.toLowerCase().indexOf('most popular') !== -1);
+      var hasLabel = !!offer.label && !isMostPopular;
+      var showDiscountTag = ((offer.discountPercent || 0) > 0 || hasLabel) && !isMostPopular;
       
       // Template-specific styles
       var isVertical = template === 'vertical';
@@ -681,7 +681,7 @@
         discountTag.style.display = 'inline-block';
         discountTag.style.width = 'fit-content';
         discountTag.style.marginTop = '4px';
-        discountTag.textContent = 'Save ' + offer.discountPercent + '%';
+        discountTag.textContent = offer.label || ('Save ' + offer.discountPercent + '%');
         contentWrapper.appendChild(discountTag);
       }
       
@@ -1071,7 +1071,7 @@
         input.style.padding = field.type === 'textarea' ? '10px 12px 10px 40px' : '10px 12px 10px 40px';
         input.style.border = borderWidth + 'px solid ' + borderColor;
         input.style.borderRadius = borderRadius + 'px';
-        input.style.fontSize = textSize + 'px';
+        input.style.fontSize = Math.max(textSize, 16) + 'px'; // minimum 16px to prevent iOS auto-zoom
         input.style.fontWeight = fontStyle === 'bold' ? '700' : '400';
         input.style.fontStyle = fontStyle === 'italic' ? 'italic' : 'normal';
         input.style.fontFamily = '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
@@ -1930,9 +1930,8 @@
           if (cb && cb.checked) {
               var price = parseFloat(row.getAttribute('data-offer-price')) || 0;
               tickUpsellTotal += price;
-              // Get title from the row
-              var titleEl = row.querySelector('div[style*="font-weight"] div[style*="font-weight"]') || row.querySelector('div div');
-              var titleText = titleEl ? titleEl.textContent : 'Upsell';
+              // Get title from data attribute (avoids duplicate ₹ from DOM text)
+              var titleText = row.getAttribute('data-offer-title') || 'Upsell';
               tickUpsellItems.push({ title: titleText, price: price });
           }
       });
@@ -2302,6 +2301,22 @@
     // Clear form on open so fields are empty on every modal open / page refresh
     if (form) form.reset();
 
+    // After form.reset(), re-apply visual styling for default-checked tick upsells
+    // (form.reset() restores checkbox checked state via defaultChecked, but row styles are inline)
+    if (form) {
+        var tickRows = form.querySelectorAll('.cod-tick-upsell-row');
+        tickRows.forEach(function(row) {
+            var cb = row.querySelector('input[type="checkbox"]');
+            if (cb && cb.checked) {
+                // Re-apply "checked" styling to the row
+                row.style.borderColor = '';    // will be overridden by next line if needed
+                row.style.background = '';
+                // Trigger change event to re-apply styling
+                cb.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        });
+    }
+
     // ── If downsell is active, hide bundle offers and skip offer syncing ──
     var isDownsellActive = form && form.getAttribute('data-downsell-active') === 'true';
     if (isDownsellActive && modal) {
@@ -2614,6 +2629,7 @@
               row.setAttribute('data-campaign-id', campaign.id);
               row.setAttribute('data-offer-id', offer.id);
               row.setAttribute('data-offer-price', String(offerPrice));
+              row.setAttribute('data-offer-title', offer.upsell_product_title || 'Upsell');
 
               var baseCss = 'display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: ' + borderRadius + 'px; background: ' + (design.bgColor || '#f0fdf4') + '; cursor: pointer; transition: all 0.2s; position: relative;';
 
@@ -2650,9 +2666,21 @@
 
               var cb = document.createElement('input');
               cb.type = 'checkbox'; cb.name = 'tick_upsell_' + campaign.id + '_' + offer.id;
-              cb.checked = campaign.checkbox_default_checked || false;
-              cb.style.cssText = 'width: 20px; height: 20px; accent-color: ' + (acceptBtn.bgColor || '#10b981') + '; flex-shrink: 0;';
+              var isDefaultChecked = campaign.checkbox_default_checked === true || campaign.checkbox_default_checked === 'true';
+              cb.checked = isDefaultChecked;
+              cb.defaultChecked = isDefaultChecked; // Set HTML attribute so form.reset() preserves the default state
+              var tickColor = acceptBtn.bgColor || '#10b981';
+              cb.style.cssText = 'width: 20px; height: 20px; accent-color: ' + tickColor + '; flex-shrink: 0; -webkit-appearance: checkbox; appearance: checkbox;';
               row.appendChild(cb);
+
+              // Apply initial styling if default checked
+              if (isDefaultChecked) {
+                  row.style.borderColor = borderColor;
+                  row.style.background = design.bgColor || '#f0fdf4';
+              } else {
+                  row.style.borderColor = borderColor + '30';
+                  row.style.background = '#fafafa';
+              }
 
               if (offer.upsell_product_image) {
                   var img = document.createElement('img');
@@ -2687,7 +2715,7 @@
               container.appendChild(row);
 
               // If default checked, trigger initial order summary update after rendering
-              if (campaign.checkbox_default_checked) {
+               if (campaign.checkbox_default_checked === true || campaign.checkbox_default_checked === 'true') {
                   setTimeout(function() { updateOrderSummaryWithTickUpsells(form, config); }, 200);
               }
           });

@@ -10,6 +10,12 @@ import { useLoaderData, useSubmit, useNavigation, useActionData, useRevalidator 
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import {
+    Page, Layout, Card, Button, Text, InlineStack, BlockStack, Tabs, Box,
+    TextField, Select, Checkbox, Badge, Banner, Divider, LegacyCard, EmptyState,
+    RadioButton, ButtonGroup, RangeSlider,
+} from "@shopify/polaris";
+import { ColorSelector, colorSelectorStyles } from "./ColorSelector";
+import {
     DndContext,
     closestCenter,
     KeyboardSensor,
@@ -172,7 +178,11 @@ async function syncOffersToMetafield(admin: any, offerGroups: any[]) {
             active: group.active,
             product_ids: group.product_ids,
             productIds: group.product_ids, // Duplicate for JS compatibility
-            offers: group.offers,
+            offers: (group.offers || []).map((offer: any) => ({
+                ...offer,
+                tagBgColor: offer.tagBgColor || null,
+                label: offer.label || null,
+            })),
             design: {
                 template: group.design?.template || 'modern',
                 selectedBgColor: group.design?.selectedBgColor || '#fff0ea',
@@ -343,73 +353,48 @@ function SortableOfferItem({
             </div>
             <div className="offer-main">
                 {!isEditing ? (
-                    <div className="offer-collapsed">
-                        <span className="offer-title">{offer.quantity} {offer.quantity === 1 ? 'Unit' : 'Units'}</span>
-                        <div className="offer-actions">
-                            <button className="btn-edit" onClick={() => onToggleEdit(offer.id)}>Edit</button>
-                            <button className="btn-delete-icon" onClick={() => onDelete(offer.id)}>🗑</button>
-                        </div>
-                    </div>
+                    <InlineStack align="space-between" blockAlign="center">
+                        <Text variant="bodyMd" fontWeight="semibold" as="span">{offer.quantity} {offer.quantity === 1 ? 'Unit' : 'Units'}</Text>
+                        <InlineStack gap="200">
+                            <Button size="slim" onClick={() => onToggleEdit(offer.id)}>Edit</Button>
+                            <Button size="slim" tone="critical" variant="plain" onClick={() => onDelete(offer.id)}>🗑</Button>
+                        </InlineStack>
+                    </InlineStack>
                 ) : (
-                    <div className="offer-expanded">
-                        <div className="offer-row">
-                            <div className="offer-field">
-                                <label>Quantity</label>
-                                <input type="number" min="1" value={offer.quantity}
-                                    onChange={(e) => onUpdate(offer.id, { quantity: parseInt(e.target.value) || 1 })} />
+                    <BlockStack gap="300">
+                        <InlineStack gap="300" wrap={false}>
+                            <div style={{ flex: 1 }}>
+                                <TextField label="Quantity" type="number" min={"1" as any} value={String(offer.quantity)} onChange={(val) => onUpdate(offer.id, { quantity: parseInt(val) || 1 })} autoComplete="off" />
                             </div>
-                            <div className="offer-field">
-                                <label>Title</label>
-                                <input type="text" value={offer.title || `${offer.quantity} Unit${offer.quantity !== 1 ? 's' : ''}`}
-                                    onChange={(e) => onUpdate(offer.id, { title: e.target.value })} />
+                            <div style={{ flex: 1 }}>
+                                <TextField label="Title" value={offer.title || `${offer.quantity} Unit${offer.quantity !== 1 ? 's' : ''}`} onChange={(val) => onUpdate(offer.id, { title: val })} autoComplete="off" />
                             </div>
-                        </div>
-                        <div className="offer-row">
-                            <div className="offer-field">
-                                <label>Discount type</label>
-                                <select value={offer.discountType || 'percentage'}
-                                    onChange={(e) => onUpdate(offer.id, { discountType: e.target.value as any })}>
-                                    <option value="percentage">Percentage</option>
-                                    <option value="fixed">Fixed Amount</option>
-                                </select>
+                        </InlineStack>
+                        <InlineStack gap="300" wrap={false}>
+                            <div style={{ flex: 1 }}>
+                                <Select label="Discount type" value={offer.discountType || 'percentage'} options={[
+                                    { label: 'Percentage', value: 'percentage' },
+                                    { label: 'Fixed Amount', value: 'fixed' },
+                                ]} onChange={(val) => onUpdate(offer.id, { discountType: val as any })} />
                             </div>
-                            <div className="offer-field">
-                                <label>Discount value</label>
-                                <div className="input-suffix">
-                                    <input type="number" min="0" value={offer.discountPercent || 0}
-                                        onChange={(e) => onUpdate(offer.id, { discountPercent: parseInt(e.target.value) || 0 })} />
-                                    <span>{offer.discountType === 'fixed' ? '₹' : '%'}</span>
-                                </div>
+                            <div style={{ flex: 1 }}>
+                                <TextField label="Discount value" type="number" min={"0" as any} value={String(offer.discountPercent || 0)} suffix={offer.discountType === 'fixed' ? '₹' : '%'} onChange={(val) => onUpdate(offer.id, { discountPercent: parseInt(val) || 0 })} autoComplete="off" />
                             </div>
-                        </div>
-                        <div className="offer-row">
-                            <div className="offer-field">
-                                <label>Tag</label>
-                                <input type="text" placeholder="Save 0%" value={offer.label || ''}
-                                    onChange={(e) => onUpdate(offer.id, { label: e.target.value })} />
+                        </InlineStack>
+                        <InlineStack gap="300" wrap={false}>
+                            <div style={{ flex: 1 }}>
+                                <TextField label="Tag" placeholder="Save 0%" value={offer.label || ''} onChange={(val) => onUpdate(offer.id, { label: val })} autoComplete="off" />
                             </div>
-                            <div className="offer-field">
-                                <label>Tag background</label>
-                                <div className="color-input-row">
-                                    <input type="color" value={offer.tagBgColor || '#ef4444'}
-                                        onChange={(e) => onUpdate(offer.id, { tagBgColor: e.target.value })} />
-                                    <input type="text" value={offer.tagBgColor || '#ffffff'}
-                                        onChange={(e) => onUpdate(offer.id, { tagBgColor: e.target.value })} />
-                                </div>
+                            <div style={{ flex: 1 }}>
+                                <ColorSelector label="Tag background" value={offer.tagBgColor || '#ef4444'} onChange={(val) => onUpdate(offer.id, { tagBgColor: val })} />
                             </div>
-                        </div>
-                        <div className="offer-row">
-                            <label className="checkbox-row">
-                                <input type="checkbox" checked={offer.preselect || false}
-                                    onChange={(e) => onUpdate(offer.id, { preselect: e.target.checked })} />
-                                <span>Preselect this offer</span>
-                            </label>
-                        </div>
-                        <div className="offer-actions">
-                            <button className="btn-done" onClick={() => onToggleEdit(offer.id)}>Done</button>
-                            <button className="btn-delete-icon" onClick={() => onDelete(offer.id)}>🗑</button>
-                        </div>
-                    </div>
+                        </InlineStack>
+                        <Checkbox label="Preselect this offer" checked={offer.preselect || false} onChange={(checked) => onUpdate(offer.id, { preselect: checked })} />
+                        <InlineStack gap="200">
+                            <Button variant="primary" onClick={() => onToggleEdit(offer.id)}>Done</Button>
+                            <Button tone="critical" variant="plain" onClick={() => onDelete(offer.id)}>🗑</Button>
+                        </InlineStack>
+                    </BlockStack>
                 )}
             </div>
         </div>
@@ -733,7 +718,7 @@ export default function QuantityOffersPage() {
     return (
         <>
             <style
-                dangerouslySetInnerHTML={{ __html: styles }}
+                dangerouslySetInnerHTML={{ __html: styles + colorSelectorStyles }}
             />
             {/* Native Shopify Save Bar */}
             <ui-save-bar id="bundle-offers-save-bar">
@@ -759,212 +744,198 @@ export default function QuantityOffersPage() {
                             <div className={`status-toggle ${activeGroup.active ? 'on' : ''}`}
                                 onClick={() => updateActiveGroup({ active: !activeGroup.active })}>
                                 <div className="toggle-track"><div className="toggle-thumb" /></div>
-                                <span>{activeGroup.active ? 'Active' : 'Inactive'}</span>
+                                <Badge tone={activeGroup.active ? 'success' : 'critical'}>{activeGroup.active ? 'Active' : 'Inactive'}</Badge>
                             </div>
                         )}
                     </div>
+                    {!activeGroup && (
+                        <Button variant="primary" onClick={handleCreateNew}>+ New Offer</Button>
+                    )}
                 </div>
-
                 <div className="qo-body">
                     {/* Builder */}
                     <div className="qo-builder">
                         {activeGroup ? (
                             <>
                                 {/* Name Input */}
-                                <div className="qo-card">
-                                    <div className="field-row">
-                                        <label>Name</label>
-                                        <input type="text" value={activeGroup.name} placeholder="New offer"
-                                            onChange={(e) => updateActiveGroup({ name: e.target.value })} />
-                                    </div>
-                                </div>
+                                <LegacyCard sectioned>
+                                    <TextField label="Name" value={activeGroup.name} placeholder="New offer"
+                                        onChange={(val) => updateActiveGroup({ name: val })} autoComplete="off" />
+                                </LegacyCard>
 
                                 {/* Products */}
-                                <div className="qo-card">
-                                    <div className="card-header-row">
-                                        <span>Create offers for these products. ({activeGroup.productIds?.length || 0} selected)</span>
-                                    </div>
-                                    <button className="btn-product" onClick={openProductPicker}>Change product</button>
-                                    {activeGroup.selectedProducts && activeGroup.selectedProducts.length > 0 && (
-                                        <div className="product-list">
-                                            {activeGroup.selectedProducts.map((p: any) => (
-                                                <div key={p.id} className="product-row">
-                                                    <div className="product-thumb">🎁</div>
-                                                    <div className="product-info">
-                                                        <span className="product-name">{p.title}</span>
-                                                        <span className="product-id">{p.id.split('/').pop()}</span>
+                                <LegacyCard title={`Products (${activeGroup.productIds?.length || 0} selected)`} sectioned>
+                                    <BlockStack gap="300">
+                                        <Text variant="bodySm" tone="subdued" as="p">Create offers for these products.</Text>
+                                        <Button onClick={openProductPicker}>Change product</Button>
+                                        {activeGroup.selectedProducts && activeGroup.selectedProducts.length > 0 && (
+                                            <BlockStack gap="200">
+                                                {activeGroup.selectedProducts.map((p: any) => (
+                                                    <div key={p.id} className="product-row">
+                                                        <div className="product-thumb">🎁</div>
+                                                        <div className="product-info">
+                                                            <span className="product-name">{p.title}</span>
+                                                            <span className="product-id">{p.id.split('/').pop()}</span>
+                                                        </div>
+                                                        <button onClick={() => updateActiveGroup({
+                                                            productIds: activeGroup.productIds.filter((id: string) => id !== p.id.replace('gid://shopify/Product/', '')),
+                                                            selectedProducts: activeGroup.selectedProducts?.filter((sp: any) => sp.id !== p.id)
+                                                        })}>×</button>
                                                     </div>
-                                                    <button onClick={() => updateActiveGroup({
-                                                        productIds: activeGroup.productIds.filter((id: string) => id !== p.id.replace('gid://shopify/Product/', '')),
-                                                        selectedProducts: activeGroup.selectedProducts?.filter((sp: any) => sp.id !== p.id)
-                                                    })}>×</button>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
+                                                ))}
+                                            </BlockStack>
+                                        )}
+                                    </BlockStack>
+                                </LegacyCard>
 
                                 {/* Tabs */}
-                                <div className="qo-tabs">
-                                    <button className={activeTab === 'offers' ? 'active' : ''} onClick={() => setActiveTab('offers')}>
-                                        ◇ Offers
-                                    </button>
-                                    <button className={activeTab === 'design' ? 'active' : ''} onClick={() => setActiveTab('design')}>
-                                        ✧ Design
-                                    </button>
-                                </div>
+                                <Tabs
+                                    tabs={[
+                                        { id: 'offers', content: '◇ Offers', panelID: 'offers-panel' },
+                                        { id: 'design', content: '✧ Design', panelID: 'design-panel' },
+                                    ]}
+                                    selected={activeTab === 'offers' ? 0 : 1}
+                                    onSelect={(idx) => setActiveTab(idx === 0 ? 'offers' : 'design')}
+                                >
+                                    <Box paddingBlockStart="400">
+                                        {activeTab === 'offers' && (
+                                            <LegacyCard sectioned>
+                                                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                                                    <SortableContext items={activeGroup.offers.map(o => o.id)} strategy={verticalListSortingStrategy}>
+                                                        <div className="offers-list">
+                                                            {activeGroup.offers.map(offer => (
+                                                                <SortableOfferItem
+                                                                    key={offer.id}
+                                                                    offer={offer}
+                                                                    isEditing={editingOfferId === offer.id}
+                                                                    onToggleEdit={(id) => setEditingOfferId(editingOfferId === id ? null : id)}
+                                                                    onUpdate={updateOffer}
+                                                                    onDelete={deleteOffer}
+                                                                />
+                                                            ))}
+                                                        </div>
+                                                    </SortableContext>
+                                                </DndContext>
+                                                <button className="btn-add-offer" onClick={addOffer}>+ Add offer</button>
+                                            </LegacyCard>
+                                        )}
 
-                                {activeTab === 'offers' && (
-                                    <div className="qo-card">
-                                        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                                            <SortableContext items={activeGroup.offers.map(o => o.id)} strategy={verticalListSortingStrategy}>
-                                                <div className="offers-list">
-                                                    {activeGroup.offers.map(offer => (
-                                                        <SortableOfferItem
-                                                            key={offer.id}
-                                                            offer={offer}
-                                                            isEditing={editingOfferId === offer.id}
-                                                            onToggleEdit={(id) => setEditingOfferId(editingOfferId === id ? null : id)}
-                                                            onUpdate={updateOffer}
-                                                            onDelete={deleteOffer}
+                                        {activeTab === 'design' && (
+                                            <BlockStack gap="400">
+                                                {/* Template Selection */}
+                                                <LegacyCard title="Template" sectioned>
+                                                    <div className="template-grid">
+                                                        <div className={`template-opt ${activeGroup.design.template === 'classic' ? 'selected' : ''}`}
+                                                            onClick={() => updateDesign({ template: 'classic' })}>
+                                                            <div className="template-preview classic">
+                                                                <div className="t-row"><div className="t-img"></div><div className="t-lines"></div></div>
+                                                                <div className="t-row"><div className="t-img"></div><div className="t-lines"></div></div>
+                                                            </div>
+                                                            <span>Classic</span>
+                                                        </div>
+                                                        <div className={`template-opt ${activeGroup.design.template === 'modern' ? 'selected' : ''}`}
+                                                            onClick={() => updateDesign({ template: 'modern' })}>
+                                                            <div className="template-preview modern">
+                                                                <div className="t-row"><div className="t-lines full"></div></div>
+                                                                <div className="t-row"><div className="t-lines full"></div></div>
+                                                            </div>
+                                                            <span>Modern</span>
+                                                        </div>
+                                                        <div className={`template-opt ${activeGroup.design.template === 'vertical' ? 'selected' : ''}`}
+                                                            onClick={() => updateDesign({ template: 'vertical' })}>
+                                                            <div className="template-preview vertical">
+                                                                <div className="t-col"><div className="t-img"></div><div className="t-lines"></div></div>
+                                                                <div className="t-col"><div className="t-img"></div><div className="t-lines"></div></div>
+                                                            </div>
+                                                            <span>Vertical</span>
+                                                        </div>
+                                                        <div className={`template-opt ${activeGroup.design.template === 'minimal' ? 'selected' : ''}`}
+                                                            onClick={() => updateDesign({ template: 'minimal' })}>
+                                                            <div className="template-preview minimal">
+                                                                <div className="t-row minimal"><div className="t-dot"></div><div className="t-lines short"></div></div>
+                                                                <div className="t-row minimal"><div className="t-dot"></div><div className="t-lines short"></div></div>
+                                                            </div>
+                                                            <span>Minimal</span>
+                                                        </div>
+                                                        <div className={`template-opt ${activeGroup.design.template === 'cards' ? 'selected' : ''}`}
+                                                            onClick={() => updateDesign({ template: 'cards' })}>
+                                                            <div className="template-preview cards">
+                                                                <div className="t-card"><div className="t-img"></div><div className="t-badge"></div></div>
+                                                                <div className="t-card"><div className="t-img"></div><div className="t-badge"></div></div>
+                                                            </div>
+                                                            <span>Cards</span>
+                                                        </div>
+                                                    </div>
+                                                </LegacyCard>
+
+                                                {/* Placement */}
+                                                <LegacyCard title="Show offers" sectioned>
+                                                    <BlockStack gap="200">
+                                                        <RadioButton
+                                                            label="At the top of form"
+                                                            checked={activeGroup.placement === 'at_top'}
+                                                            id="placement-at-top"
+                                                            name="placement"
+                                                            onChange={() => updateActiveGroup({ placement: 'at_top' })}
                                                         />
-                                                    ))}
-                                                </div>
-                                            </SortableContext>
-                                        </DndContext>
-                                        <button className="btn-add-offer" onClick={addOffer}>+ Add offer</button>
-                                    </div>
-                                )}
+                                                        <RadioButton
+                                                            label="Above Buy Button"
+                                                            checked={activeGroup.placement === 'above_button'}
+                                                            id="placement-above-button"
+                                                            name="placement"
+                                                            onChange={() => updateActiveGroup({ placement: 'above_button' })}
+                                                        />
+                                                        <RadioButton
+                                                            label="In product page"
+                                                            checked={activeGroup.placement === 'in_product_page'}
+                                                            id="placement-in-product-page"
+                                                            name="placement"
+                                                            onChange={() => updateActiveGroup({ placement: 'in_product_page' })}
+                                                        />
+                                                    </BlockStack>
+                                                </LegacyCard>
 
-                                {activeTab === 'design' && (
-                                    <div className="qo-card design-card">
-                                        {/* Template Selection */}
-                                        <div className="design-section">
-                                            <label>Template</label>
-                                            <div className="template-grid">
-                                                <div className={`template-opt ${activeGroup.design.template === 'classic' ? 'selected' : ''}`}
-                                                    onClick={() => updateDesign({ template: 'classic' })}>
-                                                    <div className="template-preview classic">
-                                                        <div className="t-row"><div className="t-img"></div><div className="t-lines"></div></div>
-                                                        <div className="t-row"><div className="t-img"></div><div className="t-lines"></div></div>
+                                                {/* Color Presets */}
+                                                <LegacyCard title="Color Presets" sectioned>
+                                                    <div className="color-presets">
+                                                        {COLOR_PRESETS.map(preset => (
+                                                            <div key={preset.name} className="preset-swatch"
+                                                                style={{ background: `linear-gradient(135deg, ${preset.bg} 50%, ${preset.border} 50%)` }}
+                                                                onClick={() => applyColorPreset(preset)}
+                                                                title={preset.name} />
+                                                        ))}
                                                     </div>
-                                                    <span>Classic</span>
-                                                </div>
-                                                <div className={`template-opt ${activeGroup.design.template === 'modern' ? 'selected' : ''}`}
-                                                    onClick={() => updateDesign({ template: 'modern' })}>
-                                                    <div className="template-preview modern">
-                                                        <div className="t-row"><div className="t-lines full"></div></div>
-                                                        <div className="t-row"><div className="t-lines full"></div></div>
-                                                    </div>
-                                                    <span>Modern</span>
-                                                </div>
-                                                <div className={`template-opt ${activeGroup.design.template === 'vertical' ? 'selected' : ''}`}
-                                                    onClick={() => updateDesign({ template: 'vertical' })}>
-                                                    <div className="template-preview vertical">
-                                                        <div className="t-col"><div className="t-img"></div><div className="t-lines"></div></div>
-                                                        <div className="t-col"><div className="t-img"></div><div className="t-lines"></div></div>
-                                                    </div>
-                                                    <span>Vertical</span>
-                                                </div>
-                                                <div className={`template-opt ${activeGroup.design.template === 'minimal' ? 'selected' : ''}`}
-                                                    onClick={() => updateDesign({ template: 'minimal' })}>
-                                                    <div className="template-preview minimal">
-                                                        <div className="t-row minimal"><div className="t-dot"></div><div className="t-lines short"></div></div>
-                                                        <div className="t-row minimal"><div className="t-dot"></div><div className="t-lines short"></div></div>
-                                                    </div>
-                                                    <span>Minimal</span>
-                                                </div>
-                                                <div className={`template-opt ${activeGroup.design.template === 'cards' ? 'selected' : ''}`}
-                                                    onClick={() => updateDesign({ template: 'cards' })}>
-                                                    <div className="template-preview cards">
-                                                        <div className="t-card"><div className="t-img"></div><div className="t-badge"></div></div>
-                                                        <div className="t-card"><div className="t-img"></div><div className="t-badge"></div></div>
-                                                    </div>
-                                                    <span>Cards</span>
-                                                </div>
-                                            </div>
-                                        </div>
+                                                </LegacyCard>
 
-                                        {/* Placement */}
-                                        <div className="design-section">
-                                            <label>Show offers:</label>
-                                            <div className="placement-opts">
-                                                <label className="radio-opt">
-                                                    <input type="radio" name="placement" checked={activeGroup.placement === 'at_top'}
-                                                        onChange={() => updateActiveGroup({ placement: 'at_top' })} />
-                                                    <span>At the top of form</span>
-                                                </label>
-                                                <label className="radio-opt">
-                                                    <input type="radio" name="placement" checked={activeGroup.placement === 'above_button'}
-                                                        onChange={() => updateActiveGroup({ placement: 'above_button' })} />
-                                                    <span>Above Buy Button</span>
-                                                </label>
-                                                <label className="radio-opt">
-                                                    <input type="radio" name="placement" checked={activeGroup.placement === 'in_product_page'}
-                                                        onChange={() => updateActiveGroup({ placement: 'in_product_page' })} />
-                                                    <span>In product page</span>
-                                                </label>
-                                            </div>
-                                        </div>
-
-                                        {/* Color Presets */}
-                                        <div className="design-section">
-                                            <label>Color Presets</label>
-                                            <div className="color-presets">
-                                                {COLOR_PRESETS.map(preset => (
-                                                    <div key={preset.name} className="preset-swatch"
-                                                        style={{ background: `linear-gradient(135deg, ${preset.bg} 50%, ${preset.border} 50%)` }}
-                                                        onClick={() => applyColorPreset(preset)}
-                                                        title={preset.name} />
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                        {/* Custom Colors */}
-                                        <div className="design-section">
-                                            <div className="color-row">
-                                                <div className="color-field">
-                                                    <label>Background color</label>
-                                                    <div className="color-input">
-                                                        <input type="color" value={activeGroup.design.selectedBgColor}
-                                                            onChange={(e) => updateDesign({ selectedBgColor: e.target.value })} />
-                                                        <input type="text" value={activeGroup.design.selectedBgColor}
-                                                            onChange={(e) => updateDesign({ selectedBgColor: e.target.value })} />
-                                                    </div>
-                                                </div>
-                                                <div className="color-field">
-                                                    <label>Border color</label>
-                                                    <div className="color-input">
-                                                        <input type="color" value={activeGroup.design.selectedBorderColor}
-                                                            onChange={(e) => updateDesign({ selectedBorderColor: e.target.value })} />
-                                                        <input type="text" value={activeGroup.design.selectedBorderColor}
-                                                            onChange={(e) => updateDesign({ selectedBorderColor: e.target.value })} />
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div className="color-row">
-                                                <div className="color-field">
-                                                    <label>Tag color</label>
-                                                    <div className="color-input">
-                                                        <input type="color" value={activeGroup.design.selectedTagBgColor}
-                                                            onChange={(e) => updateDesign({ selectedTagBgColor: e.target.value })} />
-                                                        <input type="text" value={activeGroup.design.selectedTagBgColor}
-                                                            onChange={(e) => updateDesign({ selectedTagBgColor: e.target.value })} />
-                                                    </div>
-                                                </div>
-                                                <div className="color-field">
-                                                    <label>Tag text color</label>
-                                                    <div className="color-input">
-                                                        <input type="color" value={activeGroup.design.selectedTagTextColor}
-                                                            onChange={(e) => updateDesign({ selectedTagTextColor: e.target.value })} />
-                                                        <input type="text" value={activeGroup.design.selectedTagTextColor}
-                                                            onChange={(e) => updateDesign({ selectedTagTextColor: e.target.value })} />
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
+                                                {/* Custom Colors - Using ColorSelector */}
+                                                <LegacyCard title="Custom Colors" sectioned>
+                                                    <BlockStack gap="400">
+                                                        <InlineStack gap="300" wrap={false}>
+                                                            <div style={{ flex: 1 }}>
+                                                                <ColorSelector label="Background color" value={activeGroup.design.selectedBgColor}
+                                                                    onChange={(c) => updateDesign({ selectedBgColor: c })} />
+                                                            </div>
+                                                            <div style={{ flex: 1 }}>
+                                                                <ColorSelector label="Border color" value={activeGroup.design.selectedBorderColor}
+                                                                    onChange={(c) => updateDesign({ selectedBorderColor: c })} />
+                                                            </div>
+                                                        </InlineStack>
+                                                        <InlineStack gap="300" wrap={false}>
+                                                            <div style={{ flex: 1 }}>
+                                                                <ColorSelector label="Tag color" value={activeGroup.design.selectedTagBgColor}
+                                                                    onChange={(c) => updateDesign({ selectedTagBgColor: c })} />
+                                                            </div>
+                                                            <div style={{ flex: 1 }}>
+                                                                <ColorSelector label="Tag text color" value={activeGroup.design.selectedTagTextColor}
+                                                                    onChange={(c) => updateDesign({ selectedTagTextColor: c })} />
+                                                            </div>
+                                                        </InlineStack>
+                                                    </BlockStack>
+                                                </LegacyCard>
+                                            </BlockStack>
+                                        )}
+                                    </Box>
+                                </Tabs>
                             </>
                         ) : (
                             <div className="qo-card">
@@ -973,26 +944,16 @@ export default function QuantityOffersPage() {
                                         <h2 className="qo-groups-title">Your Bundle Offers</h2>
                                         <p className="qo-groups-subtitle">Create and manage volume discounts for your products.</p>
                                     </div>
-                                    <button className="btn-create" onClick={handleCreateNew}>+ New Offer</button>
                                 </div>
 
                                 {(initialOfferGroups || []).length > 0 ? (
                                     <div className="qo-groups-list">
                                         {(initialOfferGroups || []).map((g: any) => (
-                                            <div
-                                                key={String(g.id)}
-                                                className="qo-group-row"
-                                            >
+                                            <div key={String(g.id)} className="qo-group-row">
                                                 <div className="qo-group-row-main" onClick={() => handleSelectGroup(g)} style={{ cursor: 'pointer', flex: 1 }}>
                                                     <div className="qo-group-row-title">{g.name || 'Untitled offer'}</div>
                                                     <div className="qo-group-row-meta">
-                                                        <span
-                                                            className={`qo-pill clickable ${g.active ? 'on' : ''}`}
-                                                            onClick={(e) => handleToggleGroupActive(g, e)}
-                                                            title={g.active ? 'Click to deactivate' : 'Click to activate'}
-                                                        >
-                                                            {g.active ? 'Active' : 'Inactive'}
-                                                        </span>
+                                                        <Badge tone={g.active ? 'success' : 'critical'}>{g.active ? 'Active' : 'Inactive'}</Badge>
                                                         <span>{(g.product_ids || []).length} products</span>
                                                         <span>{(g.offers || []).length} offers</span>
                                                     </div>
@@ -1013,6 +974,7 @@ export default function QuantityOffersPage() {
                                     <div className="qo-empty">
                                         <h2>Create Bundle Offers</h2>
                                         <p>Encourage customers to buy more with volume discounts</p>
+                                        <Button variant="primary" onClick={handleCreateNew}>+ New Offer</Button>
                                     </div>
                                 )}
                             </div>
@@ -1048,8 +1010,9 @@ export default function QuantityOffersPage() {
                                                         const isVertical = template === 'vertical';
                                                         const isMinimal = template === 'minimal';
                                                         const isCards = template === 'cards';
-                                                        const isMostPopular = offer.label?.toLowerCase().includes('most popular') || (i === activeGroup.offers.length - 1 && activeGroup.offers.length > 1);
-                                                        const showDiscountTag = (offer.discountPercent || 0) > 0 && !isMostPopular;
+                                                        const isMostPopular = offer.label?.toLowerCase().includes('most popular');
+                                                        const hasLabel = !!offer.label && !isMostPopular;
+                                                        const showDiscountTag = ((offer.discountPercent || 0) > 0 || hasLabel) && !isMostPopular;
                                                         const borderColor = isSelected
                                                             ? (activeGroup.design.selectedBorderColor || '#dc2626')
                                                             : (activeGroup.design.unselectedBorderColor || '#e5e7eb');
@@ -1103,7 +1066,7 @@ export default function QuantityOffersPage() {
                                                                                 color: activeGroup.design.selectedTagTextColor,
                                                                                 fontSize: '9px', fontWeight: 600, padding: '2px 6px',
                                                                                 borderRadius: '4px', display: 'inline-block', width: 'fit-content',
-                                                                            }}>Save {offer.discountPercent}%</span>
+                                                                            }}>{offer.label || `Save ${offer.discountPercent}%`}</span>
                                                                         )}
                                                                     </div>
                                                                 </div>
@@ -1187,8 +1150,9 @@ export default function QuantityOffersPage() {
                                                                 const isVertical = template === 'vertical';
                                                                 const isMinimal = template === 'minimal';
                                                                 const isCards = template === 'cards';
-                                                                const isMostPopular = offer.label?.toLowerCase().includes('most popular') || (i === activeGroup.offers.length - 1 && activeGroup.offers.length > 1);
-                                                                const showDiscountTag = (offer.discountPercent || 0) > 0 && !isMostPopular;
+                                                                const isMostPopular = offer.label?.toLowerCase().includes('most popular');
+                                                                const hasLabel = !!offer.label && !isMostPopular;
+                                                                const showDiscountTag = ((offer.discountPercent || 0) > 0 || hasLabel) && !isMostPopular;
 
                                                                 // Get border color based on selection - use actual saved colors
                                                                 const borderColor = isSelected
@@ -1261,7 +1225,7 @@ export default function QuantityOffersPage() {
                                                                                         borderRadius: '4px',
                                                                                         display: 'inline-block',
                                                                                         width: 'fit-content',
-                                                                                    }}>Save {offer.discountPercent}%</span>
+                                                                                    }}>{offer.label || `Save ${offer.discountPercent}%`}</span>
                                                                                 )}
                                                                             </div>
                                                                         </div>
@@ -1394,8 +1358,9 @@ export default function QuantityOffersPage() {
                                                                 const isVertical = template === 'vertical';
                                                                 const isMinimal = template === 'minimal';
                                                                 const isCards = template === 'cards';
-                                                                const isMostPopular = offer.label?.toLowerCase().includes('most popular') || (i === activeGroup.offers.length - 1 && activeGroup.offers.length > 1);
-                                                                const showDiscountTag = (offer.discountPercent || 0) > 0 && !isMostPopular;
+                                                                const isMostPopular = offer.label?.toLowerCase().includes('most popular');
+                                                                const hasLabel = !!offer.label && !isMostPopular;
+                                                                const showDiscountTag = ((offer.discountPercent || 0) > 0 || hasLabel) && !isMostPopular;
 
                                                                 // Get border color based on selection - use actual saved colors
                                                                 const borderColor = isSelected
@@ -1468,7 +1433,7 @@ export default function QuantityOffersPage() {
                                                                                         borderRadius: '4px',
                                                                                         display: 'inline-block',
                                                                                         width: 'fit-content',
-                                                                                    }}>Save {offer.discountPercent}%</span>
+                                                                                    }}>{offer.label || `Save ${offer.discountPercent}%`}</span>
                                                                                 )}
                                                                             </div>
                                                                         </div>
@@ -1673,10 +1638,10 @@ const styles = `
     .btn-save:disabled { opacity: 0.6; }
 
     /* Body */
-    .qo-body { display: grid; grid-template-columns: 1fr 380px; gap: 24px; padding: 24px; flex: 1; }
+    .qo-body { display: grid; grid-template-columns: 1fr 380px; gap: 24px; padding: 24px; flex: 1; align-items: start; }
     
     /* Builder */
-    .qo-builder { display: flex; flex-direction: column; gap: 16px; }
+    .qo-builder { display: flex; flex-direction: column; gap: 16px; overflow-y: auto; max-height: 150vh; padding-right: 4px; }
     .qo-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px; }
     .field-row { display: flex; align-items: center; gap: 12px; }
     .field-row label { font-size: 14px; font-weight: 500; min-width: 50px; }
