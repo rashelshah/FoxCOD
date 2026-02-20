@@ -383,10 +383,78 @@ export default function OrderDetailPage() {
                                     <div className="detail-item-label">Quantity</div>
                                     <div className="detail-item-value">{order.quantity}</div>
                                 </div>
+                                {order.city && (
+                                    <div className="detail-item">
+                                        <div className="detail-item-label">City</div>
+                                        <div className="detail-item-value">{order.city}</div>
+                                    </div>
+                                )}
+                                {order.state && (
+                                    <div className="detail-item">
+                                        <div className="detail-item-label">State</div>
+                                        <div className="detail-item-value">{order.state}</div>
+                                    </div>
+                                )}
+                                {order.pincode && (
+                                    <div className="detail-item">
+                                        <div className="detail-item-label">Pincode</div>
+                                        <div className="detail-item-value">{order.pincode}</div>
+                                    </div>
+                                )}
                             </div>
-                            <div className="detail-item" style={{ marginTop: '16px', textAlign: 'center' }}>
-                                <div className="detail-item-label">Total Amount (COD)</div>
-                                <div className="amount-display">{formatCurrency(order.total_price)}</div>
+
+                            {/* Price Breakdown */}
+                            <div style={{ marginTop: '16px', padding: '16px', background: '#f9fafb', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
+                                <div style={{ fontSize: '13px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' as const, letterSpacing: '0.5px', marginBottom: '12px' }}>Price Breakdown</div>
+
+                                {(() => {
+                                    const notes = order.customer_notes || '';
+                                    const discountMatch = notes.match(/BUNDLE DISCOUNT:\s*([\d.]+)% off/);
+                                    const shippingMatch = notes.match(/SHIPPING:\s*(.+?)\s*\(₹([\d.]+)\)/);
+                                    const downsellMatch = notes.match(/DOWNSELL APPLIED:\s*(.+?)\s*\(₹([\d.]+)\)/);
+                                    const upsellLines = notes.split('\n').filter((l: string) => l.trim().startsWith('-'));
+
+                                    return (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                            {downsellMatch ? (
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#374151' }}>
+                                                    <span>Downsell: {downsellMatch[1]}</span>
+                                                    <span>{formatCurrency(parseFloat(downsellMatch[2]))} × {order.quantity}</span>
+                                                </div>
+                                            ) : null}
+
+                                            {discountMatch ? (
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#059669' }}>
+                                                    <span>Bundle Discount</span>
+                                                    <span>-{discountMatch[1]}%</span>
+                                                </div>
+                                            ) : null}
+
+                                            {upsellLines.length > 0 && upsellLines.map((line: string, idx: number) => {
+                                                const m = line.match(/-\s*(.+?)\s*\(₹([\d.]+)\)\s*x(\d+)\s*\[(.+?)\]/);
+                                                if (!m) return null;
+                                                return (
+                                                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#059669' }}>
+                                                        <span>+ {m[1]} ({m[4] === 'click_upsell' ? '1-Click' : m[4] === 'downsell' ? 'Downsell' : 'Tick'})</span>
+                                                        <span>{formatCurrency(parseFloat(m[2]))} × {m[3]}</span>
+                                                    </div>
+                                                );
+                                            })}
+
+                                            {shippingMatch ? (
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#374151' }}>
+                                                    <span>Shipping: {shippingMatch[1]}</span>
+                                                    <span>{formatCurrency(parseFloat(shippingMatch[2]))}</span>
+                                                </div>
+                                            ) : null}
+
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '18px', fontWeight: 800, color: '#111827', borderTop: '1px dashed #d1d5db', paddingTop: '8px', marginTop: '4px' }}>
+                                                <span>Total (COD)</span>
+                                                <span>{formatCurrency(order.total_price)}</span>
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         </div>
                     </div>

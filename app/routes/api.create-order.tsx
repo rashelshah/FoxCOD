@@ -28,11 +28,20 @@ interface OrderRequestBody {
     customerName: string;
     customerPhone: string;
     customerAddress: string;
+    customerEmail?: string;
+    customerState?: string;
+    customerCity?: string;
+    customerZipcode?: string;
     productId: string;
     variantId: string;
     quantity: number;
     price: number;
     productTitle: string;
+    notes?: string;
+    shippingLabel?: string;
+    shippingPrice?: number;
+    discountPercent?: number;
+    finalTotal?: number;
     upsell_items?: Array<{
         product_id: string;
         variant_id: string;
@@ -121,7 +130,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         // Parse request body
         const body: OrderRequestBody = await request.json();
 
-        console.log("[COD Order] Received order request:", body.shop, body.productTitle);
+        console.log("[COD Order] Received order request:", body.shop, body.productTitle, "qty:", body.quantity, "discount:", body.discountPercent, "finalTotal:", body.finalTotal);
 
         // Validate shop domain
         if (!body.shop) {
@@ -161,17 +170,39 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         // Generate order name
         const orderName = generateOrderName();
 
-        // Calculate total price including upsells
-        const basePrice = body.price * body.quantity;
+        // Calculate total price:
+        // Priority 1: finalTotal from order summary DOM (most accurate — includes qty, discounts, shipping, upsells)
+        // Priority 2: Compute from individual fields
         const upsellTotal = (body.upsell_items || []).reduce((sum, item) => sum + (item.price * item.quantity), 0);
-        const totalPrice = basePrice + upsellTotal;
+        const shippingPrice = body.shippingPrice || 0;
+        const discountPercent = body.discountPercent || 0;
+
+        let totalPrice: number;
+        if (body.finalTotal && body.finalTotal > 0) {
+            totalPrice = body.finalTotal;
+            console.log("[COD Order] Using finalTotal from storefront:", totalPrice);
+        } else {
+            const subtotal = body.price * body.quantity;
+            const discount = subtotal * (discountPercent / 100);
+            totalPrice = subtotal - discount + shippingPrice + upsellTotal;
+            console.log("[COD Order] Computed total:", totalPrice, "(subtotal:", subtotal, "discount:", discount, "shipping:", shippingPrice, "upsells:", upsellTotal, ")");
+        }
 
         // Build notes with upsell details
-        let orderNotes = '';
+        let orderNotes = body.notes || '';
         if (body.upsell_items && body.upsell_items.length > 0) {
-            orderNotes = 'UPSELL ITEMS:\n' + body.upsell_items.map(item =>
+            const upsellNotes = 'UPSELL ITEMS:\n' + body.upsell_items.map(item =>
                 `  - ${item.title} (₹${item.price}) x${item.quantity} [${item.type}]`
             ).join('\n');
+            orderNotes = orderNotes ? orderNotes + '\n' + upsellNotes : upsellNotes;
+        }
+        if (shippingPrice > 0 && body.shippingLabel) {
+            orderNotes = orderNotes ? orderNotes + '\n' : '';
+            orderNotes += `SHIPPING: ${body.shippingLabel} (₹${shippingPrice.toFixed(2)})`;
+        }
+        if (discountPercent > 0) {
+            orderNotes = orderNotes ? orderNotes + '\n' : '';
+            orderNotes += `BUNDLE DISCOUNT: ${discountPercent}% off`;
         }
 
         // Log order in Supabase - this is the primary order storage
@@ -180,23 +211,129 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             customer_name: body.customerName,
             customer_phone: body.customerPhone,
             customer_address: body.customerAddress,
+            customer_email: body.customerEmail || undefined,
             product_id: body.productId,
             product_title: body.productTitle,
             variant_id: body.variantId,
             quantity: body.quantity,
             price: totalPrice.toString(),
             notes: orderNotes || undefined,
+            city: body.customerCity || undefined,
+            state: body.customerState || undefined,
+            pincode: body.customerZipcode || undefined,
+            shipping_label: body.shippingLabel || undefined,
+            shipping_price: shippingPrice || undefined,
         });
 
         console.log("[COD Order] Order logged successfully:", orderLog.id, orderName);
 
-        // Return success - order is captured in Supabase
-        // Note: Shopify order creation is skipped due to protected customer data access requirements
-        // Merchants can view and manage orders from the app dashboard
+        // ── Create Shopify Draft Order ──
+        let shopifyOrderName = orderName;
+        let shopifyOrderId = '';
+        try {
+            const accessToken = shop.access_token;
+            if (accessToken) {
+                // Build line items
+                const lineItems: Array<{ variantId: string; quantity: number }> = [];
+
+                // Main product
+                const mainVariantGid = body.variantId.startsWith('gid://')
+                    ? body.variantId
+                    : `gid://shopify/ProductVariant/${body.variantId}`;
+                lineItems.push({ variantId: mainVariantGid, quantity: body.quantity });
+
+                // Upsell items
+                if (body.upsell_items && body.upsell_items.length > 0) {
+                    body.upsell_items.forEach(item => {
+                        const upsellVariantGid = item.variant_id.startsWith('gid://')
+                            ? item.variant_id
+                            : `gid://shopify/ProductVariant/${item.variant_id}`;
+                        lineItems.push({ variantId: upsellVariantGid, quantity: item.quantity });
+                    });
+                }
+
+                // Build draft order mutation
+                const draftOrderInput: Record<string, any> = {
+                    note: orderNotes || `COD Order via FoxCOD - ${orderName}`,
+                    tags: ['FoxCOD', 'COD'],
+                    lineItems: lineItems.map(li => ({
+                        variantId: li.variantId,
+                        quantity: li.quantity,
+                    })),
+                    paymentTerms: {
+                        paymentTermsTemplateId: null,
+                    },
+                };
+
+                // Add shipping address if available
+                if (body.customerName || body.customerAddress) {
+                    draftOrderInput.shippingAddress = {
+                        firstName: body.customerName?.split(' ')[0] || '',
+                        lastName: body.customerName?.split(' ').slice(1).join(' ') || '',
+                        address1: body.customerAddress || '',
+                        city: body.customerCity || '',
+                        province: body.customerState || '',
+                        zip: body.customerZipcode || '',
+                        country: 'IN',
+                        phone: body.customerPhone || '',
+                    };
+                }
+
+                const shopifyApiUrl = `https://${body.shop}/admin/api/2024-01/graphql.json`;
+                const draftOrderMutation = `
+                    mutation draftOrderCreate($input: DraftOrderInput!) {
+                        draftOrderCreate(input: $input) {
+                            draftOrder {
+                                id
+                                name
+                            }
+                            userErrors {
+                                field
+                                message
+                            }
+                        }
+                    }
+                `;
+
+                const shopifyRes = await fetch(shopifyApiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Shopify-Access-Token': accessToken,
+                    },
+                    body: JSON.stringify({
+                        query: draftOrderMutation,
+                        variables: { input: draftOrderInput },
+                    }),
+                });
+
+                const shopifyData = await shopifyRes.json();
+                console.log("[COD Order] Shopify draft order response:", JSON.stringify(shopifyData).substring(0, 500));
+
+                if (shopifyData.data?.draftOrderCreate?.draftOrder) {
+                    const draftOrder = shopifyData.data.draftOrderCreate.draftOrder;
+                    shopifyOrderId = draftOrder.id;
+                    shopifyOrderName = draftOrder.name;
+
+                    // Update Supabase record with Shopify order info
+                    await updateOrderStatus(orderLog.id, shopifyOrderId, shopifyOrderName, 'pending');
+                    console.log("[COD Order] Shopify draft order created:", shopifyOrderName);
+                } else {
+                    const errors = shopifyData.data?.draftOrderCreate?.userErrors || shopifyData.errors || [];
+                    console.warn("[COD Order] Shopify draft order errors:", errors);
+                }
+            } else {
+                console.log("[COD Order] No access token found, skipping Shopify draft order");
+            }
+        } catch (shopifyError: any) {
+            // Don't fail the order if Shopify draft order creation fails
+            console.error("[COD Order] Shopify draft order error (non-fatal):", shopifyError.message);
+        }
+
         return Response.json({
             success: true,
             orderId: orderLog.id,
-            orderName: orderName,
+            orderName: shopifyOrderName,
             message: "Order placed successfully!",
         }, { headers: corsHeaders });
 

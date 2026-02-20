@@ -324,6 +324,8 @@ export async function logOrder(order: OrderLogEntry) {
     if (order.city != null) insertPayload.city = order.city;
     if (order.state != null) insertPayload.state = order.state;
     if (order.pincode != null) insertPayload.pincode = order.pincode;
+    if (order.shipping_label != null) insertPayload.shipping_label = order.shipping_label;
+    if (order.shipping_price != null) insertPayload.shipping_price = order.shipping_price;
 
     const { data, error } = await supabase
         .from('order_logs')

@@ -3257,8 +3257,46 @@
           productTitle: config.productTitle,
           shippingLabel: '',
           shippingPrice: 0,
+          discountPercent: 0,
+          finalTotal: 0,
           upsell_items: getCheckedTickUpsells(form, config)
       };
+
+      // ── Read bundle offer selection (quantity + discount) ──
+      var _modal = form.closest('.cod-modal') || form;
+      var _qOffers = _modal.querySelector('.cod-quantity-offers');
+      if (_qOffers) {
+          try {
+              var _od = _qOffers.getAttribute('data-selected-offer');
+              if (_od) {
+                  var _so = JSON.parse(_od);
+                  payload.quantity = _so.quantity || payload.quantity;
+                  payload.discountPercent = _so.discountPercent || 0;
+              }
+          } catch(e) {}
+      }
+      // Also check product-page offers (for in_product_page placement)
+      if (payload.discountPercent === 0) {
+          var _ppOffers = document.querySelector('.cod-product-page-offers');
+          if (_ppOffers) {
+              try {
+                  var _ppd = _ppOffers.getAttribute('data-selected-offer');
+                  if (_ppd) {
+                      var _ppo = JSON.parse(_ppd);
+                      payload.quantity = _ppo.quantity || payload.quantity;
+                      payload.discountPercent = _ppo.discountPercent || 0;
+                  }
+              } catch(e) {}
+          }
+      }
+
+      // ── Read final total from order summary DOM (includes qty, discounts, shipping, upsells) ──
+      var _summaryTotalEl = form.querySelector('#cod-summary-total');
+      if (_summaryTotalEl) {
+          payload.finalTotal = parseFloat(_summaryTotalEl.textContent.replace(/[^0-9.]/g, '')) || 0;
+      }
+
+      console.log('[COD Form] Bundle offer applied — qty:', payload.quantity, 'discount:', payload.discountPercent + '%', 'finalTotal:', payload.finalTotal);
 
       // If downsell is active, it replaces the product price (not added on top)
       var dsItemsAttr = form.getAttribute('data-downsell-items');
@@ -3266,13 +3304,12 @@
           try {
               var dsItems = JSON.parse(dsItemsAttr);
               if (dsItems.length > 0) {
-                  // Use the downsell price as the product price
                   payload.price = dsItems[0].price;
                   payload.notes = (payload.notes ? payload.notes + '\n' : '') + 'DOWNSELL APPLIED: ' + dsItems[0].title + ' (₹' + dsItems[0].price.toFixed(2) + ')';
               }
           } catch(e) {}
       }
-      
+
       // Get selected shipping option
       var shippingRadio = form.querySelector('input[name="shipping_method"]:checked');
       if (shippingRadio && config.shippingOptions && config.shippingOptions.options) {

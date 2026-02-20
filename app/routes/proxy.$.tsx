@@ -288,21 +288,42 @@ async function handleRegularOrder(data: any) {
     }
 
     // Calculate prices including upsell items
-    const basePrice = parseFloat(data.price) * (parseInt(data.quantity) || 1);
     const upsellItems = data.upsell_items || [];
     const upsellTotal = upsellItems.reduce((sum: number, item: any) => sum + (parseFloat(item.price) * (parseInt(item.quantity) || 1)), 0);
-    const totalPrice = basePrice + upsellTotal;
+    const shippingPrice = parseFloat(data.shippingPrice) || 0;
+    const discountPercent = parseFloat(data.discountPercent) || 0;
 
-    // Build notes including upsell details
+    // Use finalTotal from storefront DOM (most accurate — includes qty, discounts, shipping, upsells)
+    // Fallback: compute from individual fields
+    let totalPrice: number;
+    if (data.finalTotal && parseFloat(data.finalTotal) > 0) {
+        totalPrice = parseFloat(data.finalTotal);
+        console.log('[Proxy] Using finalTotal from storefront:', totalPrice);
+    } else {
+        const subtotal = parseFloat(data.price) * (parseInt(data.quantity) || 1);
+        const discount = subtotal * (discountPercent / 100);
+        totalPrice = subtotal - discount + shippingPrice + upsellTotal;
+        console.log('[Proxy] Computed total:', totalPrice, '(subtotal:', subtotal, 'discount:', discount, 'shipping:', shippingPrice, 'upsells:', upsellTotal, ')');
+    }
+
+    // Build notes including upsell details, shipping, and discount
     let orderNotes = data.notes || data.customerNotes || '';
     if (upsellItems.length > 0) {
         const upsellNotes = 'UPSELL ITEMS:\n' + upsellItems.map((item: any) =>
             `  - ${item.title} (₹${item.price}) x${item.quantity} [${item.type}]`
         ).join('\n');
-        orderNotes = orderNotes ? orderNotes + '\n\n' + upsellNotes : upsellNotes;
+        orderNotes = orderNotes ? orderNotes + '\n' + upsellNotes : upsellNotes;
+    }
+    if (shippingPrice > 0 && data.shippingLabel) {
+        orderNotes = orderNotes ? orderNotes + '\n' : '';
+        orderNotes += `SHIPPING: ${data.shippingLabel} (₹${shippingPrice.toFixed(2)})`;
+    }
+    if (discountPercent > 0) {
+        orderNotes = orderNotes ? orderNotes + '\n' : '';
+        orderNotes += `BUNDLE DISCOUNT: ${discountPercent}% off`;
     }
 
-    console.log('[Proxy] Base price:', basePrice, 'Upsell total:', upsellTotal, 'Total:', totalPrice, 'Upsell items:', upsellItems.length);
+    console.log('[Proxy] Total price:', totalPrice, 'Qty:', data.quantity, 'Discount:', discountPercent + '%', 'Upsell items:', upsellItems.length);
 
     // Create the order using logOrder
     const result = await logOrder({
@@ -321,10 +342,75 @@ async function handleRegularOrder(data: any) {
         quantity: parseInt(data.quantity) || 1,
         price: totalPrice.toString(),
         shipping_label: data.shippingLabel || '',
-        shipping_price: parseFloat(data.shippingPrice) || 0,
+        shipping_price: shippingPrice,
     });
 
     console.log('[Proxy] Order created:', result);
+
+    // Try to create Shopify draft order
+    try {
+        const shop = await getShop(data.shop);
+        const accessToken = shop?.access_token;
+        if (accessToken) {
+            const mainVariantGid = data.variantId.startsWith('gid://')
+                ? data.variantId
+                : `gid://shopify/ProductVariant/${data.variantId}`;
+
+            const lineItems: Array<{ variantId: string; quantity: number }> = [
+                { variantId: mainVariantGid, quantity: parseInt(data.quantity) || 1 }
+            ];
+
+            if (upsellItems.length > 0) {
+                upsellItems.forEach((item: any) => {
+                    const vid = item.variant_id.startsWith('gid://')
+                        ? item.variant_id
+                        : `gid://shopify/ProductVariant/${item.variant_id}`;
+                    lineItems.push({ variantId: vid, quantity: parseInt(item.quantity) || 1 });
+                });
+            }
+
+            const draftOrderInput: Record<string, any> = {
+                note: orderNotes || `COD Order via FoxCOD`,
+                tags: ['FoxCOD', 'COD'],
+                lineItems: lineItems.map(li => ({ variantId: li.variantId, quantity: li.quantity })),
+            };
+
+            if (data.customerName || data.customerAddress) {
+                draftOrderInput.shippingAddress = {
+                    firstName: (data.customerName || '').split(' ')[0] || '',
+                    lastName: (data.customerName || '').split(' ').slice(1).join(' ') || '',
+                    address1: data.customerAddress || '',
+                    city: data.customerCity || '',
+                    province: data.customerState || '',
+                    zip: data.customerZipcode || '',
+                    country: 'IN',
+                    phone: data.customerPhone || '',
+                };
+            }
+
+            const shopifyRes = await fetch(`https://${data.shop}/admin/api/2024-01/graphql.json`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': accessToken },
+                body: JSON.stringify({
+                    query: `mutation draftOrderCreate($input: DraftOrderInput!) { draftOrderCreate(input: $input) { draftOrder { id name } userErrors { field message } } }`,
+                    variables: { input: draftOrderInput },
+                }),
+            });
+
+            const shopifyData = await shopifyRes.json();
+            if (shopifyData.data?.draftOrderCreate?.draftOrder) {
+                const draftOrder = shopifyData.data.draftOrderCreate.draftOrder;
+                console.log('[Proxy] Shopify draft order created:', draftOrder.name);
+                // Update Supabase record
+                const { updateOrderStatus } = await import("../config/supabase.server");
+                await updateOrderStatus(result.id, draftOrder.id, draftOrder.name, 'pending');
+            } else {
+                console.warn('[Proxy] Shopify draft order errors:', shopifyData.data?.draftOrderCreate?.userErrors || shopifyData.errors);
+            }
+        }
+    } catch (shopifyErr: any) {
+        console.error('[Proxy] Shopify draft order error (non-fatal):', shopifyErr.message);
+    }
 
     // Non-blocking Google Sheets sync
     syncOrderToGoogleSheets(data.shop, {
