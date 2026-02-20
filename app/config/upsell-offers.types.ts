@@ -44,6 +44,7 @@ export interface ButtonDesign {
     borderStyle: string; // 'none' | 'solid' | 'dashed' | 'dashed_animation'
     shadow: boolean;
     animation: string; // 'none', 'pulse', 'bounce', 'shake'
+    changeIcon: string; // 'none', 'cart', 'check', 'star', 'gift', 'heart'
 }
 
 /**
@@ -72,7 +73,7 @@ export interface DiscountTagDesign {
  * Full campaign design settings
  */
 export interface CampaignDesign {
-    // Header
+    // Header (used by click_upsell)
     headerText: string;
     headerTextSize: number;
     headerTextColor: string;
@@ -100,6 +101,43 @@ export interface CampaignDesign {
 
     // Background
     bgColor: string;
+    bgImage: string; // Custom background image URL
+
+    // ========== Downsell-specific fields ==========
+    // Title section (e.g. "Hold on!")
+    titleText: string;
+    titleTextColor: string;
+    titleTextSize: number;
+    titleBold: boolean;
+    titleItalic: boolean;
+
+    // Subtitle section
+    subtitleText: string;
+    subtitleTextColor: string;
+    subtitleTextSize: number;
+    subtitleBold: boolean;
+    subtitleItalic: boolean;
+
+    // Description section
+    descriptionText: string;
+    descriptionTextColor: string;
+    descriptionTextSize: number;
+    descriptionBold: boolean;
+    descriptionItalic: boolean;
+
+    // Content section (freeform)
+    contentText: string;
+    contentTextColor: string;
+    contentTextSize: number;
+    contentBold: boolean;
+    contentItalic: boolean;
+
+    // Discount badge
+    discountBadgeTitle: string;
+    discountBadgeBgColor: string;
+    discountBadgeDiscountColor: string;
+    discountBadgeSize: number;     // 20-80 range slider
+    discountBadgeTextSize: number; // 10-40 range slider
 }
 
 /**
@@ -132,6 +170,9 @@ export interface UpsellCampaign {
     display_location: string;
     checkbox_default_checked: boolean;
 
+    // For downsells
+    form_close_count: number; // 1-4, how many form closes before showing downsell
+
     priority: number;
     created_at?: string;
     updated_at?: string;
@@ -157,6 +198,7 @@ export const DEFAULT_BUTTON_ACCEPT: ButtonDesign = {
     borderStyle: 'dashed',
     shadow: false,
     animation: 'none',
+    changeIcon: 'none',
 };
 
 export const DEFAULT_BUTTON_REJECT: ButtonDesign = {
@@ -172,6 +214,40 @@ export const DEFAULT_BUTTON_REJECT: ButtonDesign = {
     borderStyle: 'solid',
     shadow: false,
     animation: 'none',
+    changeIcon: 'none',
+};
+
+// Downsell-specific button defaults
+export const DEFAULT_DOWNSELL_ACCEPT: ButtonDesign = {
+    text: 'Complete order with {discount} OFF',
+    bgColor: 'linear-gradient(135deg, #ff4500, #ff8c00)',
+    textColor: '#ffffff',
+    textSize: 16,
+    bold: true,
+    italic: false,
+    borderColor: '#000000',
+    borderWidth: 0,
+    borderRadius: 8,
+    borderStyle: 'none',
+    shadow: false,
+    animation: 'none',
+    changeIcon: 'none',
+};
+
+export const DEFAULT_DOWNSELL_REJECT: ButtonDesign = {
+    text: 'No thanks',
+    bgColor: '#ffffff',
+    textColor: '#000000',
+    textSize: 16,
+    bold: false,
+    italic: false,
+    borderColor: '#000000',
+    borderWidth: 1,
+    borderRadius: 8,
+    borderStyle: 'solid',
+    shadow: false,
+    animation: 'none',
+    changeIcon: 'none',
 };
 
 export const DEFAULT_TIMER: TimerSettings = {
@@ -204,6 +280,68 @@ export const DEFAULT_CAMPAIGN_DESIGN: CampaignDesign = {
     acceptButton: { ...DEFAULT_BUTTON_ACCEPT },
     rejectButton: { ...DEFAULT_BUTTON_REJECT },
     bgColor: '#ffffff',
+    bgImage: '',
+    // Downsell-specific defaults (empty for non-downsell campaigns)
+    titleText: '',
+    titleTextColor: '#000000',
+    titleTextSize: 24,
+    titleBold: true,
+    titleItalic: false,
+    subtitleText: '',
+    subtitleTextColor: '#000000',
+    subtitleTextSize: 16,
+    subtitleBold: false,
+    subtitleItalic: false,
+    descriptionText: '',
+    descriptionTextColor: '#000000',
+    descriptionTextSize: 20,
+    descriptionBold: true,
+    descriptionItalic: false,
+    contentText: '',
+    contentTextColor: '#fffdfdf',
+    contentTextSize: 16,
+    contentBold: false,
+    contentItalic: false,
+    discountBadgeTitle: '',
+    discountBadgeBgColor: 'linear-gradient(135deg, #ff4500, #ff8c00)',
+    discountBadgeDiscountColor: '#ffffff',
+    discountBadgeSize: 50,
+    discountBadgeTextSize: 20,
+};
+
+export const DEFAULT_DOWNSELL_DESIGN: CampaignDesign = {
+    ...DEFAULT_CAMPAIGN_DESIGN,
+    headerText: '',
+    subheaderText: '',
+    bgColor: 'linear-gradient(135deg, #ffd700, #ff8c00)',
+    bgImage: '',
+    titleText: 'Hold on!',
+    titleTextColor: '#000000',
+    titleTextSize: 24,
+    titleBold: true,
+    titleItalic: false,
+    subtitleText: "Congratulations! You've just unlocked a special discount!",
+    subtitleTextColor: '#000000',
+    subtitleTextSize: 16,
+    subtitleBold: false,
+    subtitleItalic: false,
+    descriptionText: 'Buy now, get a discount!',
+    descriptionTextColor: '#000000',
+    descriptionTextSize: 20,
+    descriptionBold: true,
+    descriptionItalic: false,
+    contentText: '',
+    contentTextColor: '#fffdfd',
+    contentTextSize: 16,
+    contentBold: false,
+    contentItalic: false,
+    discountBadgeTitle: '',
+    discountBadgeBgColor: 'linear-gradient(135deg, #ff4500, #ff8c00)',
+    discountBadgeDiscountColor: '#ffffff',
+    discountBadgeSize: 50,
+    discountBadgeTextSize: 20,
+    acceptButton: { ...DEFAULT_DOWNSELL_ACCEPT },
+    rejectButton: { ...DEFAULT_DOWNSELL_REJECT },
 };
 
 export function createDefaultOffer(index: number): CampaignOffer {
@@ -224,6 +362,7 @@ export function createDefaultOffer(index: number): CampaignOffer {
 }
 
 export function createDefaultCampaign(type: UpsellType): Omit<UpsellCampaign, 'id' | 'shop_domain' | 'created_at' | 'updated_at'> {
+    const isDownsell = type === 'downsell';
     return {
         type,
         campaign_name: type === 'tick_upsell' ? 'New Tick Upsell' : type === 'click_upsell' ? 'New Upsell' : 'New Downsell',
@@ -234,9 +373,12 @@ export function createDefaultCampaign(type: UpsellType): Omit<UpsellCampaign, 'i
         min_order_value: 0,
         max_order_value: 0,
         offers: [createDefaultOffer(1)],
-        design: { ...DEFAULT_CAMPAIGN_DESIGN, timer: { ...DEFAULT_TIMER }, discountTag: { ...DEFAULT_DISCOUNT_TAG }, acceptButton: { ...DEFAULT_BUTTON_ACCEPT }, rejectButton: { ...DEFAULT_BUTTON_REJECT } },
+        design: isDownsell
+            ? { ...DEFAULT_DOWNSELL_DESIGN }
+            : { ...DEFAULT_CAMPAIGN_DESIGN, timer: { ...DEFAULT_TIMER }, discountTag: { ...DEFAULT_DISCOUNT_TAG }, acceptButton: { ...DEFAULT_BUTTON_ACCEPT }, rejectButton: { ...DEFAULT_BUTTON_REJECT } },
         display_location: type === 'tick_upsell' ? 'in_form' : 'post_purchase',
         checkbox_default_checked: false,
+        form_close_count: 1,
         priority: 0,
     };
 }
