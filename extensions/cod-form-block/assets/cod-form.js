@@ -8,6 +8,194 @@
 (function() {
   'use strict';
 
+  // Ensure FoxCod.pixelTracking always exists
+  window.FoxCod = window.FoxCod || {};
+  window.FoxCod.pixelTracking = window.FoxCod.pixelTracking || {};
+  console.log('[FoxCod] Pixel Tracking init:', window.FoxCod.pixelTracking);
+
+  // =============================================
+  // PIXEL TRACKING — Script Loader & Event Dispatcher
+  // =============================================
+  var _pixelsLoaded = false;
+
+  function loadPixelScripts() {
+      if (_pixelsLoaded) return;
+      _pixelsLoaded = true;
+      var pixels = (window.FoxCod && window.FoxCod.pixelTracking) || {};
+      console.log('[FoxCod Pixels] Loading scripts for:', Object.keys(pixels));
+
+      // Facebook Pixel
+      if (pixels.facebook && pixels.facebook.pixel_id) {
+          (function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+          n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+          n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+          t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)})(window,
+          document,'script','https://connect.facebook.net/en_US/fbevents.js');
+          fbq('init', pixels.facebook.pixel_id);
+          console.log('[FoxCod Pixels] Facebook pixel loaded:', pixels.facebook.pixel_id);
+      }
+
+      // TikTok Pixel
+      if (pixels.tiktok && pixels.tiktok.pixel_id) {
+          !function(w,d,t){w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=
+          ["page","track","identify","instances","debug","on","off","once","ready","alias",
+          "group","enableCookie","disableCookie"];ttq.setAndDefer=function(t,e){t[e]=function()
+          {t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};for(var i=0;i<ttq.methods.length;i++)
+          ttq.setAndDefer(ttq,ttq.methods[i]);ttq.instance=function(t){for(var e=ttq._i[t]||[],n=0;
+          n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e};ttq.load=function(e,n)
+          {var i="https://analytics.tiktok.com/i18n/pixel/events.js";ttq._i=ttq._i||{};ttq._i[e]=[];
+          ttq._i[e]._u=i;ttq._t=ttq._t||{};ttq._t[e]=+new Date;ttq._o=ttq._o||{};ttq._o[e]=n||{};
+          var o=document.createElement("script");o.type="text/javascript";o.async=!0;o.src=i+"?sdkid="+e+"&lib="+t;
+          var a=document.getElementsByTagName("script")[0];a.parentNode.insertBefore(o,a)};
+          ttq.load(pixels.tiktok.pixel_id);ttq.page();}(window,document,'ttq');
+          console.log('[FoxCod Pixels] TikTok pixel loaded:', pixels.tiktok.pixel_id);
+      }
+
+      // Google Tag (gtag)
+      if (pixels.google && pixels.google.pixel_id) {
+          var gs = document.createElement('script');
+          gs.async = true;
+          gs.src = 'https://www.googletagmanager.com/gtag/js?id=' + pixels.google.pixel_id;
+          document.head.appendChild(gs);
+          window.dataLayer = window.dataLayer || [];
+          window.gtag = function() { window.dataLayer.push(arguments); };
+          window.gtag('js', new Date());
+          window.gtag('config', pixels.google.pixel_id);
+          console.log('[FoxCod Pixels] Google tag loaded:', pixels.google.pixel_id);
+      }
+
+      // Snap Pixel
+      if (pixels.snap && pixels.snap.pixel_id) {
+          (function(e,t,n){if(e.snaptr)return;var a=e.snaptr=function(){a.handleRequest?
+          a.handleRequest.apply(a,arguments):a.queue.push(arguments)};a.queue=[];
+          var s=t.createElement('script');s.async=!0;s.src=n;var r=t.getElementsByTagName('script')[0];
+          r.parentNode.insertBefore(s,r)})(window,document,'https://sc-static.net/scevent.min.js');
+          snaptr('init', pixels.snap.pixel_id);
+          console.log('[FoxCod Pixels] Snap pixel loaded:', pixels.snap.pixel_id);
+      }
+
+      // Pinterest Tag
+      if (pixels.pinterest && pixels.pinterest.pixel_id) {
+          !function(e){if(!window.pintrk){window.pintrk=function(){window.pintrk.queue.push(
+          Array.prototype.slice.call(arguments))};var n=window.pintrk;n.queue=[];n.version="3.0";
+          var t=document.createElement("script");t.async=!0;t.src=e;
+          var r=document.getElementsByTagName("script")[0];r.parentNode.insertBefore(t,r)}}
+          ("https://s.pinimg.com/ct/core.js");
+          pintrk('load', pixels.pinterest.pixel_id);
+          pintrk('page');
+          console.log('[FoxCod Pixels] Pinterest tag loaded:', pixels.pinterest.pixel_id);
+      }
+
+      // Taboola Pixel
+      if (pixels.taboola && pixels.taboola.pixel_id) {
+          window._tfa = window._tfa || [];
+          window._tfa.push({notify: 'event', name: 'page_view', id: pixels.taboola.pixel_id});
+          !function(t,f,a,x){if(!document.getElementById(x)){t.async=1;t.src=a;t.id=x;
+          f.parentNode.insertBefore(t,f)}}(document.createElement('script'),
+          document.getElementsByTagName('script')[0],'//cdn.taboola.com/libtrc/unip/' + pixels.taboola.pixel_id + '/tfa.js','tb_tfa_script');
+          console.log('[FoxCod Pixels] Taboola pixel loaded:', pixels.taboola.pixel_id);
+      }
+
+      // Kwai Pixel
+      if (pixels.kwai && pixels.kwai.pixel_id) {
+          var ks = document.createElement('script');
+          ks.async = true;
+          ks.src = 'https://s1.kwai.net/kos/s101/nlav11187/pixel/events.js';
+          document.head.appendChild(ks);
+          ks.onload = function() {
+              if (window.kwaiq) {
+                  kwaiq.load(pixels.kwai.pixel_id);
+                  kwaiq.page();
+              }
+          };
+          console.log('[FoxCod Pixels] Kwai pixel loaded:', pixels.kwai.pixel_id);
+      }
+  }
+
+  function foxCodTrackEvent(eventName, data) {
+      var pixels = (window.FoxCod && window.FoxCod.pixelTracking) || {};
+      if (!pixels || Object.keys(pixels).length === 0) return;
+
+      console.log('[FoxCod Pixels] Tracking:', eventName, data);
+
+      // Facebook
+      if (pixels.facebook && pixels.facebook.enabled && window.fbq) {
+          var fbEvent = eventName;
+          if (eventName === 'InitiateCheckout') fbEvent = 'InitiateCheckout';
+          else if (eventName === 'Purchase') fbEvent = 'Purchase';
+          else if (eventName === 'AddToCart') fbEvent = 'AddToCart';
+          else if (eventName === 'ViewContent') fbEvent = 'ViewContent';
+          else if (eventName === 'AddPaymentInfo') fbEvent = 'AddPaymentInfo';
+          try { fbq('track', fbEvent, data); } catch(e) { console.warn('[FoxCod Pixels] FB error:', e); }
+      }
+
+      // TikTok
+      if (pixels.tiktok && pixels.tiktok.enabled && window.ttq) {
+          var ttEvent = eventName;
+          if (eventName === 'Purchase') ttEvent = 'CompletePayment';
+          try { ttq.track(ttEvent, data); } catch(e) { console.warn('[FoxCod Pixels] TT error:', e); }
+      }
+
+      // Google
+      if (pixels.google && pixels.google.enabled && window.gtag) {
+          var gEvent = eventName.toLowerCase();
+          if (eventName === 'InitiateCheckout') gEvent = 'begin_checkout';
+          else if (eventName === 'Purchase') gEvent = 'purchase';
+          try { gtag('event', gEvent, data); } catch(e) { console.warn('[FoxCod Pixels] GA error:', e); }
+      }
+
+      // Snap
+      if (pixels.snap && pixels.snap.enabled && window.snaptr) {
+          var snapEvent = eventName.toUpperCase();
+          if (eventName === 'InitiateCheckout') snapEvent = 'START_CHECKOUT';
+          else if (eventName === 'Purchase') snapEvent = 'PURCHASE';
+          try { snaptr('track', snapEvent, data); } catch(e) { console.warn('[FoxCod Pixels] Snap error:', e); }
+      }
+
+      // Pinterest
+      if (pixels.pinterest && pixels.pinterest.enabled && window.pintrk) {
+          var pinEvent = 'checkout';
+          try { pintrk('track', pinEvent, data); } catch(e) { console.warn('[FoxCod Pixels] Pin error:', e); }
+      }
+
+      // Taboola
+      if (pixels.taboola && pixels.taboola.enabled && window._tfa) {
+          var tabEvent = eventName === 'Purchase' ? 'make_purchase' : 'start_checkout';
+          try { _tfa.push({notify: 'event', name: tabEvent, id: pixels.taboola.pixel_id}); } catch(e) { console.warn('[FoxCod Pixels] Tab error:', e); }
+      }
+
+      // Kwai
+      if (pixels.kwai && pixels.kwai.enabled && window.kwaiq) {
+          var kwEvent = eventName.charAt(0).toLowerCase() + eventName.slice(1);
+          if (eventName === 'InitiateCheckout') kwEvent = 'initiatedCheckout';
+          else if (eventName === 'Purchase') kwEvent = 'purchase';
+          else if (eventName === 'ViewContent') kwEvent = 'contentView';
+          try { kwaiq.track(kwEvent, data); } catch(e) { console.warn('[FoxCod Pixels] Kwai error:', e); }
+      }
+  }
+
+  // =============================================
+  // Load pixel scripts on page load
+  // =============================================
+  if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', loadPixelScripts);
+  } else {
+      loadPixelScripts();
+  }
+
+  // =============================================
+  // Track ViewContent on page load
+  // =============================================
+  setTimeout(function() {
+      var pixels = (window.FoxCod && window.FoxCod.pixelTracking) || {};
+      if (pixels.facebook && pixels.facebook.track_view_content ||
+          pixels.tiktok && pixels.tiktok.track_view_content ||
+          pixels.google && pixels.google.track_view_content ||
+          pixels.kwai && pixels.kwai.track_view_content) {
+          foxCodTrackEvent('ViewContent', {});
+      }
+  }, 1000);
+
   // Wait for DOM to be ready
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initCODForms);
@@ -2297,6 +2485,20 @@
     }
     if (overlay) overlay.style.display = 'flex';
     document.body.style.overflow = 'hidden';
+
+    // ── Pixel Tracking: InitiateCheckout ──
+    foxCodTrackEvent('InitiateCheckout', { currency: 'INR' });
+
+    // ── Pixel Tracking: AddPaymentInfo on first input ──
+    if (form && !form._pixelInputTracked) {
+        form._pixelInputTracked = false;
+        form.addEventListener('input', function _onFirstInput() {
+            if (!form._pixelInputTracked) {
+                form._pixelInputTracked = true;
+                foxCodTrackEvent('AddPaymentInfo', {});
+            }
+        });
+    }
     
     // Clear form on open so fields are empty on every modal open / page refresh
     if (form) form.reset();
@@ -3185,6 +3387,20 @@
           if (result.success) {
               // Save customer data to LocalStorage for future auto-fill
               saveCustomerToLocalStorage(form);
+
+              // ── Pixel Tracking: Purchase ──
+              // Read the final displayed total from order summary (includes qty, discounts, shipping, upsells)
+              var purchaseValue = 0;
+              var summaryTotalEl = form.querySelector('#cod-summary-total');
+              if (summaryTotalEl) {
+                  purchaseValue = parseFloat(summaryTotalEl.textContent.replace(/[^0-9.]/g, '')) || 0;
+              }
+              // Fallback: compute from payload if DOM element not found
+              if (!purchaseValue) {
+                  purchaseValue = ((payload.price || 0) * (payload.quantity || 1)) + (payload.shippingPrice || 0);
+              }
+              console.log('[FoxCod Pixels] Correct Purchase total:', purchaseValue);
+              foxCodTrackEvent('Purchase', { value: purchaseValue, currency: 'INR' });
               
               // Show success message with order ID
               var successDiv = form.querySelector('.cod-message-success');

@@ -138,6 +138,8 @@ async function ensureMetafieldDefinitions(admin: any) {
         { key: "shipping_rates_json", type: "json" },
         // Upsells & Downsells
         { key: "upsells_downsells_json", type: "json" },
+        // Pixel Tracking
+        { key: "pixel_tracking_settings_json", type: "json" },
     ];
 
     console.log('[Settings] Ensuring metafield definitions (parallel)...');
