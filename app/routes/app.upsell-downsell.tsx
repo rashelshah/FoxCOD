@@ -494,6 +494,7 @@ export default function UpsellDownsellPage() {
                                                             {offer.upsell_product_image && <img src={offer.upsell_product_image} alt="" />}
                                                             <div className="prod-row-info"><div className="name">{offer.upsell_product_title}</div><div className="vid">{offer.upsell_product_id}</div></div>
                                                             <Button size="slim" onClick={() => pickProduct(offer.id)}>Change</Button>
+                                                            <button className="prod-x" onClick={() => updOffer(offer.id, { upsell_product_id: '', upsell_product_title: '', upsell_product_image: '', upsell_variant_id: '', original_price: 0 })}>×</button>
                                                         </div>
                                                     ) : (
                                                         <Button onClick={() => pickProduct(offer.id)}>Link to a product</Button>
@@ -1184,158 +1185,161 @@ export default function UpsellDownsellPage() {
                                     <div className="pv-wrap">
                                         <div className="pv-panel">
                                             <div className="pv-panel-header">
-                                                <h3>Live preview:</h3>
+                                                <h3>📱 Live Preview</h3>
                                             </div>
-                                            <div style={{ padding: 16 }}>
-                                                {/* Downsell popup preview */}
-                                                {(() => {
-                                                    const d = editing.design;
-                                                    const offer = editing.offers?.[0];
-                                                    const origPrice = offer?.original_price || 0;
-                                                    const discountVal = offer?.discount_value || 10;
-                                                    const discountLabel = offer?.discount_type === 'percentage' ? discountVal + '%' : '₹' + discountVal;
-                                                    const discountedPrice = offer?.discount_type === 'percentage'
-                                                        ? Math.round((origPrice - origPrice * discountVal / 100) * 100) / 100
-                                                        : Math.max(0, origPrice - discountVal);
-                                                    const acceptText = (d.acceptButton.text || 'Complete order with {discount} OFF').replace('{discount}', discountLabel);
-                                                    const rejectText = d.rejectButton.text || 'No thanks';
+                                            <div className="pv-phone">
+                                                <div className="pv-phone-screen">
+                                                    {/* Downsell popup preview */}
+                                                    {(() => {
+                                                        const d = editing.design;
+                                                        const offer = editing.offers?.[0];
+                                                        const origPrice = offer?.original_price || 0;
+                                                        const discountVal = offer?.discount_value || 10;
+                                                        const discountLabel = offer?.discount_type === 'percentage' ? discountVal + '%' : '₹' + discountVal;
+                                                        const discountedPrice = offer?.discount_type === 'percentage'
+                                                            ? Math.round((origPrice - origPrice * discountVal / 100) * 100) / 100
+                                                            : Math.max(0, origPrice - discountVal);
+                                                        const acceptText = (d.acceptButton.text || 'Complete order with {discount} OFF').replace('{discount}', discountLabel);
+                                                        const rejectText = d.rejectButton.text || 'No thanks';
 
-                                                    // Button icon helper
-                                                    const iconMap: Record<string, string> = { cart: '🛒', check: '✓', star: '⭐', gift: '🎁', heart: '❤️' };
-                                                    const acceptIcon = d.acceptButton.changeIcon && d.acceptButton.changeIcon !== 'none' ? iconMap[d.acceptButton.changeIcon] + ' ' : '';
-                                                    const rejectIcon = d.rejectButton.changeIcon && d.rejectButton.changeIcon !== 'none' ? iconMap[d.rejectButton.changeIcon] + ' ' : '';
+                                                        // Button icon helper
+                                                        const iconMap: Record<string, string> = { cart: '🛒', check: '✓', star: '⭐', gift: '🎁', heart: '❤️' };
+                                                        const acceptIcon = d.acceptButton.changeIcon && d.acceptButton.changeIcon !== 'none' ? iconMap[d.acceptButton.changeIcon] + ' ' : '';
+                                                        const rejectIcon = d.rejectButton.changeIcon && d.rejectButton.changeIcon !== 'none' ? iconMap[d.rejectButton.changeIcon] + ' ' : '';
 
-                                                    // Animation class
-                                                    const acceptAnimClass = d.acceptButton.animation && d.acceptButton.animation !== 'none' ? `pv-anim-${d.acceptButton.animation}` : '';
-                                                    const rejectAnimClass = d.rejectButton.animation && d.rejectButton.animation !== 'none' ? `pv-anim-${d.rejectButton.animation}` : '';
+                                                        // Animation class
+                                                        const acceptAnimClass = d.acceptButton.animation && d.acceptButton.animation !== 'none' ? `pv-anim-${d.acceptButton.animation}` : '';
+                                                        const rejectAnimClass = d.rejectButton.animation && d.rejectButton.animation !== 'none' ? `pv-anim-${d.rejectButton.animation}` : '';
 
-                                                    // Background style (supports gradient, solid color, and image)
-                                                    const bgStyle: React.CSSProperties = d.bgImage
-                                                        ? { backgroundImage: `url(${d.bgImage})`, backgroundSize: 'cover', backgroundPosition: 'center' }
-                                                        : { background: d.bgColor || '#ffd700' };
+                                                        // Background style (supports gradient, solid color, and image)
+                                                        const bgStyle: React.CSSProperties = d.bgImage
+                                                            ? { backgroundImage: `url(${d.bgImage})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+                                                            : { background: d.bgColor || '#ffd700' };
 
-                                                    return (
-                                                        <div style={{
-                                                            ...bgStyle,
-                                                            borderRadius: 16,
-                                                            overflow: 'hidden',
-                                                            boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
-                                                        }}>
-                                                            <div style={{ padding: '24px 20px 8px', textAlign: 'center' }}>
-                                                                {/* Title */}
-                                                                {d.titleText && (
-                                                                    <div style={{
-                                                                        color: d.titleTextColor || '#000',
-                                                                        fontSize: d.titleTextSize || 24,
-                                                                        fontWeight: d.titleBold ? 700 : 400,
-                                                                        fontStyle: d.titleItalic ? 'italic' : 'normal',
-                                                                        marginBottom: 4,
-                                                                    }}>{d.titleText}</div>
-                                                                )}
-                                                                {/* Subtitle */}
-                                                                {d.subtitleText && (
-                                                                    <div style={{
-                                                                        color: d.subtitleTextColor || '#000',
-                                                                        fontSize: d.subtitleTextSize || 16,
-                                                                        fontWeight: d.subtitleBold ? 700 : 400,
-                                                                        fontStyle: d.subtitleItalic ? 'italic' : 'normal',
-                                                                        marginBottom: 8,
-                                                                    }}>{d.subtitleText}</div>
-                                                                )}
-                                                                {/* Description */}
-                                                                {d.descriptionText && (
-                                                                    <div style={{
-                                                                        color: d.descriptionTextColor || '#000',
-                                                                        fontSize: d.descriptionTextSize || 20,
-                                                                        fontWeight: d.descriptionBold ? 700 : 400,
-                                                                        fontStyle: d.descriptionItalic ? 'italic' : 'normal',
-                                                                        marginBottom: 12,
-                                                                    }}>{d.descriptionText}</div>
-                                                                )}
-                                                            </div>
-
-                                                            {/* Discount badge */}
-                                                            <div style={{ textAlign: 'center', padding: '0 20px 12px' }}>
-                                                                <div style={{
-                                                                    display: 'inline-flex',
-                                                                    alignItems: 'center',
-                                                                    justifyContent: 'center',
-                                                                    width: d.discountBadgeSize + 20 || 70,
-                                                                    height: d.discountBadgeSize + 20 || 70,
-                                                                    borderRadius: '50%',
-                                                                    background: d.discountBadgeBgColor || 'linear-gradient(135deg, #ff4500, #ff8c00)',
-                                                                    boxShadow: '0 4px 20px rgba(255,69,0,0.3)',
-                                                                    position: 'relative' as const,
-                                                                }}>
-                                                                    {d.discountBadgeTitle && (
-                                                                        <div style={{ position: 'absolute', top: -8, right: -8, background: '#ff4500', borderRadius: '50%', width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#fff', fontWeight: 700 }}>
-                                                                            {d.discountBadgeTitle.slice(0, 2)}
-                                                                        </div>
+                                                        return (
+                                                            <div style={{
+                                                                ...bgStyle,
+                                                                borderRadius: 16,
+                                                                overflow: 'hidden',
+                                                                boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
+                                                                border: '1px solid #e5e7eb',
+                                                            }}>
+                                                                <div style={{ padding: '24px 20px 8px', textAlign: 'center' }}>
+                                                                    {/* Title */}
+                                                                    {d.titleText && (
+                                                                        <div style={{
+                                                                            color: d.titleTextColor || '#000',
+                                                                            fontSize: d.titleTextSize || 24,
+                                                                            fontWeight: d.titleBold ? 700 : 400,
+                                                                            fontStyle: d.titleItalic ? 'italic' : 'normal',
+                                                                            marginBottom: 4,
+                                                                        }}>{d.titleText}</div>
                                                                     )}
-                                                                    <span style={{
-                                                                        color: d.discountBadgeDiscountColor || '#fff',
-                                                                        fontSize: d.discountBadgeTextSize || 20,
-                                                                        fontWeight: 700,
-                                                                    }}>{discountLabel}</span>
+                                                                    {/* Subtitle */}
+                                                                    {d.subtitleText && (
+                                                                        <div style={{
+                                                                            color: d.subtitleTextColor || '#000',
+                                                                            fontSize: d.subtitleTextSize || 16,
+                                                                            fontWeight: d.subtitleBold ? 700 : 400,
+                                                                            fontStyle: d.subtitleItalic ? 'italic' : 'normal',
+                                                                            marginBottom: 8,
+                                                                        }}>{d.subtitleText}</div>
+                                                                    )}
+                                                                    {/* Description */}
+                                                                    {d.descriptionText && (
+                                                                        <div style={{
+                                                                            color: d.descriptionTextColor || '#000',
+                                                                            fontSize: d.descriptionTextSize || 20,
+                                                                            fontWeight: d.descriptionBold ? 700 : 400,
+                                                                            fontStyle: d.descriptionItalic ? 'italic' : 'normal',
+                                                                            marginBottom: 12,
+                                                                        }}>{d.descriptionText}</div>
+                                                                    )}
+                                                                </div>
+
+                                                                {/* Discount badge */}
+                                                                <div style={{ textAlign: 'center', padding: '0 20px 12px' }}>
+                                                                    <div style={{
+                                                                        display: 'inline-flex',
+                                                                        alignItems: 'center',
+                                                                        justifyContent: 'center',
+                                                                        width: d.discountBadgeSize + 20 || 70,
+                                                                        height: d.discountBadgeSize + 20 || 70,
+                                                                        borderRadius: '50%',
+                                                                        background: d.discountBadgeBgColor || 'linear-gradient(135deg, #ff4500, #ff8c00)',
+                                                                        boxShadow: '0 4px 20px rgba(255,69,0,0.3)',
+                                                                        position: 'relative' as const,
+                                                                    }}>
+                                                                        {d.discountBadgeTitle && (
+                                                                            <div style={{ position: 'absolute', top: -8, right: -8, background: '#ff4500', borderRadius: '50%', width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#fff', fontWeight: 700 }}>
+                                                                                {d.discountBadgeTitle.slice(0, 2)}
+                                                                            </div>
+                                                                        )}
+                                                                        <span style={{
+                                                                            color: d.discountBadgeDiscountColor || '#fff',
+                                                                            fontSize: d.discountBadgeTextSize || 20,
+                                                                            fontWeight: 700,
+                                                                        }}>{discountLabel}</span>
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* Content */}
+                                                                {
+                                                                    d.contentText && (
+                                                                        <div style={{
+                                                                            textAlign: 'center',
+                                                                            padding: '0 20px 12px',
+                                                                            color: d.contentTextColor || '#fff',
+                                                                            fontSize: d.contentTextSize || 16,
+                                                                            fontWeight: d.contentBold ? 700 : 400,
+                                                                            fontStyle: d.contentItalic ? 'italic' : 'normal',
+                                                                        }}>{d.contentText}</div>
+                                                                    )
+                                                                }
+
+                                                                {/* Product image & price */}
+                                                                {
+                                                                    offer?.upsell_product_image && (
+                                                                        <div style={{ textAlign: 'center', padding: '0 20px 8px' }}>
+                                                                            <img src={offer.upsell_product_image} alt="" style={{ maxWidth: 160, maxHeight: 160, objectFit: 'contain', borderRadius: 10 }} />
+                                                                        </div>
+                                                                    )
+                                                                }
+                                                                {
+                                                                    offer?.upsell_product_title && (
+                                                                        <div style={{ textAlign: 'center', padding: '0 20px 4px', fontSize: 14, color: '#374151' }}>{offer.upsell_product_title}</div>
+                                                                    )
+                                                                }
+                                                                {
+                                                                    origPrice > 0 && (
+                                                                        <div style={{ textAlign: 'center', padding: '0 20px 12px' }}>
+                                                                            {discountVal > 0 && <s style={{ color: '#9ca3af', fontSize: 14, marginRight: 8 }}>₹{origPrice.toFixed(2)}</s>}
+                                                                            <strong style={{ fontSize: 20, color: '#1f2937' }}>₹{discountedPrice.toFixed(2)}</strong>
+                                                                        </div>
+                                                                    )
+                                                                }
+
+                                                                {/* Buttons */}
+                                                                <div style={{ padding: '8px 20px 20px' }}>
+                                                                    <button className={acceptAnimClass} style={{
+                                                                        display: 'block', width: '100%', padding: '14px 16px', marginBottom: 8, border: `${d.acceptButton.borderWidth || 0}px solid ${d.acceptButton.borderColor || '#000'}`,
+                                                                        borderRadius: d.acceptButton.borderRadius || 8, cursor: 'pointer',
+                                                                        background: d.acceptButton.bgColor || '#ff4500', color: d.acceptButton.textColor || '#fff',
+                                                                        fontSize: d.acceptButton.textSize || 16, fontWeight: d.acceptButton.bold ? 700 : 400, fontStyle: d.acceptButton.italic ? 'italic' : 'normal',
+                                                                        boxShadow: d.acceptButton.shadow ? '0 4px 12px rgba(0,0,0,0.15)' : 'none',
+                                                                    }}>{acceptIcon}{acceptText}</button>
+                                                                    <button className={rejectAnimClass} style={{
+                                                                        display: 'block', width: '100%', padding: '12px 16px', border: `${d.rejectButton.borderWidth || 1}px solid ${d.rejectButton.borderColor || '#000'}`,
+                                                                        borderRadius: d.rejectButton.borderRadius || 8, cursor: 'pointer',
+                                                                        background: d.rejectButton.bgColor || '#fff', color: d.rejectButton.textColor || '#000',
+                                                                        fontSize: d.rejectButton.textSize || 16, fontWeight: d.rejectButton.bold ? 700 : 400, fontStyle: d.rejectButton.italic ? 'italic' : 'normal',
+                                                                        boxShadow: d.rejectButton.shadow ? '0 4px 12px rgba(0,0,0,0.15)' : 'none',
+                                                                    }}>{rejectIcon}{rejectText}</button>
                                                                 </div>
                                                             </div>
-
-                                                            {/* Content */}
-                                                            {
-                                                                d.contentText && (
-                                                                    <div style={{
-                                                                        textAlign: 'center',
-                                                                        padding: '0 20px 12px',
-                                                                        color: d.contentTextColor || '#fff',
-                                                                        fontSize: d.contentTextSize || 16,
-                                                                        fontWeight: d.contentBold ? 700 : 400,
-                                                                        fontStyle: d.contentItalic ? 'italic' : 'normal',
-                                                                    }}>{d.contentText}</div>
-                                                                )
-                                                            }
-
-                                                            {/* Product image & price */}
-                                                            {
-                                                                offer?.upsell_product_image && (
-                                                                    <div style={{ textAlign: 'center', padding: '0 20px 8px' }}>
-                                                                        <img src={offer.upsell_product_image} alt="" style={{ maxWidth: 160, maxHeight: 160, objectFit: 'contain', borderRadius: 10 }} />
-                                                                    </div>
-                                                                )
-                                                            }
-                                                            {
-                                                                offer?.upsell_product_title && (
-                                                                    <div style={{ textAlign: 'center', padding: '0 20px 4px', fontSize: 14, color: '#374151' }}>{offer.upsell_product_title}</div>
-                                                                )
-                                                            }
-                                                            {
-                                                                origPrice > 0 && (
-                                                                    <div style={{ textAlign: 'center', padding: '0 20px 12px' }}>
-                                                                        {discountVal > 0 && <s style={{ color: '#9ca3af', fontSize: 14, marginRight: 8 }}>₹{origPrice.toFixed(2)}</s>}
-                                                                        <strong style={{ fontSize: 20, color: '#1f2937' }}>₹{discountedPrice.toFixed(2)}</strong>
-                                                                    </div>
-                                                                )
-                                                            }
-
-                                                            {/* Buttons */}
-                                                            <div style={{ padding: '8px 20px 20px' }}>
-                                                                <button className={acceptAnimClass} style={{
-                                                                    display: 'block', width: '100%', padding: '14px 16px', marginBottom: 8, border: `${d.acceptButton.borderWidth || 0}px solid ${d.acceptButton.borderColor || '#000'}`,
-                                                                    borderRadius: d.acceptButton.borderRadius || 8, cursor: 'pointer',
-                                                                    background: d.acceptButton.bgColor || '#ff4500', color: d.acceptButton.textColor || '#fff',
-                                                                    fontSize: d.acceptButton.textSize || 16, fontWeight: d.acceptButton.bold ? 700 : 400, fontStyle: d.acceptButton.italic ? 'italic' : 'normal',
-                                                                    boxShadow: d.acceptButton.shadow ? '0 4px 12px rgba(0,0,0,0.15)' : 'none',
-                                                                }}>{acceptIcon}{acceptText}</button>
-                                                                <button className={rejectAnimClass} style={{
-                                                                    display: 'block', width: '100%', padding: '12px 16px', border: `${d.rejectButton.borderWidth || 1}px solid ${d.rejectButton.borderColor || '#000'}`,
-                                                                    borderRadius: d.rejectButton.borderRadius || 8, cursor: 'pointer',
-                                                                    background: d.rejectButton.bgColor || '#fff', color: d.rejectButton.textColor || '#000',
-                                                                    fontSize: d.rejectButton.textSize || 16, fontWeight: d.rejectButton.bold ? 700 : 400, fontStyle: d.rejectButton.italic ? 'italic' : 'normal',
-                                                                    boxShadow: d.rejectButton.shadow ? '0 4px 12px rgba(0,0,0,0.15)' : 'none',
-                                                                }}>{rejectIcon}{rejectText}</button>
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })()}
+                                                        );
+                                                    })()}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -1414,6 +1418,7 @@ export default function UpsellDownsellPage() {
                                                             {offer.upsell_product_image && <img src={offer.upsell_product_image} alt="" />}
                                                             <div className="prod-row-info"><div className="name">{offer.upsell_product_title}</div><div className="vid">{offer.upsell_product_id}</div></div>
                                                             <button className="btn-pick" onClick={() => pickProduct(offer.id)}>Change product</button>
+                                                            <button className="prod-x" onClick={() => updOffer(offer.id, { upsell_product_id: '', upsell_product_title: '', upsell_product_image: '', upsell_variant_id: '', original_price: 0 })}>×</button>
                                                         </div>
                                                     ) : (
                                                         <button className="btn-pick" onClick={() => pickProduct(offer.id)}>Change product</button>
@@ -1438,6 +1443,47 @@ export default function UpsellDownsellPage() {
                                         {editing.offers.length >= 2 && (
                                             <div className="info-banner">ℹ️ Create up to 5 upsell offers. When the customer accepts or rejects an offer, the next one will be shown.</div>
                                         )}
+                                    </div>
+
+                                    {/* Background */}
+                                    <div className="sec">
+                                        <h3><span className="icon">🎨</span> 3- Customize the background</h3>
+                                        {/* Background color swatches */}
+                                        <div className="fg"><label>Background color</label></div>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 16 }}>
+                                            {[
+                                                'linear-gradient(135deg, #667eea, #764ba2)',
+                                                'linear-gradient(135deg, #ffd700, #ff8c00)',
+                                                'linear-gradient(135deg, #43e97b, #38f9d7)',
+                                                'linear-gradient(135deg, #fa709a, #fee140)',
+                                                'linear-gradient(135deg, #d4fc79, #96e6a1)',
+                                                'linear-gradient(135deg, #a18cd1, #fbc2eb)',
+                                                'linear-gradient(135deg, #fccb90, #d57eeb)',
+                                                'linear-gradient(135deg, #e0c3fc, #8ec5fc)',
+                                                'linear-gradient(135deg, #f093fb, #f5576c)',
+                                                '#ffffff',
+                                            ].map((bg, i) => (
+                                                <div key={i} onClick={() => updDesign({ bgColor: bg })} style={{
+                                                    width: '100%', aspectRatio: '1', borderRadius: 12, background: bg, cursor: 'pointer',
+                                                    border: editing.design.bgColor === bg ? '3px solid #1f2937' : '2px solid #e5e7eb',
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
+                                                    boxShadow: editing.design.bgColor === bg ? '0 0 0 2px #fff, 0 0 0 4px #1f2937' : 'none',
+                                                }}>
+                                                    {editing.design.bgColor === bg && <span style={{ background: '#1f2937', color: '#fff', borderRadius: 4, width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>✓</span>}
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <ColorSelector label="Custom background" value={editing.design.bgColor.startsWith('#') ? editing.design.bgColor : '#ffffff'} onChange={c => updDesign({ bgColor: c })} />
+                                        <div className="fg" style={{ marginTop: 8 }}>
+                                            <label>Background image URL</label>
+                                            <input value={editing.design.bgImage || ''} placeholder="https://example.com/image.jpg" onChange={e => updDesign({ bgImage: e.target.value })} />
+                                            {editing.design.bgImage && (
+                                                <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                    <img src={editing.design.bgImage} alt="" style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 8, border: '1px solid #e5e7eb' }} />
+                                                    <button onClick={() => updDesign({ bgImage: '' })} style={{ padding: '4px 10px', border: '1px solid #e5e7eb', borderRadius: 6, cursor: 'pointer', fontSize: 12, color: '#ef4444', background: '#fff' }}>Remove</button>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
 
                                     {/* Header Design */}
@@ -1641,7 +1687,10 @@ export default function UpsellDownsellPage() {
                                             </div>
                                             <div className="pv-phone">
                                                 <div className="pv-phone-screen">
-                                                    <div className="pv-modal" style={{ background: editing.design.bgColor }}>
+                                                    <div className="pv-modal" style={editing.design.bgImage
+                                                        ? { backgroundImage: `url(${editing.design.bgImage})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+                                                        : { background: editing.design.bgColor }
+                                                    }>
                                                         <div className="pv-header">
                                                             <h2 style={{ fontSize: editing.design.headerTextSize, color: editing.design.headerTextColor, fontWeight: editing.design.headerBold ? 700 : 400 }}>{editing.design.headerText || "You've unlocked a special deal"}</h2>
                                                             <p>{editing.design.subheaderText || 'Only for a limited time!'}</p>

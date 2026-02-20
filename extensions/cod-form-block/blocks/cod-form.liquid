@@ -776,11 +776,11 @@
   {% if cod_button_style == 'outline' %}
   .cod-buy-btn, .cod-submit-btn {
       background-color: transparent !important;
-      border: 2px solid var(--cod-btn-border-color) !important;
-      color: var(--cod-primary) !important;
+      border: 2px solid var(--cod-btn-bg) !important;
+      color: var(--cod-btn-bg) !important;
   }
   .cod-buy-btn:hover, .cod-submit-btn:hover {
-      background-color: var(--cod-primary) !important;
+      background-color: var(--cod-btn-bg) !important;
       color: #ffffff !important;
   }
   {% endif %}
@@ -877,91 +877,44 @@
   .btn-anim-bounce.speed-slow { animation-duration: 1.5s; }
   .btn-anim-bounce.speed-fast { animation-duration: 0.5s; }
   
-  /* Glow */
-  @keyframes btn-glow {
-      0%, 100% { box-shadow: 0 0 5px var(--cod-primary); }
-      50% { box-shadow: 0 0 20px var(--cod-primary), 0 0 30px var(--cod-primary); }
-  }
-  .btn-anim-glow { animation: btn-glow 2s ease-in-out infinite; }
-  .btn-anim-glow.speed-slow { animation-duration: 3s; }
-  .btn-anim-glow.speed-fast { animation-duration: 1s; }
+
   
-  /* Gradient Flow */
-  @keyframes btn-gradient-flow {
-      0% { background-position: 0% 50%; }
-      50% { background-position: 100% 50%; }
-      100% { background-position: 0% 50%; }
+  /* Dashed Moving Border (Marching Ants) */
+  @keyframes border-dash {
+      0% { stroke-dashoffset: 0; }
+      100% { stroke-dashoffset: -20; }
   }
-  .btn-anim-gradient-flow {
-      background-size: 200% 200% !important;
-      animation: btn-gradient-flow 3s ease infinite;
-  }
-  .btn-anim-gradient-flow.speed-slow { animation-duration: 5s; }
-  .btn-anim-gradient-flow.speed-fast { animation-duration: 1.5s; }
-  
-  /* Shimmer */
-  @keyframes btn-shimmer {
-      0% { left: -100%; }
-      100% { left: 100%; }
-  }
-  .btn-anim-shimmer {
-      position: relative;
-      overflow: hidden;
-  }
-  .btn-anim-shimmer::after {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: -100%;
-      width: 50%;
-      height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
-      animation: btn-shimmer 2s ease-in-out infinite;
-  }
-  .btn-anim-shimmer.speed-slow::after { animation-duration: 3s; }
-  .btn-anim-shimmer.speed-fast::after { animation-duration: 1s; }
-  
-  /* =========================
-     BORDER EFFECT ANIMATIONS
-     ========================= */
-  
-  /* Glowing Border */
-  @keyframes border-glow {
-      0%, 100% { box-shadow: 0 0 3px var(--cod-btn-border-color, #6366f1); }
-      50% { box-shadow: 0 0 12px var(--cod-btn-border-color, #6366f1), 0 0 20px var(--cod-btn-border-color, #6366f1); }
-  }
-  .btn-border-glowing { animation: border-glow 2s ease-in-out infinite; }
-  .btn-border-glowing.intensity-low { animation-duration: 3s; }
-  .btn-border-glowing.intensity-high { animation-duration: 1s; }
-  
-  /* Animated Gradient Border */
-  @keyframes border-gradient {
-      0% { border-color: var(--cod-primary); }
-      33% { border-color: color-mix(in srgb, var(--cod-primary) 70%, #ec4899); }
-      66% { border-color: color-mix(in srgb, var(--cod-primary) 70%, #10b981); }
-      100% { border-color: var(--cod-primary); }
-  }
-  .btn-border-animated-gradient { 
-      animation: border-gradient 3s linear infinite; 
-      border-width: 2px !important;
-      border-style: solid !important;
-  }
-  
-  /* Dashed Moving Border */
   .btn-border-dashed-moving {
-      border-style: dashed !important;
-      border-width: 2px !important;
+      border: none !important;
+      position: relative;
+      overflow: visible;
+  }
+  .btn-border-dashed-moving .marching-ants-svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1;
+  }
+  .btn-border-dashed-moving .marching-ants-svg rect {
+      fill: none;
+      stroke: var(--cod-btn-border-color, var(--cod-primary));
+      stroke-width: 2;
+      stroke-dasharray: 8 4;
+      animation: border-dash 0.6s linear infinite;
+  }
+  .btn-border-dashed-moving.intensity-low .marching-ants-svg rect {
+      animation-duration: 1s;
+  }
+  .btn-border-dashed-moving.intensity-high .marching-ants-svg rect {
+      animation-duration: 0.3s;
   }
   
-  /* =========================
-     HOVER & CLICK EFFECTS
-     ========================= */
+  /* Hover & Click Effects */
   .btn-hover-lift:hover {
       transform: translateY(-3px) !important;
       box-shadow: 0 8px 20px rgba(0,0,0,0.15) !important;
-  }
-  .btn-hover-glow:hover {
-      box-shadow: 0 0 20px var(--cod-primary) !important;
   }
   .btn-click-press:active {
       transform: scale(0.96) !important;
@@ -1237,12 +1190,7 @@
       .btn-anim-shake,
       .btn-anim-pulse,
       .btn-anim-bounce,
-      .btn-anim-glow,
-      .btn-anim-gradient-flow,
-      .btn-anim-shimmer,
-      .btn-anim-shimmer::after,
-      .btn-border-glowing,
-      .btn-border-animated-gradient {
+      .btn-border-dashed-moving .marching-ants-svg rect {
           animation: none !important;
       }
   }
