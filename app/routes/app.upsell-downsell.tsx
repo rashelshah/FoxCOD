@@ -903,8 +903,459 @@ export default function UpsellDownsellPage() {
                                     </div>
                                 </div>
                             </>
+                        ) : editing.type === 'downsell' ? (
+                            /* ==================== DOWNSELL EDITOR (EasySell-style) ==================== */
+                            <>
+                                <div>
+                                    {/* Name + Active */}
+                                    <div className="sec">
+                                        <div className="fr">
+                                            <div className="fg"><label>Name</label><input value={editing.campaign_name} placeholder="New Downsell" onChange={e => upd({ campaign_name: e.target.value })} /></div>
+                                        </div>
+                                    </div>
+
+                                    {/* 1 - Display the downsell for */}
+                                    <div className="sec">
+                                        <h3>1- Display the downsell for</h3>
+                                        <div className="mode-toggle">
+                                            <button className={`mode-btn ${editing.show_condition_type === 'always' ? 'active' : ''}`} onClick={() => upd({ show_condition_type: 'always' as any })}>✅ All products</button>
+                                            <button className={`mode-btn ${editing.show_condition_type === 'specific_products' ? 'active' : ''}`} onClick={() => upd({ show_condition_type: 'specific_products' as any })}>Specific products</button>
+                                        </div>
+                                        {editing.show_condition_type === 'specific_products' && (
+                                            <>
+                                                <button className="btn-pick" onClick={pickTrigger}>Select products ({editing.trigger_product_ids?.length || 0} selected)</button>
+                                                {editing._triggerProducts?.map((p: any) => (
+                                                    <div key={p.id} className="prod-row">
+                                                        {p.images?.[0] && <img src={p.images[0].originalSrc || p.images[0].url} alt="" />}
+                                                        <div className="prod-row-info"><div className="name">{p.title}</div><div className="vid">{p.id.replace('gid://shopify/Product/', '')}</div></div>
+                                                        <button className="prod-x" onClick={() => upd({ trigger_product_ids: editing.trigger_product_ids.filter(id => id !== p.id.replace('gid://shopify/Product/', '')), _triggerProducts: editing._triggerProducts?.filter((tp: any) => tp.id !== p.id) })}>×</button>
+                                                    </div>
+                                                ))}
+                                            </>
+                                        )}
+                                        <div style={{ marginTop: 16 }}>
+                                            <div className="fg"><label>How many times should the form be closed before displaying the downsell?</label></div>
+                                            <div style={{ display: 'flex', gap: 24 }}>
+                                                {[1, 2, 3, 4].map(n => (
+                                                    <label key={n} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 14, fontWeight: 500, color: '#374151' }}>
+                                                        <input type="radio" name="form-close-count" checked={editing.form_close_count === n} onChange={() => upd({ form_close_count: n })} style={{ accentColor: '#1f2937', width: 18, height: 18 }} />
+                                                        {n}
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* 2 - Discount value */}
+                                    <div className="sec">
+                                        <h3>2- Discount value</h3>
+                                        {editing.offers[0] && (() => {
+                                            const offer = editing.offers[0];
+                                            return (
+                                                <>
+                                                    <div className="mode-toggle">
+                                                        <button className={`mode-btn ${offer.discount_type === 'fixed' ? 'active' : ''}`} onClick={() => updOffer(offer.id, { discount_type: 'fixed' as any })}>Fixed amount</button>
+                                                        <button className={`mode-btn ${offer.discount_type === 'percentage' ? 'active' : ''}`} onClick={() => updOffer(offer.id, { discount_type: 'percentage' as any })}>Percentage</button>
+                                                    </div>
+                                                    <div className="fr" style={{ marginTop: 12 }}>
+                                                        <div className="fg">
+                                                            <input type="number" min="0" value={offer.discount_value} onChange={e => updOffer(offer.id, { discount_value: parseFloat(e.target.value) || 0 })} />
+                                                        </div>
+                                                        <div style={{ alignSelf: 'center', fontWeight: 700, fontSize: 18, color: '#374151' }}>{offer.discount_type === 'percentage' ? '%' : '₹'}</div>
+                                                    </div>
+                                                </>
+                                            );
+                                        })()}
+                                    </div>
+
+                                    {/* Product selection */}
+                                    <div className="sec">
+                                        <h3>Downsell product</h3>
+                                        {editing.offers[0] && (() => {
+                                            const offer = editing.offers[0];
+                                            return (
+                                                <>
+                                                    <button className="btn-pick" onClick={() => pickProduct(offer.id)}>Select product</button>
+                                                    {offer.upsell_product_id ? (
+                                                        <div className="prod-row" style={{ marginTop: 8 }}>
+                                                            {offer.upsell_product_image && <img src={offer.upsell_product_image} alt="" />}
+                                                            <div className="prod-row-info"><div className="name">{offer.upsell_product_title}</div><div className="vid">₹{offer.original_price?.toFixed(2) || '0.00'}</div></div>
+                                                            <button className="prod-x" onClick={() => updOffer(offer.id, { upsell_product_id: '', upsell_variant_id: '', upsell_product_title: '', upsell_product_image: '', original_price: 0, offer_price: 0, _selectedProduct: undefined })}>×</button>
+                                                        </div>
+                                                    ) : (
+                                                        <div style={{ padding: 12, border: '1px dashed #e5e7eb', borderRadius: 10, textAlign: 'center', color: '#9ca3af', fontSize: 13, marginTop: 8 }}>No product selected — select a product to show its price in the downsell</div>
+                                                    )}
+                                                </>
+                                            );
+                                        })()}
+                                    </div>
+
+                                    {/* 3 - Customize the downsell */}
+                                    <div className="sec">
+                                        <h3>3- Customize the downsell</h3>
+
+                                        {/* Background color swatches */}
+                                        <div className="fg"><label>Background color</label></div>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 16 }}>
+                                            {[
+                                                'linear-gradient(135deg, #ffd700, #ff8c00)',
+                                                'linear-gradient(135deg, #667eea, #764ba2)',
+                                                'linear-gradient(135deg, #43e97b, #38f9d7)',
+                                                'linear-gradient(135deg, #fa709a, #fee140)',
+                                                'linear-gradient(135deg, #d4fc79, #96e6a1)',
+                                                'linear-gradient(135deg, #a18cd1, #fbc2eb)',
+                                                'linear-gradient(135deg, #fccb90, #d57eeb)',
+                                                'linear-gradient(135deg, #e0c3fc, #8ec5fc)',
+                                                'linear-gradient(135deg, #f093fb, #f5576c)',
+                                                '#ffffff',
+                                            ].map((bg, i) => (
+                                                <div key={i} onClick={() => updDesign({ bgColor: bg })} style={{
+                                                    width: '100%', aspectRatio: '1', borderRadius: 12, background: bg, cursor: 'pointer',
+                                                    border: editing.design.bgColor === bg ? '3px solid #1f2937' : '2px solid #e5e7eb',
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
+                                                    boxShadow: editing.design.bgColor === bg ? '0 0 0 2px #fff, 0 0 0 4px #1f2937' : 'none',
+                                                }}>
+                                                    {editing.design.bgColor === bg && <span style={{ background: '#1f2937', color: '#fff', borderRadius: 4, width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>✓</span>}
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <ColorSelector label="Custom background" value={editing.design.bgColor.startsWith('#') ? editing.design.bgColor : '#ffd700'} onChange={c => updDesign({ bgColor: c })} />
+                                        <div className="fg" style={{ marginTop: 8 }}>
+                                            <label>Background image URL</label>
+                                            <input value={editing.design.bgImage || ''} placeholder="https://example.com/image.jpg" onChange={e => updDesign({ bgImage: e.target.value })} />
+                                            {editing.design.bgImage && (
+                                                <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                    <img src={editing.design.bgImage} alt="" style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 8, border: '1px solid #e5e7eb' }} />
+                                                    <button onClick={() => updDesign({ bgImage: '' })} style={{ padding: '4px 10px', border: '1px solid #e5e7eb', borderRadius: 6, cursor: 'pointer', fontSize: 12, color: '#ef4444', background: '#fff' }}>Remove</button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Discount badge */}
+                                    <div className="sec">
+                                        <h3>Discount badge</h3>
+                                        <div className="fr">
+                                            <div className="fg"><label>Title</label><input value={editing.design.discountBadgeTitle} placeholder="" onChange={e => updDesign({ discountBadgeTitle: e.target.value })} /></div>
+                                            <ColorSelector label="Background color" value={editing.design.discountBadgeBgColor.startsWith('#') ? editing.design.discountBadgeBgColor : '#ff4500'} onChange={c => updDesign({ discountBadgeBgColor: c })} />
+                                        </div>
+                                        <ColorSelector label="Discount color" value={editing.design.discountBadgeDiscountColor} onChange={c => updDesign({ discountBadgeDiscountColor: c })} />
+                                        <div className="fr">
+                                            <div className="fg">
+                                                <label>Badge size</label>
+                                                <div style={{ padding: '0 8px', width: '100%' }}>
+                                                    <RangeSlider labelHidden label="Badge size" min={20} max={80} value={editing.design.discountBadgeSize} onChange={val => updDesign({ discountBadgeSize: Number(val) })} output />
+                                                </div>
+                                            </div>
+                                            <div className="fg">
+                                                <label>Text size</label>
+                                                <div style={{ padding: '0 8px', width: '100%' }}>
+                                                    <RangeSlider labelHidden label="Text size" min={10} max={40} value={editing.design.discountBadgeTextSize} onChange={val => updDesign({ discountBadgeTextSize: Number(val) })} output />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Edit text */}
+                                    <div className="sec">
+                                        <h3>Edit text</h3>
+
+                                        {/* Title */}
+                                        <div style={{ marginBottom: 20 }}>
+                                            <div className="fg"><label>Title</label><input value={editing.design.titleText} placeholder="Hold on!" onChange={e => updDesign({ titleText: e.target.value })} /></div>
+                                            <div className="fr3">
+                                                <ColorSelector label="Text color" value={editing.design.titleTextColor} onChange={c => updDesign({ titleTextColor: c })} />
+                                                <div className="fg"><label>Text size</label><input type="number" min="8" max="48" value={editing.design.titleTextSize} onChange={e => updDesign({ titleTextSize: parseInt(e.target.value) || 24 })} /><span style={{ fontSize: 11, color: '#9ca3af' }}>px</span></div>
+                                                <div className="fg"><label>Style</label>
+                                                    <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+                                                        <button onClick={() => updDesign({ titleBold: !editing.design.titleBold })} style={{ padding: '8px 14px', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontWeight: 700, background: editing.design.titleBold ? '#1f2937' : '#fff', color: editing.design.titleBold ? '#fff' : '#374151' }}>B</button>
+                                                        <button onClick={() => updDesign({ titleItalic: !editing.design.titleItalic })} style={{ padding: '8px 14px', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontStyle: 'italic', background: editing.design.titleItalic ? '#1f2937' : '#fff', color: editing.design.titleItalic ? '#fff' : '#374151' }}>I</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Subtitle */}
+                                        <div style={{ marginBottom: 20 }}>
+                                            <div className="fg"><label>Subtitle</label><input value={editing.design.subtitleText} placeholder="Congratulations! You've just unlocked a special discount!" onChange={e => updDesign({ subtitleText: e.target.value })} /></div>
+                                            <div className="fr3">
+                                                <ColorSelector label="Text color" value={editing.design.subtitleTextColor} onChange={c => updDesign({ subtitleTextColor: c })} />
+                                                <div className="fg"><label>Text size</label><input type="number" min="8" max="48" value={editing.design.subtitleTextSize} onChange={e => updDesign({ subtitleTextSize: parseInt(e.target.value) || 16 })} /><span style={{ fontSize: 11, color: '#9ca3af' }}>px</span></div>
+                                                <div className="fg"><label>Style</label>
+                                                    <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+                                                        <button onClick={() => updDesign({ subtitleBold: !editing.design.subtitleBold })} style={{ padding: '8px 14px', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontWeight: 700, background: editing.design.subtitleBold ? '#1f2937' : '#fff', color: editing.design.subtitleBold ? '#fff' : '#374151' }}>B</button>
+                                                        <button onClick={() => updDesign({ subtitleItalic: !editing.design.subtitleItalic })} style={{ padding: '8px 14px', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontStyle: 'italic', background: editing.design.subtitleItalic ? '#1f2937' : '#fff', color: editing.design.subtitleItalic ? '#fff' : '#374151' }}>I</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Description */}
+                                        <div style={{ marginBottom: 20 }}>
+                                            <div className="fg"><label>Description</label><input value={editing.design.descriptionText} placeholder="Buy now, get a discount!" onChange={e => updDesign({ descriptionText: e.target.value })} /></div>
+                                            <div className="fr3">
+                                                <ColorSelector label="Text color" value={editing.design.descriptionTextColor} onChange={c => updDesign({ descriptionTextColor: c })} />
+                                                <div className="fg"><label>Text size</label><input type="number" min="8" max="48" value={editing.design.descriptionTextSize} onChange={e => updDesign({ descriptionTextSize: parseInt(e.target.value) || 20 })} /><span style={{ fontSize: 11, color: '#9ca3af' }}>px</span></div>
+                                                <div className="fg"><label>Style</label>
+                                                    <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+                                                        <button onClick={() => updDesign({ descriptionBold: !editing.design.descriptionBold })} style={{ padding: '8px 14px', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontWeight: 700, background: editing.design.descriptionBold ? '#1f2937' : '#fff', color: editing.design.descriptionBold ? '#fff' : '#374151' }}>B</button>
+                                                        <button onClick={() => updDesign({ descriptionItalic: !editing.design.descriptionItalic })} style={{ padding: '8px 14px', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontStyle: 'italic', background: editing.design.descriptionItalic ? '#1f2937' : '#fff', color: editing.design.descriptionItalic ? '#fff' : '#374151' }}>I</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Content */}
+                                        <div>
+                                            <div className="fg"><label>Content</label><textarea value={editing.design.contentText} placeholder="Additional content..." onChange={e => updDesign({ contentText: e.target.value })} /></div>
+                                            <div className="fr3">
+                                                <ColorSelector label="Text color" value={editing.design.contentTextColor} onChange={c => updDesign({ contentTextColor: c })} />
+                                                <div className="fg"><label>Text size</label><input type="number" min="8" max="48" value={editing.design.contentTextSize} onChange={e => updDesign({ contentTextSize: parseInt(e.target.value) || 16 })} /><span style={{ fontSize: 11, color: '#9ca3af' }}>px</span></div>
+                                                <div className="fg"><label>Style</label>
+                                                    <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+                                                        <button onClick={() => updDesign({ contentBold: !editing.design.contentBold })} style={{ padding: '8px 14px', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontWeight: 700, background: editing.design.contentBold ? '#1f2937' : '#fff', color: editing.design.contentBold ? '#fff' : '#374151' }}>B</button>
+                                                        <button onClick={() => updDesign({ contentItalic: !editing.design.contentItalic })} style={{ padding: '8px 14px', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontStyle: 'italic', background: editing.design.contentItalic ? '#1f2937' : '#fff', color: editing.design.contentItalic ? '#fff' : '#374151' }}>I</button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Complete order button */}
+                                    <div className="sec">
+                                        <h3>Complete order button</h3>
+                                        <div className="fg"><label>Button Text</label><input value={editing.design.acceptButton.text} placeholder="Complete order with {discount} OFF" onChange={e => updAccept({ text: e.target.value })} /></div>
+                                        <div className="fr">
+                                            <ColorSelector label="Background color" value={editing.design.acceptButton.bgColor.startsWith('#') ? editing.design.acceptButton.bgColor : '#ff4500'} onChange={c => updAccept({ bgColor: c })} />
+                                            <div className="fg"><label>Animation</label><select value={editing.design.acceptButton.animation} onChange={e => updAccept({ animation: e.target.value })}><option value="none">None</option><option value="pulse">Pulse</option><option value="bounce">Bounce</option><option value="shake">Shake</option></select></div>
+                                        </div>
+                                        <div className="fg"><label>Change icon</label>
+                                            <select value={editing.design.acceptButton.changeIcon || 'none'} onChange={e => updAccept({ changeIcon: e.target.value })}>
+                                                <option value="none">None</option>
+                                                <option value="cart">🛒 Cart</option>
+                                                <option value="check">✓ Check</option>
+                                                <option value="star">⭐ Star</option>
+                                                <option value="gift">🎁 Gift</option>
+                                                <option value="heart">❤️ Heart</option>
+                                            </select>
+                                        </div>
+                                        <div className="fr3">
+                                            <ColorSelector label="Text color" value={editing.design.acceptButton.textColor} onChange={c => updAccept({ textColor: c })} />
+                                            <div className="fg"><label>Text size</label><input type="number" min="8" max="32" value={editing.design.acceptButton.textSize} onChange={e => updAccept({ textSize: parseInt(e.target.value) || 16 })} /><span style={{ fontSize: 11, color: '#9ca3af' }}>px</span></div>
+                                            <div className="fg"><label>Style</label>
+                                                <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+                                                    <button onClick={() => updAccept({ bold: !editing.design.acceptButton.bold })} style={{ padding: '8px 14px', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontWeight: 700, background: editing.design.acceptButton.bold ? '#1f2937' : '#fff', color: editing.design.acceptButton.bold ? '#fff' : '#374151' }}>B</button>
+                                                    <button onClick={() => updAccept({ italic: !editing.design.acceptButton.italic })} style={{ padding: '8px 14px', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontStyle: 'italic', background: editing.design.acceptButton.italic ? '#1f2937' : '#fff', color: editing.design.acceptButton.italic ? '#fff' : '#374151' }}>I</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="up-section-label">Border</div>
+                                        <ColorSelector label="Border color" value={editing.design.acceptButton.borderColor} onChange={c => updAccept({ borderColor: c })} />
+                                        <div className="fg"><label>Border width</label><div style={{ padding: '0 8px', width: '100%' }}><RangeSlider labelHidden label="Border width" min={0} max={5} value={editing.design.acceptButton.borderWidth} onChange={val => updAccept({ borderWidth: Number(val) })} output /></div></div>
+                                        <div className="fg"><label>Rounded corners</label><div style={{ padding: '0 8px', width: '100%' }}><RangeSlider labelHidden label="Rounded corners" min={0} max={30} value={editing.design.acceptButton.borderRadius} onChange={val => updAccept({ borderRadius: Number(val) })} output /></div></div>
+                                        <div className="fg"><label>Shadow</label><div style={{ padding: '0 8px', width: '100%' }}><RangeSlider labelHidden label="Shadow" min={0} max={20} value={editing.design.acceptButton.shadow ? 10 : 0} onChange={val => updAccept({ shadow: Number(val) > 0 })} output /></div></div>
+                                    </div>
+
+                                    {/* No thank you button */}
+                                    <div className="sec">
+                                        <h3>No thank you button</h3>
+                                        <div className="fg"><label>Button Text</label><input value={editing.design.rejectButton.text} placeholder="No thanks" onChange={e => updReject({ text: e.target.value })} /></div>
+                                        <div className="fr">
+                                            <ColorSelector label="Background color" value={editing.design.rejectButton.bgColor.startsWith('#') ? editing.design.rejectButton.bgColor : '#ffffff'} onChange={c => updReject({ bgColor: c })} />
+                                            <div className="fg"><label>Animation</label><select value={editing.design.rejectButton.animation} onChange={e => updReject({ animation: e.target.value })}><option value="none">None</option><option value="pulse">Pulse</option><option value="bounce">Bounce</option><option value="shake">Shake</option></select></div>
+                                        </div>
+                                        <div className="fg"><label>Change icon</label>
+                                            <select value={editing.design.rejectButton.changeIcon || 'none'} onChange={e => updReject({ changeIcon: e.target.value })}>
+                                                <option value="none">None</option>
+                                                <option value="cart">🛒 Cart</option>
+                                                <option value="check">✓ Check</option>
+                                                <option value="star">⭐ Star</option>
+                                                <option value="gift">🎁 Gift</option>
+                                                <option value="heart">❤️ Heart</option>
+                                            </select>
+                                        </div>
+                                        <div className="fr3">
+                                            <ColorSelector label="Text color" value={editing.design.rejectButton.textColor} onChange={c => updReject({ textColor: c })} />
+                                            <div className="fg"><label>Text size</label><input type="number" min="8" max="32" value={editing.design.rejectButton.textSize} onChange={e => updReject({ textSize: parseInt(e.target.value) || 16 })} /><span style={{ fontSize: 11, color: '#9ca3af' }}>px</span></div>
+                                            <div className="fg"><label>Style</label>
+                                                <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+                                                    <button onClick={() => updReject({ bold: !editing.design.rejectButton.bold })} style={{ padding: '8px 14px', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontWeight: 700, background: editing.design.rejectButton.bold ? '#1f2937' : '#fff', color: editing.design.rejectButton.bold ? '#fff' : '#374151' }}>B</button>
+                                                    <button onClick={() => updReject({ italic: !editing.design.rejectButton.italic })} style={{ padding: '8px 14px', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontStyle: 'italic', background: editing.design.rejectButton.italic ? '#1f2937' : '#fff', color: editing.design.rejectButton.italic ? '#fff' : '#374151' }}>I</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="up-section-label">Border</div>
+                                        <ColorSelector label="Border color" value={editing.design.rejectButton.borderColor} onChange={c => updReject({ borderColor: c })} />
+                                        <div className="fg"><label>Border width</label><div style={{ padding: '0 8px', width: '100%' }}><RangeSlider labelHidden label="Border width" min={0} max={5} value={editing.design.rejectButton.borderWidth} onChange={val => updReject({ borderWidth: Number(val) })} output /></div></div>
+                                        <div className="fg"><label>Rounded corners</label><div style={{ padding: '0 8px', width: '100%' }}><RangeSlider labelHidden label="Rounded corners" min={0} max={30} value={editing.design.rejectButton.borderRadius} onChange={val => updReject({ borderRadius: Number(val) })} output /></div></div>
+                                        <div className="fg"><label>Shadow</label><div style={{ padding: '0 8px', width: '100%' }}><RangeSlider labelHidden label="Shadow" min={0} max={20} value={editing.design.rejectButton.shadow ? 10 : 0} onChange={val => updReject({ shadow: Number(val) > 0 })} output /></div></div>
+                                    </div>
+                                </div>
+
+                                {/* Downsell Live Preview */}
+                                <div>
+                                    <div className="pv-wrap">
+                                        <div className="pv-panel">
+                                            <div className="pv-panel-header">
+                                                <h3>Live preview:</h3>
+                                            </div>
+                                            <div style={{ padding: 16 }}>
+                                                {/* Downsell popup preview */}
+                                                {(() => {
+                                                    const d = editing.design;
+                                                    const offer = editing.offers?.[0];
+                                                    const origPrice = offer?.original_price || 0;
+                                                    const discountVal = offer?.discount_value || 10;
+                                                    const discountLabel = offer?.discount_type === 'percentage' ? discountVal + '%' : '₹' + discountVal;
+                                                    const discountedPrice = offer?.discount_type === 'percentage'
+                                                        ? Math.round((origPrice - origPrice * discountVal / 100) * 100) / 100
+                                                        : Math.max(0, origPrice - discountVal);
+                                                    const acceptText = (d.acceptButton.text || 'Complete order with {discount} OFF').replace('{discount}', discountLabel);
+                                                    const rejectText = d.rejectButton.text || 'No thanks';
+
+                                                    // Button icon helper
+                                                    const iconMap: Record<string, string> = { cart: '🛒', check: '✓', star: '⭐', gift: '🎁', heart: '❤️' };
+                                                    const acceptIcon = d.acceptButton.changeIcon && d.acceptButton.changeIcon !== 'none' ? iconMap[d.acceptButton.changeIcon] + ' ' : '';
+                                                    const rejectIcon = d.rejectButton.changeIcon && d.rejectButton.changeIcon !== 'none' ? iconMap[d.rejectButton.changeIcon] + ' ' : '';
+
+                                                    // Animation class
+                                                    const acceptAnimClass = d.acceptButton.animation && d.acceptButton.animation !== 'none' ? `pv-anim-${d.acceptButton.animation}` : '';
+                                                    const rejectAnimClass = d.rejectButton.animation && d.rejectButton.animation !== 'none' ? `pv-anim-${d.rejectButton.animation}` : '';
+
+                                                    // Background style (supports gradient, solid color, and image)
+                                                    const bgStyle: React.CSSProperties = d.bgImage
+                                                        ? { backgroundImage: `url(${d.bgImage})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+                                                        : { background: d.bgColor || '#ffd700' };
+
+                                                    return (
+                                                        <div style={{
+                                                            ...bgStyle,
+                                                            borderRadius: 16,
+                                                            overflow: 'hidden',
+                                                            boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
+                                                        }}>
+                                                            <div style={{ padding: '24px 20px 8px', textAlign: 'center' }}>
+                                                                {/* Title */}
+                                                                {d.titleText && (
+                                                                    <div style={{
+                                                                        color: d.titleTextColor || '#000',
+                                                                        fontSize: d.titleTextSize || 24,
+                                                                        fontWeight: d.titleBold ? 700 : 400,
+                                                                        fontStyle: d.titleItalic ? 'italic' : 'normal',
+                                                                        marginBottom: 4,
+                                                                    }}>{d.titleText}</div>
+                                                                )}
+                                                                {/* Subtitle */}
+                                                                {d.subtitleText && (
+                                                                    <div style={{
+                                                                        color: d.subtitleTextColor || '#000',
+                                                                        fontSize: d.subtitleTextSize || 16,
+                                                                        fontWeight: d.subtitleBold ? 700 : 400,
+                                                                        fontStyle: d.subtitleItalic ? 'italic' : 'normal',
+                                                                        marginBottom: 8,
+                                                                    }}>{d.subtitleText}</div>
+                                                                )}
+                                                                {/* Description */}
+                                                                {d.descriptionText && (
+                                                                    <div style={{
+                                                                        color: d.descriptionTextColor || '#000',
+                                                                        fontSize: d.descriptionTextSize || 20,
+                                                                        fontWeight: d.descriptionBold ? 700 : 400,
+                                                                        fontStyle: d.descriptionItalic ? 'italic' : 'normal',
+                                                                        marginBottom: 12,
+                                                                    }}>{d.descriptionText}</div>
+                                                                )}
+                                                            </div>
+
+                                                            {/* Discount badge */}
+                                                            <div style={{ textAlign: 'center', padding: '0 20px 12px' }}>
+                                                                <div style={{
+                                                                    display: 'inline-flex',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'center',
+                                                                    width: d.discountBadgeSize + 20 || 70,
+                                                                    height: d.discountBadgeSize + 20 || 70,
+                                                                    borderRadius: '50%',
+                                                                    background: d.discountBadgeBgColor || 'linear-gradient(135deg, #ff4500, #ff8c00)',
+                                                                    boxShadow: '0 4px 20px rgba(255,69,0,0.3)',
+                                                                    position: 'relative' as const,
+                                                                }}>
+                                                                    {d.discountBadgeTitle && (
+                                                                        <div style={{ position: 'absolute', top: -8, right: -8, background: '#ff4500', borderRadius: '50%', width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#fff', fontWeight: 700 }}>
+                                                                            {d.discountBadgeTitle.slice(0, 2)}
+                                                                        </div>
+                                                                    )}
+                                                                    <span style={{
+                                                                        color: d.discountBadgeDiscountColor || '#fff',
+                                                                        fontSize: d.discountBadgeTextSize || 20,
+                                                                        fontWeight: 700,
+                                                                    }}>{discountLabel}</span>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Content */}
+                                                            {
+                                                                d.contentText && (
+                                                                    <div style={{
+                                                                        textAlign: 'center',
+                                                                        padding: '0 20px 12px',
+                                                                        color: d.contentTextColor || '#fff',
+                                                                        fontSize: d.contentTextSize || 16,
+                                                                        fontWeight: d.contentBold ? 700 : 400,
+                                                                        fontStyle: d.contentItalic ? 'italic' : 'normal',
+                                                                    }}>{d.contentText}</div>
+                                                                )
+                                                            }
+
+                                                            {/* Product image & price */}
+                                                            {
+                                                                offer?.upsell_product_image && (
+                                                                    <div style={{ textAlign: 'center', padding: '0 20px 8px' }}>
+                                                                        <img src={offer.upsell_product_image} alt="" style={{ maxWidth: 160, maxHeight: 160, objectFit: 'contain', borderRadius: 10 }} />
+                                                                    </div>
+                                                                )
+                                                            }
+                                                            {
+                                                                offer?.upsell_product_title && (
+                                                                    <div style={{ textAlign: 'center', padding: '0 20px 4px', fontSize: 14, color: '#374151' }}>{offer.upsell_product_title}</div>
+                                                                )
+                                                            }
+                                                            {
+                                                                origPrice > 0 && (
+                                                                    <div style={{ textAlign: 'center', padding: '0 20px 12px' }}>
+                                                                        {discountVal > 0 && <s style={{ color: '#9ca3af', fontSize: 14, marginRight: 8 }}>₹{origPrice.toFixed(2)}</s>}
+                                                                        <strong style={{ fontSize: 20, color: '#1f2937' }}>₹{discountedPrice.toFixed(2)}</strong>
+                                                                    </div>
+                                                                )
+                                                            }
+
+                                                            {/* Buttons */}
+                                                            <div style={{ padding: '8px 20px 20px' }}>
+                                                                <button className={acceptAnimClass} style={{
+                                                                    display: 'block', width: '100%', padding: '14px 16px', marginBottom: 8, border: `${d.acceptButton.borderWidth || 0}px solid ${d.acceptButton.borderColor || '#000'}`,
+                                                                    borderRadius: d.acceptButton.borderRadius || 8, cursor: 'pointer',
+                                                                    background: d.acceptButton.bgColor || '#ff4500', color: d.acceptButton.textColor || '#fff',
+                                                                    fontSize: d.acceptButton.textSize || 16, fontWeight: d.acceptButton.bold ? 700 : 400, fontStyle: d.acceptButton.italic ? 'italic' : 'normal',
+                                                                    boxShadow: d.acceptButton.shadow ? '0 4px 12px rgba(0,0,0,0.15)' : 'none',
+                                                                }}>{acceptIcon}{acceptText}</button>
+                                                                <button className={rejectAnimClass} style={{
+                                                                    display: 'block', width: '100%', padding: '12px 16px', border: `${d.rejectButton.borderWidth || 1}px solid ${d.rejectButton.borderColor || '#000'}`,
+                                                                    borderRadius: d.rejectButton.borderRadius || 8, cursor: 'pointer',
+                                                                    background: d.rejectButton.bgColor || '#fff', color: d.rejectButton.textColor || '#000',
+                                                                    fontSize: d.rejectButton.textSize || 16, fontWeight: d.rejectButton.bold ? 700 : 400, fontStyle: d.rejectButton.italic ? 'italic' : 'normal',
+                                                                    boxShadow: d.rejectButton.shadow ? '0 4px 12px rgba(0,0,0,0.15)' : 'none',
+                                                                }}>{rejectIcon}{rejectText}</button>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })()}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </>
                         ) : (
-                            /* ==================== CLICK UPSELL / DOWNSELL EDITOR ==================== */
+                            /* ==================== CLICK UPSELL EDITOR ==================== */
                             <>
                                 <div>
                                     {/* Name */}

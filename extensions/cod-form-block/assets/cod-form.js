@@ -853,9 +853,9 @@
         }
     }
     
-    // Show product header (image + price) ONLY for in_product_page placement
-    // For at_top / above_button, always hide it since offers replace the header
-    if (placement !== 'in_product_page') {
+    // Show product header (image + price) ONLY when bundle offers are NOT present
+    // Only hide when there are actual bundle offers rendered
+    if (quantityOffersEl && placement !== 'in_product_page') {
         hideProductHeaderIfOffersActive(container);
     }
 
@@ -892,7 +892,7 @@
     applyModalStyles(container, config);
 
     // Setup modal events
-    setupModalEvents(productId);
+    setupModalEvents(productId, config);
     
     // Setup quantity selector
     setupQuantitySelector(form, config);
@@ -1937,7 +1937,29 @@
           }
       });
 
-      var total = subtotal - discount + shipping + tickUpsellTotal;
+      // Calculate downsell total
+      var downsellTotal = 0;
+      var downsellItems = [];
+      var dsItemsAttr = form.getAttribute('data-downsell-items');
+      if (dsItemsAttr) {
+          try {
+              var dsArr = JSON.parse(dsItemsAttr);
+              dsArr.forEach(function(di) {
+                  downsellTotal += di.price;
+                  downsellItems.push({ title: di.title || 'Downsell item', price: di.price });
+              });
+          } catch(e) {}
+      }
+
+      // When downsell is active, the downsell price REPLACES the original subtotal
+      var displaySubtotal = subtotal;
+      var downsellSavings = 0;
+      if (downsellItems.length > 0) {
+          displaySubtotal = downsellTotal;
+          downsellSavings = subtotal - downsellTotal;
+      }
+
+      var total = displaySubtotal - discount + shipping + tickUpsellTotal;
       
       var summaryEl = form.querySelector('.cod-order-summary') || modal.querySelector('.cod-order-summary');
       if (summaryEl) {
@@ -1948,9 +1970,16 @@
             '</div>' +
             '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#6b7280;">' +
             '   <span>Subtotal (' + quantity + ' ' + (quantity === 1 ? 'item' : 'items') + ')</span>' +
-            '   <span id="cod-summary-subtotal">' + formatMoney(subtotal) + '</span>' +
+            '   <span id="cod-summary-subtotal">' + formatMoney(displaySubtotal) + '</span>' +
             '</div>';
           
+          if (downsellSavings > 0) {
+            html += '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#10b981;">' +
+            '   <span>Downsell discount</span>' +
+            '   <span>-' + formatMoney(downsellSavings) + '</span>' +
+            '</div>';
+          }
+
           if (discount > 0) {
             html += '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#10b981;">' +
             '   <span>Bundle Discount (' + discountPercent + '%)</span>' +
@@ -2075,6 +2104,20 @@
       }
       
       var total = subtotal - discount + shippingCost;
+
+      // Include tick upsell prices in total
+      var tickUpsellTotal = 0;
+      var tickItems = getCheckedTickUpsells(form, config);
+      tickItems.forEach(function(tu) { tickUpsellTotal += tu.price; });
+
+      // Include downsell items in total
+      var downsellTotal = 0;
+      var dsItemsAttr = form.getAttribute('data-downsell-items');
+      var dsItems = [];
+      if (dsItemsAttr) { try { dsItems = JSON.parse(dsItemsAttr); } catch(e) {} }
+      dsItems.forEach(function(di) { downsellTotal += di.price; });
+
+      total += tickUpsellTotal + downsellTotal;
       
       console.log('[COD Form] Updating order summary:', {
           quantity: quantity,
@@ -2104,6 +2147,16 @@
         '   <span>Shipping</span>' +
         '   <span id="cod-summary-shipping">' + (shippingCost === 0 ? 'FREE' : formatMoney(shippingCost)) + '</span>' +
         '</div>' +
+        (tickUpsellTotal > 0 ?
+        '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#059669;">' +
+        '   <span>Tick Upsells</span>' +
+        '   <span>+' + formatMoney(tickUpsellTotal) + '</span>' +
+        '</div>' : '') +
+        (downsellTotal > 0 ?
+        '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#047857;">' +
+        '   <span>Downsell</span>' +
+        '   <span>+' + formatMoney(downsellTotal) + '</span>' +
+        '</div>' : '') +
         '<div style="display:flex; justify-content:space-between; margin-top:8px; padding-top:8px; border-top:1px dashed #d1d5db; font-weight:700; color:#111827;">' +
         '   <span>Total</span>' +
         '   <span id="cod-summary-total" style="color:' + config.primaryColor + '">' + formatMoney(total) + '</span>' +
@@ -2170,23 +2223,23 @@
   /**
    * Modal Event Listeners
    */
-  function setupModalEvents(productId) {
+  function setupModalEvents(productId, config) {
     var closeButtons = document.querySelectorAll('[data-cod-close="' + productId + '"]');
     closeButtons.forEach(function(btn) {
       btn.addEventListener('click', function() {
-        closeModal(productId);
+        closeModal(productId, config);
       });
     });
 
     var overlay = document.getElementById('cod-modal-overlay-' + productId);
     if (overlay) {
       overlay.addEventListener('click', function(e) {
-        if (e.target === overlay) closeModal(productId);
+        if (e.target === overlay) closeModal(productId, config);
       });
     }
 
     document.addEventListener('keydown', function(e) {
-      if (e.key === 'Escape') closeModal(productId);
+      if (e.key === 'Escape') closeModal(productId, config);
     });
   }
 
@@ -2248,6 +2301,41 @@
     
     // Clear form on open so fields are empty on every modal open / page refresh
     if (form) form.reset();
+
+    // ── If downsell is active, hide bundle offers and skip offer syncing ──
+    var isDownsellActive = form && form.getAttribute('data-downsell-active') === 'true';
+    if (isDownsellActive && modal) {
+        // Hide bundle offers IMMEDIATELY (synchronously) so they never flash
+        var bundleOffers = modal.querySelector('.cod-quantity-offers');
+        if (bundleOffers) {
+            bundleOffers.style.setProperty('display', 'none', 'important');
+            bundleOffers.removeAttribute('data-selected-offer');
+        }
+        // Also hide ALL cod-quantity-offers in the document (in case of multiple)
+        document.querySelectorAll('.cod-quantity-offers').forEach(function(el) {
+            el.style.setProperty('display', 'none', 'important');
+        });
+        // Also hide product page offers container
+        var ppOffers = document.querySelector('.cod-product-page-offers');
+        if (ppOffers) {
+            ppOffers.style.setProperty('display', 'none', 'important');
+            ppOffers.removeAttribute('data-selected-offer');
+        }
+        // Ensure product info section is visible
+        var productInfo = modal.querySelector('.cod-product-info');
+        if (productInfo) productInfo.style.display = 'flex';
+        // Update order summary with downsell price (needs slight delay for DOM)
+        setTimeout(function() {
+            // Re-hide bundle offers again in case anything restored them
+            var bo = modal.querySelector('.cod-quantity-offers');
+            if (bo) bo.style.setProperty('display', 'none', 'important');
+            document.querySelectorAll('.cod-quantity-offers').forEach(function(el) {
+                el.style.setProperty('display', 'none', 'important');
+            });
+            updateOrderSummaryWithTickUpsells(form, config);
+        }, 50);
+        return; // Skip offer syncing below
+    }
     
     // Sync pre-selected offer from product page to the modal
     if (config && form) {
@@ -2307,12 +2395,161 @@
     }
   }
 
-  function closeModal(productId) {
+  function closeModal(productId, config) {
     var modal = document.getElementById('cod-form-' + productId);
     var overlay = document.getElementById('cod-modal-overlay-' + productId);
+
+    // Check for downsell campaigns before closing
+    if (config && config.upsellOffers && config.upsellOffers.downsells && config.upsellOffers.downsells.length > 0) {
+        var matchingDs = config.upsellOffers.downsells.filter(function(ds) {
+            return shouldShowUpsell(ds, config);
+        });
+
+        if (matchingDs.length > 0) {
+            var ds = matchingDs[0];
+            var formCloseCount = ds.form_close_count || 1;
+            var closeKey = 'foxcod_ds_formclose_' + productId + '_' + (ds.id || 'default');
+            var currentCloses = parseInt(localStorage.getItem(closeKey) || '0') + 1;
+
+            if (currentCloses >= formCloseCount) {
+                // Threshold reached — show downsell and reset counter
+                localStorage.removeItem(closeKey);
+
+                // Close the COD form first
+                if (modal) {
+                    modal.classList.remove('visible');
+                    setTimeout(function() { modal.style.display = 'none'; }, 300);
+                }
+                if (overlay) overlay.style.display = 'none';
+                document.body.style.overflow = '';
+
+                // Show downsell modal after a brief delay
+                var form = document.getElementById('cod-order-form-' + productId);
+                setTimeout(function() {
+                    showDownsellModal(form, config, productId, ds, [], function(acceptedItems) {
+                        if (acceptedItems.length > 0) {
+                            console.log('[COD Form] Downsell accepted from form close:', acceptedItems);
+                            // Store accepted downsell items on the form for inclusion in order
+                            var existingDs = [];
+                            try { existingDs = JSON.parse(form.getAttribute('data-downsell-items') || '[]'); } catch(e) {}
+                            var merged = existingDs.concat(acceptedItems);
+                            form.setAttribute('data-downsell-items', JSON.stringify(merged));
+                            // Mark downsell as active BEFORE reopening form
+                            form.setAttribute('data-downsell-active', 'true');
+                            
+                            // Pre-hide bundle offers BEFORE openModal to prevent any flash
+                            document.querySelectorAll('.cod-quantity-offers').forEach(function(el) {
+                                el.style.setProperty('display', 'none', 'important');
+                            });
+                            var ppOffersPreHide = document.querySelector('.cod-product-page-offers');
+                            if (ppOffersPreHide) ppOffersPreHide.style.setProperty('display', 'none', 'important');
+                            
+                            // Re-open the form
+                            openModal(productId, config);
+                            // Modify the existing .cod-product-info section to show downsell pricing
+                            setTimeout(function() {
+                                var container = form.closest('.cod-modal') || form.parentElement;
+
+                                // ── Hide bundle offers (only one offer at a time) ──
+                                var bundleOffers = container.querySelector('.cod-quantity-offers');
+                                if (bundleOffers) {
+                                    bundleOffers.style.setProperty('display', 'none', 'important');
+                                    // Clear any selected bundle offer to prevent double-discount
+                                    bundleOffers.removeAttribute('data-selected-offer');
+                                }
+                                // Hide ALL quantity offers in the document
+                                document.querySelectorAll('.cod-quantity-offers').forEach(function(el) {
+                                    el.style.setProperty('display', 'none', 'important');
+                                });
+                                // Also clear product page offers
+                                var ppOffers = document.querySelector('.cod-product-page-offers');
+                                if (ppOffers) {
+                                    ppOffers.style.setProperty('display', 'none', 'important');
+                                    ppOffers.removeAttribute('data-selected-offer');
+                                }
+
+                                // ── Show product info at top ──
+                                var productInfoSection = container.querySelector('.cod-product-info');
+                                if (!productInfoSection) {
+                                    // If it was hidden by bundle offers, we need to check for it
+                                    // It might have display:none from hideProductHeaderIfOffersActive
+                                    var allProductInfo = container.querySelectorAll('.cod-product-info');
+                                    allProductInfo.forEach(function(el) {
+                                        if (el.style.display === 'none') {
+                                            productInfoSection = el;
+                                        }
+                                    });
+                                }
+
+                                if (productInfoSection) {
+                                    // Ensure product info is visible
+                                    productInfoSection.style.display = 'flex';
+
+                                    // Get the price element and modify it
+                                    var priceEl = productInfoSection.querySelector('.cod-product-price');
+                                    var dsItem = merged[0];
+                                    var originalPrice = parseFloat(config.productPrice) || 0;
+
+                                    if (priceEl) {
+                                        // Remove any previous downsell markup
+                                        var prevDs = productInfoSection.querySelector('.cod-ds-price-wrapper');
+                                        if (prevDs) prevDs.remove();
+
+                                        // Hide original price element
+                                        priceEl.style.display = 'none';
+
+                                        // Create new price wrapper with strikeout + discounted price
+                                        var priceWrapper = document.createElement('div');
+                                        priceWrapper.className = 'cod-ds-price-wrapper';
+                                        priceWrapper.innerHTML =
+                                            '<div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">' +
+                                            '  <span style="text-decoration: line-through; color: #9ca3af; font-size: 14px;">₹' + originalPrice.toFixed(2) + '</span>' +
+                                            '  <span style="font-size: 18px; font-weight: 700; color: ' + (config.primaryColor || '#10b981') + ';">₹' + dsItem.price.toFixed(2) + '</span>' +
+                                            '</div>' +
+                                            '<div style="display: flex; align-items: center; gap: 6px; margin-top: 4px;">' +
+                                            '  <span style="font-size: 11px; color: #10b981; font-weight: 600;">✓ Downsell offer applied</span>' +
+                                            '  <button type="button" class="cod-ds-remove" style="padding: 2px 8px; border: 1px solid #d1d5db; border-radius: 4px; cursor: pointer; font-size: 10px; color: #ef4444; background: #fff;">Remove</button>' +
+                                            '</div>';
+                                        priceEl.parentNode.insertBefore(priceWrapper, priceEl.nextSibling);
+
+                                        priceWrapper.querySelector('.cod-ds-remove').addEventListener('click', function() {
+                                            form.removeAttribute('data-downsell-items');
+                                            form.removeAttribute('data-downsell-active');
+                                            priceWrapper.remove();
+                                            priceEl.style.display = '';
+                                            // ── Restore bundle offers ──
+                                            var bOffers = container.querySelector('.cod-quantity-offers');
+                                            if (bOffers) {
+                                                bOffers.style.display = '';
+                                                // Re-hide product info if bundle offers are present
+                                                productInfoSection.style.display = 'none';
+                                            }
+                                            // Restore product page offers if they exist
+                                            var ppOffers = document.querySelector('.cod-product-page-offers');
+                                            if (ppOffers) ppOffers.style.display = '';
+                                            // Update order summary to remove downsell
+                                            updateOrderSummaryWithTickUpsells(form, config);
+                                        });
+                                    }
+                                }
+                                // Update order summary to include downsell price
+                                updateOrderSummaryWithTickUpsells(form, config);
+                            }, 200);
+                        }
+                    });
+                }, 350);
+                return; // Don't close normally — downsell is being shown
+            } else {
+                // Not enough closes yet — increment and close normally
+                localStorage.setItem(closeKey, String(currentCloses));
+            }
+        }
+    }
+
+    // Normal close (no downsell or threshold not reached)
     if (modal) {
         modal.classList.remove('visible');
-        setTimeout(() => modal.style.display = 'none', 300);
+        setTimeout(function() { modal.style.display = 'none'; }, 300);
     }
     if (overlay) overlay.style.display = 'none';
     document.body.style.overflow = '';
@@ -2617,6 +2854,107 @@
       });
   }
 
+  function buildDownsellModalHTML(dsCampaign, offer) {
+      var design = dsCampaign.design || {};
+      var acceptBtn = design.acceptButton || {};
+      var rejectBtn = design.rejectButton || {};
+      var origPrice = offer.original_price || 0;
+      var offerPrice = getOfferPrice(offer);
+      var hasDiscount = offer.discount_value > 0;
+      var discountLabel = offer.discount_type === 'percentage' ? offer.discount_value + '%' : '₹' + offer.discount_value;
+
+      // Icon helper
+      var iconMap = { cart: '🛒', check: '✓', star: '⭐', gift: '🎁', heart: '❤️' };
+      var acceptIcon = acceptBtn.changeIcon && acceptBtn.changeIcon !== 'none' ? iconMap[acceptBtn.changeIcon] + ' ' : '';
+      var rejectIcon = rejectBtn.changeIcon && rejectBtn.changeIcon !== 'none' ? iconMap[rejectBtn.changeIcon] + ' ' : '';
+
+      // Resolve {discount} placeholder in button text
+      var acceptText = (acceptBtn.text || 'Complete order with {discount} OFF').replace('{discount}', discountLabel);
+      var rejectText = rejectBtn.text || 'No thanks';
+
+      var html = '';
+
+      // Animation keyframes
+      html += '<style>';
+      html += '@keyframes cod-up-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}';
+      html += '@keyframes cod-up-bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}';
+      html += '@keyframes cod-up-shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-3px)}40%{transform:translateX(3px)}60%{transform:translateX(-2px)}80%{transform:translateX(2px)}}';
+      html += '.cod-upsell-anim-pulse{animation:cod-up-pulse 1.5s ease-in-out infinite}';
+      html += '.cod-upsell-anim-bounce{animation:cod-up-bounce 1s ease-in-out infinite}';
+      html += '.cod-upsell-anim-shake{animation:cod-up-shake .5s ease-in-out infinite}';
+      html += '</style>';
+
+      // Background: image takes priority, then gradient/color
+      var bgCss = design.bgImage
+          ? 'background-image: url(' + design.bgImage + '); background-size: cover; background-position: center;'
+          : 'background: ' + (design.bgColor || '#fff') + ';';
+
+      // Main container
+      html += '<div style="padding: 24px; text-align: center; ' + bgCss + ' border-radius: 12px;">';
+
+      // Title
+      if (design.titleText) {
+          html += '<div style="font-size: ' + (design.titleTextSize || 24) + 'px; color: ' + (design.titleTextColor || '#000') + '; font-weight: ' + (design.titleBold ? '700' : '400') + '; font-style: ' + (design.titleItalic ? 'italic' : 'normal') + '; margin: 0 0 4px;">' + design.titleText + '</div>';
+      }
+
+      // Subtitle
+      if (design.subtitleText) {
+          html += '<div style="font-size: ' + (design.subtitleTextSize || 16) + 'px; color: ' + (design.subtitleTextColor || '#000') + '; font-weight: ' + (design.subtitleBold ? '700' : '400') + '; font-style: ' + (design.subtitleItalic ? 'italic' : 'normal') + '; margin: 0 0 8px;">' + design.subtitleText + '</div>';
+      }
+
+      // Description
+      if (design.descriptionText) {
+          html += '<div style="font-size: ' + (design.descriptionTextSize || 20) + 'px; color: ' + (design.descriptionTextColor || '#000') + '; font-weight: ' + (design.descriptionBold ? '700' : '400') + '; font-style: ' + (design.descriptionItalic ? 'italic' : 'normal') + '; margin: 0 0 12px;">' + design.descriptionText + '</div>';
+      }
+
+      // Discount badge
+      if (hasDiscount) {
+          var badgeSize = (design.discountBadgeSize || 50) + 20;
+          var badgeTextSize = design.discountBadgeTextSize || 20;
+          var badgeBg = design.discountBadgeBgColor || 'linear-gradient(135deg, #ff4500, #ff8c00)';
+          var badgeColor = design.discountBadgeDiscountColor || '#fff';
+          html += '<div style="margin: 8px 0 12px; display: flex; justify-content: center;">';
+          html += '<div style="display: inline-flex; align-items: center; justify-content: center; width: ' + badgeSize + 'px; height: ' + badgeSize + 'px; border-radius: 50%; background: ' + badgeBg + '; box-shadow: 0 4px 20px rgba(255,69,0,0.3);">';
+          html += '<span style="color: ' + badgeColor + '; font-size: ' + badgeTextSize + 'px; font-weight: 700;">' + discountLabel + '</span>';
+          html += '</div></div>';
+      }
+
+      // Content text
+      if (design.contentText) {
+          html += '<div style="font-size: ' + (design.contentTextSize || 16) + 'px; color: ' + (design.contentTextColor || '#000') + '; font-weight: ' + (design.contentBold ? '700' : '400') + '; font-style: ' + (design.contentItalic ? 'italic' : 'normal') + '; margin: 0 0 12px;">' + design.contentText + '</div>';
+      }
+
+      // Product image
+      if (offer.upsell_product_image) {
+          html += '<div style="margin: 0 0 8px;"><img src="' + offer.upsell_product_image + '" style="max-width: 180px; max-height: 180px; object-fit: contain; border-radius: 10px;" /></div>';
+      }
+
+      // Product title
+      if (offer.upsell_product_title) {
+          html += '<div style="font-size: 14px; margin-bottom: 6px; color: #374151;">' + offer.upsell_product_title + '</div>';
+      }
+
+      // Price display - only show when product has a price
+      if (origPrice > 0) {
+          html += '<div style="margin-bottom: 20px;">';
+          if (hasDiscount) html += '<s style="color: #9ca3af; font-size: 14px; margin-right: 8px;">₹' + origPrice.toFixed(2) + '</s>';
+          html += '<strong style="font-size: 20px; color: #1f2937;">₹' + offerPrice.toFixed(2) + '</strong></div>';
+      }
+
+      // Accept button animation class
+      var acceptAnimClass = acceptBtn.animation && acceptBtn.animation !== 'none' ? ' cod-upsell-anim-' + acceptBtn.animation : '';
+      var rejectAnimClass = rejectBtn.animation && rejectBtn.animation !== 'none' ? ' cod-upsell-anim-' + rejectBtn.animation : '';
+
+      // Accept button
+      html += '<button class="cod-upsell-accept' + acceptAnimClass + '" style="display: block; width: 100%; padding: 14px; margin-bottom: 8px; background: ' + (acceptBtn.bgColor || '#000') + '; color: ' + (acceptBtn.textColor || '#fff') + '; font-size: ' + (acceptBtn.textSize || 16) + 'px; font-weight: ' + (acceptBtn.bold ? '700' : '400') + '; font-style: ' + (acceptBtn.italic ? 'italic' : 'normal') + '; border: ' + (acceptBtn.borderWidth || 0) + 'px solid ' + (acceptBtn.borderColor || '#000') + '; border-radius: ' + (acceptBtn.borderRadius || 8) + 'px; cursor: pointer; box-shadow: ' + (acceptBtn.shadow ? '0 4px 12px rgba(0,0,0,.15)' : 'none') + ';">' + acceptIcon + acceptText + '</button>';
+
+      // Reject button
+      html += '<button class="cod-upsell-decline' + rejectAnimClass + '" style="display: block; width: 100%; padding: 12px; background: ' + (rejectBtn.bgColor || '#fff') + '; color: ' + (rejectBtn.textColor || '#000') + '; font-size: ' + (rejectBtn.textSize || 16) + 'px; font-weight: ' + (rejectBtn.bold ? '700' : '400') + '; font-style: ' + (rejectBtn.italic ? 'italic' : 'normal') + '; border: ' + (rejectBtn.borderWidth || 1) + 'px solid ' + (rejectBtn.borderColor || '#000') + '; border-radius: ' + (rejectBtn.borderRadius || 8) + 'px; cursor: pointer; box-shadow: ' + (rejectBtn.shadow ? '0 4px 12px rgba(0,0,0,.15)' : 'none') + ';">' + rejectIcon + rejectText + '</button>';
+
+      html += '</div>';
+      return html;
+  }
+
   function showDownsellModal(form, config, productId, dsCampaign, acceptedItems, onComplete) {
       var offers = dsCampaign.offers || [];
       if (offers.length === 0) { onComplete(acceptedItems); return; }
@@ -2626,7 +2964,11 @@
       overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100000; display: flex; align-items: center; justify-content: center; padding: 20px;';
       var modal = document.createElement('div');
       modal.style.cssText = 'background: #fff; border-radius: 12px; max-width: 420px; width: 100%; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.2);';
-      modal.innerHTML = buildUpsellModalHTML(dsCampaign, offer, 0);
+
+      // Use dedicated downsell builder if design has downsell-specific fields, else fallback to upsell builder
+      var hasDownsellDesign = dsCampaign.design && (dsCampaign.design.titleText || dsCampaign.design.subtitleText || dsCampaign.design.descriptionText);
+      modal.innerHTML = hasDownsellDesign ? buildDownsellModalHTML(dsCampaign, offer) : buildUpsellModalHTML(dsCampaign, offer, 0);
+
       overlay.appendChild(modal);
       document.body.appendChild(overlay);
       startUpsellTimer(overlay);
@@ -2634,7 +2976,7 @@
       modal.querySelector('.cod-upsell-accept').addEventListener('click', function() {
           if (overlay._timerInterval) clearInterval(overlay._timerInterval);
           console.log('[COD Form] Downsell accepted:', offer.upsell_product_title);
-          acceptedItems.push({ product_id: offer.upsell_product_id, variant_id: offer.upsell_variant_id, title: offer.upsell_product_title, price: getOfferPrice(offer), quantity: 1, type: 'downsell' });
+          acceptedItems.push({ product_id: offer.upsell_product_id, variant_id: offer.upsell_variant_id, title: offer.upsell_product_title, image: offer.upsell_product_image || '', price: getOfferPrice(offer), quantity: 1, type: 'downsell' });
           overlay.remove();
           onComplete(acceptedItems);
       });
@@ -2686,6 +3028,19 @@
           shippingPrice: 0,
           upsell_items: getCheckedTickUpsells(form, config)
       };
+
+      // If downsell is active, it replaces the product price (not added on top)
+      var dsItemsAttr = form.getAttribute('data-downsell-items');
+      if (dsItemsAttr) {
+          try {
+              var dsItems = JSON.parse(dsItemsAttr);
+              if (dsItems.length > 0) {
+                  // Use the downsell price as the product price
+                  payload.price = dsItems[0].price;
+                  payload.notes = (payload.notes ? payload.notes + '\n' : '') + 'DOWNSELL APPLIED: ' + dsItems[0].title + ' (₹' + dsItems[0].price.toFixed(2) + ')';
+              }
+          } catch(e) {}
+      }
       
       // Get selected shipping option
       var shippingRadio = form.querySelector('input[name="shipping_method"]:checked');
