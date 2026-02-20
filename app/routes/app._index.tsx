@@ -828,15 +828,34 @@ export default function Index() {
               Form Builder
             </Link>
 
-            {/* TEMPORARILY HIDDEN - Component preserved for future use */}
-            {/* <Link to="/app/orders" className="action-btn action-btn-orders">
+            <Link to="/app/quantity-offers" className="action-btn" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', boxShadow: '0 4px 15px rgba(245, 158, 11, 0.4)' }}>
+              <span className="action-btn-icon">📦</span>
+              Bundle Offers
+            </Link>
+
+            <Link to="/app/upsell-downsell" className="action-btn" style={{ background: 'linear-gradient(135deg, #ec4899, #db2777)', boxShadow: '0 4px 15px rgba(236, 72, 153, 0.4)' }}>
+              <span className="action-btn-icon">🎯</span>
+              Upsells &amp; Downsells
+            </Link>
+
+            <Link to="/app/orders" className="action-btn action-btn-orders">
               <span className="action-btn-icon">📋</span>
-              View All Orders
-            </Link> */}
+              Orders
+            </Link>
 
             <Link to="/app/analytics" className="action-btn action-btn-analytics">
               <span className="action-btn-icon">📊</span>
               Analytics
+            </Link>
+
+            <Link to="/app/pixel-tracking" className="action-btn" style={{ background: 'linear-gradient(135deg, #14b8a6, #0d9488)', boxShadow: '0 4px 15px rgba(20, 184, 166, 0.4)' }}>
+              <span className="action-btn-icon">📡</span>
+              Pixel Tracking
+            </Link>
+
+            <Link to="/app/integrations" className="action-btn" style={{ background: 'linear-gradient(135deg, #6366f1, #4f46e5)', boxShadow: '0 4px 15px rgba(99, 102, 241, 0.4)' }}>
+              <span className="action-btn-icon">🔗</span>
+              Integrations
             </Link>
           </div>
 
