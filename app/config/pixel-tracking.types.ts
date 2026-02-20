@@ -5,9 +5,8 @@
 
 export type PixelProvider =
     | "facebook"
-    | "tiktok"
     | "google"
-    | "snap"
+    | "snapchat"
     | "pinterest"
     | "taboola"
     | "kwai";
@@ -53,14 +52,6 @@ export const PIXEL_PROVIDERS: PixelProviderMeta[] = [
         events: ["InitiateCheckout", "Purchase", "AddToCart", "ViewContent", "AddPaymentInfo"],
     },
     {
-        key: "tiktok",
-        label: "TikTok Pixel",
-        icon: "🎵",
-        idLabel: "Pixel ID",
-        hasConversionApi: false,
-        events: ["InitiateCheckout", "CompletePayment"],
-    },
-    {
         key: "google",
         label: "Google Tag (gtag)",
         icon: "🔍",
@@ -69,12 +60,12 @@ export const PIXEL_PROVIDERS: PixelProviderMeta[] = [
         events: ["begin_checkout", "purchase"],
     },
     {
-        key: "snap",
-        label: "Snap Pixel",
+        key: "snapchat",
+        label: "Snapchat Pixel",
         icon: "👻",
         idLabel: "Pixel ID",
         hasConversionApi: false,
-        events: ["START_CHECKOUT", "PURCHASE"],
+        events: ["START_CHECKOUT", "PURCHASE", "ADD_PAYMENT_INFO", "VIEW_CONTENT"],
     },
     {
         key: "pinterest",
