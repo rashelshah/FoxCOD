@@ -197,6 +197,18 @@
   }
 </script>
 
+{% comment %} Pixel Tracking — separate block so it never fails silently {% endcomment %}
+<script>
+  window.FoxCod = window.FoxCod || {};
+  try {
+    var _ptRaw = {{ shop.metafields.fox_cod.pixel_tracking_settings_json.value | json | default: 'null' }};
+    window.FoxCod.pixelTracking = (typeof _ptRaw === 'object' && _ptRaw !== null) ? _ptRaw : {};
+  } catch (e) {
+    window.FoxCod.pixelTracking = {};
+  }
+  console.log('[FoxCod] Pixel tracking loaded:', window.FoxCod.pixelTracking);
+</script>
+
 {% comment %} Modal Overlay {% endcomment %}
 <div class="cod-modal-overlay" id="cod-modal-overlay-{{ product.id }}" style="display: none;">
 
