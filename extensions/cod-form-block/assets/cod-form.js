@@ -3730,61 +3730,164 @@
               console.log('[FoxCod Pixels] Correct Purchase total:', purchaseValue);
               foxCodTrackEvent('Purchase', { value: purchaseValue, currency: 'INR' });
               
-              // Show success message with order ID
-              var successDiv = form.querySelector('.cod-message-success');
-              var successText = successDiv ? successDiv.querySelector('.cod-message-text') : null;
+              // Close the main checkout modal immediately
+              closeModal(productId);
               
-              if (successDiv && successText) {
-                  // Premium success popup - larger text, refined design, no horizontal swipe
-                  successText.innerHTML = 
-                      '<div class="cod-success-popup" style="width: 440px; max-width: 92vw; font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif; text-align: center; touch-action: pan-y; overflow: hidden; overscroll-behavior: contain;">' +
-                      '<div style="background: linear-gradient(160deg, #ffffff 0%, #f0fdf4 100%); border-radius: 20px; padding: 40px 36px; box-shadow: 0 32px 64px -12px rgba(0,0,0,0.18), 0 0 0 1px rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.12);">' +
-                      '<div style="width: 72px; height: 72px; margin: 0 auto 24px; background: linear-gradient(145deg, #10b981 0%, #059669 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 12px 28px rgba(16,185,129,0.35);">' +
-                      '<svg style="width: 36px; height: 36px; color: white;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>' +
-                      '</div>' +
-                      '<h2 style="margin: 0 0 16px; font-size: 1.75rem; font-weight: 800; color: #0f172a; letter-spacing: -0.02em;">Order Confirmed</h2>' +
-                      '<p style="margin: 0 0 24px; font-size: 1.125rem; line-height: 1.7; color: #334155; font-weight: 500;">' + (config.successMessage || 'Your order has been placed successfully! We will contact you shortly.') + '</p>' +
-                      '<div style="background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); border-radius: 14px; padding: 20px 24px; margin-bottom: 28px; border: 1px solid rgba(16,185,129,0.2);">' +
-                      '<span style="font-size: 1rem; color: #047857; font-weight: 600; display: block; margin-bottom: 6px;">Order ID</span>' +
-                      '<div style="font-size: 1.5rem; font-weight: 800; color: #0f172a; letter-spacing: 0.05em;">' + (result.orderName || result.orderId) + '</div>' +
-                      '</div>' +
-                      '<div style="display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;">' +
-                      '<button onclick="window.location.reload()" style="cursor: pointer; padding: 16px 32px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; font-size: 1.0625rem; font-weight: 700; border-radius: 12px; border: none; box-shadow: 0 6px 20px rgba(16,185,129,0.45);" onmouseover="this.style.transform=\'translateY(-2px)\'; this.style.boxShadow=\'0 10px 28px rgba(16,185,129,0.5)\'" onmouseout="this.style.transform=\'\'; this.style.boxShadow=\'0 6px 20px rgba(16,185,129,0.45)\'">Continue Shopping</button>' +
-                      '<button onclick="var f=document.getElementById(\'cod-form-' + config.productId + '\').querySelector(\'form\'); f.reset(); var sd=document.querySelector(\'.cod-message-success\'); if(sd) sd.style.display=\'none\'; f.querySelectorAll(\'.cod-dynamic-fields-container, button[type=submit], .cod-total, .cod-order-summary, .cod-product-info, .cod-form-headers, .cod-shipping-section\').forEach(function(e){e.style.display=e.classList.contains(\'cod-product-info\')||e.classList.contains(\'cod-total\')?\'flex\':\'\';});" style="cursor: pointer; padding: 16px 32px; background: white; color: #475569; font-size: 1.0625rem; font-weight: 700; border-radius: 12px; border: 2px solid #e2e8f0;" onmouseover="this.style.background=\'#f8fafc\'; this.style.borderColor=\'#cbd5e1\'" onmouseout="this.style.background=\'white\'; this.style.borderColor=\'#e2e8f0\'">Place Another</button>' +
-                      '</div>' +
-                      '</div>' +
-                      '</div>';
-                  
-                  // Hide ALL form elements so only success popup is visible
-                  var toHide = form.querySelectorAll('.cod-dynamic-fields-container, button[type="submit"], .cod-total, .cod-order-summary, .cod-product-info, .cod-form-headers, .cod-shipping-section');
-                  toHide.forEach(function(el) { el.style.display = 'none'; });
-                  
-                  successDiv.style.display = 'flex';
-                  successDiv.style.justifyContent = 'center';
-                  successDiv.style.alignItems = 'center';
-                  successDiv.style.minHeight = '320px';
-                  successDiv.style.padding = '24px';
-                  successDiv.style.background = 'transparent';
-                  successDiv.style.border = 'none';
-                  
-                  // Close modal after 3.5 seconds and reset
-                  setTimeout(function() {
-                      closeModal(productId);
-                      form.reset();
-                      form.querySelectorAll('.cod-dynamic-fields-container, button[type="submit"], .cod-total, .cod-order-summary, .cod-product-info, .cod-form-headers, .cod-shipping-section').forEach(function(el) {
-                          el.style.display = el.classList.contains('cod-product-info') || el.classList.contains('cod-total') ? 'flex' : '';
-                      });
-                      successDiv.style.display = 'none';
-                      successDiv.style.justifyContent = '';
-                      successDiv.style.alignItems = '';
-                      successDiv.style.minHeight = '';
-                      successDiv.style.padding = '';
-                      successDiv.style.background = '';
-                  }, 3500);
-              } else {
-                  console.error('[COD Form] Success message elements not found');
-                  closeModal(productId);
+              // Reset the form
+              var f = document.getElementById('cod-form-' + productId).querySelector('form');
+              if (f) {
+                  f.reset();
+                  // Reset dynamic displays if any form fields were hidden
+                  f.querySelectorAll('.cod-dynamic-fields-container, button[type=submit], .cod-total, .cod-order-summary, .cod-product-info, .cod-form-headers, .cod-shipping-section').forEach(function(e){
+                      e.style.display = e.classList.contains('cod-product-info') || e.classList.contains('cod-total') ? 'flex' : '';
+                  });
               }
+
+              // Create and show premium global success modal
+              var overlay = document.createElement('div');
+              overlay.className = 'fox-cod-success-overlay';
+              
+              var successMessage = config.successMessage || 'Your order has been placed successfully!';
+              var orderIdDisplay = result.orderName || result.orderId || 'Pending';
+              
+              overlay.innerHTML = `
+                <style>
+                  .fox-cod-success-overlay {
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100vw;
+                    height: 100vh;
+                    background: rgba(0, 0, 0, 0.4);
+                    backdrop-filter: blur(8px);
+                    -webkit-backdrop-filter: blur(8px);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 2147483647;
+                    opacity: 0;
+                    animation: foxCodFadeIn 0.3s ease forwards;
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+                    padding: 20px;
+                    box-sizing: border-box;
+                  }
+                  .fox-cod-success-modal {
+                    background: #ffffff;
+                    width: 100%;
+                    max-width: 420px;
+                    border-radius: 24px;
+                    padding: 40px 32px;
+                    text-align: center;
+                    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+                    transform: translateY(20px) scale(0.95);
+                    opacity: 0;
+                    animation: foxCodSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards 0.1s;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    box-sizing: border-box;
+                  }
+                  .fox-cod-success-icon {
+                    width: 72px;
+                    height: 72px;
+                    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    margin-bottom: 24px;
+                    box-shadow: 0 12px 24px rgba(16, 185, 129, 0.3);
+                  }
+                  .fox-cod-success-icon svg {
+                    width: 36px;
+                    height: 36px;
+                    color: white;
+                  }
+                  .fox-cod-success-modal h2 {
+                    font-size: 24px !important;
+                    font-weight: 800 !important;
+                    color: #111827 !important;
+                    margin: 0 0 12px 0 !important;
+                    line-height: 1.2 !important;
+                    letter-spacing: -0.02em !important;
+                  }
+                  .fox-cod-success-modal p {
+                    font-size: 15px !important;
+                    color: #4b5563 !important;
+                    margin: 0 0 24px 0 !important;
+                    line-height: 1.5 !important;
+                  }
+                  .fox-cod-order-box {
+                    background: #f9fafb;
+                    border: 1px dashed #d1d5db;
+                    border-radius: 12px;
+                    padding: 16px;
+                    width: 100%;
+                    box-sizing: border-box;
+                  }
+                  .fox-cod-order-label {
+                    display: block;
+                    font-size: 12px !important;
+                    color: #6b7280 !important;
+                    text-transform: uppercase;
+                    letter-spacing: 0.05em;
+                    font-weight: 600 !important;
+                    margin-bottom: 6px !important;
+                  }
+                  .fox-cod-order-id {
+                    font-size: 22px !important;
+                    color: #111827 !important;
+                    font-weight: 800 !important;
+                    letter-spacing: 0.02em;
+                    margin: 0 !important;
+                  }
+                  @keyframes foxCodFadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                  }
+                  @keyframes foxCodSlideUp {
+                    from { opacity: 0; transform: translateY(20px) scale(0.95); }
+                    to { opacity: 1; transform: translateY(0) scale(1); }
+                  }
+                  @keyframes foxCodFadeOut {
+                    from { opacity: 1; }
+                    to { opacity: 0; }
+                  }
+                  @keyframes foxCodSlideDown {
+                    from { opacity: 1; transform: translateY(0) scale(1); }
+                    to { opacity: 0; transform: translateY(20px) scale(0.95); }
+                  }
+                </style>
+                <div class="fox-cod-success-modal">
+                  <div class="fox-cod-success-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                    </svg>
+                  </div>
+                  <h2>Order Confirmed!</h2>
+                  <p>${successMessage}</p>
+                  <div class="fox-cod-order-box">
+                    <span class="fox-cod-order-label">Order ID</span>
+                    <p class="fox-cod-order-id">${orderIdDisplay}</p>
+                  </div>
+                </div>
+              `;
+              
+              document.body.appendChild(overlay);
+
+              // Auto-close after 2.5 seconds
+              setTimeout(function() {
+                  if (overlay.parentNode) {
+                      overlay.style.animation = 'foxCodFadeOut 0.3s ease forwards';
+                      var modalContent = overlay.querySelector('.fox-cod-success-modal');
+                      if (modalContent) modalContent.style.animation = 'foxCodSlideDown 0.3s ease forwards';
+                      setTimeout(function() {
+                          if (overlay.parentNode) {
+                              overlay.remove();
+                          }
+                      }, 300);
+                  }
+              }, 2500);
           } else {
               throw new Error(result.error || result.message || 'Order failed');
           }
