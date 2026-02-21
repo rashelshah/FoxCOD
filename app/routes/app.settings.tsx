@@ -807,8 +807,8 @@ const PreviewDisplay = memo(({
         return svgs[fieldId] || svgs.name;
     };
 
-    // Get visible fields sorted by order
-    const visibleFields = (fields || []).filter((f: FormField) => f.visible).sort((a: FormField, b: FormField) => a.order - b.order);
+    // Get visible fields sorted by order — exclude quantity (handled by +/- buttons)
+    const visibleFields = (fields || []).filter((f: FormField) => f.visible && f.id !== 'quantity').sort((a: FormField, b: FormField) => a.order - b.order);
 
     // Sample price values for rate card
     const subtotal = 1999;
@@ -851,6 +851,14 @@ const PreviewDisplay = memo(({
                             )}
                             {activeTab !== 'button' && showPrice && (
                                 <div className="preview-product-price">₹1,999</div>
+                            )}
+                            {/* Quantity +/- selector in live preview */}
+                            {activeTab !== 'button' && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '6px' }}>
+                                    <div style={{ width: '28px', height: '28px', border: '1px solid #d1d5db', borderRadius: '6px', background: '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 600, color: '#374151', cursor: 'default' }}>−</div>
+                                    <div style={{ width: '32px', height: '28px', border: '1px solid #d1d5db', borderRadius: '6px', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 600, color: '#1f2937' }}>1</div>
+                                    <div style={{ width: '28px', height: '28px', border: '1px solid #d1d5db', borderRadius: '6px', background: '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 600, color: '#374151', cursor: 'default' }}>+</div>
+                                </div>
                             )}
                             {/* Only show Order button in Button tab */}
                             {activeTab === 'button' && (
@@ -3413,10 +3421,10 @@ export default function SettingsPage() {
                                                 onDragEnd={handleDragEnd}
                                             >
                                                 <SortableContext
-                                                    items={fields.map(f => f.id)}
+                                                    items={fields.filter(f => f.id !== 'quantity').map(f => f.id)}
                                                     strategy={verticalListSortingStrategy}
                                                 >
-                                                    {fields.sort((a, b) => a.order - b.order).map((field) => (
+                                                    {fields.filter(f => f.id !== 'quantity').sort((a, b) => a.order - b.order).map((field) => (
                                                         <SortableFieldItem
                                                             key={field.id}
                                                             field={field}
@@ -3672,24 +3680,7 @@ export default function SettingsPage() {
                                         )}
                                     </div>
 
-                                    {/* Order Settings */}
-                                    <div className="settings-card">
-                                        <h3 className="card-title"><span>📦</span> Order Settings</h3>
-                                        <div className="input-group">
-                                            <label className="input-label">Maximum Quantity per Order</label>
-                                            <div style={{ padding: '0 8px', width: '100%' }}>
-                                                <RangeSlider
-                                                    labelHidden
-                                                    label="Maximum Quantity"
-                                                    min={1}
-                                                    max={50}
-                                                    value={maxQuantity}
-                                                    onChange={(val) => setMaxQuantity(Number(val))}
-                                                    output
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
+
 
                                     {/* Form Content */}
                                     <div className="settings-card">

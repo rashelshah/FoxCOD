@@ -251,6 +251,12 @@
         <p class="cod-variant-title">{{ current_variant.title }}</p>
       {% endif %}
     </div>
+    {%- comment -%} Quantity Selector — hidden when bundle offers are active {%- endcomment -%}
+    <div class="cod-product-qty" data-max-qty="{{ cod_max_quantity }}">
+      <button type="button" class="cod-qty-btn cod-qty-minus" aria-label="Decrease quantity">−</button>
+      <input type="number" name="quantity" class="cod-qty-input" value="1" min="1" max="{{ cod_max_quantity }}" readonly>
+      <button type="button" class="cod-qty-btn cod-qty-plus" aria-label="Increase quantity">+</button>
+    </div>
   </div>
   {% endif %}
   
@@ -397,6 +403,7 @@
 
   .cod-product-info {
     display: flex;
+    align-items: center;
     gap: 12px;
     margin-bottom: 20px;
     padding-bottom: 16px;
@@ -412,6 +419,55 @@
 
   .cod-product-details {
     flex: 1;
+    min-width: 0;
+  }
+
+  .cod-product-qty {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .cod-product-qty .cod-qty-btn {
+    width: 32px;
+    height: 32px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #f9fafb;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #374151;
+    transition: all 0.15s;
+    padding: 0;
+    line-height: 1;
+  }
+  .cod-product-qty .cod-qty-btn:hover {
+    background: #e5e7eb;
+    border-color: #9ca3af;
+  }
+  .cod-product-qty .cod-qty-btn:active {
+    transform: scale(0.95);
+  }
+  .cod-product-qty .cod-qty-input {
+    width: 36px;
+    text-align: center;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 6px 2px;
+    background: #fff;
+    color: #1f2937;
+    -moz-appearance: textfield;
+  }
+  .cod-product-qty .cod-qty-input::-webkit-inner-spin-button,
+  .cod-product-qty .cod-qty-input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
   }
 
   .cod-product-title {
