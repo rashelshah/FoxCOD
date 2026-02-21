@@ -848,9 +848,14 @@ export default function Index() {
               Analytics
             </Link>
 
-            <Link to="/app/pixel-tracking" className="action-btn" style={{ background: 'linear-gradient(135deg, #14b8a6, #0d9488)', boxShadow: '0 4px 15px rgba(20, 184, 166, 0.4)' }}>
+            <Link to="/app/app-settings?tab=pixels" className="action-btn" style={{ background: 'linear-gradient(135deg, #14b8a6, #0d9488)', boxShadow: '0 4px 15px rgba(20, 184, 166, 0.4)' }}>
               <span className="action-btn-icon">📡</span>
               Pixel Tracking
+            </Link>
+
+            <Link to="/app/app-settings?tab=fraud" className="action-btn" style={{ background: 'linear-gradient(135deg, #f43f5e, #e11d48)', boxShadow: '0 4px 15px rgba(244, 63, 94, 0.4)' }}>
+              <span className="action-btn-icon">🛡️</span>
+              Fraud Protection
             </Link>
 
             <Link to="/app/integrations" className="action-btn" style={{ background: 'linear-gradient(135deg, #6366f1, #4f46e5)', boxShadow: '0 4px 15px rgba(99, 102, 241, 0.4)' }}>

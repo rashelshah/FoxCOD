@@ -163,74 +163,53 @@ export default function OrdersPage() {
                     overflow-x: hidden;
                 }
 
-                /* Header with Gradient */
-                .orders-header {
-                    background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
-                    border-radius: 20px;
-                    padding: 28px 32px;
-                    color: white;
-                    margin-bottom: 24px;
-                    position: relative;
-                    overflow: hidden;
-                    box-shadow: 0 20px 40px rgba(0,0,0,0.15);
-                }
-
-                .orders-header::before {
-                    content: '';
-                    position: absolute;
-                    top: -80px;
-                    right: -80px;
-                    width: 250px;
-                    height: 250px;
-                    background: radial-gradient(circle, rgba(16, 185, 129, 0.15) 0%, transparent 70%);
-                    border-radius: 50%;
-                }
-
-                .header-top {
+                /* Standard Page Header */
+                .page-header {
                     display: flex;
                     align-items: center;
                     justify-content: space-between;
-                    position: relative;
-                    z-index: 1;
+                    margin-bottom: 24px;
                 }
 
-                .header-left {
+                .page-header-left {
                     display: flex;
                     align-items: center;
                     gap: 16px;
                 }
 
                 .back-btn {
-                    width: 44px;
-                    height: 44px;
+                    width: 40px;
+                    height: 40px;
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    background: rgba(255,255,255,0.1);
-                    border: 1px solid rgba(255,255,255,0.2);
-                    border-radius: 12px;
+                    border: 1px solid #e5e7eb;
+                    border-radius: 10px;
+                    background: white;
                     text-decoration: none;
-                    color: white;
-                    font-size: 18px;
+                    color: #374151;
                     transition: all 0.2s ease;
-                    backdrop-filter: blur(10px);
                 }
 
                 .back-btn:hover {
-                    background: rgba(255,255,255,0.2);
-                    transform: translateY(-2px);
+                    background: #f9fafb;
                 }
 
-                .header-title h1 {
-                    font-size: 26px;
+                .page-title {
+                    display: flex;
+                    flex-direction: column;
+                }
+
+                .page-title h1 {
+                    font-size: 24px;
                     font-weight: 700;
+                    color: #111827;
                     margin: 0 0 4px 0;
-                    letter-spacing: -0.5px;
                 }
 
-                .header-title p {
+                .page-title p {
                     font-size: 14px;
-                    opacity: 0.7;
+                    color: #6b7280;
                     margin: 0;
                 }
 
@@ -583,15 +562,6 @@ export default function OrdersPage() {
                         padding: 0 16px;
                     }
 
-                    .orders-header {
-                        padding: 20px;
-                        border-radius: 16px;
-                    }
-
-                    .header-title h1 {
-                        font-size: 22px;
-                    }
-
                     .stats-grid {
                         grid-template-columns: 1fr 1fr;
                         gap: 12px;
@@ -658,15 +628,6 @@ export default function OrdersPage() {
                 }
 
                 @media (max-width: 480px) {
-                    .header-left {
-                        gap: 12px;
-                    }
-
-                    .back-btn {
-                        width: 40px;
-                        height: 40px;
-                    }
-
                     .stats-grid {
                         grid-template-columns: 1fr;
                     }
@@ -679,15 +640,13 @@ export default function OrdersPage() {
 
             <s-page heading="">
                 <div className="orders-page">
-                    {/* Premium Header */}
-                    <div className="orders-header">
-                        <div className="header-top">
-                            <div className="header-left">
-                                <Link to="/app" className="back-btn">←</Link>
-                                <div className="header-title">
-                                    <h1>📋 All Orders</h1>
-                                    <p>Manage and track your COD orders</p>
-                                </div>
+                    {/* Standard Header */}
+                    <div className="page-header">
+                        <div className="page-header-left">
+                            <Link to="/app" className="back-btn">←</Link>
+                            <div className="page-title">
+                                <h1>📋 All Orders</h1>
+                                <p>Manage and track your COD orders</p>
                             </div>
                         </div>
                     </div>
