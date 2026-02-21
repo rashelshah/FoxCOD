@@ -10,7 +10,7 @@ import { authenticate } from "../shopify.server";
 import { getUpsellCampaigns, saveCampaign, deleteCampaign, toggleCampaignActive, syncUpsellsToMetafield } from "../services/upsell-offers.server";
 import { type UpsellCampaign, type UpsellType, type CampaignOffer, type CampaignDesign, type ButtonDesign, createDefaultCampaign, createDefaultOffer, DEFAULT_CAMPAIGN_DESIGN } from "../config/upsell-offers.types";
 import { ColorSelector, colorSelectorStyles } from "./ColorSelector";
-import { Page, Layout, Tabs, Card, Button, Badge, EmptyState, Text, InlineStack, BlockStack, Box, Divider, TextField, Select, ButtonGroup, Banner, LegacyCard, RangeSlider } from "@shopify/polaris";
+import { Page, Layout, Tabs, Card, Button, Badge, EmptyState, Text, InlineStack, BlockStack, Box, Divider, TextField, Select, ButtonGroup, Banner, LegacyCard, RangeSlider, Modal } from "@shopify/polaris";
 import { getFormSettings } from "../config/supabase.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -129,8 +129,9 @@ ${colorSelectorStyles}
 .up-card-actions{display:flex;align-items:center;gap:6px;flex-shrink:0}
 /* Icon Buttons */
 .up-icon-btn{width:32px;height:32px;border-radius:8px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s ease}
-.up-icon-btn.delete{background:rgba(239,68,68,.08);color:#ef4444}
-.up-icon-btn.delete:hover{background:rgba(239,68,68,.15)}
+.btn-delete-campaign{background:#fef2f2;border:1px solid #fecaca;color:#ef4444;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:14px;transition:all .15s ease}
+.btn-delete-campaign:hover{background:#fee2e2;border-color:#f87171}
+.up-group-row-cta{font-size:13px;font-weight:600;color:#1f2937}
 .up-edit-cta{font-size:12px;font-weight:700;color:#1f2937;cursor:pointer;white-space:nowrap}
 /* Empty State */
 .up-empty{text-align:center;padding:60px 20px;background:#fafafa;border-radius:16px;border:2px dashed #e5e7eb}
@@ -273,7 +274,21 @@ export default function UpsellDownsellPage() {
     const lastActionRef = useRef<any>(null);
     const pendingSaveRef = useRef<string | null>(null);
 
+    const [campaignToDelete, setCampaignToDelete] = useState<{ id: string, name: string } | null>(null);
+
     const filtered = useMemo(() => (initialCampaigns || []).filter((c: any) => c.type === activeTab), [initialCampaigns, activeTab]);
+
+    const deletingCampaignId = navigation.state === "submitting" && navigation.formData?.get("action") === "delete"
+        ? navigation.formData.get("campaignId")
+        : null;
+
+    const displayCampaigns = useMemo(() => {
+        if (!filtered) return [];
+        if (deletingCampaignId) {
+            return filtered.filter((c: any) => String(c.id) !== deletingCampaignId);
+        }
+        return filtered;
+    }, [filtered, deletingCampaignId]);
 
     const hasChanges = useMemo(() => {
         if (!editing) return false;
@@ -320,12 +335,18 @@ export default function UpsellDownsellPage() {
     };
 
     const handleDiscard = () => { if (savedStr) setEditing(JSON.parse(savedStr)); };
-    const handleDelete = (id: string, e: React.MouseEvent) => {
-        e.stopPropagation(); if (!confirm('Delete this campaign?')) return;
-        const fd = new FormData(); fd.append("action", "delete"); fd.append("campaignId", id);
-        submit(fd, { method: "post" });
-        if (editing?.id === id) { setEditing(null); setSavedStr(null); }
+    const handleDelete = (id: string, name: string, e: React.MouseEvent) => {
+        e.stopPropagation(); setCampaignToDelete({ id, name });
     };
+
+    const confirmDelete = useCallback(() => {
+        if (!campaignToDelete) return;
+        const fd = new FormData(); fd.append("action", "delete"); fd.append("campaignId", campaignToDelete.id);
+        submit(fd, { method: "post" });
+        if (editing?.id === campaignToDelete.id) { setEditing(null); setSavedStr(null); }
+        setCampaignToDelete(null);
+    }, [campaignToDelete, submit, editing?.id]);
+
     const handleToggle = (id: string, active: boolean, e: React.MouseEvent) => {
         e.stopPropagation();
         const fd = new FormData(); fd.append("action", "toggle"); fd.append("campaignId", id); fd.append("active", String(active));
@@ -405,6 +426,29 @@ export default function UpsellDownsellPage() {
                 <button onClick={handleDiscard} disabled={isSaving}>Discard</button>
             </ui-save-bar>
 
+            <Modal
+                open={!!campaignToDelete}
+                onClose={() => setCampaignToDelete(null)}
+                title={`Delete campaign: ${campaignToDelete?.name || 'Untitled'}`}
+                primaryAction={{
+                    content: 'Delete',
+                    onAction: confirmDelete,
+                    destructive: true,
+                }}
+                secondaryActions={[
+                    {
+                        content: 'Cancel',
+                        onAction: () => setCampaignToDelete(null),
+                    },
+                ]}
+            >
+                <Modal.Section>
+                    <Text as="p">
+                        Are you sure you want to delete this campaign? This cannot be undone.
+                    </Text>
+                </Modal.Section>
+            </Modal>
+
             <div className="up-page">
                 <div className="page-header">
                     <div className="page-header-left">
@@ -452,11 +496,11 @@ export default function UpsellDownsellPage() {
                                     </Card>
                                 ) : (
                                     <BlockStack gap="300">
-                                        {filtered.map((c: any) => {
+                                        {displayCampaigns.map((c: any) => {
                                             const firstOffer = c.offers?.[0];
                                             return (
                                                 <Card key={c.id}>
-                                                    <div style={{ cursor: 'pointer' }} onClick={() => handleEdit(c)}>
+                                                    <div className="up-row-card" style={{ cursor: 'pointer' }} onClick={() => handleEdit(c)}>
                                                         <InlineStack align="space-between" blockAlign="center" gap="400">
                                                             <InlineStack gap="400" blockAlign="center">
                                                                 <div className="up-card-img">{firstOffer?.upsell_product_image ? <img src={firstOffer.upsell_product_image} alt="" /> : '🎁'}</div>
@@ -474,10 +518,13 @@ export default function UpsellDownsellPage() {
                                                                 <div onClick={e => e.stopPropagation()}>
                                                                     <div className={`toggle-track ${c.active ? 'on' : ''}`} onClick={e => handleToggle(c.id, !c.active, e)}><div className="toggle-thumb" /></div>
                                                                 </div>
-                                                                <div onClick={e => { e.stopPropagation(); handleDelete(c.id, e); }}>
-                                                                    <Button tone="critical" variant="plain">🗑</Button>
-                                                                </div>
-                                                                <Text variant="bodySm" fontWeight="bold" as="span">Edit →</Text>
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn-delete-campaign"
+                                                                    title="Delete campaign"
+                                                                    onClick={(e) => handleDelete(c.id, c.campaign_name || 'Untitled', e)}
+                                                                >🗑</button>
+                                                                <span className="up-group-row-cta">Edit →</span>
                                                             </InlineStack>
                                                         </InlineStack>
                                                     </div>
