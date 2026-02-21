@@ -271,6 +271,7 @@ export interface OrderLogEntry {
     pincode?: string;
     shipping_label?: string;
     shipping_price?: number;
+    currency?: string;
     created_at?: string;
     // Partial COD tracking
     is_partial_cod?: boolean;
@@ -326,6 +327,7 @@ export async function logOrder(order: OrderLogEntry) {
     if (order.pincode != null) insertPayload.pincode = order.pincode;
     if (order.shipping_label != null) insertPayload.shipping_label = order.shipping_label;
     if (order.shipping_price != null) insertPayload.shipping_price = order.shipping_price;
+    if (order.currency != null) insertPayload.currency = order.currency;
 
     const { data, error } = await supabase
         .from('order_logs')

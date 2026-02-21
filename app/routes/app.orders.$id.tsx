@@ -13,8 +13,16 @@ import { ORDER_STATUSES, type OrderStatus } from "../config/constants";
  * Loader: Fetch single order
  */
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-    const { session } = await authenticate.admin(request);
+    const { admin, session } = await authenticate.admin(request);
     const shopDomain = session.shop;
+
+    // Query shop currency from Shopify Admin API
+    let shopCurrency = 'USD';
+    try {
+        const currencyRes = await admin.graphql(`{ shop { currencyCode } }`);
+        const currencyData = await currencyRes.json();
+        shopCurrency = currencyData?.data?.shop?.currencyCode || 'USD';
+    } catch (e) { console.log('Error fetching shop currency:', e); }
     const orderId = params.id;
 
     if (!orderId) {
@@ -33,7 +41,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         throw redirect("/app/orders");
     }
 
-    return { order, shop: shopDomain };
+    return { order, shop: shopDomain, shopCurrency };
 };
 
 /**
@@ -62,7 +70,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
  * Order Detail Component
  */
 export default function OrderDetailPage() {
-    const { order } = useLoaderData<typeof loader>();
+    const { order, shopCurrency } = useLoaderData<typeof loader>();
     const submit = useSubmit();
     const navigation = useNavigation();
 
@@ -70,12 +78,15 @@ export default function OrderDetailPage() {
 
     // Format currency
     const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat("en-IN", {
+        return new Intl.NumberFormat(undefined, {
             style: "currency",
-            currency: "INR",
+            currency: order.currency || shopCurrency || "USD",
             minimumFractionDigits: 0,
         }).format(amount);
     };
+
+    // Strip currency symbols/commas from note-parsed price strings before parseFloat
+    const parsePrice = (s: string) => parseFloat(s.replace(/[^\d.-]/g, '')) || 0;
 
     // Format date
     const formatDate = (date: string) => {
@@ -485,8 +496,8 @@ export default function OrderDetailPage() {
                                     const hasDiscount = notes.includes('BUNDLE DISCOUNT:');
                                     const hasShipping = notes.includes('SHIPPING:');
                                     const discountMatch = notes.match(/BUNDLE DISCOUNT:\s*([\d.]+)% off/);
-                                    const shippingMatch = notes.match(/SHIPPING:\s*(.+?)\s*\(₹([\d.]+)\)/);
-                                    const downsellMatch = notes.match(/DOWNSELL APPLIED:\s*(.+?)\s*\(₹([\d.]+)\)/);
+                                    const shippingMatch = notes.match(/SHIPPING:\s*(.+?)\s*\(([^)]+)\)/);
+                                    const downsellMatch = notes.match(/DOWNSELL APPLIED:\s*(.+?)\s*\(([^)]+)\)/);
                                     const upsellLines = notes.split('\n').filter((l: string) => l.trim().startsWith('-'));
 
                                     return (
@@ -494,7 +505,7 @@ export default function OrderDetailPage() {
                                             {downsellMatch ? (
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#374151' }}>
                                                     <span>Downsell: {downsellMatch[1]}</span>
-                                                    <span>{formatCurrency(parseFloat(downsellMatch[2]))} × {order.quantity}</span>
+                                                    <span>{formatCurrency(parsePrice(downsellMatch[2]))} × {order.quantity}</span>
                                                 </div>
                                             ) : null}
 
@@ -506,12 +517,12 @@ export default function OrderDetailPage() {
                                             ) : null}
 
                                             {upsellLines.length > 0 && upsellLines.map((line: string, idx: number) => {
-                                                const m = line.match(/-\s*(.+?)\s*\(₹([\d.]+)\)\s*x(\d+)\s*\[(.+?)\]/);
+                                                const m = line.match(/-\s*(.+?)\s*\(([^)]+)\)\s*x(\d+)\s*\[(.+?)\]/);
                                                 if (!m) return null;
                                                 return (
                                                     <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#059669' }}>
                                                         <span>+ {m[1]} ({m[4] === 'click_upsell' ? '1-Click' : m[4] === 'downsell' ? 'Downsell' : 'Tick'})</span>
-                                                        <span>{formatCurrency(parseFloat(m[2]))} × {m[3]}</span>
+                                                        <span>{formatCurrency(parsePrice(m[2]))} × {m[3]}</span>
                                                     </div>
                                                 );
                                             })}
@@ -519,7 +530,7 @@ export default function OrderDetailPage() {
                                             {hasShipping && shippingMatch ? (
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#374151' }}>
                                                     <span>Shipping: {shippingMatch[1]}</span>
-                                                    <span>{formatCurrency(parseFloat(shippingMatch[2]))}</span>
+                                                    <span>{formatCurrency(parsePrice(shippingMatch[2]))}</span>
                                                 </div>
                                             ) : null}
 
@@ -542,7 +553,7 @@ export default function OrderDetailPage() {
                             </div>
                             <div className="order-card-body">
                                 {order.customer_notes.split('\n').filter((line: string) => line.trim().startsWith('-')).map((line: string, idx: number) => {
-                                    const match = line.match(/-\s*(.+?)\s*\(₹([\d.]+)\)\s*x(\d+)\s*\[(.+?)\]/);
+                                    const match = line.match(/-\s*(.+?)\s*\(([^)]+)\)\s*x(\d+)\s*\[(.+?)\]/);
                                     if (!match) return null;
                                     const [, title, price, qty, type] = match;
                                     return (

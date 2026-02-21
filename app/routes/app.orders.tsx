@@ -15,8 +15,16 @@ import { ORDER_STATUSES, type OrderStatus } from "../config/constants";
  * Loader: Fetch all orders
  */
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-    const { session } = await authenticate.admin(request);
+    const { admin, session } = await authenticate.admin(request);
     const shopDomain = session.shop;
+
+    // Query shop currency from Shopify Admin API
+    let shopCurrency = 'USD';
+    try {
+        const currencyRes = await admin.graphql(`{ shop { currencyCode } }`);
+        const currencyData = await currencyRes.json();
+        shopCurrency = currencyData?.data?.shop?.currencyCode || 'USD';
+    } catch (e) { console.log('Error fetching shop currency:', e); }
 
     const url = new URL(request.url);
     const statusFilter = url.searchParams.get("status") as OrderStatus | null;
@@ -43,6 +51,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         statusFilter,
         pendingCount,
         confirmedCount,
+        shopCurrency,
     };
 };
 
@@ -77,7 +86,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
  * Orders Page Component - Premium Design
  */
 export default function OrdersPage() {
-    const { orders, totalCount, currentPage, totalPages, statusFilter, pendingCount, confirmedCount } = useLoaderData<typeof loader>();
+    const { orders, totalCount, currentPage, totalPages, statusFilter, pendingCount, confirmedCount, shopCurrency } = useLoaderData<typeof loader>();
     const navigation = useNavigation();
     const fetcher = useFetcher();
     const shopify = useAppBridge();
@@ -108,9 +117,9 @@ export default function OrdersPage() {
 
     // Format currency
     const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat("en-IN", {
+        return new Intl.NumberFormat(undefined, {
             style: "currency",
-            currency: "INR",
+            currency: shopCurrency || "USD",
             minimumFractionDigits: 0,
         }).format(amount);
     };
@@ -733,10 +742,10 @@ export default function OrdersPage() {
                                                     return lines.length > 0 ? (
                                                         <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
                                                             {lines.map((line: string, idx: number) => {
-                                                                const m = line.match(/-\s*(.+?)\s*\(₹([\d.]+)\)/);
+                                                                const m = line.match(/-\s*(.+?)\s*\(([^)]+)\)/);
                                                                 return m ? (
                                                                     <span key={idx} style={{ fontSize: '11px', padding: '2px 6px', borderRadius: '4px', background: '#ecfdf5', color: '#059669', fontWeight: 600, display: 'inline-block', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                                        + {m[1]} (₹{m[2]})
+                                                                        + {m[1]} ({m[2]})
                                                                     </span>
                                                                 ) : null;
                                                             })}

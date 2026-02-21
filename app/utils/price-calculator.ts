@@ -62,11 +62,11 @@ export function calculateBundlePrice(
 /**
  * Format price for display
  * @param price - Price to format
- * @param currencySymbol - Currency symbol (default: ₹)
+ * @param currencySymbol - Currency symbol (default: $)
  * @returns Formatted price string
  */
-export function formatPrice(price: number, currencySymbol: string = '₹'): string {
-    return `${currencySymbol}${price.toLocaleString('en-IN', {
+export function formatPrice(price: number, currencySymbol: string = '$'): string {
+    return `${currencySymbol}${price.toLocaleString(undefined, {
         minimumFractionDigits: 0,
         maximumFractionDigits: 2
     })}`;

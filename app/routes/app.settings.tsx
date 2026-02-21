@@ -305,6 +305,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         appUrl = url.origin;
     }
 
+    // Query shop currency from Shopify Admin API
+    let shopCurrency = 'USD';
+    try {
+        const currencyRes = await admin.graphql(`{ shop { currencyCode } }`);
+        const currencyData = await currencyRes.json();
+        shopCurrency = currencyData?.data?.shop?.currencyCode || 'USD';
+    } catch (e) { console.log('Error fetching shop currency:', e); }
+
     const merged = settings
         ? {
             ...defaultSettings,
@@ -313,7 +321,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             button_styles: { ...DEFAULT_BUTTON_STYLES, ...(settings.button_styles || {}) },
         }
         : { ...defaultSettings, shop_domain: shopDomain };
-    return { shop: shopDomain, settings: merged, shippingRates, appUrl, products, collections };
+    return { shop: shopDomain, settings: merged, shippingRates, appUrl, products, collections, shopCurrency };
 };
 
 /**
@@ -636,7 +644,8 @@ const PreviewDisplay = memo(({
     namePlaceholder, phonePlaceholder, addressPlaceholder,
     notesPlaceholder, submitButtonText,
     primaryColor, buttonStyle, buttonSize, borderRadius, modalStyle, animationStyle,
-    fields, formStyles, buttonStylesState, blocks, shippingOpts, shippingRates, shippingRatesEnabled, activeTab
+    fields, formStyles, buttonStylesState, blocks, shippingOpts, shippingRates, shippingRatesEnabled, activeTab,
+    fmtCurrency, currencySymbol
 }: any) => {
 
     // Calculate button styles - sync with storefront
@@ -850,7 +859,7 @@ const PreviewDisplay = memo(({
                                 <div className="preview-product-title">Sample Product</div>
                             )}
                             {activeTab !== 'button' && showPrice && (
-                                <div className="preview-product-price">₹1,999</div>
+                                <div className="preview-product-price">{fmtCurrency(1999)}</div>
                             )}
                             {/* Quantity +/- selector in live preview */}
                             {activeTab !== 'button' && (
@@ -955,15 +964,15 @@ const PreviewDisplay = memo(({
                                             </div>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280', marginBottom: '6px' }}>
                                                 <span>Subtotal</span>
-                                                <span>₹{subtotal.toLocaleString()}</span>
+                                                <span>{fmtCurrency(subtotal)}</span>
                                             </div>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#10b981', marginBottom: '6px' }}>
                                                 <span>Discount</span>
-                                                <span>-₹{discount.toLocaleString()}</span>
+                                                <span>-{fmtCurrency(discount)}</span>
                                             </div>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280', marginBottom: '8px' }}>
                                                 <span>Shipping</span>
-                                                <span>{shippingCost === 0 ? 'FREE' : `₹${shippingCost}`}</span>
+                                                <span>{shippingCost === 0 ? 'FREE' : fmtCurrency(shippingCost)}</span>
                                             </div>
                                             <div style={{
                                                 display: 'flex',
@@ -975,7 +984,7 @@ const PreviewDisplay = memo(({
                                                 borderTop: '1px dashed #d1d5db'
                                             }}>
                                                 <span>Total</span>
-                                                <span style={{ color: primaryColor }}>₹{total.toLocaleString()}</span>
+                                                <span style={{ color: primaryColor }}>{fmtCurrency(total)}</span>
                                             </div>
                                         </div>
                                     )}
@@ -1017,7 +1026,7 @@ const PreviewDisplay = memo(({
                                                     }}>
                                                         <input type="radio" name="shipping-preview" disabled checked={idx === 0} style={{ width: '12px', height: '12px' }} />
                                                         <span>{rate.name}{conditionText}</span>
-                                                        <span style={{ marginLeft: 'auto', fontWeight: 600 }}>{rate.price === 0 ? 'Free' : `₹${rate.price}`}</span>
+                                                        <span style={{ marginLeft: 'auto', fontWeight: 600 }}>{rate.price === 0 ? 'Free' : fmtCurrency(rate.price)}</span>
                                                     </div>
                                                 );
                                             })}
@@ -1047,7 +1056,7 @@ const PreviewDisplay = memo(({
                                                 }}>
                                                     <input type="radio" name="shipping-preview" disabled checked={opt.id === shippingOpts.defaultOption} style={{ width: '12px', height: '12px' }} />
                                                     <span>{opt.label}</span>
-                                                    <span style={{ marginLeft: 'auto', fontWeight: 600 }}>{opt.price === 0 ? 'Free' : `₹${opt.price}`}</span>
+                                                    <span style={{ marginLeft: 'auto', fontWeight: 600 }}>{opt.price === 0 ? 'Free' : fmtCurrency(opt.price)}</span>
                                                 </div>
                                             ))}
                                         </div>
@@ -1150,6 +1159,7 @@ interface ShippingRateModalProps {
     rate: ShippingRate | null;
     products: any[];
     collections: any[];
+    currencySymbol: string;
     onClose: () => void;
     onSave: (rateData: Omit<ShippingRate, 'id' | 'shop_domain' | 'created_at' | 'updated_at'>) => void;
 }
@@ -1211,7 +1221,7 @@ const INDIAN_STATES = [
     { code: 'CH', name: 'Chandigarh' },
 ];
 
-const ShippingRateModal = ({ rate, products, collections, onClose, onSave }: ShippingRateModalProps) => {
+const ShippingRateModal = ({ rate, products, collections, currencySymbol, onClose, onSave }: ShippingRateModalProps) => {
     const [name, setName] = useState(rate?.name || '');
     const [description, setDescription] = useState(rate?.description || '');
     const [price, setPrice] = useState(rate?.price ?? 0);
@@ -1342,7 +1352,7 @@ const ShippingRateModal = ({ rate, products, collections, onClose, onSave }: Shi
                             <label className="sr-label">Price</label>
                             <div className="sr-price-row">
                                 <div className="sr-price-input-wrap">
-                                    <span className="sr-currency">₹</span>
+                                    <span className="sr-currency">{currencySymbol}</span>
                                     <input type="number" value={price} onChange={(e) => setPrice(Number(e.target.value))} min="0" placeholder="0" className="sr-input sr-price-input" />
                                 </div>
                                 <button type="button" className={`sr-free-btn ${price === 0 ? 'active' : ''}`} onClick={() => setPrice(0)}>Free shipping</button>
@@ -1367,7 +1377,7 @@ const ShippingRateModal = ({ rate, products, collections, onClose, onSave }: Shi
                                     <button className="sr-remove-link" onClick={() => { setShowConditions(false); setConditionType('none'); setMinValue(''); setMaxValue(''); }}>✕ Remove</button>
                                 </div>
                                 <select value={conditionType === 'none' ? 'order_price' : conditionType} onChange={(e) => setConditionType(e.target.value as any)} className="sr-select" style={{ marginBottom: '12px' }}>
-                                    <option value="order_price">Order price (₹)</option>
+                                    <option value="order_price">Order price ({currencySymbol})</option>
                                     <option value="order_quantity">Order quantity (items)</option>
                                     <option value="order_weight">Order weight (kg)</option>
                                 </select>
@@ -1554,7 +1564,17 @@ const ImportShippingModal = ({ onClose, onImport }: ImportShippingModalProps) =>
  * Settings Page Component - Premium Form Builder
  */
 export default function SettingsPage() {
-    const { shop, settings, shippingRates: initialShippingRates, products, collections } = useLoaderData<typeof loader>();
+    const { shop, settings, shippingRates: initialShippingRates, products, collections, shopCurrency } = useLoaderData<typeof loader>();
+
+    // Dynamic currency formatter
+    const fmtCurrency = useCallback((amount: number) => {
+        try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: shopCurrency || 'USD', minimumFractionDigits: 0 }).format(amount); }
+        catch { return `${shopCurrency} ${amount}`; }
+    }, [shopCurrency]);
+    const currencySymbol = useMemo(() => {
+        try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: shopCurrency || 'USD' }).formatToParts(0).find(p => p.type === 'currency')?.value || '$'; }
+        catch { return '$'; }
+    }, [shopCurrency]);
     const actionData = useActionData<typeof action>();
     const submit = useSubmit();
     const navigation = useNavigation();
@@ -3668,7 +3688,7 @@ export default function SettingsPage() {
                                         {partialCodEnabled && (
                                             <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                                 <div className="input-group">
-                                                    <label className="input-label">Advance Amount (₹)</label>
+                                                    <label className="input-label">Advance Amount ({currencySymbol})</label>
                                                     <input
                                                         type="number"
                                                         className="text-input"
@@ -3683,7 +3703,7 @@ export default function SettingsPage() {
                                                     </p>
                                                 </div>
                                                 <div className="input-group">
-                                                    <label className="input-label">Commission per Order (₹)</label>
+                                                    <label className="input-label">Commission per Order ({currencySymbol})</label>
                                                     <input
                                                         type="number"
                                                         className="text-input"
@@ -3700,7 +3720,7 @@ export default function SettingsPage() {
                                                 </div>
                                                 <div style={{ padding: '12px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
                                                     <p style={{ fontSize: '13px', color: '#1d4ed8', margin: 0 }}>
-                                                        <strong>ⓘ How it works:</strong> When enabled, customers will see an option to pay ₹{partialCodAdvanceAmount} online now, with the remaining balance due on delivery.
+                                                        <strong>ⓘ How it works:</strong> When enabled, customers will see an option to pay {fmtCurrency(partialCodAdvanceAmount)} online now, with the remaining balance due on delivery.
                                                     </p>
                                                 </div>
                                             </div>
@@ -3856,7 +3876,7 @@ export default function SettingsPage() {
                                                                             </td>
                                                                             <td>
                                                                                 <span className={`shipping-price-badge ${rate.price === 0 ? 'free' : ''}`}>
-                                                                                    {rate.price === 0 ? 'FREE' : `₹${rate.price}`}
+                                                                                    {rate.price === 0 ? 'FREE' : fmtCurrency(rate.price)}
                                                                                 </span>
                                                                             </td>
                                                                             <td>
@@ -4036,6 +4056,8 @@ export default function SettingsPage() {
                                 shippingRates={shippingRates}
                                 shippingRatesEnabled={shippingRatesEnabled}
                                 activeTab={activeTab}
+                                fmtCurrency={fmtCurrency}
+                                currencySymbol={currencySymbol}
                             />
                         </div>
 
@@ -4048,6 +4070,7 @@ export default function SettingsPage() {
                         rate={editingRate}
                         products={products}
                         collections={collections}
+                        currencySymbol={currencySymbol}
                         onClose={() => {
                             setShowShippingRateModal(false);
                             setEditingRate(null);

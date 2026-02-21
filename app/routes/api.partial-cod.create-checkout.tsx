@@ -100,10 +100,12 @@ export async function action({ request }: ActionFunctionArgs) {
         // Calculate the total order value (for note purposes)
         const totalOrderValue = (price * quantity) + (shippingPrice || 0);
         const actualRemainingAmount = totalOrderValue - advanceAmount;
+        const currencyCode = body.currency || 'USD';
+        const fmtAmt = (amt: number) => { try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: currencyCode }).format(amt); } catch { return `${currencyCode} ${amt.toFixed(2)}`; } };
 
         // Create a draft order with the advance amount as a custom line item
         const draftOrderInput = {
-            note: `PARTIAL COD ORDER | Advance: ₹${advanceAmount} | Remaining (COD): ₹${actualRemainingAmount.toFixed(2)} | Original Product: ${productTitle} (Qty: ${quantity})`,
+            note: `PARTIAL COD ORDER | Advance: ${fmtAmt(advanceAmount)} | Remaining (COD): ${fmtAmt(actualRemainingAmount)} | Original Product: ${productTitle} (Qty: ${quantity})`,
             email: customerEmail || undefined,
             phone: customerPhone || undefined,
             tags: ["partial-cod", "advance-payment"],

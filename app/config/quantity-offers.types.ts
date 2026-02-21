@@ -102,7 +102,7 @@ export const DEFAULT_OFFER_DESIGN: OfferDesignSettings = {
     titleFontWeight: 600,
     priceTextSize: 16,
     priceFontWeight: 700,
-    currencySymbol: '₹',
+    currencySymbol: '$',
 
     // Advanced
     hideProductImage: false,

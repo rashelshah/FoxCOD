@@ -120,6 +120,7 @@
      id="cod-data-{{ product.id }}"
      style="display: none;"
      data-product-id="{{ product.id }}"
+     data-currency="{{ shop.currency }}"
      data-variant-id="{{ current_variant.id }}"
      data-product-title="{{ product.title | escape }}"
      data-product-price="{{ current_variant.price | divided_by: 100.0 }}"
@@ -167,6 +168,9 @@
 {% comment %} Inject settings into global scope for reliable JavaScript access {% endcomment %}
 <script>
   window.FoxCod = window.FoxCod || {};
+  // Dynamic currency from shop settings
+  window.FoxCod.currency = "{{ shop.currency }}";
+  window.FoxCod.moneyFormat = {{ shop.money_format | json }};
   try {
     // Metafield .value outputs Ruby hash syntax (=>), use | json to convert to JS
     var offersData = {{ shop.metafields.fox_cod.quantity_offers_json.value | json }};

@@ -33,7 +33,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         return { ...c, offers: enrichedOffers };
     }));
     const formSettings = await getFormSettings(shopDomain);
-    return { shopDomain, campaigns: enriched, formSettings };
+
+    // Query shop currency from Shopify Admin API
+    let shopCurrency = 'USD';
+    try {
+        const currencyRes = await admin.graphql(`{ shop { currencyCode } }`);
+        const currencyData = await currencyRes.json();
+        shopCurrency = currencyData?.data?.shop?.currencyCode || 'USD';
+    } catch (e) { console.log('Error fetching shop currency:', e); }
+
+    return { shopDomain, campaigns: enriched, formSettings, shopCurrency };
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -260,12 +269,22 @@ ${colorSelectorStyles}
 `;
 
 export default function UpsellDownsellPage() {
-    const { shopDomain, campaigns: initialCampaigns, formSettings } = useLoaderData<typeof loader>();
+    const { shopDomain, campaigns: initialCampaigns, formSettings, shopCurrency } = useLoaderData<typeof loader>();
     const actionData = useActionData<typeof action>();
     const submit = useSubmit();
     const navigation = useNavigation();
     const shopify = useAppBridge();
     const isSaving = navigation.state === "submitting";
+
+    // Dynamic currency formatter
+    const fmtCurrency = useCallback((amount: number) => {
+        try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: shopCurrency || 'USD', minimumFractionDigits: 0 }).format(amount); }
+        catch { return `${shopCurrency} ${amount}`; }
+    }, [shopCurrency]);
+    const currencySymbol = useMemo(() => {
+        try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: shopCurrency || 'USD' }).formatToParts(0).find(p => p.type === 'currency')?.value || '$'; }
+        catch { return '$'; }
+    }, [shopCurrency]);
 
     const [activeTab, setActiveTab] = useState<UpsellType>('click_upsell');
     const tickPreviewRef = useRef<HTMLDivElement>(null);
@@ -509,7 +528,7 @@ export default function UpsellDownsellPage() {
                                                                     <InlineStack gap="200" align="start">
                                                                         <Text variant="bodySm" tone="subdued" as="span">{c.offers?.length || 0} offer{c.offers?.length !== 1 ? 's' : ''}</Text>
                                                                         {firstOffer?.discount_value > 0 && (
-                                                                            <Badge tone="success">{`${firstOffer.discount_type === 'percentage' ? `${firstOffer.discount_value}%` : `₹${firstOffer.discount_value}`} OFF`}</Badge>
+                                                                            <Badge tone="success">{`${firstOffer.discount_type === 'percentage' ? `${firstOffer.discount_value}%` : fmtCurrency(firstOffer.discount_value)} OFF`}</Badge>
                                                                         )}
                                                                     </InlineStack>
                                                                 </BlockStack>
@@ -660,7 +679,7 @@ export default function UpsellDownsellPage() {
                                                     <div className="tick-pv-product">
                                                         <div className="tick-pv-product-img">📦</div>
                                                         <div className="tick-pv-product-title">Sample Product</div>
-                                                        <div className="tick-pv-product-price">₹1,999</div>
+                                                        <div className="tick-pv-product-price">{fmtCurrency(1999)}</div>
 
                                                         {/* COD Form Modal - uses real Form Builder settings + modal style */}
                                                         <div style={(() => {
@@ -843,14 +862,14 @@ export default function UpsellDownsellPage() {
                                                                         const total = unitPrice + shippingCost + tickUpsellPrice;
                                                                         return (
                                                                             <>
-                                                                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280', marginBottom: '6px' }}><span>Subtotal (1 item)</span><span>₹{unitPrice.toLocaleString()}</span></div>
+                                                                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280', marginBottom: '6px' }}><span>Subtotal (1 item)</span><span>{fmtCurrency(unitPrice)}</span></div>
                                                                                 {shippingEnabled && (
-                                                                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280', marginBottom: '8px' }}><span>Shipping</span><span>{shippingCost === 0 ? 'FREE' : `₹${shippingCost}`}</span></div>
+                                                                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280', marginBottom: '8px' }}><span>Shipping</span><span>{shippingCost === 0 ? 'FREE' : fmtCurrency(shippingCost)}</span></div>
                                                                                 )}
                                                                                 {tickUpsellPrice > 0 && (
-                                                                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#059669', marginBottom: '6px' }}><span>{tickOffer?.upsell_product_title || 'Upsell'}</span><span>₹{tickUpsellPrice.toFixed(2)}</span></div>
+                                                                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#059669', marginBottom: '6px' }}><span>{tickOffer?.upsell_product_title || 'Upsell'}</span><span>{fmtCurrency(tickUpsellPrice)}</span></div>
                                                                                 )}
-                                                                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 700, color: '#111827', paddingTop: '8px', borderTop: '1px dashed #d1d5db' }}><span>Total</span><span style={{ color: formSettings?.primary_color || '#10b981' }}>₹{total.toLocaleString()}</span></div>
+                                                                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 700, color: '#111827', paddingTop: '8px', borderTop: '1px dashed #d1d5db' }}><span>Total</span><span style={{ color: formSettings?.primary_color || '#10b981' }}>{fmtCurrency(total)}</span></div>
                                                                             </>
                                                                         );
                                                                     })()}
@@ -871,7 +890,7 @@ export default function UpsellDownsellPage() {
                                                                         <div key={opt.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', color: '#6b7280', marginBottom: '4px' }}>
                                                                             <input type="radio" name="tick-shipping-preview" disabled checked={opt.id === formSettings?.shipping_options?.defaultOption} style={{ width: '12px', height: '12px' }} />
                                                                             <span>{opt.label}</span>
-                                                                            <span style={{ marginLeft: 'auto', fontWeight: 600 }}>{opt.price === 0 ? 'Free' : `₹${opt.price}`}</span>
+                                                                            <span style={{ marginLeft: 'auto', fontWeight: 600 }}>{opt.price === 0 ? 'Free' : fmtCurrency(opt.price)}</span>
                                                                         </div>
                                                                     ))}
                                                                 </div>
@@ -1045,7 +1064,7 @@ export default function UpsellDownsellPage() {
                                                         <div className="fg">
                                                             <input type="number" min="0" value={offer.discount_value} onChange={e => updOffer(offer.id, { discount_value: parseFloat(e.target.value) || 0 })} />
                                                         </div>
-                                                        <div style={{ alignSelf: 'center', fontWeight: 700, fontSize: 18, color: '#374151' }}>{offer.discount_type === 'percentage' ? '%' : '₹'}</div>
+                                                        <div style={{ alignSelf: 'center', fontWeight: 700, fontSize: 18, color: '#374151' }}>{offer.discount_type === 'percentage' ? '%' : currencySymbol}</div>
                                                     </div>
                                                 </>
                                             );
@@ -1063,7 +1082,7 @@ export default function UpsellDownsellPage() {
                                                     {offer.upsell_product_id ? (
                                                         <div className="prod-row" style={{ marginTop: 8 }}>
                                                             {offer.upsell_product_image && <img src={offer.upsell_product_image} alt="" />}
-                                                            <div className="prod-row-info"><div className="name">{offer.upsell_product_title}</div><div className="vid">₹{offer.original_price?.toFixed(2) || '0.00'}</div></div>
+                                                            <div className="prod-row-info"><div className="name">{offer.upsell_product_title}</div><div className="vid">{fmtCurrency(offer.original_price || 0)}</div></div>
                                                             <button className="prod-x" onClick={() => updOffer(offer.id, { upsell_product_id: '', upsell_variant_id: '', upsell_product_title: '', upsell_product_image: '', original_price: 0, offer_price: 0, _selectedProduct: undefined })}>×</button>
                                                         </div>
                                                     ) : (
@@ -1291,7 +1310,7 @@ export default function UpsellDownsellPage() {
                                                         const offer = editing.offers?.[0];
                                                         const origPrice = offer?.original_price || 0;
                                                         const discountVal = offer?.discount_value || 10;
-                                                        const discountLabel = offer?.discount_type === 'percentage' ? discountVal + '%' : '₹' + discountVal;
+                                                        const discountLabel = offer?.discount_type === 'percentage' ? discountVal + '%' : currencySymbol + discountVal;
                                                         const discountedPrice = offer?.discount_type === 'percentage'
                                                             ? Math.round((origPrice - origPrice * discountVal / 100) * 100) / 100
                                                             : Math.max(0, origPrice - discountVal);
@@ -1409,8 +1428,8 @@ export default function UpsellDownsellPage() {
                                                                 {
                                                                     origPrice > 0 && (
                                                                         <div style={{ textAlign: 'center', padding: '0 20px 12px' }}>
-                                                                            {discountVal > 0 && <s style={{ color: '#9ca3af', fontSize: 14, marginRight: 8 }}>₹{origPrice.toFixed(2)}</s>}
-                                                                            <strong style={{ fontSize: 20, color: '#1f2937' }}>₹{discountedPrice.toFixed(2)}</strong>
+                                                                            {discountVal > 0 && <s style={{ color: '#9ca3af', fontSize: 14, marginRight: 8 }}>{fmtCurrency(origPrice)}</s>}
+                                                                            <strong style={{ fontSize: 20, color: '#1f2937' }}>{fmtCurrency(discountedPrice)}</strong>
                                                                         </div>
                                                                     )
                                                                 }
@@ -1487,8 +1506,8 @@ export default function UpsellDownsellPage() {
                                         )}
                                         {editing.show_condition_type === 'order_value' && (
                                             <div className="fr">
-                                                <div className="fg"><label>Min (₹)</label><input type="number" min="0" value={editing.min_order_value} onChange={e => upd({ min_order_value: parseFloat(e.target.value) || 0 })} /></div>
-                                                <div className="fg"><label>Max (₹)</label><input type="number" min="0" value={editing.max_order_value} onChange={e => upd({ max_order_value: parseFloat(e.target.value) || 0 })} /></div>
+                                                <div className="fg"><label>Min ({currencySymbol})</label><input type="number" min="0" value={editing.min_order_value} onChange={e => upd({ min_order_value: parseFloat(e.target.value) || 0 })} /></div>
+                                                <div className="fg"><label>Max ({currencySymbol})</label><input type="number" min="0" value={editing.max_order_value} onChange={e => upd({ max_order_value: parseFloat(e.target.value) || 0 })} /></div>
                                             </div>
                                         )}
                                     </div>
@@ -1503,7 +1522,7 @@ export default function UpsellDownsellPage() {
                                             <div key={offer.id} className="offer-card">
                                                 <div className="offer-header" onClick={() => updOffer(offer.id, { expanded: !offer.expanded })}>
                                                     <span className="drag">⋮⋮</span>
-                                                    <span className="title">Offer #{idx + 1} {offer.discount_value > 0 ? ` -${offer.discount_type === 'percentage' ? offer.discount_value + '%' : '₹' + offer.discount_value}` : ''}</span>
+                                                    <span className="title">Offer #{idx + 1} {offer.discount_value > 0 ? ` -${offer.discount_type === 'percentage' ? offer.discount_value + '%' : currencySymbol + offer.discount_value}` : ''}</span>
                                                     <span className={`chevron ${offer.expanded ? 'open' : ''}`}>▼</span>
                                                     {editing.offers.length > 1 && <button className="del-offer" onClick={e => { e.stopPropagation(); delOffer(offer.id); }}>🗑</button>}
                                                 </div>
@@ -1527,7 +1546,7 @@ export default function UpsellDownsellPage() {
                                                                         <option value="percentage">Percentage</option><option value="fixed">Fixed</option>
                                                                     </select>
                                                                     <input type="number" min="0" value={offer.discount_value} onChange={e => updOffer(offer.id, { discount_value: parseFloat(e.target.value) || 0 })} style={{ width: 80 }} />
-                                                                    <span style={{ alignSelf: 'center', fontWeight: 600 }}>{offer.discount_type === 'percentage' ? '%' : '₹'}</span>
+                                                                    <span style={{ alignSelf: 'center', fontWeight: 600 }}>{offer.discount_type === 'percentage' ? '%' : currencySymbol}</span>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -1805,13 +1824,13 @@ export default function UpsellDownsellPage() {
                                                         {activeOffer && activeOffer.discount_value > 0 && (
                                                             <div className="pv-discount">
                                                                 <span style={{ background: editing.design.discountTag.bgColor, color: editing.design.discountTag.textColor, fontSize: editing.design.discountTag.textSize, borderRadius: editing.design.discountTag.borderRadius }}>
-                                                                    {(editing.design.discountTag.text || '- {discount}').replace('{discount}', activeOffer.discount_type === 'percentage' ? activeOffer.discount_value + '%' : '₹' + activeOffer.discount_value)}
+                                                                    {(editing.design.discountTag.text || '- {discount}').replace('{discount}', activeOffer.discount_type === 'percentage' ? activeOffer.discount_value + '%' : currencySymbol + activeOffer.discount_value)}
                                                                 </span>
                                                             </div>
                                                         )}
                                                         <div className="pv-prices">
-                                                            {activeOffer && activeOffer.discount_value > 0 && <s>₹{activeOffer.original_price.toFixed(2)}</s>}
-                                                            <strong>₹{activeOfferPrice.toFixed(2)}</strong>
+                                                            {activeOffer && activeOffer.discount_value > 0 && <s>{fmtCurrency(activeOffer.original_price)}</s>}
+                                                            <strong>{fmtCurrency(activeOfferPrice)}</strong>
                                                         </div>
                                                         <button className={`pv-accept ${editing.design.acceptButton.animation && editing.design.acceptButton.animation !== 'none' ? 'pv-anim-' + editing.design.acceptButton.animation : ''}`} style={{ background: editing.design.acceptButton.bgColor, color: editing.design.acceptButton.textColor, fontSize: editing.design.acceptButton.textSize, borderRadius: editing.design.acceptButton.borderRadius, borderWidth: editing.design.acceptButton.borderWidth, borderStyle: 'solid', borderColor: editing.design.acceptButton.borderColor, fontWeight: editing.design.acceptButton.bold ? 700 : 400, boxShadow: editing.design.acceptButton.shadow ? '0 4px 12px rgba(0,0,0,0.15)' : 'none' }}>
                                                             {editing.design.acceptButton.text}

@@ -13,14 +13,23 @@ import { ORDER_STATUSES } from "../config/constants";
  * Loader: Fetch analytics data
  */
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-    const { session } = await authenticate.admin(request);
+    const { admin, session } = await authenticate.admin(request);
     const shopDomain = session.shop;
+
+    // Query shop currency from Shopify Admin API
+    let shopCurrency = 'USD';
+    try {
+        const currencyRes = await admin.graphql(`{ shop { currencyCode } }`);
+        const currencyData = await currencyRes.json();
+        shopCurrency = currencyData?.data?.shop?.currencyCode || 'USD';
+    } catch (e) { console.log('Error fetching shop currency:', e); }
 
     const stats = await getOrderStats(shopDomain);
 
     return {
         shop: shopDomain,
         stats,
+        shopCurrency,
     };
 };
 
@@ -28,13 +37,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
  * Analytics Page Component
  */
 export default function AnalyticsPage() {
-    const { stats } = useLoaderData<typeof loader>();
+    const { stats, shopCurrency } = useLoaderData<typeof loader>();
 
     // Format currency
     const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat("en-IN", {
+        return new Intl.NumberFormat(undefined, {
             style: "currency",
-            currency: "INR",
+            currency: shopCurrency || "USD",
             minimumFractionDigits: 0,
         }).format(amount);
     };
