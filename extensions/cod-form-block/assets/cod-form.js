@@ -249,8 +249,7 @@
       var DEFAULT_FIELDS = [
           { id: 'name', label: 'Full Name', type: 'text', visible: true, required: true, order: 1 },
           { id: 'phone', label: 'Phone Number', type: 'tel', visible: true, required: true, order: 2 },
-          { id: 'address', label: 'Address', type: 'textarea', visible: true, required: true, order: 3 },
-          { id: 'quantity', label: 'Quantity', type: 'number', visible: true, required: false, order: 9 }
+          { id: 'address', label: 'Address', type: 'textarea', visible: true, required: true, order: 3 }
       ];
 
       // Debug: Log raw data attribute
@@ -1063,6 +1062,19 @@
         hideProductHeaderIfOffersActive(container);
     }
 
+    // Hide quantity selector when bundle offers are active (bundles control quantity)
+    var qtySelector = container.querySelector('.cod-product-qty');
+    if (qtySelector) {
+        // Check for bundle offers in the modal OR on the product page
+        var hasProductPageOffers = document.querySelector('.cod-product-page-offers[data-product-id="' + config.productId + '"]');
+        if (quantityOffersEl || hasProductPageOffers) {
+            qtySelector.style.display = 'none';
+            console.log('[COD Form] Hiding quantity selector — bundle offers active');
+        } else {
+            qtySelector.style.display = 'flex';
+        }
+    }
+
     // 2. Render Rate Card (Order Summary) if enabled
     console.log('[COD Form] Checking order summary - blocks:', config.blocks, 'order_summary:', config.blocks?.order_summary);
     if (config.blocks && config.blocks.order_summary) {
@@ -1157,6 +1169,12 @@
 
     sortedFields.forEach(function(field) {
         console.log('[COD Form] Processing field:', field.id, 'visible:', field.visible);
+        
+        // Skip quantity field — now rendered in cod-product-qty next to product image
+        if (field.id === 'quantity') {
+            console.log('[COD Form] Skipping quantity field (moved to product info)');
+            return;
+        }
         
         if (!field.visible) {
             console.log('[COD Form] Skipping invisible field:', field.id);
@@ -1667,8 +1685,9 @@
               console.warn('[COD Form] Failed to parse product page offer for quantity:', e);
           }
       }
-      // Fallback to quantity input
-      var qtyInput = form.querySelector('[name="quantity"]');
+      // Fallback to quantity input (check container first since qty is outside <form>)
+      var container = form.closest('.cod-form-container') || form.parentElement;
+      var qtyInput = (container && container.querySelector('.cod-product-qty .cod-qty-input')) || form.querySelector('[name="quantity"]');
       return parseInt(qtyInput ? qtyInput.value : 1) || 1;
   }
 
@@ -1799,13 +1818,13 @@
 
       applicableRates.forEach(function(rate, index) {
           var card = document.createElement('label');
-          card.style.cssText = 'display:flex;align-items:center;gap:12px;padding:12px 14px;border:2px solid ' + (index === 0 ? (config.primaryColor || '#6366f1') : '#e5e7eb') + ';border-radius:10px;cursor:pointer;margin-bottom:8px;background:' + (index === 0 ? 'rgba(99,102,241,0.04)' : '#fff') + ';transition:all 0.2s ease;';
+          card.style.cssText = 'display:flex;align-items:center;gap:12px;padding:12px 14px;border:2px solid #e5e7eb;border-radius:10px;cursor:pointer;margin-bottom:8px;background:#fff;transition:all 0.2s ease;';
           
           var radio = document.createElement('input');
           radio.type = 'radio';
           radio.name = 'shipping_method';
           radio.value = rate.id;
-          radio.checked = index === 0;
+          radio.setAttribute('data-price', rate.price);
           radio.style.cssText = 'accent-color:' + (config.primaryColor || '#6366f1') + ';width:18px;height:18px;flex-shrink:0;cursor:pointer;margin:0;';
           
           // Add change listener to update total and card styles
@@ -1874,9 +1893,7 @@
       }
       
       // Update total with first rate's price
-      if (applicableRates.length > 0) {
-          updateTotalHelper(form, config, applicableRates[0].price);
-      }
+      // Don't auto-select or auto-update total — let user choose shipping
       
       console.log('[COD Form] Rendered new shipping rates:', applicableRates.length, 'of', config.shippingRates.length);
       
@@ -1950,7 +1967,7 @@
               id: 'full_cod',
               label: 'Full COD',
               description: 'Pay ₹' + orderTotal.toFixed(0) + ' on delivery',
-              checked: true
+              checked: false
           },
           {
               id: 'partial_cod',
@@ -1969,9 +1986,9 @@
           row.style.alignItems = 'flex-start';
           row.style.gap = '12px';
           row.style.padding = '14px';
-          row.style.background = opt.checked ? 'rgba(99, 102, 241, 0.1)' : '#fff';
+          row.style.background = '#fff';
           row.style.borderRadius = '10px';
-          row.style.border = '2px solid ' + (opt.checked ? config.primaryColor : '#e5e7eb');
+          row.style.border = '2px solid #e5e7eb';
           row.style.cursor = 'pointer';
           row.style.transition = 'all 0.2s ease';
 
@@ -1980,6 +1997,7 @@
           radio.name = 'payment_method';
           radio.value = opt.id;
           radio.checked = opt.checked;
+          var row_isChecked = opt.checked;
           radio.style.marginTop = '2px';
           radio.style.accentColor = config.primaryColor;
 
@@ -2116,7 +2134,14 @@
       
       // Fallback: also check qty input if no offer found
       if (quantity === 1 && !quantityOffersEl) {
+          // The quantity input lives in .cod-product-qty which is OUTSIDE the form
           var qtyInput = form.querySelector('[name="quantity"]');
+          if (!qtyInput) {
+              var parentContainer = form.closest('.cod-form-container') || form.closest('.cod-modal') || form.parentElement;
+              if (parentContainer) {
+                  qtyInput = parentContainer.querySelector('.cod-product-qty .cod-qty-input');
+              }
+          }
           quantity = parseInt(qtyInput ? qtyInput.value : 1) || 1;
       }
       
@@ -2473,14 +2498,21 @@
    * Quantity Selector Logic
    */
   function setupQuantitySelector(form, config) {
-    var input = form.querySelector('input[name="quantity"]');
-    var minus = form.querySelector('.cod-qty-minus');
-    var plus = form.querySelector('.cod-qty-plus');
+    // Look for the quantity selector in the product info area (parent container)
+    var container = form.closest('.cod-form-container') || form.parentElement;
+    var input = container.querySelector('.cod-product-qty .cod-qty-input') || form.querySelector('input[name="quantity"]');
+    var minus = container.querySelector('.cod-product-qty .cod-qty-minus') || form.querySelector('.cod-qty-minus');
+    var plus = container.querySelector('.cod-product-qty .cod-qty-plus') || form.querySelector('.cod-qty-plus');
     
-    if (!input || !minus || !plus) return;
+    if (!input || !minus || !plus) {
+        console.log('[COD Form] Quantity selector not found');
+        return;
+    }
+
+    console.log('[COD Form] Quantity selector wired up');
 
     minus.addEventListener('click', function() {
-        var val = parseInt(input.value);
+        var val = parseInt(input.value) || 1;
         if (val > 1) {
             input.value = val - 1;
             triggerUpdate();
@@ -2488,26 +2520,20 @@
     });
 
     plus.addEventListener('click', function() {
-        var val = parseInt(input.value);
-        if (val < config.maxQuantity) {
+        var val = parseInt(input.value) || 1;
+        var max = parseInt(input.max) || config.maxQuantity || 10;
+        if (val < max) {
             input.value = val + 1;
             triggerUpdate();
         }
     });
 
     function triggerUpdate() {
-        // Find selected shipping if exists
+        // Read shipping price directly from the selected radio's data-price attribute
         var shippingPrice = 0;
-        if (config.shippingOptions && config.shippingOptions.enabled) {
-            var selected = form.querySelector('input[name="shipping_method"]:checked');
-            if (selected) {
-                 var opt = config.shippingOptions.options.find(o => o.id === selected.value);
-                 if (opt) shippingPrice = opt.price;
-            } else {
-                 // default
-                 var def = config.shippingOptions.options.find(o => o.id === config.shippingOptions.defaultOption);
-                 if (def) shippingPrice = def.price;
-            }
+        var selectedShipping = form.querySelector('input[name="shipping_method"]:checked');
+        if (selectedShipping) {
+            shippingPrice = parseFloat(selectedShipping.getAttribute('data-price')) || 0;
         }
         updateTotalHelper(form, config, shippingPrice);
     }
@@ -3495,7 +3521,7 @@
           notes: formData.get('notes') || '',
           productId: config.productId,
           variantId: config.variantId,
-          quantity: parseInt(formData.get('quantity') || '1'),
+          quantity: parseInt(formData.get('quantity') || ((form.closest('.cod-form-container') || form.parentElement).querySelector('.cod-product-qty .cod-qty-input') || {}).value || '1'),
           price: parseFloat(config.productPrice),
           productTitle: config.productTitle,
           shippingLabel: '',

@@ -119,8 +119,7 @@ export const DEFAULT_FIELDS: FormField[] = [
     { id: 'city', label: 'City', type: 'text', visible: false, required: false, order: 6 },
     { id: 'email', label: 'Email', type: 'email', visible: false, required: false, order: 7 },
     { id: 'notes', label: 'Notes', type: 'textarea', visible: false, required: false, order: 8 },
-    { id: 'quantity', label: 'Quantity', type: 'number', visible: true, required: false, order: 9 },
-    { id: 'marketing', label: 'Buyer accepts marketing', type: 'checkbox', visible: false, required: false, order: 10 },
+    { id: 'marketing', label: 'Buyer accepts marketing', type: 'checkbox', visible: false, required: false, order: 9 },
 ];
 
 /**
