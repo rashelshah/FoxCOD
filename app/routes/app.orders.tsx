@@ -168,6 +168,7 @@ export default function OrdersPage() {
                     display: flex;
                     align-items: center;
                     justify-content: space-between;
+                    margin-top: 16px;
                     margin-bottom: 24px;
                 }
 
