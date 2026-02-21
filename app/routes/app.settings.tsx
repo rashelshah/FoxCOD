@@ -654,6 +654,8 @@ const PreviewDisplay = memo(({
         const buttonColor = primaryColor;
         const borderCol = btn.borderColor || buttonColor;
         const borderW = btn.borderWidth ?? 0;
+        // Use targeted transition when transform-based animation is active
+        const hasTransformAnim = btn.animationPreset && btn.animationPreset !== 'none' && btn.animationPreset !== 'glow' && btn.animationPreset !== 'gradient-flow';
         const base: any = {
             width: '100%',
             padding: buttonSize === 'small' ? '10px' : buttonSize === 'large' ? '16px' : '13px',
@@ -663,7 +665,7 @@ const PreviewDisplay = memo(({
             fontSize: (btn.textSize ?? 15) + 'px',
             border: borderW ? `${borderW}px solid ${borderCol}` : 'none',
             cursor: 'pointer',
-            transition: 'all 0.2s ease',
+            transition: hasTransformAnim ? 'opacity 0.2s ease, background-color 0.2s ease' : 'all 0.2s ease',
             color: btn.textColor || '#ffffff',
             background: buttonColor, // Prefer global color over potentially stale local style
             boxShadow: btn.shadow ? '0 4px 6px rgba(0,0,0,0.1)' : 'none'
@@ -717,6 +719,61 @@ const PreviewDisplay = memo(({
         if (btn.clickPress) classes.push('btn-click-press');
 
         return classes.join(' ');
+    };
+
+    // Generate inline animation style for the preview button
+    // (CSS classes may not penetrate Shopify admin Shadow DOM, so we use inline styles)
+    const getButtonAnimationStyle = (): React.CSSProperties => {
+        const btn = buttonStylesState || {};
+        const style: any = {};
+
+        if (btn.animationPreset && btn.animationPreset !== 'none') {
+            const preset = btn.animationPreset;
+            const speed = btn.animationSpeed || 'normal';
+
+            if (preset === 'shake') {
+                const dur = speed === 'slow' ? '0.8s' : speed === 'fast' ? '0.3s' : '0.5s';
+                style.animation = `btn-shake ${dur} ease-in-out infinite`;
+            } else if (preset === 'pulse') {
+                const dur = speed === 'slow' ? '2.5s' : speed === 'fast' ? '0.8s' : '1.5s';
+                style.animation = `btn-pulse ${dur} ease-in-out infinite`;
+            } else if (preset === 'bounce') {
+                const dur = speed === 'slow' ? '1.5s' : speed === 'fast' ? '0.5s' : '1s';
+                style.animation = `btn-bounce ${dur} ease-in-out infinite`;
+            } else if (preset === 'glow') {
+                const dur = speed === 'slow' ? '3s' : speed === 'fast' ? '1s' : '2s';
+                style.animation = `btn-glow ${dur} ease-in-out infinite`;
+            } else if (preset === 'gradient-flow') {
+                const dur = speed === 'slow' ? '5s' : speed === 'fast' ? '1.5s' : '3s';
+                style.backgroundSize = '200% 200%';
+                style.animation = `btn-gradient-flow ${dur} ease infinite`;
+            } else if (preset === 'shimmer') {
+                style.position = 'relative';
+                style.overflow = 'hidden';
+            }
+        }
+
+        // Dashed-moving border needs no border inline
+        if (btn.borderEffect === 'dashed-moving') {
+            style.border = 'none';
+            style.position = 'relative';
+            style.overflow = 'visible';
+        }
+
+        return style;
+    };
+
+    // Generate inline keyframe CSS injected next to the preview button
+    const getPreviewKeyframesCSS = () => {
+        return `
+            @keyframes btn-shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+            @keyframes btn-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+            @keyframes btn-bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+            @keyframes btn-glow { 0%, 100% { box-shadow: 0 0 5px rgba(99,102,241,0.4); } 50% { box-shadow: 0 0 20px rgba(99,102,241,0.8), 0 0 30px rgba(99,102,241,0.4); } }
+            @keyframes btn-gradient-flow { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+            @keyframes border-dash { 0% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: -20; } }
+            @keyframes btn-shimmer { 0% { left: -100%; } 100% { left: 100%; } }
+        `;
     };
 
     // Get modal container styles based on modalStyle and formStyles
@@ -871,17 +928,20 @@ const PreviewDisplay = memo(({
                             )}
                             {/* Only show Order button in Button tab */}
                             {activeTab === 'button' && (
-                                <button
-                                    className={getButtonAnimationClasses()}
-                                    style={{ ...getButtonStyle(), maxWidth: '200px', width: '100%', position: 'relative', '--btn-border-color': buttonStylesState?.borderColor || primaryColor || '#6366f1' } as any}
-                                >
-                                    {buttonStylesState?.borderEffect === 'dashed-moving' && (
-                                        <svg className="marching-ants-svg" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
-                                            <rect x="1" y="1" width="calc(100% - 2px)" height="calc(100% - 2px)" rx={buttonStylesState?.borderRadius ?? 12} ry={buttonStylesState?.borderRadius ?? 12} />
-                                        </svg>
-                                    )}
-                                    {buttonText || 'Buy with COD'}
-                                </button>
+                                <>
+                                    <style dangerouslySetInnerHTML={{ __html: getPreviewKeyframesCSS() }} />
+                                    <button
+                                        className={getButtonAnimationClasses()}
+                                        style={{ ...getButtonStyle(), ...getButtonAnimationStyle(), maxWidth: '200px', width: '100%', position: 'relative', '--btn-border-color': buttonStylesState?.borderColor || primaryColor || '#6366f1' } as any}
+                                    >
+                                        {buttonStylesState?.borderEffect === 'dashed-moving' && (
+                                            <svg className="marching-ants-svg" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }}>
+                                                <rect x="1" y="1" style={{ width: 'calc(100% - 2px)', height: 'calc(100% - 2px)', fill: 'none', stroke: buttonStylesState?.borderColor || primaryColor || '#6366f1', strokeWidth: 2, strokeDasharray: '8 4', animation: 'border-dash 0.6s linear infinite' }} rx={buttonStylesState?.borderRadius ?? 12} ry={buttonStylesState?.borderRadius ?? 12} />
+                                            </svg>
+                                        )}
+                                        {buttonText || 'Buy with COD'}
+                                    </button>
+                                </>
                             )}
                             {/* Only show form when NOT on button tab */}
                             {activeTab !== 'button' && (

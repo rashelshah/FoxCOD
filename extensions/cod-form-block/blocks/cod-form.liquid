@@ -315,15 +315,22 @@
     font-size: 16px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: opacity 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
     text-align: center;
     display: block;
     box-sizing: border-box;
   }
 
-  .cod-buy-btn:hover {
+  /* Only apply hover transform when NO animation class is present */
+  .cod-buy-btn:not(.btn-anim-shake):not(.btn-anim-pulse):not(.btn-anim-bounce):not(.btn-anim-glow):not(.btn-anim-gradient-flow):not(.btn-anim-shimmer):hover {
     opacity: 0.9;
     transform: translateY(-1px);
+  }
+  .cod-buy-btn.btn-anim-shake:hover,
+  .cod-buy-btn.btn-anim-pulse:hover,
+  .cod-buy-btn.btn-anim-bounce:hover,
+  .cod-buy-btn.btn-anim-glow:hover {
+    opacity: 0.9;
   }
 
   /* Modal Overlay - prevent horizontal swipe/scroll */

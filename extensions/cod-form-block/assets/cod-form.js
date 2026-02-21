@@ -455,6 +455,9 @@
           }
         }
         
+        // Determine if transform-based animations are active
+        var hasTransformAnim = config.animationPreset && config.animationPreset !== 'none' && config.animationPreset !== 'glow' && config.animationPreset !== 'gradient-flow';
+        
         var baseStyles = {
           width: '100%',
           padding: (config.buttonStyles && config.buttonStyles.buttonSize === 'small') ? '10px' : (config.buttonStyles && config.buttonStyles.buttonSize === 'large') ? '16px' : '14px',
@@ -464,7 +467,7 @@
           fontSize: (btnStyles.textSize ?? 15) + 'px',
           border: borderWidth + 'px solid ' + (isOutlineStyle ? config.primaryColor : borderColor),
           cursor: 'pointer',
-          transition: 'all 0.2s ease',
+          transition: hasTransformAnim ? 'opacity 0.2s ease, background-color 0.2s ease' : 'all 0.2s ease',
           textAlign: 'center',
           display: 'block',
           boxSizing: 'border-box',
@@ -498,9 +501,12 @@
             var svg = document.createElementNS(svgNS, 'svg');
             svg.setAttribute('class', 'marching-ants-svg');
             svg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;';
+            svg.setAttribute('preserveAspectRatio', 'none');
             var rect = document.createElementNS(svgNS, 'rect');
             rect.setAttribute('x', '1'); rect.setAttribute('y', '1');
-            rect.setAttribute('width', 'calc(100% - 2px)'); rect.setAttribute('height', 'calc(100% - 2px)');
+            // SVG attributes don't support calc(), use style for percentage sizing
+            rect.style.width = 'calc(100% - 2px)';
+            rect.style.height = 'calc(100% - 2px)';
             var radius = config.borderRadius || 12;
             rect.setAttribute('rx', String(radius)); rect.setAttribute('ry', String(radius));
             svg.appendChild(rect);
