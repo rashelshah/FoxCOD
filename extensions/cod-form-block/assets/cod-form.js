@@ -3346,6 +3346,128 @@
 
 
   /**
+   * Show a styled fraud-block popup instead of browser alert()
+   */
+  function showFraudBlockPopup(message) {
+      // Remove any existing popup
+      var existing = document.getElementById('cod-fraud-popup-overlay');
+      if (existing) existing.remove();
+
+      var overlay = document.createElement('div');
+      overlay.id = 'cod-fraud-popup-overlay';
+      overlay.style.cssText = 'position: fixed; inset: 0; z-index: 999999; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(0,0,0,0.45); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); animation: codFraudFadeIn 0.25s ease;';
+
+      var popup = document.createElement('div');
+      popup.style.cssText = 'background: #fff; border-radius: 20px; max-width: 400px; width: 100%; padding: 36px 28px 28px; text-align: center; box-shadow: 0 25px 60px rgba(0,0,0,0.2), 0 0 0 1px rgba(0,0,0,0.05); animation: codFraudSlideUp 0.3s ease; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;';
+
+      // Shield icon
+      var icon = document.createElement('div');
+      icon.style.cssText = 'width: 64px; height: 64px; margin: 0 auto 20px; background: linear-gradient(145deg, #fee2e2 0%, #fecaca 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center;';
+      icon.innerHTML = '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+      popup.appendChild(icon);
+
+      // Title
+      var title = document.createElement('h3');
+      title.style.cssText = 'margin: 0 0 10px; font-size: 20px; font-weight: 700; color: #1f2937; letter-spacing: -0.01em;';
+      title.textContent = 'Order Blocked';
+      popup.appendChild(title);
+
+      // Message
+      var msg = document.createElement('p');
+      msg.style.cssText = 'margin: 0 0 24px; font-size: 15px; line-height: 1.6; color: #6b7280;';
+      msg.textContent = message || 'Sorry, you are not allowed to place orders.';
+      popup.appendChild(msg);
+
+      // OK button
+      var btn = document.createElement('button');
+      btn.textContent = 'OK';
+      btn.style.cssText = 'display: inline-block; padding: 12px 48px; background: #1f2937; color: #fff; border: none; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 12px rgba(31,41,55,0.2);';
+      btn.onmouseover = function() { btn.style.background = '#374151'; btn.style.transform = 'translateY(-1px)'; btn.style.boxShadow = '0 6px 16px rgba(31,41,55,0.3)'; };
+      btn.onmouseout = function() { btn.style.background = '#1f2937'; btn.style.transform = ''; btn.style.boxShadow = '0 4px 12px rgba(31,41,55,0.2)'; };
+      btn.onclick = function() { overlay.remove(); };
+      popup.appendChild(btn);
+
+      overlay.appendChild(popup);
+
+      // Click backdrop to close
+      overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+
+      // Inject animation CSS once
+      if (!document.getElementById('cod-fraud-popup-css')) {
+          var css = document.createElement('style');
+          css.id = 'cod-fraud-popup-css';
+          css.textContent = '@keyframes codFraudFadeIn{from{opacity:0}to{opacity:1}}@keyframes codFraudSlideUp{from{opacity:0;transform:translateY(20px) scale(0.96)}to{opacity:1;transform:translateY(0) scale(1)}}';
+          document.head.appendChild(css);
+      }
+
+      document.body.appendChild(overlay);
+
+      // Auto-dismiss after 8 seconds
+      setTimeout(function() { if (document.getElementById('cod-fraud-popup-overlay')) overlay.remove(); }, 8000);
+  }
+
+  /**
+   * Client-side Fraud Protection Validation
+   * Checks phone, email, postal code, and quantity against fraud rules
+   * IP and order frequency are enforced server-side only
+   */
+  function validateFraudProtection(payload) {
+      var fp = window.FoxCod && window.FoxCod.fraudProtection;
+      if (!fp || Object.keys(fp).length === 0) return { allowed: true, message: '' };
+
+      var msg = fp.blocked_message || 'Sorry, you are not allowed to place orders.';
+
+      // Normalize helpers
+      function normPhone(p) { return (p || '').replace(/[\s\-\(\)]/g, ''); }
+      function normEmail(e) { return (e || '').trim().toLowerCase(); }
+
+      // 1. Check blocked phone numbers
+      if (payload.customerPhone && fp.blocked_phone_numbers && fp.blocked_phone_numbers.length > 0) {
+          var np = normPhone(payload.customerPhone);
+          for (var i = 0; i < fp.blocked_phone_numbers.length; i++) {
+              if (normPhone(fp.blocked_phone_numbers[i]) === np) {
+                  return { allowed: false, message: msg };
+              }
+          }
+      }
+
+      // 2. Check blocked emails
+      if (payload.customerEmail && fp.blocked_emails && fp.blocked_emails.length > 0) {
+          var ne = normEmail(payload.customerEmail);
+          for (var j = 0; j < fp.blocked_emails.length; j++) {
+              var blocked = fp.blocked_emails[j].trim().toLowerCase();
+              if (blocked === ne || ne.endsWith('@' + blocked)) {
+                  return { allowed: false, message: msg };
+              }
+          }
+      }
+
+      // 3. Check postal code restrictions
+      if (payload.customerZipcode && fp.postal_code_mode && fp.postal_code_mode !== 'none' && fp.postal_codes && fp.postal_codes.length > 0) {
+          var nz = payload.customerZipcode.trim().toUpperCase();
+          var found = false;
+          for (var k = 0; k < fp.postal_codes.length; k++) {
+              if (fp.postal_codes[k].trim().toUpperCase() === nz) { found = true; break; }
+          }
+          if (fp.postal_code_mode === 'allow_only' && !found) {
+              return { allowed: false, message: msg };
+          }
+          if (fp.postal_code_mode === 'block_only' && found) {
+              return { allowed: false, message: msg };
+          }
+      }
+
+      // 4. Check quantity limit
+      if (fp.limit_quantity_enabled && fp.max_quantity && payload.quantity) {
+          if (payload.quantity > fp.max_quantity) {
+              return { allowed: false, message: 'Maximum ' + fp.max_quantity + ' items allowed per order.' };
+          }
+      }
+
+      return { allowed: true, message: '' };
+  }
+
+  /**
    * Handle Form Submission
    */
   function handleFormSubmit(e, productId, config) {
@@ -3382,6 +3504,16 @@
           finalTotal: 0,
           upsell_items: getCheckedTickUpsells(form, config)
       };
+
+      // ── Fraud Protection: client-side validation ──
+      var fraudResult = validateFraudProtection(payload);
+      if (!fraudResult.allowed) {
+          console.warn('[COD Form] Blocked by fraud protection:', fraudResult.message);
+          showFraudBlockPopup(fraudResult.message);
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalBtnText;
+          return;
+      }
 
       // ── Read bundle offer selection (quantity + discount) ──
       var _modal = form.closest('.cod-modal') || form;
@@ -3636,19 +3768,8 @@
           submitBtn.disabled = false;
           submitBtn.textContent = originalBtnText;
           
-          var errDiv = form.parentElement.querySelector('.cod-message-error');
-          if (errDiv) {
-              var errText = errDiv.querySelector('.cod-message-text');
-              if (errText) {
-                  errText.textContent = err.message || 'Something went wrong. Please try again.';
-              }
-              errDiv.style.display = 'block';
-              
-              // Hide error after 5 seconds
-              setTimeout(() => {
-                  errDiv.style.display = 'none';
-              }, 5000);
-          }
+          // Use the custom fraud popup for all order errors (covers server-side fraud blocks)
+          showFraudBlockPopup(err.message || 'Something went wrong. Please try again.');
       });
   }
 

@@ -14,6 +14,7 @@ import {
     logOrder,
     updateOrderStatus
 } from "../config/supabase.server";
+import { validateOrderAgainstFraudRules } from "../services/fraud-protection.server";
 
 // CORS headers for storefront requests
 const corsHeaders = {
@@ -164,6 +165,29 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             return Response.json(
                 { success: false, error: validationError },
                 { status: 400, headers: corsHeaders }
+            );
+        }
+
+        // ── Fraud Protection: server-side validation ──
+        const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+            || request.headers.get('cf-connecting-ip')
+            || request.headers.get('x-real-ip')
+            || request.headers.get('x-shopify-client-ip')
+            || '';
+        console.log('[COD Order] Fraud check — detected IP:', clientIp);
+        const fraudResult = await validateOrderAgainstFraudRules({
+            phone: body.customerPhone,
+            email: body.customerEmail,
+            ip: clientIp,
+            zipcode: body.customerZipcode,
+            quantity: body.quantity,
+            shopDomain: body.shop,
+        });
+        if (!fraudResult.allowed) {
+            console.warn('[COD Order] Blocked by fraud protection:', fraudResult.message);
+            return Response.json(
+                { success: false, error: fraudResult.message },
+                { status: 403, headers: corsHeaders }
             );
         }
 
