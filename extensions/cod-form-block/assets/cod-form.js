@@ -11,6 +11,15 @@
   // Ensure FoxCod.pixelTracking always exists
   window.FoxCod = window.FoxCod || {};
   window.FoxCod.pixelTracking = window.FoxCod.pixelTracking || {};
+
+  // =============================================
+  // CENTRAL CURRENCY CONFIGURATION
+  // =============================================
+  FoxCod.currencyConfig = {
+    code: window.FoxCod.currency || 'USD',
+  };
+
+  console.log('[FoxCod] Currency:', FoxCod.currencyConfig.code);
   console.log('[FoxCod] Pixel Tracking init:', window.FoxCod.pixelTracking);
 
   // =============================================
@@ -141,7 +150,7 @@
               if (eventName === 'Purchase') {
                   snaptr('track', 'PURCHASE', {
                       price: data.value || 0,
-                      currency: data.currency || 'INR'
+                      currency: data.currency || (FoxCod.currencyConfig && FoxCod.currencyConfig.code) || 'USD'
                   });
               } else if (eventName === 'InitiateCheckout') {
                   snaptr('track', 'START_CHECKOUT');
@@ -920,14 +929,14 @@
       if (offer.discountPercent) {
         var originalPriceSpan = document.createElement('span');
         originalPriceSpan.className = 'cod-offer-original-price';
-        originalPriceSpan.textContent = (design.currencySymbol || '₹') + originalPrice.toFixed(0);
+        originalPriceSpan.textContent = formatMoney(originalPrice);
         priceWrapper.appendChild(originalPriceSpan);
       }
       
       // Discounted price
       var priceDiv = document.createElement('div');
       priceDiv.className = 'cod-offer-price';
-      priceDiv.textContent = (design.currencySymbol || '₹') + discountedPrice.toFixed(0);
+      priceDiv.textContent = formatMoney(discountedPrice);
       priceWrapper.appendChild(priceDiv);
       
       // Append price wrapper to card
@@ -1966,13 +1975,13 @@
           {
               id: 'full_cod',
               label: 'Full COD',
-              description: 'Pay ₹' + orderTotal.toFixed(0) + ' on delivery',
+              description: 'Pay ' + formatMoney(orderTotal) + ' on delivery',
               checked: false
           },
           {
               id: 'partial_cod',
               label: 'Partial COD',
-              description: 'Pay ₹' + config.partialCodAdvance + ' now, ₹' + remainingAmount.toFixed(0) + ' on delivery',
+              description: 'Pay ' + formatMoney(config.partialCodAdvance) + ' now, ' + formatMoney(remainingAmount) + ' on delivery',
               checked: false
           }
       ];
@@ -2050,7 +2059,7 @@
               // Update submit button text
               if (submitBtn) {
                   if (opt.id === 'partial_cod') {
-                      submitBtn.textContent = 'Pay ₹' + config.partialCodAdvance + ' Now';
+                      submitBtn.textContent = 'Pay ' + formatMoney(config.partialCodAdvance) + ' Now';
                       submitBtn.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
                   } else {
                       submitBtn.textContent = originalButtonText;
@@ -2281,7 +2290,14 @@
 
   function formatMoney(amount) {
       var num = parseFloat(amount) || 0;
-      return '₹' + num.toFixed(2);
+      var code = (FoxCod.currencyConfig && FoxCod.currencyConfig.code) || 'USD';
+      try {
+          return new Intl.NumberFormat(undefined, {
+              style: 'currency', currency: code
+          }).format(num);
+      } catch(e) {
+          return code + ' ' + num.toFixed(2);
+      }
   }
 
   function updateOrderSummaryWithOffer(form, config, offer) {
@@ -2552,7 +2568,7 @@
     document.body.style.overflow = 'hidden';
 
     // ── Pixel Tracking: InitiateCheckout ──
-    foxCodTrackEvent('InitiateCheckout', { currency: 'INR' });
+    foxCodTrackEvent('InitiateCheckout', { currency: (FoxCod.currencyConfig && FoxCod.currencyConfig.code) || 'USD' });
 
     // ── Pixel Tracking: AddPaymentInfo on first input ──
     if (form && !form._pixelInputTracked) {
@@ -2626,7 +2642,7 @@
                                         '<div style="font-size:13px;font-weight:600;color:#1f2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (item.title || 'Upsell Product') + '</div>' +
                                         '<div style="font-size:11px;color:#10b981;font-weight:500;">✓ Pre-purchase upsell added</div>' +
                                     '</div>' +
-                                    '<div style="font-size:14px;font-weight:700;color:#1f2937;flex-shrink:0;">₹' + price.toFixed(2) + '</div>' +
+                                    '<div style="font-size:14px;font-weight:700;color:#1f2937;flex-shrink:0;">' + formatMoney(price) + '</div>' +
                                     '<button style="background:none;border:none;font-size:16px;color:#9ca3af;cursor:pointer;padding:2px 6px;" data-remove-pre-upsell="' + (item.variant_id || item.product_id) + '">×</button>';
 
                                 // Remove button handler
@@ -2857,8 +2873,8 @@
                                         priceWrapper.className = 'cod-ds-price-wrapper';
                                         priceWrapper.innerHTML =
                                             '<div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">' +
-                                            '  <span style="text-decoration: line-through; color: #9ca3af; font-size: 14px;">₹' + originalPrice.toFixed(2) + '</span>' +
-                                            '  <span style="font-size: 18px; font-weight: 700; color: ' + (config.primaryColor || '#10b981') + ';">₹' + dsItem.price.toFixed(2) + '</span>' +
+                                            '  <span style="text-decoration: line-through; color: #9ca3af; font-size: 14px;">' + formatMoney(originalPrice) + '</span>' +
+                                            '  <span style="font-size: 18px; font-weight: 700; color: ' + (config.primaryColor || '#10b981') + ';">' + formatMoney(dsItem.price) + '</span>' +
                                             '</div>' +
                                             '<div style="display: flex; align-items: center; gap: 6px; margin-top: 4px;">' +
                                             '  <span style="font-size: 11px; color: #10b981; font-weight: 600;">✓ Downsell offer applied</span>' +
@@ -3041,15 +3057,15 @@
               var title = document.createElement('div');
               title.style.cssText = 'font-weight: 600; font-size: ' + (design.headerTextSize || 14) + 'px; margin-bottom: 2px;';
               // Resolve {{title}} and {{price}} placeholders
-              var headerText = design.headerText || ('Add ' + (offer.upsell_product_title || 'this product') + ' for ₹' + offerPrice);
+              var headerText = design.headerText || ('Add ' + (offer.upsell_product_title || 'this product') + ' for ' + formatMoney(offerPrice));
               headerText = headerText.replace('{{title}}', offer.upsell_product_title || 'this product');
-              headerText = headerText.replace('{{price}}', '₹' + offerPrice);
+              headerText = headerText.replace('{{price}}', formatMoney(offerPrice));
               title.textContent = headerText;
               info.appendChild(title);
 
               var priceDiv = document.createElement('div');
               priceDiv.style.cssText = 'font-size: 13px;';
-              priceDiv.innerHTML = '<strong style="color: #059669;">₹' + offerPrice + '</strong>';
+              priceDiv.innerHTML = '<strong style="color: #059669;">' + formatMoney(offerPrice) + '</strong>';
               info.appendChild(priceDiv);
               row.appendChild(info);
 
@@ -3097,7 +3113,7 @@
       var rejectBtn = design.rejectButton || {};
       var offerPrice = getOfferPrice(offer);
       var hasDiscount = offer.discount_value > 0;
-      var discountLabel = offer.discount_type === 'percentage' ? offer.discount_value + '%' : '₹' + offer.discount_value;
+      var discountLabel = offer.discount_type === 'percentage' ? offer.discount_value + '%' : formatMoney(offer.discount_value);
 
       var bgStyle = design.bgImage
           ? 'background-image: url(' + design.bgImage + '); background-size: cover; background-position: center;'
@@ -3122,8 +3138,8 @@
       }
 
       html += '<div style="margin-bottom: 20px;">';
-      if (hasDiscount) html += '<s style="color: #9ca3af; font-size: 14px; margin-right: 8px;">₹' + offer.original_price.toFixed(2) + '</s>';
-      html += '<strong style="font-size: 20px; color: #1f2937;">₹' + offerPrice.toFixed(2) + '</strong></div>';
+      if (hasDiscount) html += '<s style="color: #9ca3af; font-size: 14px; margin-right: 8px;">' + formatMoney(offer.original_price) + '</s>';
+      html += '<strong style="font-size: 20px; color: #1f2937;">' + formatMoney(offerPrice) + '</strong></div>';
 
       // Determine animation class for accept button
       var animClass = '';
@@ -3239,7 +3255,7 @@
       var origPrice = offer.original_price || 0;
       var offerPrice = getOfferPrice(offer);
       var hasDiscount = offer.discount_value > 0;
-      var discountLabel = offer.discount_type === 'percentage' ? offer.discount_value + '%' : '₹' + offer.discount_value;
+      var discountLabel = offer.discount_type === 'percentage' ? offer.discount_value + '%' : formatMoney(offer.discount_value);
 
       // Icon helper
       var iconMap = { cart: '🛒', check: '✓', star: '⭐', gift: '🎁', heart: '❤️' };
@@ -3315,8 +3331,8 @@
       // Price display - only show when product has a price
       if (origPrice > 0) {
           html += '<div style="margin-bottom: 20px;">';
-          if (hasDiscount) html += '<s style="color: #9ca3af; font-size: 14px; margin-right: 8px;">₹' + origPrice.toFixed(2) + '</s>';
-          html += '<strong style="font-size: 20px; color: #1f2937;">₹' + offerPrice.toFixed(2) + '</strong></div>';
+          if (hasDiscount) html += '<s style="color: #9ca3af; font-size: 14px; margin-right: 8px;">' + formatMoney(origPrice) + '</s>';
+          html += '<strong style="font-size: 20px; color: #1f2937;">' + formatMoney(offerPrice) + '</strong></div>';
       }
 
       // Accept button animation class
@@ -3524,6 +3540,7 @@
           quantity: parseInt(formData.get('quantity') || ((form.closest('.cod-form-container') || form.parentElement).querySelector('.cod-product-qty .cod-qty-input') || {}).value || '1'),
           price: parseFloat(config.productPrice),
           productTitle: config.productTitle,
+          currency: (FoxCod.currencyConfig && FoxCod.currencyConfig.code) || 'USD',
           shippingLabel: '',
           shippingPrice: 0,
           discountPercent: 0,
@@ -3584,7 +3601,7 @@
               var dsItems = JSON.parse(dsItemsAttr);
               if (dsItems.length > 0) {
                   payload.price = dsItems[0].price;
-                  payload.notes = (payload.notes ? payload.notes + '\n' : '') + 'DOWNSELL APPLIED: ' + dsItems[0].title + ' (₹' + dsItems[0].price.toFixed(2) + ')';
+                  payload.notes = (payload.notes ? payload.notes + '\n' : '') + 'DOWNSELL APPLIED: ' + dsItems[0].title + ' (' + formatMoney(dsItems[0].price) + ')';
               }
           } catch(e) {}
       }
@@ -3690,6 +3707,24 @@
   function submitFullCodOrder(form, config, productId, payload, submitBtn, originalBtnText) {
       console.log('[COD Form] Submitting full COD order with upsell_items:', payload.upsell_items);
 
+      // Recalculate finalTotal to include any upsell items accepted after the DOM snapshot
+      if (payload.upsell_items && payload.upsell_items.length > 0) {
+          var upsellTotal = payload.upsell_items.reduce(function(sum, item) {
+              return sum + (parseFloat(item.price) || 0) * (parseInt(item.quantity) || 1);
+          }, 0);
+
+          if (payload.finalTotal && payload.finalTotal > 0) {
+              // finalTotal was set from DOM before upsells — add upsell prices to it
+              payload.finalTotal = payload.finalTotal + upsellTotal;
+          } else {
+              // No finalTotal yet — compute from scratch
+              var subtotal = (parseFloat(payload.price) || 0) * (parseInt(payload.quantity) || 1);
+              var discount = subtotal * ((parseFloat(payload.discountPercent) || 0) / 100);
+              payload.finalTotal = subtotal - discount + (parseFloat(payload.shippingPrice) || 0) + upsellTotal;
+          }
+          console.log('[COD Form] Recalculated finalTotal with upsells:', payload.finalTotal, 'upsellTotal:', upsellTotal);
+      }
+
       // Full COD: Send to regular backend
       fetch(config.proxyUrl + '/api/orders/', {
           method: 'POST',
@@ -3717,18 +3752,20 @@
               saveCustomerToLocalStorage(form);
 
               // ── Pixel Tracking: Purchase ──
-              // Read the final displayed total from order summary (includes qty, discounts, shipping, upsells)
-              var purchaseValue = 0;
-              var summaryTotalEl = form.querySelector('#cod-summary-total');
-              if (summaryTotalEl) {
-                  purchaseValue = parseFloat(summaryTotalEl.textContent.replace(/[^0-9.]/g, '')) || 0;
+              // Use payload.finalTotal which includes upsells, or read from DOM, or compute fallback
+              var purchaseValue = payload.finalTotal || 0;
+              if (!purchaseValue) {
+                  var summaryTotalEl = form.querySelector('#cod-summary-total');
+                  if (summaryTotalEl) {
+                      purchaseValue = parseFloat(summaryTotalEl.textContent.replace(/[^0-9.]/g, '')) || 0;
+                  }
               }
-              // Fallback: compute from payload if DOM element not found
+              // Fallback: compute from payload if still no value
               if (!purchaseValue) {
                   purchaseValue = ((payload.price || 0) * (payload.quantity || 1)) + (payload.shippingPrice || 0);
               }
               console.log('[FoxCod Pixels] Correct Purchase total:', purchaseValue);
-              foxCodTrackEvent('Purchase', { value: purchaseValue, currency: 'INR' });
+              foxCodTrackEvent('Purchase', { value: purchaseValue, currency: (FoxCod.currencyConfig && FoxCod.currencyConfig.code) || 'USD' });
               
               // Close the main checkout modal immediately
               closeModal(productId);

@@ -43,6 +43,7 @@ interface OrderRequestBody {
     shippingPrice?: number;
     discountPercent?: number;
     finalTotal?: number;
+    currency?: string;
     upsell_items?: Array<{
         product_id: string;
         variant_id: string;
@@ -214,15 +215,22 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
         // Build notes with upsell details
         let orderNotes = body.notes || '';
+        const currencyCode = body.currency || 'USD';
+        // Helper to format price with currency for notes
+        const fmtPrice = (amt: number) => {
+            try {
+                return new Intl.NumberFormat(undefined, { style: 'currency', currency: currencyCode }).format(amt);
+            } catch { return `${currencyCode} ${amt.toFixed(2)}`; }
+        };
         if (body.upsell_items && body.upsell_items.length > 0) {
             const upsellNotes = 'UPSELL ITEMS:\n' + body.upsell_items.map(item =>
-                `  - ${item.title} (₹${item.price}) x${item.quantity} [${item.type}]`
+                `  - ${item.title} (${fmtPrice(item.price)}) x${item.quantity} [${item.type}]`
             ).join('\n');
             orderNotes = orderNotes ? orderNotes + '\n' + upsellNotes : upsellNotes;
         }
         if (shippingPrice > 0 && body.shippingLabel) {
             orderNotes = orderNotes ? orderNotes + '\n' : '';
-            orderNotes += `SHIPPING: ${body.shippingLabel} (₹${shippingPrice.toFixed(2)})`;
+            orderNotes += `SHIPPING: ${body.shippingLabel} (${fmtPrice(shippingPrice)})`;
         }
         if (discountPercent > 0) {
             orderNotes = orderNotes ? orderNotes + '\n' : '';
@@ -247,6 +255,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             pincode: body.customerZipcode || undefined,
             shipping_label: body.shippingLabel || undefined,
             shipping_price: shippingPrice || undefined,
+            currency: currencyCode,
         });
 
         console.log("[COD Order] Order logged successfully:", orderLog.id, orderName);

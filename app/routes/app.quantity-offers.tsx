@@ -126,8 +126,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             return group;
         })
     );
+    // Query shop currency from Shopify Admin API
+    let shopCurrency = 'USD';
+    try {
+        const currencyRes = await admin.graphql(`{ shop { currencyCode } }`);
+        const currencyData = await currencyRes.json();
+        shopCurrency = currencyData?.data?.shop?.currencyCode || 'USD';
+    } catch (e) { console.log('Error fetching shop currency:', e); }
 
-    return { shopDomain, offerGroups: groupsWithProducts, formSettings };
+    return { shopDomain, offerGroups: groupsWithProducts, formSettings, shopCurrency };
 };
 
 // Ensure metafield definition
@@ -192,7 +199,7 @@ async function syncOffersToMetafield(admin: any, offerGroups: any[]) {
                 unselectedBgColor: group.design?.unselectedBgColor || '#ffffff',
                 unselectedBorderColor: group.design?.unselectedBorderColor || '#e5e7eb',
                 selectedBorderRadius: group.design?.selectedBorderRadius || 10,
-                currencySymbol: group.design?.currencySymbol || '₹',
+                currencySymbol: group.design?.currencySymbol || '$',
                 showMostPopularBadge: group.design?.showMostPopularBadge !== false,
                 autoSelectBestValue: group.design?.autoSelectBestValue || false,
                 selectedTextColor: group.design?.selectedTextColor || '#1f2937'
@@ -335,13 +342,15 @@ function SortableOfferItem({
     isEditing,
     onToggleEdit,
     onUpdate,
-    onDelete
+    onDelete,
+    currencySymbol
 }: {
     offer: QuantityOffer;
     isEditing: boolean;
     onToggleEdit: (id: string) => void;
     onUpdate: (id: string, updates: Partial<QuantityOffer>) => void;
     onDelete: (id: string) => void;
+    currencySymbol: string;
 }) {
     const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: offer.id });
     const style = { transform: CSS.Transform.toString(transform), transition };
@@ -378,7 +387,7 @@ function SortableOfferItem({
                                 ]} onChange={(val) => onUpdate(offer.id, { discountType: val as any })} />
                             </div>
                             <div style={{ flex: 1 }}>
-                                <TextField label="Discount value" type="number" min={"0" as any} value={String(offer.discountPercent || 0)} suffix={offer.discountType === 'fixed' ? '₹' : '%'} onChange={(val) => onUpdate(offer.id, { discountPercent: parseInt(val) || 0 })} autoComplete="off" />
+                                <TextField label="Discount value" type="number" min={"0" as any} value={String(offer.discountPercent || 0)} suffix={offer.discountType === 'fixed' ? currencySymbol : '%'} onChange={(val) => onUpdate(offer.id, { discountPercent: parseInt(val) || 0 })} autoComplete="off" />
                             </div>
                         </InlineStack>
                         <InlineStack gap="300" wrap={false}>
@@ -403,13 +412,23 @@ function SortableOfferItem({
 
 // Main Component
 export default function QuantityOffersPage() {
-    const { shopDomain, offerGroups: initialOfferGroups, formSettings } = useLoaderData<typeof loader>();
+    const { shopDomain, offerGroups: initialOfferGroups, formSettings, shopCurrency } = useLoaderData<typeof loader>();
     const actionData = useActionData<typeof action>();
     const revalidator = useRevalidator();
     const submit = useSubmit();
     const navigation = useNavigation();
     const shopify = useAppBridge();
     const isSaving = navigation.state === "submitting";
+
+    // Dynamic currency formatter
+    const fmtCurrency = useCallback((amount: number) => {
+        try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: shopCurrency || 'USD', minimumFractionDigits: 0 }).format(amount); }
+        catch { return `${shopCurrency} ${amount}`; }
+    }, [shopCurrency]);
+    const currencySymbol = useMemo(() => {
+        try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: shopCurrency || 'USD' }).formatToParts(0).find(p => p.type === 'currency')?.value || '$'; }
+        catch { return '$'; }
+    }, [shopCurrency]);
 
     // Track the last processed actionData to prevent duplicate processing
     const lastProcessedActionRef = useRef<any>(null);
@@ -862,6 +881,7 @@ export default function QuantityOffersPage() {
                                                                     onToggleEdit={(id) => setEditingOfferId(editingOfferId === id ? null : id)}
                                                                     onUpdate={updateOffer}
                                                                     onDelete={deleteOffer}
+                                                                    currencySymbol={currencySymbol}
                                                                 />
                                                             ))}
                                                         </div>
@@ -1123,9 +1143,9 @@ export default function QuantityOffersPage() {
                                                                 </div>
                                                                 <div style={{ textAlign: isVertical || isCards ? 'center' : 'right', display: 'flex', flexDirection: 'column', alignItems: isVertical || isCards ? 'center' : 'flex-end', gap: '2px', flexShrink: 0, width: isVertical || isCards ? '100%' : 'auto' }}>
                                                                     {offer.discountPercent ? (
-                                                                        <span style={{ fontSize: isCards ? '10px' : '11px', color: '#9ca3af', textDecoration: 'line-through' }}>₹{original.toFixed(0)}</span>
+                                                                        <span style={{ fontSize: isCards ? '10px' : '11px', color: '#9ca3af', textDecoration: 'line-through' }}>{fmtCurrency(original)}</span>
                                                                     ) : null}
-                                                                    <span style={{ fontSize: isCards ? '13px' : '16px', fontWeight: 700, color: '#1f2937', whiteSpace: 'nowrap' }}>₹{total.toFixed(2)}</span>
+                                                                    <span style={{ fontSize: isCards ? '13px' : '16px', fontWeight: 700, color: '#1f2937', whiteSpace: 'nowrap' }}>{fmtCurrency(total)}</span>
                                                                 </div>
                                                             </div>
                                                         );
@@ -1282,9 +1302,9 @@ export default function QuantityOffersPage() {
                                                                         </div>
                                                                         <div style={{ textAlign: isVertical || isCards ? 'center' : 'right', display: 'flex', flexDirection: 'column', alignItems: isVertical || isCards ? 'center' : 'flex-end', gap: '2px', flexShrink: 0, width: isVertical || isCards ? '100%' : 'auto' }}>
                                                                             {offer.discountPercent ? (
-                                                                                <span style={{ fontSize: isCards ? '10px' : '11px', color: '#9ca3af', textDecoration: 'line-through' }}>₹{original.toFixed(0)}</span>
+                                                                                <span style={{ fontSize: isCards ? '10px' : '11px', color: '#9ca3af', textDecoration: 'line-through' }}>{fmtCurrency(original)}</span>
                                                                             ) : null}
-                                                                            <span style={{ fontSize: isCards ? '13px' : '16px', fontWeight: 700, color: '#1f2937', whiteSpace: 'nowrap' }}>₹{total.toFixed(2)}</span>
+                                                                            <span style={{ fontSize: isCards ? '13px' : '16px', fontWeight: 700, color: '#1f2937', whiteSpace: 'nowrap' }}>{fmtCurrency(total)}</span>
                                                                         </div>
                                                                     </div>
                                                                 );
@@ -1490,9 +1510,9 @@ export default function QuantityOffersPage() {
                                                                         </div>
                                                                         <div style={{ textAlign: isVertical || isCards ? 'center' : 'right', display: 'flex', flexDirection: 'column', alignItems: isVertical || isCards ? 'center' : 'flex-end', gap: '2px', flexShrink: 0, width: isVertical || isCards ? '100%' : 'auto' }}>
                                                                             {offer.discountPercent ? (
-                                                                                <span style={{ fontSize: isCards ? '10px' : '11px', color: '#9ca3af', textDecoration: 'line-through' }}>₹{original.toFixed(0)}</span>
+                                                                                <span style={{ fontSize: isCards ? '10px' : '11px', color: '#9ca3af', textDecoration: 'line-through' }}>{fmtCurrency(original)}</span>
                                                                             ) : null}
-                                                                            <span style={{ fontSize: isCards ? '13px' : '16px', fontWeight: 700, color: '#1f2937', whiteSpace: 'nowrap' }}>₹{total.toFixed(2)}</span>
+                                                                            <span style={{ fontSize: isCards ? '13px' : '16px', fontWeight: 700, color: '#1f2937', whiteSpace: 'nowrap' }}>{fmtCurrency(total)}</span>
                                                                         </div>
                                                                     </div>
                                                                 );
@@ -1531,18 +1551,18 @@ export default function QuantityOffersPage() {
                                                                     <>
                                                                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280', marginBottom: '6px' }}>
                                                                             <span>Subtotal ({quantity} {quantity === 1 ? 'item' : 'items'})</span>
-                                                                            <span>₹{subtotal.toLocaleString()}</span>
+                                                                            <span>{fmtCurrency(subtotal)}</span>
                                                                         </div>
                                                                         {discount > 0 && (
                                                                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#10b981', marginBottom: '6px' }}>
                                                                                 <span>Bundle Discount ({discountPercent}%)</span>
-                                                                                <span>-₹{discount.toFixed(0)}</span>
+                                                                                <span>-{fmtCurrency(discount)}</span>
                                                                             </div>
                                                                         )}
                                                                         {shippingEnabled && (
                                                                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280', marginBottom: '8px' }}>
                                                                                 <span>Shipping</span>
-                                                                                <span>{shippingCost === 0 ? 'FREE' : `₹${shippingCost}`}</span>
+                                                                                <span>{shippingCost === 0 ? 'FREE' : fmtCurrency(shippingCost)}</span>
                                                                             </div>
                                                                         )}
                                                                         <div style={{
@@ -1555,7 +1575,7 @@ export default function QuantityOffersPage() {
                                                                             borderTop: '1px dashed #d1d5db',
                                                                         }}>
                                                                             <span>Total</span>
-                                                                            <span style={{ color: primaryColor }}>₹{total.toLocaleString()}</span>
+                                                                            <span style={{ color: primaryColor }}>{fmtCurrency(total)}</span>
                                                                         </div>
                                                                     </>
                                                                 );
@@ -1586,7 +1606,7 @@ export default function QuantityOffersPage() {
                                                                 }}>
                                                                     <input type="radio" name="shipping-preview" disabled checked={opt.id === formSettings?.shipping_options?.defaultOption} style={{ width: '12px', height: '12px' }} />
                                                                     <span>{opt.label}</span>
-                                                                    <span style={{ marginLeft: 'auto', fontWeight: 600 }}>{opt.price === 0 ? 'Free' : `₹${opt.price}`}</span>
+                                                                    <span style={{ marginLeft: 'auto', fontWeight: 600 }}>{opt.price === 0 ? 'Free' : fmtCurrency(opt.price)}</span>
                                                                 </div>
                                                             ))}
                                                         </div>

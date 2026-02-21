@@ -14,8 +14,16 @@ import { ORDER_STATUSES } from "../config/constants";
  * Loader: Fetch dashboard data from Supabase
  */
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
   const shopDomain = session.shop;
+
+  // Query shop currency from Shopify Admin API
+  let shopCurrency = 'USD';
+  try {
+    const currencyRes = await admin.graphql(`{ shop { currencyCode } }`);
+    const currencyData = await currencyRes.json();
+    shopCurrency = currencyData?.data?.shop?.currencyCode || 'USD';
+  } catch (e) { console.log('Error fetching shop currency:', e); }
 
   // Save/update shop in Supabase on each visit
   try {
@@ -57,6 +65,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     enabled: settings?.enabled || false,
     settings,
     stats,
+    shopCurrency,
   };
 };
 
@@ -64,13 +73,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
  * Dashboard Component - Premium Design
  */
 export default function Index() {
-  const { shop, enabled, stats } = useLoaderData<typeof loader>();
+  const { shop, enabled, stats, shopCurrency } = useLoaderData<typeof loader>();
 
   // Format currency
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-IN", {
+    return new Intl.NumberFormat(undefined, {
       style: "currency",
-      currency: "INR",
+      currency: shopCurrency || "USD",
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount);

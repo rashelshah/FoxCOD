@@ -203,10 +203,13 @@ async function handlePartialCodCheckout(request: Request, data: any) {
 
         // Create a Shopify cart checkout URL with notes about partial COD
         // Format: https://store.myshopify.com/cart/VARIANT_ID:QUANTITY?checkout[note]=NOTE&attributes[key]=value
+        const currencyCode = data.currency || 'USD';
+        const fmtAmt = (amt: number) => { try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: currencyCode }).format(amt); } catch { return `${currencyCode} ${amt.toFixed(2)}`; } };
+
         const encodedNote = encodeURIComponent(
             `PARTIAL COD ORDER [${orderRef}]\n` +
-            `Advance Payment: ₹${advanceAmount}\n` +
-            `Remaining (Pay on Delivery): ₹${actualRemainingAmount.toFixed(2)}\n` +
+            `Advance Payment: ${fmtAmt(parseFloat(advanceAmount))}\n` +
+            `Remaining (Pay on Delivery): ${fmtAmt(actualRemainingAmount)}\n` +
             `Customer: ${customerName} | ${customerPhone}`
         );
 
@@ -231,7 +234,7 @@ async function handlePartialCodCheckout(request: Request, data: any) {
             success: true,
             checkoutUrl: checkoutUrl,
             orderReference: orderRef,
-            message: `Partial COD order created. Reference: ${orderRef}. Advance: ₹${advanceAmount}, Remaining: ₹${actualRemainingAmount.toFixed(2)}`,
+            message: `Partial COD order created. Reference: ${orderRef}. Advance: ${fmtAmt(parseFloat(advanceAmount))}, Remaining: ${fmtAmt(actualRemainingAmount)}`,
         }), { headers: corsHeaders });
 
     } catch (error: any) {
@@ -349,15 +352,17 @@ async function handleRegularOrder(request: Request, data: any) {
 
     // Build notes including upsell details, shipping, and discount
     let orderNotes = data.notes || data.customerNotes || '';
+    const currencyCode = data.currency || 'USD';
+    const fmtPrice = (amt: number) => { try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: currencyCode }).format(amt); } catch { return `${currencyCode} ${amt.toFixed(2)}`; } };
     if (upsellItems.length > 0) {
         const upsellNotes = 'UPSELL ITEMS:\n' + upsellItems.map((item: any) =>
-            `  - ${item.title} (₹${item.price}) x${item.quantity} [${item.type}]`
+            `  - ${item.title} (${fmtPrice(parseFloat(item.price))}) x${item.quantity} [${item.type}]`
         ).join('\n');
         orderNotes = orderNotes ? orderNotes + '\n' + upsellNotes : upsellNotes;
     }
     if (shippingPrice > 0 && data.shippingLabel) {
         orderNotes = orderNotes ? orderNotes + '\n' : '';
-        orderNotes += `SHIPPING: ${data.shippingLabel} (₹${shippingPrice.toFixed(2)})`;
+        orderNotes += `SHIPPING: ${data.shippingLabel} (${fmtPrice(shippingPrice)})`;
     }
     if (discountPercent > 0) {
         orderNotes = orderNotes ? orderNotes + '\n' : '';
@@ -384,11 +389,13 @@ async function handleRegularOrder(request: Request, data: any) {
         price: totalPrice.toString(),
         shipping_label: data.shippingLabel || '',
         shipping_price: shippingPrice,
+        currency: currencyCode,
     });
 
     console.log('[Proxy] Order created:', result);
 
     // Try to create Shopify draft order
+    let shopifyOrderName = result.shopify_order_name; // fallback: COD-XXX
     try {
         const shop = await getShop(data.shop);
         const accessToken = shop?.access_token;
@@ -442,6 +449,7 @@ async function handleRegularOrder(request: Request, data: any) {
             if (shopifyData.data?.draftOrderCreate?.draftOrder) {
                 const draftOrder = shopifyData.data.draftOrderCreate.draftOrder;
                 console.log('[Proxy] Shopify draft order created:', draftOrder.name);
+                shopifyOrderName = draftOrder.name; // Use real Shopify name (e.g. #D39)
                 // Update Supabase record
                 const { updateOrderStatus } = await import("../config/supabase.server");
                 await updateOrderStatus(result.id, draftOrder.id, draftOrder.name, 'pending');
@@ -456,7 +464,7 @@ async function handleRegularOrder(request: Request, data: any) {
     // Non-blocking Google Sheets sync
     syncOrderToGoogleSheets(data.shop, {
         orderId: result.id,
-        orderName: result.shopify_order_name || `COD-${result.id}`,
+        orderName: shopifyOrderName || `COD-${result.id}`,
         customerName: data.customerName || '',
         phone: data.customerPhone || '',
         email: data.customerEmail || '',
@@ -475,7 +483,7 @@ async function handleRegularOrder(request: Request, data: any) {
     return new Response(JSON.stringify({
         success: true,
         orderId: result.id,
-        orderName: result.shopify_order_name
+        orderName: shopifyOrderName
     }), { headers: corsHeaders });
 }
 
