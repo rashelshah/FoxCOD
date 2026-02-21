@@ -410,7 +410,11 @@ async function handleRegularOrder(request: Request, data: any) {
 
             if (upsellItems.length > 0) {
                 upsellItems.forEach((item: any) => {
-                    const vid = item.variant_id.startsWith('gid://')
+                    if (!item.variant_id) {
+                        console.warn('[Proxy] Skipping upsell item with no variant_id:', item.title);
+                        return;
+                    }
+                    const vid = String(item.variant_id).startsWith('gid://')
                         ? item.variant_id
                         : `gid://shopify/ProductVariant/${item.variant_id}`;
                     lineItems.push({ variantId: vid, quantity: parseInt(item.quantity) || 1 });
@@ -436,6 +440,8 @@ async function handleRegularOrder(request: Request, data: any) {
                 };
             }
 
+            console.log('[Proxy] Creating draft order with lineItems:', JSON.stringify(lineItems));
+
             const shopifyRes = await fetch(`https://${data.shop}/admin/api/2024-01/graphql.json`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': accessToken },
@@ -454,11 +460,11 @@ async function handleRegularOrder(request: Request, data: any) {
                 const { updateOrderStatus } = await import("../config/supabase.server");
                 await updateOrderStatus(result.id, draftOrder.id, draftOrder.name, 'pending');
             } else {
-                console.warn('[Proxy] Shopify draft order errors:', shopifyData.data?.draftOrderCreate?.userErrors || shopifyData.errors);
+                console.warn('[Proxy] Shopify draft order errors:', JSON.stringify(shopifyData.data?.draftOrderCreate?.userErrors || shopifyData.errors));
             }
         }
     } catch (shopifyErr: any) {
-        console.error('[Proxy] Shopify draft order error (non-fatal):', shopifyErr.message);
+        console.error('[Proxy] Shopify draft order error (non-fatal):', shopifyErr.message, shopifyErr.stack);
     }
 
     // Non-blocking Google Sheets sync
