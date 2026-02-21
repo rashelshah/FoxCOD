@@ -1982,7 +1982,7 @@ export default function SettingsPage() {
                     box-sizing: border-box; 
                 }
                 
-                .builder-header {
+                .page-header {
                     display: flex;
                     align-items: center;
                     justify-content: space-between;
@@ -1990,8 +1990,36 @@ export default function SettingsPage() {
                     padding-bottom: 24px;
                     border-bottom: 1px solid #e5e7eb;
                 }
-                .builder-header-left { display: flex; align-items: center; gap: 16px; }
-                .back-btn { width: 44px; height: 44px; border-radius: 12px; border: 1px solid #e5e7eb; background: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; text-decoration: none; color: #374151; transition: all 0.2s ease; }
+                .page-header-left {
+                    display: flex;
+                    align-items: center;
+                    gap: 16px;
+                }
+                .back-btn {
+                    width: 40px;
+                    height: 40px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    border: 1px solid #e5e7eb;
+                    border-radius: 10px;
+                    background: white;
+                    text-decoration: none;
+                    color: #374151;
+                    transition: all 0.2s ease;
+                }
+                .back-btn:hover { background: #f9fafb; }
+                .page-title h1 {
+                    font-size: 24px;
+                    font-weight: 700;
+                    color: #111827;
+                    margin: 0 0 4px 0;
+                }
+                .page-title p {
+                    font-size: 14px;
+                    color: #6b7280;
+                    margin: 0;
+                }
                 .save-btn { padding: 14px 28px; border-radius: 12px; font-weight: 600; font-size: 14px; border: none; cursor: pointer; transition: all 0.2s ease; background: #1f2937; color: white; }
                 .style-options { display: flex; gap: 12px; flex-wrap: wrap; }
                 .style-option { padding: 12px 20px; border-radius: 12px; border: 1px solid #e5e7eb; background: white; font-size: 14px; font-weight: 600; color: #6b7280; cursor: pointer; transition: all 0.2s ease; flex: 1; text-align: center; }
@@ -2759,8 +2787,8 @@ export default function SettingsPage() {
                 
                 @media (max-width: 768px) {
                     .form-builder { padding: 0 16px; }
-                    .builder-header { padding: 20px; border-radius: 16px; flex-direction: column; gap: 16px; align-items: stretch; }
-                    .builder-header-left { gap: 12px; }
+                    .page-header { padding: 20px; border-radius: 16px; flex-direction: column; gap: 16px; align-items: stretch; }
+                    .page-header-left { gap: 12px; }
                     .builder-title h1 { font-size: 20px; }
                     .save-btn { width: 100%; justify-content: center; }
                     .main-toggle { padding: 16px; flex-direction: column; gap: 16px; text-align: center; }
@@ -2773,13 +2801,11 @@ export default function SettingsPage() {
                     .color-preset { width: 28px; height: 28px; }
                     .custom-color, .custom-color input[type="color"] { width: 28px; height: 28px; }
                     .preview-phone { padding: 8px; border-radius: 24px; }
-                    .preview-phone-screen { border-radius: 18px; min-height: 320px; }
-                }
                 
                 @media (max-width: 480px) {
                     .form-builder { padding: 0 12px; }
-                    .builder-header { padding: 16px; }
-                    .back-btn { width: 38px; height: 38px; font-size: 16px; }
+                    .page-header { padding: 16px; }
+                    .preview-panel { padding: 16px; }
                     .builder-title h1 { font-size: 18px; }
                     .builder-title p { font-size: 12px; }
                     .tabs { gap: 4px; }
@@ -2983,11 +3009,11 @@ export default function SettingsPage() {
                 )}
                 <div className="form-builder">
                     {/* Header */}
-                    <div className="builder-header">
-                        <div className="builder-header-left">
+                    <div className="page-header">
+                        <div className="page-header-left">
                             <Link to="/app" className="back-btn">←</Link>
-                            <div className="builder-title">
-                                <h1>🎨 Form Builder</h1>
+                            <div className="page-title">
+                                <h1>Form Builder</h1>
                                 <p>Customize your COD checkout form</p>
                             </div>
                         </div>

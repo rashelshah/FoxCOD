@@ -6,7 +6,7 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
-import { useLoaderData, useSubmit, useNavigation, useActionData, useRevalidator } from "react-router";
+import { useLoaderData, useSubmit, useNavigation, useActionData, useRevalidator, Link } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import {
@@ -730,26 +730,35 @@ export default function QuantityOffersPage() {
 
             <div className="qo-page">
                 {/* Header */}
-                <div className="qo-header">
-                    <div className="qo-header-left">
-                        {activeGroup && (
-                            <button className="btn-back" onClick={() => {
+                <div className="page-header" style={{ padding: '24px', background: '#f6f6f7', margin: 0 }}>
+                    <div className="page-header-left">
+                        {activeGroup ? (
+                            <Link to="#" className="back-btn" onClick={(e) => {
+                                e.preventDefault();
                                 setActiveGroup(null);
                                 setEditingOfferId(null);
                                 setActiveTab('offers');
-                            }}>←</button>
+                            }}>←</Link>
+                        ) : (
+                            <Link to="/app" className="back-btn">←</Link>
                         )}
-                        <h1>{activeGroup ? activeGroup.name || 'New offer' : 'Bundle Offers'}</h1>
+                        <div className="page-title">
+                            <h1>{activeGroup ? activeGroup.name || 'New offer' : 'Bundle Offers'}</h1>
+                            <p>{activeGroup ? 'Configure your offer details' : 'Encourage customers to buy more with volume discounts'}</p>
+                        </div>
                         {activeGroup && (
                             <div className={`status-toggle ${activeGroup.active ? 'on' : ''}`}
-                                onClick={() => updateActiveGroup({ active: !activeGroup.active })}>
+                                onClick={() => updateActiveGroup({ active: !activeGroup.active })}
+                                style={{ marginLeft: '16px' }}>
                                 <div className="toggle-track"><div className="toggle-thumb" /></div>
                                 <Badge tone={activeGroup.active ? 'success' : 'critical'}>{activeGroup.active ? 'Active' : 'Inactive'}</Badge>
                             </div>
                         )}
                     </div>
                     {!activeGroup && (
-                        <Button variant="primary" onClick={handleCreateNew}>+ New Offer</Button>
+                        <div style={{ paddingRight: '24px' }}>
+                            <Button variant="primary" onClick={handleCreateNew}>+ New Offer</Button>
+                        </div>
                     )}
                 </div>
                 <div className="qo-body">
@@ -1623,9 +1632,43 @@ const styles = `
     .qo-page { display: flex; flex-direction: column; min-height: 100vh; background: #f5f5f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
 
     /* Header */
-    .qo-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; background: #fff; border-bottom: 1px solid #e5e5e5; }
-    .qo-header-left { display: flex; align-items: center; gap: 12px; }
-    .qo-header-left h1 { margin: 0; font-size: 18px; font-weight: 600; }
+    .page-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 24px;
+    }
+    .page-header-left {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+    .back-btn {
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        background: white;
+        text-decoration: none;
+        color: #374151;
+        transition: all 0.2s ease;
+    }
+    .back-btn:hover { background: #f9fafb; }
+    .page-title { display: flex; flex-direction: column; }
+    .page-title h1 {
+        font-size: 24px;
+        font-weight: 700;
+        color: #111827;
+        margin: 0 0 4px 0;
+    }
+    .page-title p {
+        font-size: 14px;
+        color: #6b7280;
+        margin: 0;
+    }
     .btn-back { background: none; border: none; font-size: 18px; cursor: pointer; padding: 4px 8px; }
     .status-toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; }
     .toggle-track { width: 44px; height: 24px; background: var(--p-color-bg-surface-secondary-active, #dfe3e8); border-radius: 12px; position: relative; transition: 0.2s cubic-bezier(0.25, 0.1, 0.25, 1); }

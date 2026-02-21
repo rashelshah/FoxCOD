@@ -4,7 +4,7 @@
  */
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
-import { useLoaderData, useSubmit, useNavigation, useActionData } from "react-router";
+import { useLoaderData, useSubmit, useNavigation, useActionData, Link } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { getUpsellCampaigns, saveCampaign, deleteCampaign, toggleCampaignActive, syncUpsellsToMetafield } from "../services/upsell-offers.server";
@@ -66,10 +66,43 @@ const S = `
 ${colorSelectorStyles}
 /* ==================== PAGE LAYOUT ==================== */
 .up-page{max-width:1200px;margin:0 auto;padding:24px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
-.up-header{display:flex;align-items:center;gap:12px;margin-bottom:28px}
-.up-header h1{font-size:22px;font-weight:700;color:#111827;margin:0;flex:1}
-.btn-back{width:40px;height:40px;border-radius:10px;border:1px solid #e5e7eb;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;color:#374151;transition:all .15s ease}
-.btn-back:hover{background:#f3f4f6;border-color:#d1d5db}
+.page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+}
+.page-header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+.back-btn {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    background: white;
+    text-decoration: none;
+    color: #374151;
+    transition: all 0.2s ease;
+}
+.back-btn:hover { background: #f9fafb; }
+.page-title { display: flex; flex-direction: column; }
+.page-title h1 {
+    font-size: 24px;
+    font-weight: 700;
+    color: #111827;
+    margin: 0 0 4px 0;
+}
+.page-title p {
+    font-size: 14px;
+    color: #6b7280;
+    margin: 0;
+}
 .toggle-pill{display:flex;align-items:center;gap:8px}
 .toggle-track{width:44px;height:24px;border-radius:12px;background:var(--p-color-bg-surface-secondary-active, #dfe3e8);cursor:pointer;position:relative;transition:.2s cubic-bezier(.25,.1,.25,1)}
 .toggle-track.on{background:var(--p-color-bg-fill-inverse, #1a1a1a)}
@@ -372,21 +405,37 @@ export default function UpsellDownsellPage() {
                 <button onClick={handleDiscard} disabled={isSaving}>Discard</button>
             </ui-save-bar>
 
-            <Page
-                title={editing ? (editing.campaign_name || 'New Upsell') : 'Upsells & Downsells'}
-                backAction={editing ? { content: 'Back', onAction: () => { setEditing(null); setSavedStr(null); } } : undefined}
-                primaryAction={editing ? undefined : { content: `+ Create ${tabLabels[activeTab]}`, onAction: handleCreate }}
-                titleMetadata={editing ? (
-                    <InlineStack gap="200" align="center">
-                        <div onClick={() => upd({ active: !editing.active })} style={{ cursor: 'pointer' }}>
-                            <div className={`toggle-track ${editing.active ? 'on' : ''}`}>
-                                <div className="toggle-thumb" />
-                            </div>
+            <div className="up-page">
+                <div className="page-header">
+                    <div className="page-header-left">
+                        {editing ? (
+                            <Link to="#" className="back-btn" onClick={(e) => {
+                                e.preventDefault();
+                                setEditing(null);
+                                setSavedStr(null);
+                            }}>←</Link>
+                        ) : (
+                            <Link to="/app" className="back-btn">←</Link>
+                        )}
+                        <div className="page-title">
+                            <h1>{editing ? (editing.campaign_name || 'New Upsell') : 'Upsells & Downsells'}</h1>
+                            <p>{editing ? 'Configure your offer details' : 'Boost your AOV with post-purchase offers'}</p>
                         </div>
-                        <Badge tone={editing.active ? 'success' : 'critical'}>{editing.active ? 'Active' : 'Inactive'}</Badge>
-                    </InlineStack>
-                ) : undefined}
-            >
+                        {editing && (
+                            <div style={{ marginLeft: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <div onClick={() => upd({ active: !editing.active })} style={{ cursor: 'pointer' }}>
+                                    <div className={`toggle-track ${editing.active ? 'on' : ''}`}>
+                                        <div className="toggle-thumb" />
+                                    </div>
+                                </div>
+                                <Badge tone={editing.active ? 'success' : 'critical'}>{editing.active ? 'Active' : 'Inactive'}</Badge>
+                            </div>
+                        )}
+                    </div>
+                    {!editing && (
+                        <Button variant="primary" onClick={handleCreate}>+ Create {tabLabels[activeTab]}</Button>
+                    )}
+                </div>
                 {!editing ? (
                     <BlockStack gap="400">
                         <Tabs tabs={polarisTabs} selected={selectedTabIndex} onSelect={(idx) => setActiveTab(tabTypes[idx])}>
@@ -1733,7 +1782,7 @@ export default function UpsellDownsellPage() {
                         )}
                     </div>
                 )}
-            </Page>
+            </div>
         </>
     );
 }

@@ -3,7 +3,7 @@
  * Route: /app/app-settings
  */
 import { useState, useEffect, useCallback } from 'react';
-import { useLoaderData, useSubmit, useActionData, useNavigation } from 'react-router';
+import { useLoaderData, useSubmit, useActionData, useNavigation, Link, useSearchParams } from 'react-router';
 import type { LoaderFunctionArgs, ActionFunctionArgs } from 'react-router';
 import { useAppBridge } from '@shopify/app-bridge-react';
 import {
@@ -93,7 +93,16 @@ export default function AppSettingsPage() {
     const shopify = useAppBridge();
     const isSaving = navigation.state === 'submitting';
 
-    const [activeTab, setActiveTab] = useState<TabId>('pixels');
+    const [searchParams, setSearchParams] = useSearchParams();
+    const initialTab = (searchParams.get('tab') as TabId) || 'pixels';
+    const [activeTab, setActiveTab] = useState<TabId>(TABS.some(t => t.id === initialTab) ? initialTab : 'pixels');
+
+    // Update URL when tab changes
+    const handleTabChange = (idx: number) => {
+        const newTab = TABS[idx].id as TabId;
+        setActiveTab(newTab);
+        setSearchParams({ tab: newTab }, { replace: true });
+    };
 
     // ═══════════ PIXEL STATE ═══════════
     const [pixels, setPixels] = useState<PixelTrackingSettings[]>(initialPixels || []);
@@ -196,20 +205,25 @@ export default function AppSettingsPage() {
                 <button onClick={handleDiscard} disabled={isSaving}>Discard</button>
             </ui-save-bar>
 
-            <Page
-                title=""
-                fullWidth={false}
-            >
-                <div className="as-page">
+            <div className="as-page">
+                <div className="as-body">
+                    <div className="page-header">
+                        <div className="page-header-left">
+                            <Link to="/app" className="back-btn">←</Link>
+                            <div className="page-title">
+                                <h1>Settings</h1>
+                                <p>Manage your Tracking Pixels and Fraud Protection</p>
+                            </div>
+                        </div>
+                    </div>
                     {/* Polaris Tabs */}
                     <Tabs
                         tabs={TABS}
                         selected={TABS.findIndex(t => t.id === activeTab)}
-                        onSelect={(idx) => setActiveTab(TABS[idx].id as TabId)}
+                        onSelect={handleTabChange}
                         fitted
                     >
-                        {/* Body */}
-                        <div className="as-body">
+                        <div>
                             {/* ── PIXELS TAB ── */}
                             {activeTab === 'pixels' && (
                                 <div className="as-section">
@@ -384,14 +398,22 @@ export default function AppSettingsPage() {
                         </div>
                     </Tabs>
                 </div>
-            </Page>
+            </div>
         </>
     );
 }
 
 // ── STYLES ──
 const styles = `
-    .as-page { display: flex; flex-direction: column; min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    .as-page { display: flex; flex-direction: column; min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f6f6f7; }
+    .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; padding: 0 24px; }
+    @media (max-width: 640px) { .page-header { padding: 0; } }
+    .page-header-left { display: flex; align-items: center; gap: 16px; }
+    .back-btn { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border: 1px solid #e5e7eb; border-radius: 10px; background: white; text-decoration: none; color: #374151; transition: all 0.2s ease; }
+    .back-btn:hover { background: #f9fafb; }
+    .page-title { display: flex; flex-direction: column; }
+    .page-title h1 { font-size: 24px; font-weight: 700; color: #111827; margin: 0 0 4px 0; }
+    .page-title p { font-size: 14px; color: #6b7280; margin: 0; }
 
     /* Body */
     .as-body { padding: 24px 0; flex: 1; max-width: 820px; margin: 0 auto; width: 100%; }
@@ -441,4 +463,3 @@ const styles = `
         .as-body { padding: 16px; }
     }
 `;
-
