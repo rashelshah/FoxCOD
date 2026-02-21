@@ -31,13 +31,13 @@ export default function App() {
             left: 0;
             right: 0;
             height: 3px;
-            background: linear-gradient(90deg, #6366f1, #8b5cf6, #6366f1);
+            background: linear-gradient(90deg, #202223, #000000, #202223);
             background-size: 200% 100%;
-            animation: shimmer 1.5s infinite;
+            animation: shimmer 1.5s infinite linear;
             z-index: 9999;
             opacity: 0;
             pointer-events: none;
-            transition: opacity 0.2s ease;
+            transition: opacity 0.3s ease;
           }
           
           .page-loading-overlay[data-loading="true"] {

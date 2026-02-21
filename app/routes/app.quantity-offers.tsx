@@ -12,7 +12,7 @@ import { authenticate } from "../shopify.server";
 import {
     Page, Layout, Card, Button, Text, InlineStack, BlockStack, Tabs, Box,
     TextField, Select, Checkbox, Badge, Banner, Divider, LegacyCard, EmptyState,
-    RadioButton, ButtonGroup, RangeSlider,
+    RadioButton, ButtonGroup, RangeSlider, Modal,
 } from "@shopify/polaris";
 import { ColorSelector, colorSelectorStyles } from "./ColorSelector";
 import {
@@ -424,6 +424,20 @@ export default function QuantityOffersPage() {
     const [activeGroup, setActiveGroup] = useState<QuantityOfferGroup | null>(null);
     const [editingOfferId, setEditingOfferId] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<'offers' | 'design'>('offers');
+    const [groupToDelete, setGroupToDelete] = useState<{ id: string, name: string } | null>(null);
+
+    const deletingGroupId = navigation.state === "submitting" && navigation.formData?.get("action") === "delete"
+        ? navigation.formData.get("groupId")
+        : null;
+
+    const displayGroups = useMemo(() => {
+        if (!initialOfferGroups) return [];
+        if (deletingGroupId) {
+            return initialOfferGroups.filter((g: any) => String(g.id) !== deletingGroupId);
+        }
+        return initialOfferGroups;
+    }, [initialOfferGroups, deletingGroupId]);
+
 
     // Track saved state as a STATE VARIABLE (not ref) so changes trigger re-render
     const [savedGroupString, setSavedGroupString] = useState<string | null>(null);
@@ -650,14 +664,19 @@ export default function QuantityOffersPage() {
     };
 
     // Handler for quick-delete from the list view
-    const handleDeleteGroup = useCallback((groupId: string, e: React.MouseEvent) => {
+    const handleDeleteGroup = useCallback((groupId: string, groupName: string, e: React.MouseEvent) => {
         e.stopPropagation();
-        if (!confirm('Delete this offer group?')) return;
+        setGroupToDelete({ id: groupId, name: groupName });
+    }, []);
+
+    const confirmDeleteGroup = useCallback(() => {
+        if (!groupToDelete) return;
         const formData = new FormData();
         formData.append("action", "delete");
-        formData.append("groupId", groupId);
+        formData.append("groupId", groupToDelete.id);
         submit(formData, { method: "post" });
-    }, [submit]);
+        setGroupToDelete(null);
+    }, [groupToDelete, submit]);
 
     // Handler for quick-toggle active/inactive from the list view
     const handleToggleGroupActive = useCallback((dbGroup: any, e: React.MouseEvent) => {
@@ -727,6 +746,29 @@ export default function QuantityOffersPage() {
                 </button>
                 <button onClick={handleDiscard} disabled={isSaving}>Discard</button>
             </ui-save-bar>
+
+            <Modal
+                open={!!groupToDelete}
+                onClose={() => setGroupToDelete(null)}
+                title={`Delete offer: ${groupToDelete?.name || 'Untitled'}`}
+                primaryAction={{
+                    content: 'Delete',
+                    onAction: confirmDeleteGroup,
+                    destructive: true,
+                }}
+                secondaryActions={[
+                    {
+                        content: 'Cancel',
+                        onAction: () => setGroupToDelete(null),
+                    },
+                ]}
+            >
+                <Modal.Section>
+                    <Text as="p">
+                        Are you sure you want to delete this offer group? This cannot be undone.
+                    </Text>
+                </Modal.Section>
+            </Modal>
 
             <div className="qo-page">
                 {/* Header */}
@@ -955,9 +997,9 @@ export default function QuantityOffersPage() {
                                     </div>
                                 </div>
 
-                                {(initialOfferGroups || []).length > 0 ? (
+                                {(displayGroups || []).length > 0 ? (
                                     <div className="qo-groups-list">
-                                        {(initialOfferGroups || []).map((g: any) => (
+                                        {(displayGroups || []).map((g: any) => (
                                             <div key={String(g.id)} className="qo-group-row">
                                                 <div className="qo-group-row-main" onClick={() => handleSelectGroup(g)} style={{ cursor: 'pointer', flex: 1 }}>
                                                     <div className="qo-group-row-title">{g.name || 'Untitled offer'}</div>
@@ -972,7 +1014,7 @@ export default function QuantityOffersPage() {
                                                         type="button"
                                                         className="btn-delete-group"
                                                         title="Delete offer"
-                                                        onClick={(e) => handleDeleteGroup(String(g.id), e)}
+                                                        onClick={(e) => handleDeleteGroup(String(g.id), g.name || 'Untitled', e)}
                                                     >🗑</button>
                                                     <span className="qo-group-row-cta" onClick={() => handleSelectGroup(g)}>Edit →</span>
                                                 </div>

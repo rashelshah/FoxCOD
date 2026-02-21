@@ -6,6 +6,7 @@
 
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
 import { useLoaderData, Link, Form, useNavigation, redirect, useSearchParams } from "react-router";
+import { Button } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import { getAllIntegrationSettings, disconnectIntegration, supabase } from "../config/supabase.server";
 import { INTEGRATIONS, STATUS_BADGES, type Integration, type IntegrationSettings, type GoogleSheetsConfig } from "../config/integrations.types";
@@ -550,13 +551,14 @@ export default function IntegrationsPage() {
                                             <Form method="post">
                                                 <input type="hidden" name="integrationId" value={integration.id} />
                                                 <input type="hidden" name="intent" value={buttonConfig.intent} />
-                                                <button
-                                                    type="submit"
-                                                    className="cta-btn cta-btn-primary"
-                                                    disabled={buttonConfig.disabled || isSubmitting}
+                                                <Button
+                                                    submit
+                                                    variant="primary"
+                                                    disabled={buttonConfig.disabled}
+                                                    loading={isSubmitting}
                                                 >
-                                                    {isSubmitting ? '...' : buttonConfig.text}
-                                                </button>
+                                                    {buttonConfig.text}
+                                                </Button>
                                             </Form>
                                         )}
                                     </div>
