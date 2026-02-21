@@ -209,6 +209,18 @@
   console.log('[FoxCod] Pixel tracking loaded:', window.FoxCod.pixelTracking);
 </script>
 
+{% comment %} Fraud Protection — inject settings for client-side validation {% endcomment %}
+<script>
+  window.FoxCod = window.FoxCod || {};
+  try {
+    var _fpRaw = {{ shop.metafields.fox_cod.fraud_protection_settings_json.value | json | default: 'null' }};
+    window.FoxCod.fraudProtection = (typeof _fpRaw === 'object' && _fpRaw !== null) ? _fpRaw : {};
+  } catch (e) {
+    window.FoxCod.fraudProtection = {};
+  }
+  console.log('[FoxCod] Fraud protection loaded:', window.FoxCod.fraudProtection);
+</script>
+
 {% comment %} Modal Overlay {% endcomment %}
 <div class="cod-modal-overlay" id="cod-modal-overlay-{{ product.id }}" style="display: none;">
 

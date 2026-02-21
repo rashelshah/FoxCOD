@@ -12,6 +12,7 @@ import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { logOrder, supabase, getShop } from "../config/supabase.server";
 import { lookupCustomerByPhone } from "../services/customer-lookup.server";
 import { syncOrderToGoogleSheets } from "../services/google-sheets.server";
+import { validateOrderAgainstFraudRules } from "../services/fraud-protection.server";
 
 const corsHeaders = {
     "Content-Type": "application/json",
@@ -89,7 +90,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
         // Default Route: Regular COD Order Creation
         console.log('[Proxy] Using default order creation route');
-        return await handleRegularOrder(data);
+        return await handleRegularOrder(request, data);
 
     } catch (error: any) {
         console.error('[Proxy] Error:', error);
@@ -243,7 +244,7 @@ async function handlePartialCodCheckout(request: Request, data: any) {
 }
 
 // Handle Regular COD Order
-async function handleRegularOrder(data: any) {
+async function handleRegularOrder(request: Request, data: any) {
     // Validate required fields
     if (!data.shop || !data.productId || !data.variantId) {
         return new Response(JSON.stringify({
@@ -253,6 +254,46 @@ async function handleRegularOrder(data: any) {
             status: 400,
             headers: corsHeaders
         });
+    }
+
+    // ── Fraud Protection: server-side validation ──
+    // Log ALL IP-related headers for debugging
+    console.log('[Proxy] ===== IP HEADER DEBUG =====');
+    console.log('[Proxy] x-forwarded-for:', request.headers.get('x-forwarded-for'));
+    console.log('[Proxy] cf-connecting-ip:', request.headers.get('cf-connecting-ip'));
+    console.log('[Proxy] x-real-ip:', request.headers.get('x-real-ip'));
+    console.log('[Proxy] x-shopify-client-ip:', request.headers.get('x-shopify-client-ip'));
+    console.log('[Proxy] x-request-id:', request.headers.get('x-request-id'));
+    console.log('[Proxy] ================================');
+
+    const clientIp =
+        request.headers.get('x-shopify-client-ip')
+        || request.headers.get('cf-connecting-ip')
+        || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+        || request.headers.get('x-real-ip')
+        || 'unknown';
+    console.log('[Proxy] >>> CUSTOMER IP:', clientIp, '<<<');
+
+    try {
+        const fraudResult = await validateOrderAgainstFraudRules({
+            phone: data.customerPhone,
+            email: data.customerEmail,
+            ip: clientIp,
+            zipcode: data.customerZipcode,
+            quantity: parseInt(data.quantity) || 1,
+            shopDomain: data.shop,
+        });
+        if (!fraudResult.allowed) {
+            console.warn('[Proxy] Blocked by fraud protection:', fraudResult.message);
+            return new Response(JSON.stringify({
+                success: false,
+                error: fraudResult.message
+            }), { status: 403, headers: corsHeaders });
+        }
+        console.log('[Proxy] Fraud check passed');
+    } catch (fraudErr: any) {
+        console.error('[Proxy] Fraud check error (allowing order):', fraudErr.message);
+        // If fraud check fails due to DB error, allow the order to proceed
     }
 
     // Save/update customer data in customers table for autofill

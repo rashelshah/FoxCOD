@@ -31,6 +31,7 @@ export default function App() {
           <s-link href="/app/analytics">Analytics</s-link>
           <s-link href="/app/pixel-tracking">Pixel Tracking</s-link>
           <s-link href="/app/integrations">Integrations</s-link>
+          <s-link href="/app/fraud-protection">Fraud Protection</s-link>
         </s-app-nav>
         <Outlet />
       </AppProvider>
