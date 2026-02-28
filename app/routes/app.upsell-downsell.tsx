@@ -11,6 +11,7 @@ import { getUpsellCampaigns, saveCampaign, deleteCampaign, toggleCampaignActive,
 import { type UpsellCampaign, type UpsellType, type CampaignOffer, type CampaignDesign, type ButtonDesign, createDefaultCampaign, createDefaultOffer, DEFAULT_CAMPAIGN_DESIGN } from "../config/upsell-offers.types";
 import { ColorSelector, colorSelectorStyles } from "./ColorSelector";
 import { Page, Layout, Tabs, Card, Button, Badge, EmptyState, Text, InlineStack, BlockStack, Box, Divider, TextField, Select, ButtonGroup, Banner, LegacyCard, RangeSlider, Modal } from "@shopify/polaris";
+import { EditIcon, DeleteIcon } from "@shopify/polaris-icons";
 import { getFormSettings } from "../config/supabase.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -522,7 +523,7 @@ export default function UpsellDownsellPage() {
                                                     <div className="up-row-card" style={{ cursor: 'pointer' }} onClick={() => handleEdit(c)}>
                                                         <InlineStack align="space-between" blockAlign="center" gap="400">
                                                             <InlineStack gap="400" blockAlign="center">
-                                                                <div className="up-card-img">{firstOffer?.upsell_product_image ? <img src={firstOffer.upsell_product_image} alt="" /> : '🎁'}</div>
+                                                                <div className="up-card-img">{(firstOffer?.upsell_product_image || firstOffer?._selectedProduct?.featuredImage?.url || firstOffer?._selectedProduct?.images?.[0]?.url) ? <img src={firstOffer?.upsell_product_image || firstOffer?._selectedProduct?.featuredImage?.url || firstOffer?._selectedProduct?.images?.[0]?.url} alt="" /> : <span style={{ color: '#9ca3af', fontSize: '12px' }}>No img</span>}</div>
                                                                 <BlockStack gap="100">
                                                                     <Text variant="bodyMd" fontWeight="semibold" as="span">{c.campaign_name || 'Untitled'}</Text>
                                                                     <InlineStack gap="200" align="start">
@@ -537,13 +538,10 @@ export default function UpsellDownsellPage() {
                                                                 <div onClick={e => e.stopPropagation()}>
                                                                     <div className={`toggle-track ${c.active ? 'on' : ''}`} onClick={e => handleToggle(c.id, !c.active, e)}><div className="toggle-thumb" /></div>
                                                                 </div>
-                                                                <button
-                                                                    type="button"
-                                                                    className="btn-delete-campaign"
-                                                                    title="Delete campaign"
-                                                                    onClick={(e) => handleDelete(c.id, c.campaign_name || 'Untitled', e)}
-                                                                >🗑</button>
-                                                                <span className="up-group-row-cta">Edit →</span>
+                                                                <div onClick={e => e.stopPropagation()} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                                    <Button icon={DeleteIcon} variant="tertiary" tone="critical" accessibilityLabel="Delete campaign" onClick={() => setCampaignToDelete({ id: c.id, name: c.campaign_name || 'Untitled' })} />
+                                                                    <Button icon={EditIcon} variant="tertiary" accessibilityLabel="Edit campaign" onClick={() => handleEdit(c)} />
+                                                                </div>
                                                             </InlineStack>
                                                         </InlineStack>
                                                     </div>
@@ -567,7 +565,7 @@ export default function UpsellDownsellPage() {
                                     </LegacyCard>
 
                                     {/* Where to show */}
-                                    <LegacyCard title="🛒 Where you want to show this upsell?" sectioned>
+                                    <LegacyCard title="Where you want to show this upsell?" sectioned>
                                         <BlockStack gap="300">
                                             <Text variant="bodySm" tone="subdued" as="p">This upsell will show up on the products you choose below, you can show it on all products or specific</Text>
                                             <ButtonGroup variant="segmented">
@@ -590,7 +588,7 @@ export default function UpsellDownsellPage() {
                                     </LegacyCard>
 
                                     {/* Configure 1-Tick Offer */}
-                                    <LegacyCard title="⚡ Configure 1-Tick Offer" sectioned>
+                                    <LegacyCard title="Configure 1-Tick Offer" sectioned>
                                         {editing.offers[0] && (() => {
                                             const offer = editing.offers[0];
                                             return (
@@ -617,7 +615,7 @@ export default function UpsellDownsellPage() {
                                                     <TextField
                                                         label="Offer text"
                                                         value={editing.design.headerText || ''}
-                                                        placeholder={`🔥 Add {{title}} for only {{price}}`}
+                                                        placeholder={`Add {{title}} for only {{price}}`}
                                                         onChange={val => updDesign({ headerText: val })}
                                                         multiline={2}
                                                         helpText="You can use {{title}} and {{price}} to dynamically replace the values"
@@ -629,7 +627,7 @@ export default function UpsellDownsellPage() {
                                     </LegacyCard>
 
                                     {/* Settings */}
-                                    <LegacyCard title="⚙️ Settings" sectioned>
+                                    <LegacyCard title="Settings" sectioned>
                                         <div className="up-toggle-row" onClick={() => upd({ checkbox_default_checked: !editing.checkbox_default_checked })}>
                                             <span>Ticked by default</span>
                                             <div className={`up-mini-toggle ${editing.checkbox_default_checked ? 'on' : 'off'}`} />
@@ -637,7 +635,7 @@ export default function UpsellDownsellPage() {
                                     </LegacyCard>
 
                                     {/* Style */}
-                                    <LegacyCard title="🎨 Style" sectioned>
+                                    <LegacyCard title="Style" sectioned>
                                         <BlockStack gap="400">
                                             <InlineStack gap="300" wrap={false}>
                                                 <div style={{ flex: 1 }}><ColorSelector label="Tick Color" value={editing.design.acceptButton.bgColor} onChange={c => updAccept({ bgColor: c })} /></div>
@@ -670,14 +668,14 @@ export default function UpsellDownsellPage() {
                                     <div className="pv-wrap">
                                         <div className="pv-panel">
                                             <div className="pv-panel-header">
-                                                <h3>📱 Live Preview</h3>
+                                                <h3>Live Preview</h3>
                                             </div>
                                             <div className="pv-phone">
                                                 <div className="pv-phone-screen" ref={tickPreviewRef}>
 
                                                     {/* Product Section + Form Modal - same structure as Form Builder */}
                                                     <div className="tick-pv-product">
-                                                        <div className="tick-pv-product-img">📦</div>
+                                                        <div className="tick-pv-product-img" style={{ color: '#9ca3af', fontSize: '14px' }}></div>
                                                         <div className="tick-pv-product-title">Sample Product</div>
                                                         <div className="tick-pv-product-price">{fmtCurrency(1999)}</div>
 
@@ -851,7 +849,7 @@ export default function UpsellDownsellPage() {
                                                                     marginBottom: '12px',
                                                                     border: '1px solid #e2e8f0',
                                                                 }}>
-                                                                    <div style={{ fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>🧾 Order Summary</div>
+                                                                    <div style={{ fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>Order Summary</div>
                                                                     {(() => {
                                                                         const unitPrice = 1999;
                                                                         const shippingEnabled = formSettings?.shipping_options?.enabled;
@@ -885,7 +883,7 @@ export default function UpsellDownsellPage() {
                                                                     marginBottom: '12px',
                                                                     border: '1px solid #e2e8f0',
                                                                 }}>
-                                                                    <div style={{ fontSize: '11px', fontWeight: 600, color: '#374151', marginBottom: '8px' }}>🚚 Shipping</div>
+                                                                    <div style={{ fontSize: '11px', fontWeight: 600, color: '#374151', marginBottom: '8px' }}>Shipping</div>
                                                                     {formSettings?.shipping_options?.options?.slice(0, 2).map((opt: any) => (
                                                                         <div key={opt.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', color: '#6b7280', marginBottom: '4px' }}>
                                                                             <input type="radio" name="tick-shipping-preview" disabled checked={opt.id === formSettings?.shipping_options?.defaultOption} style={{ width: '12px', height: '12px' }} />
@@ -915,7 +913,7 @@ export default function UpsellDownsellPage() {
                                                                 const textColor = editing.design.headerTextColor || '#000000';
                                                                 const textSize = editing.design.headerTextSize || 13;
                                                                 const bStyle = editing.design.acceptButton.borderStyle || 'dashed';
-                                                                const displayText = (editing.design.headerText || '🔥 Add {{title}} for only {{price}}')
+                                                                const displayText = (editing.design.headerText || 'Add {{title}} for only {{price}}')
                                                                     .replace('{{title}}', `<strong>${offer.upsell_product_title || 'Shipping protection'}</strong>`)
                                                                     .replace('{{price}}', `$${(offer.original_price || 0).toFixed(2)}`);
 
@@ -1020,7 +1018,7 @@ export default function UpsellDownsellPage() {
                                     <LegacyCard title="1- Display the downsell for" sectioned>
                                         <BlockStack gap="300">
                                             <ButtonGroup variant="segmented">
-                                                <Button pressed={editing.show_condition_type === 'always'} onClick={() => upd({ show_condition_type: 'always' as any })}>✅ All products</Button>
+                                                <Button pressed={editing.show_condition_type === 'always'} onClick={() => upd({ show_condition_type: 'always' as any })}>All products</Button>
                                                 <Button pressed={editing.show_condition_type === 'specific_products'} onClick={() => upd({ show_condition_type: 'specific_products' as any })}>Specific products</Button>
                                             </ButtonGroup>
                                             {editing.show_condition_type === 'specific_products' && (
@@ -1057,8 +1055,10 @@ export default function UpsellDownsellPage() {
                                             return (
                                                 <>
                                                     <div className="mode-toggle">
-                                                        <button className={`mode-btn ${offer.discount_type === 'fixed' ? 'active' : ''}`} onClick={() => updOffer(offer.id, { discount_type: 'fixed' as any })}>Fixed amount</button>
-                                                        <button className={`mode-btn ${offer.discount_type === 'percentage' ? 'active' : ''}`} onClick={() => updOffer(offer.id, { discount_type: 'percentage' as any })}>Percentage</button>
+                                                        <ButtonGroup variant="segmented">
+                                                            <Button pressed={offer.discount_type === 'fixed'} onClick={() => updOffer(offer.id, { discount_type: 'fixed' as any })}>Fixed amount</Button>
+                                                            <Button pressed={offer.discount_type === 'percentage'} onClick={() => updOffer(offer.id, { discount_type: 'percentage' as any })}>Percentage</Button>
+                                                        </ButtonGroup>
                                                     </div>
                                                     <div className="fr" style={{ marginTop: 12 }}>
                                                         <div className="fg">
@@ -1078,7 +1078,7 @@ export default function UpsellDownsellPage() {
                                             const offer = editing.offers[0];
                                             return (
                                                 <>
-                                                    <button className="btn-pick" onClick={() => pickProduct(offer.id)}>Select product</button>
+                                                    <Button onClick={() => pickProduct(offer.id)}>Select product</Button>
                                                     {offer.upsell_product_id ? (
                                                         <div className="prod-row" style={{ marginTop: 8 }}>
                                                             {offer.upsell_product_image && <img src={offer.upsell_product_image} alt="" />}
@@ -1300,7 +1300,7 @@ export default function UpsellDownsellPage() {
                                     <div className="pv-wrap">
                                         <div className="pv-panel">
                                             <div className="pv-panel-header">
-                                                <h3>📱 Live Preview</h3>
+                                                <h3>Live Preview</h3>
                                             </div>
                                             <div className="pv-phone">
                                                 <div className="pv-phone-screen">
@@ -1484,7 +1484,7 @@ export default function UpsellDownsellPage() {
 
                                     {/* Trigger Rules */}
                                     <div className="sec">
-                                        <h3><span className="icon">🛒</span> 1. If a customer bought one of these products</h3>
+                                        <h3><span className="icon"></span> 1. If a customer bought one of these products</h3>
                                         <div className="fg">
                                             <select value={editing.show_condition_type} onChange={e => upd({ show_condition_type: e.target.value as any })}>
                                                 <option value="always">Show for all products</option>
@@ -1494,7 +1494,7 @@ export default function UpsellDownsellPage() {
                                         </div>
                                         {editing.show_condition_type === 'specific_products' && (
                                             <>
-                                                <button className="btn-pick" onClick={pickTrigger}>Select products ({editing.trigger_product_ids?.length || 0} selected)</button>
+                                                <Button onClick={pickTrigger}>Select products ({editing.trigger_product_ids?.length || 0} selected)</Button>
                                                 {editing._triggerProducts?.map((p: any) => (
                                                     <div key={p.id} className="prod-row">
                                                         {p.images?.[0] && <img src={p.images[0].originalSrc || p.images[0].url} alt="" />}
@@ -1515,8 +1515,8 @@ export default function UpsellDownsellPage() {
                                     {/* Offers */}
                                     <div className="sec">
                                         <h3 style={{ justifyContent: 'space-between' }}>
-                                            <span><span className="icon">⚡</span> 2. Create offer to include in this upsell</span>
-                                            {editing.offers.length < 5 && <button className="btn-pick" onClick={addOffer}>Add offer</button>}
+                                            <span><span className="icon"></span> 2. Create offer to include in this upsell</span>
+                                            {editing.offers.length < 5 && <Button onClick={addOffer}>Add offer</Button>}
                                         </h3>
                                         {editing.offers.map((offer, idx) => (
                                             <div key={offer.id} className="offer-card">
@@ -1524,7 +1524,7 @@ export default function UpsellDownsellPage() {
                                                     <span className="drag">⋮⋮</span>
                                                     <span className="title">Offer #{idx + 1} {offer.discount_value > 0 ? ` -${offer.discount_type === 'percentage' ? offer.discount_value + '%' : currencySymbol + offer.discount_value}` : ''}</span>
                                                     <span className={`chevron ${offer.expanded ? 'open' : ''}`}>▼</span>
-                                                    {editing.offers.length > 1 && <button className="del-offer" onClick={e => { e.stopPropagation(); delOffer(offer.id); }}>🗑</button>}
+                                                    {editing.offers.length > 1 && <span onClick={e => { e.stopPropagation(); delOffer(offer.id); }} style={{ cursor: 'pointer', display: 'inline-flex' }}><Button icon={DeleteIcon} variant="plain" tone="critical" accessibilityLabel="Delete offer" onClick={() => delOffer(offer.id)} /></span>}
                                                 </div>
                                                 <div className={`offer-body ${offer.expanded ? '' : 'collapsed'}`}>
                                                     <div className="fg"><label>Select the product you want to offer</label></div>
@@ -1532,11 +1532,11 @@ export default function UpsellDownsellPage() {
                                                         <div className="prod-row">
                                                             {offer.upsell_product_image && <img src={offer.upsell_product_image} alt="" />}
                                                             <div className="prod-row-info"><div className="name">{offer.upsell_product_title}</div><div className="vid">{offer.upsell_product_id}</div></div>
-                                                            <button className="btn-pick" onClick={() => pickProduct(offer.id)}>Change product</button>
+                                                            <Button onClick={() => pickProduct(offer.id)}>Change product</Button>
                                                             <button className="prod-x" onClick={() => updOffer(offer.id, { upsell_product_id: '', upsell_product_title: '', upsell_product_image: '', upsell_variant_id: '', original_price: 0 })}>×</button>
                                                         </div>
                                                     ) : (
-                                                        <button className="btn-pick" onClick={() => pickProduct(offer.id)}>Change product</button>
+                                                        <Button onClick={() => pickProduct(offer.id)}>Select Product</Button>
                                                     )}
                                                     <div style={{ marginTop: 14 }}>
                                                         <div className="fr">
@@ -1556,13 +1556,13 @@ export default function UpsellDownsellPage() {
                                             </div>
                                         ))}
                                         {editing.offers.length >= 2 && (
-                                            <div className="info-banner">ℹ️ Create up to 5 upsell offers. When the customer accepts or rejects an offer, the next one will be shown.</div>
+                                            <div className="info-banner">Create up to 5 upsell offers. When the customer accepts or rejects an offer, the next one will be shown.</div>
                                         )}
                                     </div>
 
                                     {/* Background */}
                                     <div className="sec">
-                                        <h3><span className="icon">🎨</span> 3- Customize the background</h3>
+                                        <h3><span className="icon"></span> 3- Customize the background</h3>
                                         {/* Background color swatches */}
                                         <div className="fg"><label>Background color</label></div>
                                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 16 }}>
@@ -1603,7 +1603,7 @@ export default function UpsellDownsellPage() {
 
                                     {/* Header Design */}
                                     <div className="sec">
-                                        <h3><span className="icon">📝</span> Header</h3>
+                                        <h3><span className="icon"></span> Header</h3>
                                         <div className="fg"><label>Header Text</label><input value={editing.design.headerText} onChange={e => updDesign({ headerText: e.target.value })} /></div>
                                         <div className="fg"><label>Subheader</label><input value={editing.design.subheaderText} onChange={e => updDesign({ subheaderText: e.target.value })} /></div>
                                         <div className="fg">
@@ -1625,7 +1625,7 @@ export default function UpsellDownsellPage() {
 
                                     {/* Timer */}
                                     <div className="sec">
-                                        <h3><span className="icon">⏱️</span> Timer</h3>
+                                        <h3><span className="icon"></span> Timer</h3>
                                         <div className="up-toggle-row" onClick={() => updDesign({ timer: { ...editing.design.timer, enabled: !editing.design.timer.enabled } })}>
                                             <span>Enable timer</span>
                                             <div className={`up-mini-toggle ${editing.design.timer.enabled ? 'on' : 'off'}`} />
@@ -1642,7 +1642,7 @@ export default function UpsellDownsellPage() {
 
                                     {/* Discount Tag */}
                                     <div className="sec">
-                                        <h3><span className="icon">🏷️</span> Discount Tag</h3>
+                                        <h3><span className="icon"></span> Discount Tag</h3>
                                         <div className="fg"><label>Text</label><input value={editing.design.discountTag.text} onChange={e => updDesign({ discountTag: { ...editing.design.discountTag, text: e.target.value } })} /></div>
                                         <ColorSelector label="Background" value={editing.design.discountTag.bgColor.startsWith('#') ? editing.design.discountTag.bgColor : '#ec4899'} onChange={c => updDesign({ discountTag: { ...editing.design.discountTag, bgColor: c } })} />
                                         <ColorSelector label="Text Color" value={editing.design.discountTag.textColor} onChange={c => updDesign({ discountTag: { ...editing.design.discountTag, textColor: c } })} />
@@ -1678,7 +1678,7 @@ export default function UpsellDownsellPage() {
 
                                     {/* Accept Button */}
                                     <div className="sec">
-                                        <h3><span className="icon">✅</span> Accept Button</h3>
+                                        <h3><span className="icon"></span> Accept Button</h3>
                                         <div className="fg"><label>Button Text</label><input value={editing.design.acceptButton.text} onChange={e => updAccept({ text: e.target.value })} /></div>
                                         <div className="fg"><label>Animation</label><select value={editing.design.acceptButton.animation} onChange={e => updAccept({ animation: e.target.value })}><option value="none">None</option><option value="pulse">Pulse</option><option value="bounce">Bounce</option><option value="shake">Shake</option></select></div>
                                         <div className="up-section-label">Colors</div>
@@ -1736,7 +1736,7 @@ export default function UpsellDownsellPage() {
 
                                     {/* Reject Button */}
                                     <div className="sec">
-                                        <h3><span className="icon">❌</span> Reject Button</h3>
+                                        <h3><span className="icon"></span> Reject Button</h3>
                                         <div className="fg"><label>Button Text</label><input value={editing.design.rejectButton.text} onChange={e => updReject({ text: e.target.value })} /></div>
                                         <div className="up-section-label">Colors</div>
                                         <ColorSelector label="Background" value={editing.design.rejectButton.bgColor} onChange={c => updReject({ bgColor: c })} />
@@ -1797,7 +1797,7 @@ export default function UpsellDownsellPage() {
                                     <div className="pv-wrap">
                                         <div className="pv-panel">
                                             <div className="pv-panel-header">
-                                                <h3>📱 Live Preview</h3>
+                                                <h3>Live Preview</h3>
                                                 <span className="pv-badge">Offer #{(expandedOfferIdx >= 0 ? expandedOfferIdx : 0) + 1}</span>
                                             </div>
                                             <div className="pv-phone">

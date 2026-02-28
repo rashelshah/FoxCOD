@@ -324,7 +324,7 @@ export default function AnalyticsPage() {
                             <div className="stats-grid">
                                 <div className="stat-card">
                                     <div className="stat-card-header">
-                                        <div className="stat-icon stat-icon-blue">📦</div>
+                                        <div className="stat-icon stat-icon-blue"><svg width="22" height="22" viewBox="0 0 20 20" fill="none"><rect x="3" y="5" width="14" height="12" rx="2" stroke="white" strokeWidth="1.5" fill="none" /><path d="M3 9h14" stroke="white" strokeWidth="1.5" /></svg></div>
                                         <span className="stat-label">Total Orders</span>
                                     </div>
                                     <p className="stat-value">{stats.totalOrders}</p>
@@ -333,7 +333,7 @@ export default function AnalyticsPage() {
 
                                 <div className="stat-card">
                                     <div className="stat-card-header">
-                                        <div className="stat-icon stat-icon-green">💰</div>
+                                        <div className="stat-icon stat-icon-green"><svg width="22" height="22" viewBox="0 0 20 20" fill="none"><path d="M10 2a8 8 0 100 16 8 8 0 000-16z" stroke="white" strokeWidth="1.5" fill="none" /><path d="M6 10l3 3 5-5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" /></svg></div>
                                         <span className="stat-label">Total Revenue</span>
                                     </div>
                                     <p className="stat-value">{formatCurrency(stats.totalRevenue)}</p>
@@ -342,7 +342,7 @@ export default function AnalyticsPage() {
 
                                 <div className="stat-card">
                                     <div className="stat-card-header">
-                                        <div className="stat-icon stat-icon-purple">📊</div>
+                                        <div className="stat-icon stat-icon-purple"><svg width="22" height="22" viewBox="0 0 20 20" fill="none"><path d="M3 17V5h2v12H3zm4 0V8h2v9H7zm4 0V3h2v14h-2zm4 0V10h2v7h-2z" fill="white" /></svg></div>
                                         <span className="stat-label">Avg Order Value</span>
                                     </div>
                                     <p className="stat-value">{formatCurrency(avgOrderValue)}</p>
@@ -351,7 +351,7 @@ export default function AnalyticsPage() {
 
                                 <div className="stat-card">
                                     <div className="stat-card-header">
-                                        <div className="stat-icon stat-icon-orange">📅</div>
+                                        <div className="stat-icon stat-icon-orange"><svg width="22" height="22" viewBox="0 0 20 20" fill="none"><rect x="3" y="3" width="14" height="14" rx="2" stroke="white" strokeWidth="1.5" fill="none" /><path d="M3 8h14M8 3v14" stroke="white" strokeWidth="1.5" /></svg></div>
                                         <span className="stat-label">This Week</span>
                                     </div>
                                     <p className="stat-value">{stats.weekOrders}</p>
@@ -396,7 +396,7 @@ export default function AnalyticsPage() {
 
                             {/* Visual Chart Section */}
                             <div className="section">
-                                <h2 className="section-title">📊 Order Distribution</h2>
+                                <h2 className="section-title">Order Distribution</h2>
                                 <div style={{
                                     background: 'white',
                                     border: '1px solid #e5e7eb',
@@ -490,7 +490,7 @@ export default function AnalyticsPage() {
                         </>
                     ) : (
                         <div className="empty-state">
-                            <div className="empty-icon">📊</div>
+                            <div className="empty-icon"><svg width="48" height="48" viewBox="0 0 20 20" fill="none"><path d="M3 17V5h2v12H3zm4 0V8h2v9H7zm4 0V3h2v14h-2zm4 0V10h2v7h-2z" fill="#d1d5db" /></svg></div>
                             <h3>No analytics data yet</h3>
                             <p>Start receiving COD orders to see your analytics here</p>
                         </div>

@@ -9,7 +9,8 @@ import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
 import { useLoaderData, useSubmit, useNavigation, Link, useActionData } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
-import { RangeSlider } from "@shopify/polaris";
+import { RangeSlider, Button, InlineStack, Modal, Text } from "@shopify/polaris";
+import { EditIcon, DeleteIcon } from "@shopify/polaris-icons";
 import {
     DndContext,
     closestCenter,
@@ -840,8 +841,8 @@ const PreviewDisplay = memo(({
     // Animation indicator
     const getAnimationLabel = () => {
         if (animationStyle === 'slide') return '↗ Slide';
-        if (animationStyle === 'scale') return '⚡ Scale';
-        return '✨ Fade';
+        if (animationStyle === 'scale') return 'Scale';
+        return 'Fade';
     };
 
     // Field icons - exact match to storefront (cod-form.js) - iconColor, iconBackground
@@ -899,7 +900,7 @@ const PreviewDisplay = memo(({
     return (
         <div className="preview-panel">
             <div className="preview-header">
-                <h3>📱 Live Preview</h3>
+                <h3>Live Preview</h3>
                 <span style={{ fontSize: '11px', color: '#6b7280', background: '#f3f4f6', padding: '4px 8px', borderRadius: '6px' }}>
                     {getAnimationLabel()} | {modalStyle.charAt(0).toUpperCase() + modalStyle.slice(1)}
                 </span>
@@ -910,7 +911,9 @@ const PreviewDisplay = memo(({
                         <div className="preview-product" style={activeTab === 'button' ? { padding: '24px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' } : undefined}>
                             {/* Only show image and price when NOT on button tab */}
                             {activeTab !== 'button' && showProductImage && (
-                                <div className="preview-product-img">📦</div>
+                                <div className="preview-product-img">
+                                    <svg width="24" height="24" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16.5 7H3.5L2 9.5V11h1v5.5h14V11h1V9.5L16.5 7z" stroke="#9ca3af" strokeWidth="1.5" strokeLinejoin="round" /></svg>
+                                </div>
                             )}
                             {activeTab !== 'button' && (
                                 <div className="preview-product-title">Sample Product</div>
@@ -1020,7 +1023,7 @@ const PreviewDisplay = memo(({
                                             border: '1px solid #e2e8f0'
                                         }}>
                                             <div style={{ fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                🧾 Order Summary
+                                                Order Summary
                                             </div>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280', marginBottom: '6px' }}>
                                                 <span>Subtotal</span>
@@ -1059,7 +1062,7 @@ const PreviewDisplay = memo(({
                                             border: '1px solid #e2e8f0'
                                         }}>
                                             <div style={{ fontSize: '11px', fontWeight: 600, color: '#374151', marginBottom: '8px' }}>
-                                                🚚 Shipping
+                                                Shipping
                                             </div>
                                             {shippingRates.filter((r: any) => r.is_active).slice(0, 3).map((rate: any, idx: number) => {
                                                 // Build condition indicator
@@ -1103,7 +1106,7 @@ const PreviewDisplay = memo(({
                                             border: '1px solid #e2e8f0'
                                         }}>
                                             <div style={{ fontSize: '11px', fontWeight: 600, color: '#374151', marginBottom: '8px' }}>
-                                                🚚 Shipping
+                                                Shipping
                                             </div>
                                             {shippingOpts.options?.slice(0, 2).map((opt: any) => (
                                                 <div key={opt.id} style={{
@@ -1198,17 +1201,10 @@ const SortableFieldItem = ({ field, onToggleVisibility, onToggleRequired, isCust
                     ✱
                 </button>
                 {isCustom && onRemove && (
-                    <button
-                        type="button"
-                        className="icon-btn remove-btn"
-                        onClick={() => onRemove(field.id)}
-                        title="Remove field"
-                    >
-                        🗑️
-                    </button>
+                    <Button icon={DeleteIcon} variant="plain" tone="critical" accessibilityLabel="Remove field" onClick={() => onRemove(field.id)} />
                 )}
             </div>
-        </div>
+        </div >
     );
 };
 
@@ -1380,7 +1376,9 @@ const ShippingRateModal = ({ rate, products, collections, currencySymbol, onClos
                 {/* Unique Header - dark with accent */}
                 <div className="sr-modal-header">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div className="sr-header-icon">📦</div>
+                        <div className="sr-header-icon">
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16.5 7H3.5L2 9.5V11h1v5.5h14V11h1V9.5L16.5 7z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" /><path d="M7 11v5.5M13 11v5.5M2 9.5h16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
+                        </div>
                         <div>
                             <h3 style={{ margin: 0 }}>{rate ? 'Edit Shipping Rate' : 'New Shipping Rate'}</h3>
                             <span style={{ fontSize: '12px', opacity: 0.7 }}>Configure pricing, conditions and restrictions</span>
@@ -1567,9 +1565,9 @@ const ShippingRateModal = ({ rate, products, collections, currencySymbol, onClos
                             <span style={{ fontSize: '13px', color: isActive ? '#10b981' : '#9ca3af', fontWeight: 500 }}>{isActive ? 'Active' : 'Inactive'}</span>
                         </label>
                     </div>
-                    <div className="sr-footer-right">
-                        <button className="sr-btn-cancel" onClick={onClose}>Cancel</button>
-                        <button className="sr-btn-done" onClick={handleSave} disabled={!name.trim()}>{rate ? 'Save Changes' : 'Create Rate'}</button>
+                    <div className="sr-footer-right" style={{ display: 'flex', gap: '8px' }}>
+                        <Button onClick={onClose}>Cancel</Button>
+                        <Button variant="primary" onClick={handleSave} disabled={!name.trim()}>{rate ? 'Save Changes' : 'Create Rate'}</Button>
                     </div>
                 </div>
             </div>
@@ -1696,6 +1694,7 @@ export default function SettingsPage() {
     const [showShippingRateModal, setShowShippingRateModal] = useState(false);
     const [editingRate, setEditingRate] = useState<ShippingRate | null>(null);
     const [isImportingShipping, setIsImportingShipping] = useState(false);
+    const [rateToDelete, setRateToDelete] = useState<ShippingRate | null>(null);
 
     // Client-side mounted state for save bar (prevents hydration mismatch)
     const [isMounted, setIsMounted] = useState(false);
@@ -2744,32 +2743,6 @@ export default function SettingsPage() {
                 .sr-btn-done:disabled { opacity: 0.4; cursor: not-allowed; }
 
                 /* ==================== SHIPPING TAB TABLE STYLES ==================== */
-                .shipping-action-btn {
-                    flex: 1;
-                    padding: 10px 16px;
-                    border-radius: 10px;
-                    font-weight: 600;
-                    font-size: 13px;
-                    cursor: pointer;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    gap: 8px;
-                    transition: all 0.2s ease;
-                    border: none;
-                }
-                .shipping-action-btn.primary {
-                    background: #1f2937;
-                    color: white;
-                }
-                .shipping-action-btn.primary:hover { background: #111827; }
-                .shipping-action-btn.secondary {
-                    background: #f3f4f6;
-                    color: #374151;
-                    border: 1px solid #d1d5db;
-                }
-                .shipping-action-btn.secondary:hover { background: #e5e7eb; }
-                .shipping-action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
                 .shipping-table-wrapper {
                     border: 1px solid #e5e7eb;
                     border-radius: 12px;
@@ -2826,32 +2799,6 @@ export default function SettingsPage() {
                 }
                 .shipping-status-dot.active { color: #10b981; background: rgba(16, 185, 129, 0.1); }
                 .shipping-status-dot.inactive { color: #9ca3af; background: #f3f4f6; }
-                .shipping-icon-btn {
-                    width: 32px;
-                    height: 32px;
-                    border-radius: 8px;
-                    border: none;
-                    cursor: pointer;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    transition: all 0.15s ease;
-                }
-                .shipping-icon-btn.edit {
-                    background: #f3f4f6;
-                    color: #6b7280;
-                }
-                .shipping-icon-btn.edit:hover {
-                    background: #e5e7eb;
-                    color: #1f2937;
-                }
-                .shipping-icon-btn.delete {
-                    background: rgba(239, 68, 68, 0.06);
-                    color: #ef4444;
-                }
-                .shipping-icon-btn.delete:hover {
-                    background: rgba(239, 68, 68, 0.14);
-                }
 
                 /* Content Blocks */
                 .content-blocks { margin-top: 20px; }
@@ -3118,7 +3065,7 @@ export default function SettingsPage() {
                     <div className={`main-toggle ${enabled ? 'enabled' : 'disabled'}`}>
                         <div className="toggle-info">
                             <h3>
-                                <span>{enabled ? '✅' : '⚪'}</span> COD Form Status
+                                <span>{enabled ? '' : ''}</span> COD Form Status
                             </h3>
                             <p>{enabled ? 'Your COD form is live on product pages' : 'Enable to show COD form on your store'}</p>
                         </div>
@@ -3134,25 +3081,25 @@ export default function SettingsPage() {
                             className={`tab ${activeTab === 'button' ? 'active' : ''}`}
                             onClick={() => setActiveTab('button')}
                         >
-                            🔘 Button
+                            Button
                         </button>
                         <button
                             className={`tab ${activeTab === 'form' ? 'active' : ''}`}
                             onClick={() => setActiveTab('form')}
                         >
-                            📝 Form Fields
+                            Form Fields
                         </button>
                         <button
                             className={`tab ${activeTab === 'style' ? 'active' : ''}`}
                             onClick={() => setActiveTab('style')}
                         >
-                            ✨ Style
+                            Style
                         </button>
                         <button
                             className={`tab ${activeTab === 'shipping' ? 'active' : ''}`}
                             onClick={() => setActiveTab('shipping')}
                         >
-                            🚚 Shipping
+                            Shipping
                         </button>
                     </div>
 
@@ -3163,7 +3110,7 @@ export default function SettingsPage() {
                             {activeTab === 'button' && (
                                 <>
                                     <div className="settings-card">
-                                        <h3 className="card-title"><span>📝</span> Button Text</h3>
+                                        <h3 className="card-title">Button Text</h3>
                                         <div className="input-group">
                                             <label className="input-label">Button Label</label>
                                             <input
@@ -3177,7 +3124,7 @@ export default function SettingsPage() {
                                     </div>
 
                                     <div className="settings-card">
-                                        <h3 className="card-title"><span>🎨</span> Button Color</h3>
+                                        <h3 className="card-title">Button Color</h3>
                                         <div className="color-picker">
                                             {/* Preset color palette with checkmark indicator */}
                                             <div className="color-presets">
@@ -3252,7 +3199,7 @@ export default function SettingsPage() {
                                     </div>
 
                                     <div className="settings-card">
-                                        <h3 className="card-title"><span>🔲</span> Button Style</h3>
+                                        <h3 className="card-title"> Button Style</h3>
                                         <div className="style-options">
                                             {['solid', 'outline', 'gradient'].map((style) => (
                                                 <button
@@ -3277,7 +3224,7 @@ export default function SettingsPage() {
                                     </div>
 
                                     <div className="settings-card">
-                                        <h3 className="card-title"><span>📐</span> Button Size</h3>
+                                        <h3 className="card-title"> Button Size</h3>
                                         <div className="style-options">
                                             {['small', 'medium', 'large'].map((size) => (
                                                 <button
@@ -3292,7 +3239,7 @@ export default function SettingsPage() {
                                     </div>
 
                                     <div className="settings-card">
-                                        <h3 className="card-title"><span>✏️</span> Button Typography</h3>
+                                        <h3 className="card-title"> Button Typography</h3>
                                         <div className="input-group">
                                             <ColorSelector
                                                 label="Text Color"
@@ -3327,7 +3274,7 @@ export default function SettingsPage() {
                                     </div>
 
                                     <div className="settings-card">
-                                        <h3 className="card-title"><span>🔲</span> Button Border & Effects</h3>
+                                        <h3 className="card-title"> Button Border & Effects</h3>
                                         <div className="input-group">
                                             <ColorSelector
                                                 label="Border Color"
@@ -3371,7 +3318,7 @@ export default function SettingsPage() {
 
                                     {/* Animation Presets */}
                                     <div className="settings-card">
-                                        <h3 className="card-title"><span>✨</span> Animation Presets</h3>
+                                        <h3 className="card-title">Animation Presets</h3>
                                         <div className="input-group">
                                             <label className="input-label">Button Animation</label>
                                             <select
@@ -3400,7 +3347,7 @@ export default function SettingsPage() {
 
                                     {/* Border Effects */}
                                     <div className="settings-card">
-                                        <h3 className="card-title"><span>🔲</span> Border Effects</h3>
+                                        <h3 className="card-title"> Border Effects</h3>
                                         <div className="input-group">
                                             <label className="input-label">Border Animation</label>
                                             <div className="style-options" style={{ flexWrap: 'wrap' }}>
@@ -3428,7 +3375,7 @@ export default function SettingsPage() {
 
                                     {/* Hover & Click Effects */}
                                     <div className="settings-card">
-                                        <h3 className="card-title"><span>👆</span> Hover & Click Effects</h3>
+                                        <h3 className="card-title"> Hover & Click Effects</h3>
                                         <div className="toggle-option" onClick={() => setButtonStylesState(s => ({ ...s, hoverLift: !s.hoverLift }))}>
                                             <span className="toggle-option-label">Hover Lift + Shadow</span>
                                             <div className={`mini-toggle ${buttonStylesState?.hoverLift ? 'on' : 'off'}`} />
@@ -3446,7 +3393,7 @@ export default function SettingsPage() {
 
                                     {/* Timing & Behavior */}
                                     <div className="settings-card">
-                                        <h3 className="card-title"><span>⏱️</span> Timing & Behavior</h3>
+                                        <h3 className="card-title">Timing & Behavior</h3>
                                         <div className="input-group">
                                             <label className="input-label">Start Animation</label>
                                             <select
@@ -3484,7 +3431,7 @@ export default function SettingsPage() {
 
                                     {/* Device Control */}
                                     <div className="settings-card">
-                                        <h3 className="card-title"><span>📱</span> Device Control</h3>
+                                        <h3 className="card-title">Device Control</h3>
                                         <div className="toggle-option" onClick={() => setButtonStylesState(s => ({ ...s, enableDesktop: !s.enableDesktop }))}>
                                             <span className="toggle-option-label">Enable Animations on Desktop</span>
                                             <div className={`mini-toggle ${buttonStylesState?.enableDesktop !== false ? 'on' : 'off'}`} />
@@ -3517,7 +3464,7 @@ export default function SettingsPage() {
                                 <>
                                     {/* Drag & Drop Fields */}
                                     <div className="settings-card">
-                                        <h3 className="card-title"><span>📋</span> Form Fields</h3>
+                                        <h3 className="card-title"><span></span> Form Fields</h3>
                                         <p style={{ color: '#6b7280', fontSize: '13px', marginBottom: '16px' }}>
                                             Drag to reorder • <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle', marginBottom: 2 }}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg> visibility • ✱ required
                                         </p>
@@ -3566,7 +3513,7 @@ export default function SettingsPage() {
 
                                     {/* Form Field Styling - above Content Blocks */}
                                     <div className="settings-card">
-                                        <h3 className="card-title"><span>🎨</span> Form Field Styling</h3>
+                                        <h3 className="card-title">Form Field Styling</h3>
                                         <div className="input-group">
                                             <ColorSelector
                                                 label="Text Color"
@@ -3714,7 +3661,7 @@ export default function SettingsPage() {
 
                                     {/* Content Blocks */}
                                     <div className="settings-card">
-                                        <h3 className="card-title"><span>🧩</span> Content Blocks</h3>
+                                        <h3 className="card-title"> Content Blocks</h3>
                                         <div className="toggle-options">
                                             <div className="toggle-option" onClick={() => setBlocks({ ...blocks, order_summary: !blocks.order_summary })}>
                                                 <span className="toggle-option-label">Order Summary</span>
@@ -3737,7 +3684,7 @@ export default function SettingsPage() {
 
                                     {/* Partial Cash on Delivery */}
                                     <div className="settings-card">
-                                        <h3 className="card-title"><span>💳</span> Partial Cash on Delivery</h3>
+                                        <h3 className="card-title"> Partial Cash on Delivery</h3>
                                         <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '16px' }}>
                                             Allow customers to pay a portion of the order online and the rest on delivery.
                                         </p>
@@ -3791,7 +3738,7 @@ export default function SettingsPage() {
 
                                     {/* Form Content */}
                                     <div className="settings-card">
-                                        <h3 className="card-title"><span>✍️</span> Form Content</h3>
+                                        <h3 className="card-title"> Form Content</h3>
                                         <div className="input-group">
                                             <label className="input-label">Form Title</label>
                                             <input
@@ -3870,7 +3817,9 @@ export default function SettingsPage() {
                                         {/* Shipping Rates Enable Toggle */}
                                         <div className="settings-card">
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                                                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#1f2937', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>⚙️</div>
+                                                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#1f2937', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M17 10a7 7 0 11-14 0 7 7 0 0114 0z" stroke="#fff" strokeWidth="1.5" /><path d="M10 7v6M7 10h6" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" /></svg>
+                                                </div>
                                                 <div>
                                                     <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: '#1f2937' }}>Shipping Rates</h3>
                                                     <p style={{ margin: 0, fontSize: '12px', color: '#9ca3af' }}>Configure rates with conditions and restrictions</p>
@@ -3887,31 +3836,27 @@ export default function SettingsPage() {
                                                 {/* Action Buttons */}
                                                 <div className="settings-card">
                                                     <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setIsImportingShipping(true)}
-                                                            disabled={isImportingShipping}
-                                                            className="shipping-action-btn secondary"
-                                                        >
-                                                            {isImportingShipping ? (
-                                                                <><span className="spinner" style={{ width: '14px', height: '14px', border: '2px solid #6366f1', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} /> Importing...</>
-                                                            ) : (
-                                                                <>📥 Import from Shopify</>
-                                                            )}
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => { setEditingRate(null); setShowShippingRateModal(true); }}
-                                                            className="shipping-action-btn primary"
-                                                        >
-                                                            + Add Rate
-                                                        </button>
+                                                        <InlineStack gap="300">
+                                                            <Button
+                                                                onClick={() => setIsImportingShipping(true)}
+                                                                disabled={isImportingShipping}
+                                                                loading={isImportingShipping}
+                                                            >
+                                                                Import from Shopify
+                                                            </Button>
+                                                            <Button
+                                                                variant="primary"
+                                                                onClick={() => { setEditingRate(null); setShowShippingRateModal(true); }}
+                                                            >
+                                                                + Add Rate
+                                                            </Button>
+                                                        </InlineStack>
                                                     </div>
 
                                                     {/* Shipping Rates Table */}
                                                     {shippingRates.length === 0 ? (
                                                         <div style={{ textAlign: 'center', padding: '40px 20px', background: '#f9fafb', borderRadius: '12px', border: '1px dashed #d1d5db' }}>
-                                                            <div style={{ fontSize: '32px', marginBottom: '12px' }}>📦</div>
+                                                            <div style={{ fontSize: '14px', marginBottom: '12px', color: '#9ca3af' }}>No rates</div>
                                                             <p style={{ fontSize: '14px', color: '#6b7280', margin: '0 0 4px 0' }}>No shipping rates yet</p>
                                                             <p style={{ fontSize: '13px', color: '#9ca3af', margin: 0 }}>Add rates manually or import from Shopify</p>
                                                         </div>
@@ -3944,7 +3889,7 @@ export default function SettingsPage() {
                                                                                     <span style={{ fontSize: '12px', color: '#9ca3af' }}>—</span>
                                                                                 ) : (
                                                                                     <span className="shipping-condition-badge">
-                                                                                        {rate.condition_type === 'order_price' ? '💰 Price' : rate.condition_type === 'order_quantity' ? '📦 Qty' : '⚖️ Weight'}
+                                                                                        {rate.condition_type === 'order_price' ? 'Price' : rate.condition_type === 'order_quantity' ? 'Qty' : 'Weight'}
                                                                                         {rate.min_value != null && ` ≥ ${rate.min_value}`}
                                                                                         {rate.max_value != null && ` ≤ ${rate.max_value}`}
                                                                                     </span>
@@ -3956,31 +3901,21 @@ export default function SettingsPage() {
                                                                                 </span>
                                                                             </td>
                                                                             <td>
-                                                                                <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        className="shipping-icon-btn edit"
-                                                                                        title="Edit rate"
+                                                                                <InlineStack gap="100">
+                                                                                    <Button
+                                                                                        icon={EditIcon}
+                                                                                        variant="tertiary"
+                                                                                        accessibilityLabel="Edit rate"
                                                                                         onClick={() => { setEditingRate(rate); setShowShippingRateModal(true); }}
-                                                                                    >
-                                                                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-                                                                                    </button>
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        className="shipping-icon-btn delete"
-                                                                                        title="Delete rate"
-                                                                                        onClick={() => {
-                                                                                            if (confirm(`Delete "${rate.name}"?`)) {
-                                                                                                // Queue delete for save bar (don't submit immediately)
-                                                                                                setPendingShippingOps(prev => [...prev, { type: 'delete', rateId: rate.id! }]);
-                                                                                                // Optimistically remove from UI
-                                                                                                setShippingRates(prev => prev.filter(r => r.id !== rate.id));
-                                                                                            }
-                                                                                        }}
-                                                                                    >
-                                                                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></svg>
-                                                                                    </button>
-                                                                                </div>
+                                                                                    />
+                                                                                    <Button
+                                                                                        icon={DeleteIcon}
+                                                                                        variant="tertiary"
+                                                                                        tone="critical"
+                                                                                        accessibilityLabel="Delete rate"
+                                                                                        onClick={() => setRateToDelete(rate)}
+                                                                                    />
+                                                                                </InlineStack>
                                                                             </td>
                                                                         </tr>
                                                                     ))}
@@ -3993,7 +3928,7 @@ export default function SettingsPage() {
                                                 {/* Info Card */}
                                                 <div className="settings-card" style={{ background: 'rgba(59, 130, 246, 0.05)', borderColor: 'rgba(59, 130, 246, 0.2)' }}>
                                                     <div style={{ display: 'flex', gap: '12px' }}>
-                                                        <div style={{ fontSize: '24px' }}>💡</div>
+                                                        <div style={{ fontSize: '24px' }}><svg width="24" height="24" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="8" r="5" stroke="#3b82f6" strokeWidth="1.5" fill="none" /><path d="M8 13v2a2 2 0 004 0v-2M10 3V1" stroke="#3b82f6" strokeWidth="1.5" strokeLinecap="round" /></svg></div>
                                                         <div>
                                                             <h4 style={{ fontSize: '14px', fontWeight: 600, color: '#1e40af', margin: '0 0 4px 0' }}>How Shipping Rates Work</h4>
                                                             <p style={{ fontSize: '13px', color: '#3b82f6', margin: 0, lineHeight: '1.5' }}>
@@ -4014,7 +3949,7 @@ export default function SettingsPage() {
                             {activeTab === 'style' && (
                                 <>
                                     <div className="settings-card">
-                                        <h3 className="card-title"><span>🎭</span> Modal Style</h3>
+                                        <h3 className="card-title"> Modal Style</h3>
                                         <div className="style-options">
                                             {['modern', 'minimal', 'glassmorphism'].map((style) => (
                                                 <button
@@ -4029,7 +3964,7 @@ export default function SettingsPage() {
                                     </div>
 
                                     <div className="settings-card">
-                                        <h3 className="card-title"><span>🎬</span> Animation</h3>
+                                        <h3 className="card-title"> Animation</h3>
                                         <div className="style-options">
                                             {['fade', 'slide', 'scale'].map((style) => (
                                                 <button
@@ -4044,7 +3979,7 @@ export default function SettingsPage() {
                                     </div>
 
                                     <div className="settings-card">
-                                        <h3 className="card-title"><span>⭕</span> Border Radius</h3>
+                                        <h3 className="card-title"> Border Radius</h3>
                                         <div style={{ padding: '0 8px', width: '100%' }}>
                                             <RangeSlider
                                                 labelHidden
@@ -4059,7 +3994,7 @@ export default function SettingsPage() {
                                     </div>
 
                                     <div className="settings-card">
-                                        <h3 className="card-title"><span>📱</span> Display Options</h3>
+                                        <h3 className="card-title">Display Options</h3>
                                         <div className="toggle-options">
                                             <div className="toggle-option" onClick={() => setShowProductImage(!showProductImage)}>
                                                 <span className="toggle-option-label">Show Product Image in Modal</span>
@@ -4123,6 +4058,32 @@ export default function SettingsPage() {
 
                     </div>
                 </div>
+
+                {/* Shipping Rate Delete Confirmation Modal */}
+                <Modal
+                    open={!!rateToDelete}
+                    onClose={() => setRateToDelete(null)}
+                    title={`Delete "${rateToDelete?.name || 'Untitled'}"`}
+                    primaryAction={{
+                        content: 'Delete',
+                        destructive: true,
+                        onAction: () => {
+                            if (rateToDelete) {
+                                setPendingShippingOps(prev => [...prev, { type: 'delete', rateId: rateToDelete.id! }]);
+                                setShippingRates(prev => prev.filter(r => r.id !== rateToDelete.id));
+                            }
+                            setRateToDelete(null);
+                        },
+                    }}
+                    secondaryActions={[{
+                        content: 'Cancel',
+                        onAction: () => setRateToDelete(null),
+                    }]}
+                >
+                    <Modal.Section>
+                        <Text as="p">Are you sure you want to delete this shipping rate? This cannot be undone.</Text>
+                    </Modal.Section>
+                </Modal>
 
                 {/* Shipping Rate Modal */}
                 {showShippingRateModal && (

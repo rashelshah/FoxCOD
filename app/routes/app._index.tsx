@@ -5,7 +5,8 @@
  */
 
 import type { LoaderFunctionArgs } from "react-router";
-import { useLoaderData, Link } from "react-router";
+import { useLoaderData, Link, useNavigate } from "react-router";
+import { Button, InlineStack } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import { getOrderStats, getFormSettings, saveShop } from "../config/supabase.server";
 import { ORDER_STATUSES } from "../config/constants";
@@ -74,6 +75,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
  */
 export default function Index() {
   const { shop, enabled, stats, shopCurrency } = useLoaderData<typeof loader>();
+  const navigate = useNavigate();
 
   // Format currency
   const formatCurrency = (amount: number) => {
@@ -342,7 +344,7 @@ export default function Index() {
           margin-top: 6px;
         }
         
-        /* Quick Actions - Premium Horizontal Design */
+        /* Quick Actions */
         .section-header {
           display: flex;
           align-items: center;
@@ -368,74 +370,8 @@ export default function Index() {
           text-decoration: underline;
         }
         
-        .quick-actions {
-          display: flex;
-          gap: 12px;
+        .quick-actions-polaris {
           margin-bottom: 28px;
-          flex-wrap: wrap;
-        }
-        
-        .action-btn {
-          display: inline-flex;
-          align-items: center;
-          gap: 10px;
-          padding: 14px 24px;
-          border-radius: 50px;
-          font-size: 14px;
-          font-weight: 600;
-          text-decoration: none;
-          color: white;
-          cursor: pointer;
-          border: none;
-          transition: all 0.2s ease;
-          position: relative;
-          overflow: hidden;
-          will-change: transform;
-        }
-        
-        .action-btn::before {
-          content: '';
-          position: absolute;
-          top: 0;
-          left: -100%;
-          width: 100%;
-          height: 100%;
-          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
-          transition: left 0.5s ease;
-        }
-        
-        .action-btn:hover::before {
-          left: 100%;
-        }
-        
-        .action-btn:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 20px rgba(0,0,0,0.2);
-        }
-        
-        .action-btn:active {
-          transform: scale(0.98);
-        }
-        
-        .action-btn-settings {
-          background: linear-gradient(135deg, #6366f1, #8b5cf6);
-          box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
-        }
-        
-        .action-btn-orders {
-          background: linear-gradient(135deg, #10b981, #059669);
-          box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
-        }
-        
-        .action-btn-analytics {
-          background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-          box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
-        }
-        
-        .action-btn-icon {
-          font-size: 18px;
-          display: flex;
-          align-items: center;
         }
         
         /* Orders Table */
@@ -675,13 +611,8 @@ export default function Index() {
             font-size: 24px;
           }
           
-          .quick-actions {
-            flex-direction: column;
-          }
-          
-          .action-btn {
-            justify-content: center;
-            width: 100%;
+          .quick-actions-polaris {
+            margin-bottom: 20px;
           }
           
           .orders-card {
@@ -734,7 +665,7 @@ export default function Index() {
           <div className="welcome-banner">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', position: 'relative', zIndex: 1 }}>
               <div>
-                <h1>Welcome to Fox COD 🦊</h1>
+                <h1>Welcome to Fox COD</h1>
                 <p>Manage your Cash on Delivery orders efficiently</p>
               </div>
               <span className={`status-pill ${enabled ? 'status-active' : 'status-inactive'}`}>
@@ -744,13 +675,13 @@ export default function Index() {
             </div>
             <div className="welcome-actions">
               <Link to="/app/settings" className="welcome-btn welcome-btn-primary">
-                🎨 Form Builder
+                Form Builder
               </Link>
               <button
                 className="welcome-btn welcome-btn-secondary"
                 onClick={() => window.open(`https://${shop}/admin/themes/current/editor?context=apps`, '_blank')}
               >
-                🎨 Add to Theme
+                Add to Theme
               </button>
             </div>
           </div>
@@ -759,7 +690,7 @@ export default function Index() {
           {setupProgress < 100 && (
             <div className="setup-card">
               <div className="setup-header">
-                <h3>🚀 Quick Setup</h3>
+                <h3>Quick Setup</h3>
                 <span className="setup-progress-text">{setupProgress}% complete</span>
               </div>
               <div className="setup-progress-bar">
@@ -782,7 +713,7 @@ export default function Index() {
           <div className="stats-grid">
             <div className="stat-card">
               <div className="stat-header">
-                <div className="stat-icon stat-icon-blue">📦</div>
+                <div className="stat-icon stat-icon-blue"><svg width="22" height="22" viewBox="0 0 20 20" fill="none"><rect x="3" y="5" width="14" height="12" rx="2" stroke="white" strokeWidth="1.5" fill="none" /><path d="M3 9h14" stroke="white" strokeWidth="1.5" /></svg></div>
                 <span className="stat-label">Total Orders</span>
               </div>
               <p className="stat-value">{stats.totalOrders}</p>
@@ -801,7 +732,7 @@ export default function Index() {
 
             <div className="stat-card">
               <div className="stat-header">
-                <div className="stat-icon stat-icon-green">💰</div>
+                <div className="stat-icon stat-icon-green"><svg width="22" height="22" viewBox="0 0 20 20" fill="none"><path d="M10 2a8 8 0 100 16 8 8 0 000-16z" stroke="white" strokeWidth="1.5" fill="none" /><path d="M6 10l3 3 5-5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" /></svg></div>
                 <span className="stat-label">Revenue</span>
               </div>
               <p className="stat-value">{formatCurrency(stats.totalRevenue)}</p>
@@ -810,7 +741,7 @@ export default function Index() {
 
             <div className="stat-card">
               <div className="stat-header">
-                <div className="stat-icon stat-icon-purple">📅</div>
+                <div className="stat-icon stat-icon-purple"><svg width="22" height="22" viewBox="0 0 20 20" fill="none"><rect x="3" y="3" width="14" height="14" rx="2" stroke="white" strokeWidth="1.5" fill="none" /><path d="M3 8h14M8 3v14" stroke="white" strokeWidth="1.5" /></svg></div>
                 <span className="stat-label">Today</span>
               </div>
               <p className="stat-value">{stats.todayOrders}</p>
@@ -819,7 +750,7 @@ export default function Index() {
 
             <div className="stat-card">
               <div className="stat-header">
-                <div className="stat-icon stat-icon-orange">📆</div>
+                <div className="stat-icon stat-icon-orange"><svg width="22" height="22" viewBox="0 0 20 20" fill="none"><path d="M3 17V5h2v12H3zm4 0V8h2v9H7zm4 0V3h2v14h-2zm4 0V10h2v7h-2z" fill="white" /></svg></div>
                 <span className="stat-label">This Week</span>
               </div>
               <p className="stat-value">{stats.weekOrders || 0}</p>
@@ -827,50 +758,21 @@ export default function Index() {
             </div>
           </div>
 
-          {/* Quick Actions - Premium Pill Buttons */}
+          {/* Quick Actions - Polaris Buttons */}
           <div className="section-header">
             <h2>Quick Actions</h2>
           </div>
-          <div className="quick-actions">
-            <Link to="/app/settings" className="action-btn action-btn-settings">
-              <span className="action-btn-icon">⚙️</span>
-              Form Builder
-            </Link>
-
-            <Link to="/app/quantity-offers" className="action-btn" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', boxShadow: '0 4px 15px rgba(245, 158, 11, 0.4)' }}>
-              <span className="action-btn-icon">📦</span>
-              Bundle Offers
-            </Link>
-
-            <Link to="/app/upsell-downsell" className="action-btn" style={{ background: 'linear-gradient(135deg, #ec4899, #db2777)', boxShadow: '0 4px 15px rgba(236, 72, 153, 0.4)' }}>
-              <span className="action-btn-icon">🎯</span>
-              Upsells &amp; Downsells
-            </Link>
-
-            <Link to="/app/orders" className="action-btn action-btn-orders">
-              <span className="action-btn-icon">📋</span>
-              Orders
-            </Link>
-
-            <Link to="/app/analytics" className="action-btn action-btn-analytics">
-              <span className="action-btn-icon">📊</span>
-              Analytics
-            </Link>
-
-            <Link to="/app/app-settings?tab=pixels" className="action-btn" style={{ background: 'linear-gradient(135deg, #14b8a6, #0d9488)', boxShadow: '0 4px 15px rgba(20, 184, 166, 0.4)' }}>
-              <span className="action-btn-icon">📡</span>
-              Pixel Tracking
-            </Link>
-
-            <Link to="/app/app-settings?tab=fraud" className="action-btn" style={{ background: 'linear-gradient(135deg, #f43f5e, #e11d48)', boxShadow: '0 4px 15px rgba(244, 63, 94, 0.4)' }}>
-              <span className="action-btn-icon">🛡️</span>
-              Fraud Protection
-            </Link>
-
-            <Link to="/app/integrations" className="action-btn" style={{ background: 'linear-gradient(135deg, #6366f1, #4f46e5)', boxShadow: '0 4px 15px rgba(99, 102, 241, 0.4)' }}>
-              <span className="action-btn-icon">🔗</span>
-              Integrations
-            </Link>
+          <div className="quick-actions-polaris">
+            <InlineStack gap="300" wrap>
+              <Button variant="primary" size="large" onClick={() => navigate('/app/settings')}>Form Builder</Button>
+              <Button variant="primary" size="large" onClick={() => navigate('/app/quantity-offers')}>Bundle Offers</Button>
+              <Button variant="primary" size="large" onClick={() => navigate('/app/upsell-downsell')}>Upsells & Downsells</Button>
+              <Button variant="primary" size="large" onClick={() => navigate('/app/orders')}>Orders</Button>
+              <Button variant="primary" size="large" onClick={() => navigate('/app/analytics')}>Analytics</Button>
+              <Button variant="primary" size="large" onClick={() => navigate('/app/app-settings?tab=pixels')}>Pixel Tracking</Button>
+              <Button variant="primary" size="large" onClick={() => navigate('/app/app-settings?tab=fraud')}>Fraud Protection</Button>
+              <Button variant="primary" size="large" onClick={() => navigate('/app/integrations')}>Integrations</Button>
+            </InlineStack>
           </div>
 
           {/* TEMPORARILY HIDDEN - Components preserved for future use */}

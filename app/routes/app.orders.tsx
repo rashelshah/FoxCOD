@@ -5,8 +5,9 @@
 
 import { useState, useCallback, useEffect } from "react";
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
-import { useLoaderData, useNavigation, useFetcher, Link } from "react-router";
+import { useLoaderData, useNavigation, useFetcher, Link, useNavigate } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
+import { Page, Select, Button, ButtonGroup, Pagination, Badge, InlineStack, Text } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import { getOrders, updateOrderStatusSimple } from "../config/supabase.server";
 import { ORDER_STATUSES, type OrderStatus } from "../config/constants";
@@ -101,7 +102,7 @@ export default function OrdersPage() {
     useEffect(() => {
         if (fetcher.state === "idle" && fetcher.data) {
             if (fetcher.data.success) {
-                shopify.toast.show("✅ Status updated successfully!");
+                shopify.toast.show("Status updated successfully!");
                 if (fetcher.data.orderId) {
                     setPendingUpdates(prev => {
                         const next = { ...prev };
@@ -110,7 +111,7 @@ export default function OrdersPage() {
                     });
                 }
             } else if (fetcher.data.error) {
-                shopify.toast.show(`❌ Error: ${fetcher.data.error}`);
+                shopify.toast.show(`Error: ${fetcher.data.error}`);
             }
         }
     }, [fetcher.state, fetcher.data, shopify]);
@@ -134,7 +135,6 @@ export default function OrdersPage() {
         });
     };
 
-    // Handle status change
     const handleStatusChange = useCallback((orderId: string, newStatus: string) => {
         setPendingUpdates(prev => ({ ...prev, [orderId]: newStatus }));
         fetcher.submit(
@@ -142,6 +142,11 @@ export default function OrdersPage() {
             { method: "post" }
         );
     }, [fetcher]);
+
+    const navigate = useNavigate();
+
+    // Build Select options for status dropdown
+    const statusSelectOptions = ORDER_STATUSES.map(s => ({ label: s.label, value: s.value }));
 
     // Get display status
     const getDisplayStatus = (order: any) => {
@@ -648,183 +653,152 @@ export default function OrdersPage() {
                 }
             `}</style>
 
-            <s-page heading="">
-                <div className="orders-page">
-                    {/* Standard Header */}
-                    <div className="page-header">
-                        <div className="page-header-left">
-                            <Link to="/app" className="back-btn">←</Link>
-                            <div className="page-title">
-                                <h1>📋 All Orders</h1>
-                                <p>Manage and track your COD orders</p>
-                            </div>
+            <Page
+                title="All Orders"
+                subtitle="Manage and track your COD orders"
+                backAction={{ content: 'Dashboard', onAction: () => navigate('/app') }}
+            >
+
+                {/* Stats Grid */}
+                <div className="stats-grid">
+                    <div className="stat-card">
+                        <div className="stat-icon stat-icon-blue"><svg width="22" height="22" viewBox="0 0 20 20" fill="none"><rect x="3" y="5" width="14" height="12" rx="2" stroke="white" strokeWidth="1.5" fill="none" /><path d="M3 9h14" stroke="white" strokeWidth="1.5" /></svg></div>
+                        <div className="stat-content">
+                            <h3>{totalCount}</h3>
+                            <p>Total Orders</p>
                         </div>
                     </div>
-
-                    {/* Stats Grid */}
-                    <div className="stats-grid">
-                        <div className="stat-card">
-                            <div className="stat-icon stat-icon-blue">📦</div>
-                            <div className="stat-content">
-                                <h3>{totalCount}</h3>
-                                <p>Total Orders</p>
-                            </div>
-                        </div>
-                        <div className="stat-card">
-                            <div className="stat-icon stat-icon-orange">⏳</div>
-                            <div className="stat-content">
-                                <h3>{pendingCount}</h3>
-                                <p>Pending</p>
-                            </div>
-                        </div>
-                        <div className="stat-card">
-                            <div className="stat-icon stat-icon-green">✓</div>
-                            <div className="stat-content">
-                                <h3>{confirmedCount}</h3>
-                                <p>Confirmed</p>
-                            </div>
-                        </div>
-                        <div className="stat-card">
-                            <div className="stat-icon stat-icon-purple">📊</div>
-                            <div className="stat-content">
-                                <h3>{currentPage}/{totalPages || 1}</h3>
-                                <p>Current Page</p>
-                            </div>
+                    <div className="stat-card">
+                        <div className="stat-icon stat-icon-orange"><svg width="22" height="22" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="white" strokeWidth="1.5" fill="none" /><path d="M10 6v4l3 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" /></svg></div>
+                        <div className="stat-content">
+                            <h3>{pendingCount}</h3>
+                            <p>Pending</p>
                         </div>
                     </div>
-
-                    {/* Filter Pills */}
-                    <div className="filters-section">
-                        <div className="filters">
-                            <Link
-                                to="/app/orders"
-                                className={`filter-pill ${!statusFilter ? 'active' : ''}`}
-                            >
-                                All Orders
-                                <span className="filter-count">{totalCount}</span>
-                            </Link>
-                            {ORDER_STATUSES.map((status) => (
-                                <Link
-                                    key={status.value}
-                                    to={`/app/orders?status=${status.value}`}
-                                    className={`filter-pill ${statusFilter === status.value ? 'active' : ''}`}
-                                >
-                                    {status.label}
-                                </Link>
-                            ))}
+                    <div className="stat-card">
+                        <div className="stat-icon stat-icon-green"><svg width="22" height="22" viewBox="0 0 20 20" fill="none"><path d="M6 10l3 3 5-5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" /></svg></div>
+                        <div className="stat-content">
+                            <h3>{confirmedCount}</h3>
+                            <p>Confirmed</p>
                         </div>
                     </div>
-
-                    {/* Orders List */}
-                    {orders.length > 0 ? (
-                        <>
-                            <div className="orders-container">
-                                {/* Desktop: Grid layout inside each card */}
-                                {orders.map((order: any) => {
-                                    const displayStatus = getDisplayStatus(order);
-                                    const statusInfo = getStatusInfo(displayStatus);
-                                    return (
-                                        <div key={order.id} className="order-card">
-                                            <div className="order-id-cell">
-                                                <Link to={`/app/orders/${order.id}`}>
-                                                    {order.shopify_order_name || `#${order.id.slice(0, 8)}`}
-                                                </Link>
-                                            </div>
-                                            <div className="customer-cell">
-                                                <span className="customer-name">{order.customer_name}</span>
-                                                <span className="customer-phone">{order.customer_phone}</span>
-                                            </div>
-                                            <div className="product-cell">
-                                                <span className="product-title">{order.product_title || 'Product'}</span>
-                                                <span className="product-qty">Qty: {order.quantity}</span>
-                                                {order.customer_notes && order.customer_notes.includes('UPSELL ITEMS') && (() => {
-                                                    const lines = order.customer_notes.split('\n').filter((l: string) => l.trim().startsWith('-'));
-                                                    return lines.length > 0 ? (
-                                                        <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                                                            {lines.map((line: string, idx: number) => {
-                                                                const m = line.match(/-\s*(.+?)\s*\(([^)]+)\)/);
-                                                                return m ? (
-                                                                    <span key={idx} style={{ fontSize: '11px', padding: '2px 6px', borderRadius: '4px', background: '#ecfdf5', color: '#059669', fontWeight: 600, display: 'inline-block', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                                        + {m[1]} ({m[2]})
-                                                                    </span>
-                                                                ) : null;
-                                                            })}
-                                                        </div>
-                                                    ) : null;
-                                                })()}
-                                            </div>
-                                            <div className="amount-cell">
-                                                {formatCurrency(order.total_price)}
-                                            </div>
-                                            <div className="status-cell">
-                                                <select
-                                                    value={displayStatus}
-                                                    onChange={(e) => handleStatusChange(order.id, e.target.value)}
-                                                    disabled={isUpdating && !!pendingUpdates[order.id]}
-                                                    style={{
-                                                        borderColor: statusInfo.color,
-                                                        color: statusInfo.color,
-                                                        opacity: pendingUpdates[order.id] ? 0.7 : 1
-                                                    }}
-                                                >
-                                                    {ORDER_STATUSES.map((status) => (
-                                                        <option key={status.value} value={status.value}>
-                                                            {status.label}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                            <div className="date-cell">
-                                                {formatDate(order.created_at)}
-                                            </div>
-                                            <div className="action-cell">
-                                                <Link to={`/app/orders/${order.id}`}>
-                                                    View
-                                                </Link>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-
-                            {/* Pagination */}
-                            {totalPages > 1 && (
-                                <div className="pagination">
-                                    {currentPage > 1 && (
-                                        <Link
-                                            to={`/app/orders?page=${currentPage - 1}${statusFilter ? `&status=${statusFilter}` : ''}`}
-                                            className="page-btn"
-                                        >
-                                            ← Previous
-                                        </Link>
-                                    )}
-                                    <span className="page-btn active">
-                                        Page {currentPage} of {totalPages}
-                                    </span>
-                                    {currentPage < totalPages && (
-                                        <Link
-                                            to={`/app/orders?page=${currentPage + 1}${statusFilter ? `&status=${statusFilter}` : ''}`}
-                                            className="page-btn"
-                                        >
-                                            Next →
-                                        </Link>
-                                    )}
-                                </div>
-                            )}
-                        </>
-                    ) : (
-                        <div className="empty-state">
-                            <div className="empty-icon">📦</div>
-                            <h3>No orders found</h3>
-                            <p>
-                                {statusFilter
-                                    ? `No ${statusFilter} orders yet`
-                                    : 'Orders will appear here once customers start placing COD orders'}
-                            </p>
+                    <div className="stat-card">
+                        <div className="stat-icon stat-icon-purple"><svg width="22" height="22" viewBox="0 0 20 20" fill="none"><path d="M3 17V5h2v12H3zm4 0V8h2v9H7zm4 0V3h2v14h-2zm4 0V10h2v7h-2z" fill="white" /></svg></div>
+                        <div className="stat-content">
+                            <h3>{currentPage}/{totalPages || 1}</h3>
+                            <p>Current Page</p>
                         </div>
-                    )}
+                    </div>
                 </div>
-            </s-page>
+
+                {/* Filter Pills */}
+                <div style={{ marginBottom: '20px' }}>
+                    <InlineStack gap="200" wrap>
+                        <Button
+                            variant={!statusFilter ? 'primary' : undefined}
+                            onClick={() => navigate('/app/orders')}
+                        >
+                            All Orders ({totalCount})
+                        </Button>
+                        {ORDER_STATUSES.map((status) => (
+                            <Button
+                                key={status.value}
+                                variant={statusFilter === status.value ? 'primary' : undefined}
+                                onClick={() => navigate(`/app/orders?status=${status.value}`)}
+                            >
+                                {status.label}
+                            </Button>
+                        ))}
+                    </InlineStack>
+                </div>
+
+                {/* Orders List */}
+                {orders.length > 0 ? (
+                    <>
+                        <div className="orders-container">
+                            {/* Desktop: Grid layout inside each card */}
+                            {orders.map((order: any) => {
+                                const displayStatus = getDisplayStatus(order);
+                                const statusInfo = getStatusInfo(displayStatus);
+                                return (
+                                    <div key={order.id} className="order-card">
+                                        <div className="order-id-cell">
+                                            <Link to={`/app/orders/${order.id}`}>
+                                                {order.shopify_order_name || `#${order.id.slice(0, 8)}`}
+                                            </Link>
+                                        </div>
+                                        <div className="customer-cell">
+                                            <span className="customer-name">{order.customer_name}</span>
+                                            <span className="customer-phone">{order.customer_phone}</span>
+                                        </div>
+                                        <div className="product-cell">
+                                            <span className="product-title">{order.product_title || 'Product'}</span>
+                                            <span className="product-qty">Qty: {order.quantity}</span>
+                                            {order.customer_notes && order.customer_notes.includes('UPSELL ITEMS') && (() => {
+                                                const lines = order.customer_notes.split('\n').filter((l: string) => l.trim().startsWith('-'));
+                                                return lines.length > 0 ? (
+                                                    <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                                        {lines.map((line: string, idx: number) => {
+                                                            const m = line.match(/-\s*(.+?)\s*\(([^)]+)\)/);
+                                                            return m ? (
+                                                                <span key={idx} style={{ fontSize: '11px', padding: '2px 6px', borderRadius: '4px', background: '#ecfdf5', color: '#059669', fontWeight: 600, display: 'inline-block', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                                    + {m[1]} ({m[2]})
+                                                                </span>
+                                                            ) : null;
+                                                        })}
+                                                    </div>
+                                                ) : null;
+                                            })()}
+                                        </div>
+                                        <div className="amount-cell">
+                                            {formatCurrency(order.total_price)}
+                                        </div>
+                                        <div className="status-cell">
+                                            <Select
+                                                label=""
+                                                labelHidden
+                                                options={statusSelectOptions}
+                                                value={displayStatus}
+                                                onChange={(val) => handleStatusChange(order.id, val)}
+                                                disabled={isUpdating && !!pendingUpdates[order.id]}
+                                            />
+                                        </div>
+                                        <div className="date-cell">
+                                            {formatDate(order.created_at)}
+                                        </div>
+                                        <div className="action-cell">
+                                            <Button onClick={() => navigate(`/app/orders/${order.id}`)}>View</Button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* Pagination */}
+                        {totalPages > 1 && (
+                            <div style={{ display: 'flex', justifyContent: 'center', padding: '24px 0' }}>
+                                <Pagination
+                                    hasPrevious={currentPage > 1}
+                                    onPrevious={() => navigate(`/app/orders?page=${currentPage - 1}${statusFilter ? `&status=${statusFilter}` : ''}`)}
+                                    hasNext={currentPage < totalPages}
+                                    onNext={() => navigate(`/app/orders?page=${currentPage + 1}${statusFilter ? `&status=${statusFilter}` : ''}`)}
+                                    label={`Page ${currentPage} of ${totalPages}`}
+                                />
+                            </div>
+                        )}
+                    </>
+                ) : (
+                    <div className="empty-state">
+                        <div className="empty-icon"><svg width="48" height="48" viewBox="0 0 20 20" fill="none"><rect x="3" y="5" width="14" height="12" rx="2" stroke="#d1d5db" strokeWidth="1.5" fill="none" /><path d="M3 9h14" stroke="#d1d5db" strokeWidth="1.5" /></svg></div>
+                        <h3>No orders found</h3>
+                        <p>
+                            {statusFilter
+                                ? `No ${statusFilter} orders yet`
+                                : 'Orders will appear here once customers start placing COD orders'}
+                        </p>
+                    </div>
+                )}
+            </Page>
         </>
     );
 }
