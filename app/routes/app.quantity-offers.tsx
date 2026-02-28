@@ -1108,16 +1108,22 @@ export default function QuantityOffersPage() {
                                                                     textAlign: isVertical || isCards ? 'center' : 'left',
                                                                     position: 'relative',
                                                                     overflow: 'visible',
+                                                                    marginTop: isMostPopular ? '14px' : '0',
                                                                     boxShadow: isCards ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
                                                                 }}>
                                                                 {isMostPopular && (
                                                                     <div style={{
-                                                                        position: 'absolute', top: '-10px', right: '-6px',
-                                                                        background: offer.tagBgColor || activeGroup.design.selectedTagBgColor || '#1f2937',
+                                                                        position: 'absolute', top: '-14px', left: '50%', transform: 'translateX(-50%)',
+                                                                        background: offer.tagBgColor || activeGroup.design.selectedTagBgColor || '#2ec4b6',
                                                                         color: activeGroup.design.selectedTagTextColor || '#ffffff',
-                                                                        fontSize: '10px', fontWeight: 700, padding: '4px 10px', borderRadius: '4px',
-                                                                        zIndex: 10, boxShadow: '0 2px 4px rgba(0,0,0,0.15)', whiteSpace: 'nowrap',
-                                                                    }}>{offer.label || 'Most Popular'}</div>
+                                                                        fontSize: '11px', fontWeight: 700, padding: '5px 20px', borderRadius: '14px',
+                                                                        zIndex: 10, boxShadow: '0 2px 8px rgba(0,0,0,0.15)', whiteSpace: 'nowrap',
+                                                                        letterSpacing: '0.3px', textTransform: 'uppercase' as const, lineHeight: '1.2',
+                                                                    }}>
+                                                                        <span style={{ position: 'absolute', bottom: '-4px', left: '8px', width: 0, height: 0, borderLeft: `5px solid ${offer.tagBgColor || activeGroup.design.selectedTagBgColor || '#2ec4b6'}`, borderBottom: '4px solid transparent' }} />
+                                                                        <span style={{ position: 'absolute', bottom: '-4px', right: '8px', width: 0, height: 0, borderRight: `5px solid ${offer.tagBgColor || activeGroup.design.selectedTagBgColor || '#2ec4b6'}`, borderBottom: '4px solid transparent' }} />
+                                                                        {offer.label || 'Most Popular'}
+                                                                    </div>
                                                                 )}
                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: isVertical || isCards ? '8px' : (isMinimal ? '6px' : '10px'), flex: isVertical || isCards ? '0 0 auto' : 1, minWidth: 0, flexDirection: isVertical || isCards ? 'column' : 'row', width: '100%' }}>
                                                                     {showImage && (
@@ -1250,24 +1256,23 @@ export default function QuantityOffersPage() {
                                                                             textAlign: isVertical || isCards ? 'center' : 'left',
                                                                             position: 'relative',
                                                                             overflow: 'visible',
+                                                                            marginTop: isMostPopular ? '14px' : '0',
                                                                             boxShadow: isCards ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
                                                                         }}>
                                                                         {/* Most Popular Ribbon Tag */}
                                                                         {isMostPopular && (
                                                                             <div style={{
-                                                                                position: 'absolute',
-                                                                                top: '-10px',
-                                                                                right: '-6px',
-                                                                                background: offer.tagBgColor || activeGroup.design.selectedTagBgColor || '#1f2937',
+                                                                                position: 'absolute', top: '-14px', left: '50%', transform: 'translateX(-50%)',
+                                                                                background: offer.tagBgColor || activeGroup.design.selectedTagBgColor || '#2ec4b6',
                                                                                 color: activeGroup.design.selectedTagTextColor || '#ffffff',
-                                                                                fontSize: '10px',
-                                                                                fontWeight: 700,
-                                                                                padding: '4px 10px',
-                                                                                borderRadius: '4px',
-                                                                                zIndex: 10,
-                                                                                boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
-                                                                                whiteSpace: 'nowrap',
-                                                                            }}>{offer.label || 'Most Popular'}</div>
+                                                                                fontSize: '11px', fontWeight: 700, padding: '5px 20px', borderRadius: '14px',
+                                                                                zIndex: 10, boxShadow: '0 2px 8px rgba(0,0,0,0.15)', whiteSpace: 'nowrap',
+                                                                                letterSpacing: '0.3px', textTransform: 'uppercase' as const, lineHeight: '1.2',
+                                                                            }}>
+                                                                                <span style={{ position: 'absolute', bottom: '-4px', left: '8px', width: 0, height: 0, borderLeft: `5px solid ${offer.tagBgColor || activeGroup.design.selectedTagBgColor || '#2ec4b6'}`, borderBottom: '4px solid transparent' }} />
+                                                                                <span style={{ position: 'absolute', bottom: '-4px', right: '8px', width: 0, height: 0, borderRight: `5px solid ${offer.tagBgColor || activeGroup.design.selectedTagBgColor || '#2ec4b6'}`, borderBottom: '4px solid transparent' }} />
+                                                                                {offer.label || 'Most Popular'}
+                                                                            </div>
                                                                         )}
                                                                         <div style={{ display: 'flex', alignItems: 'center', gap: isVertical || isCards ? '8px' : (isMinimal ? '6px' : '10px'), flex: isVertical || isCards ? '0 0 auto' : 1, minWidth: 0, flexDirection: isVertical || isCards ? 'column' : 'row', width: '100%' }}>
                                                                             {showImage && (
@@ -1458,24 +1463,23 @@ export default function QuantityOffersPage() {
                                                                             textAlign: isVertical || isCards ? 'center' : 'left',
                                                                             position: 'relative',
                                                                             overflow: 'visible',
+                                                                            marginTop: isMostPopular ? '14px' : '0',
                                                                             boxShadow: isCards ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
                                                                         }}>
                                                                         {/* Most Popular Ribbon Tag */}
                                                                         {isMostPopular && (
                                                                             <div style={{
-                                                                                position: 'absolute',
-                                                                                top: '-10px',
-                                                                                right: '-6px',
-                                                                                background: offer.tagBgColor || activeGroup.design.selectedTagBgColor || '#1f2937',
+                                                                                position: 'absolute', top: '-14px', left: '50%', transform: 'translateX(-50%)',
+                                                                                background: offer.tagBgColor || activeGroup.design.selectedTagBgColor || '#2ec4b6',
                                                                                 color: activeGroup.design.selectedTagTextColor || '#ffffff',
-                                                                                fontSize: '10px',
-                                                                                fontWeight: 700,
-                                                                                padding: '4px 10px',
-                                                                                borderRadius: '4px',
-                                                                                zIndex: 10,
-                                                                                boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
-                                                                                whiteSpace: 'nowrap',
-                                                                            }}>{offer.label || 'Most Popular'}</div>
+                                                                                fontSize: '11px', fontWeight: 700, padding: '5px 20px', borderRadius: '14px',
+                                                                                zIndex: 10, boxShadow: '0 2px 8px rgba(0,0,0,0.15)', whiteSpace: 'nowrap',
+                                                                                letterSpacing: '0.3px', textTransform: 'uppercase' as const, lineHeight: '1.2',
+                                                                            }}>
+                                                                                <span style={{ position: 'absolute', bottom: '-4px', left: '8px', width: 0, height: 0, borderLeft: `5px solid ${offer.tagBgColor || activeGroup.design.selectedTagBgColor || '#2ec4b6'}`, borderBottom: '4px solid transparent' }} />
+                                                                                <span style={{ position: 'absolute', bottom: '-4px', right: '8px', width: 0, height: 0, borderRight: `5px solid ${offer.tagBgColor || activeGroup.design.selectedTagBgColor || '#2ec4b6'}`, borderBottom: '4px solid transparent' }} />
+                                                                                {offer.label || 'Most Popular'}
+                                                                            </div>
                                                                         )}
                                                                         <div style={{ display: 'flex', alignItems: 'center', gap: isVertical || isCards ? '8px' : (isMinimal ? '6px' : '10px'), flex: isVertical || isCards ? '0 0 auto' : 1, minWidth: 0, flexDirection: isVertical || isCards ? 'column' : 'row', width: '100%' }}>
                                                                             {showImage && (
