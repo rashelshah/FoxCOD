@@ -238,6 +238,29 @@
     }
   }
 
+
+  // ── Embedded SVG background presets (data URIs) ──
+  // These are inlined so the storefront never needs to fetch from appUrl
+  var BG_PRESET_DATA_URIS = {
+    '/bg-presets/1.svg': 'data:image/svg+xml;base64,PHN2ZyBpZD0idmlzdWFsIiB2aWV3Qm94PSIwIDAgOTAwIDYwMCIgd2lkdGg9IjkwMCIgaGVpZ2h0PSI2MDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHZlcnNpb249IjEuMSI+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjkwMCIgaGVpZ2h0PSI2MDAiIGZpbGw9IiMwMDIyMzMiPjwvcmVjdD48cGF0aCBkPSJNMCA1MjNMMjEuNSA1MDIuOEM0MyA0ODIuNyA4NiA0NDIuMyAxMjguOCA0NDIuM0MxNzEuNyA0NDIuMyAyMTQuMyA0ODIuNyAyNTcuMiA0OTMuN0MzMDAgNTA0LjcgMzQzIDQ4Ni4zIDM4NS44IDQ3My4zQzQyOC43IDQ2MC4zIDQ3MS4zIDQ1Mi43IDUxNC4yIDQzOS44QzU1NyA0MjcgNjAwIDQwOSA2NDIuOCA0MDUuM0M2ODUuNyA0MDEuNyA3MjguMyA0MTIuMyA3NzEuMiA0MzFDODE0IDQ0OS43IDg1NyA0NzYuMyA4NzguNSA0ODkuN0w5MDAgNTAzTDkwMCA2MDFMODc4LjUgNjAxQzg1NyA2MDEgODE0IDYwMSA3NzEuMiA2MDFDNzI4LjMgNjAxIDY4NS43IDYwMSA2NDIuOCA2MDFDNjAwIDYwMSA1NTcgNjAxIDUxNC4yIDYwMUM0NzEuMyA2MDEgNDI4LjcgNjAxIDM4NS44IDYwMUMzNDMgNjAxIDMwMCA2MDEgMjU3LjIgNjAxQzIxNC4zIDYwMSAxNzEuNyA2MDEgMTI4LjggNjAxQzg2IDYwMSA0MyA2MDEgMjEuNSA2MDFMMCA2MDFaIiBmaWxsPSIjMDA2NkZGIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0ibWl0ZXIiPjwvcGF0aD48L3N2Zz4=',
+    '/bg-presets/2.svg': 'data:image/svg+xml;base64,PHN2ZyBpZD0idmlzdWFsIiB2aWV3Qm94PSIwIDAgOTAwIDYwMCIgd2lkdGg9IjkwMCIgaGVpZ2h0PSI2MDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHZlcnNpb249IjEuMSI+PHBhdGggZD0iTTAgNjdMMTMuNyA3NkMyNy4zIDg1IDU0LjcgMTAzIDgyIDEwMUMxMDkuMyA5OSAxMzYuNyA3NyAxNjMuOCA4MkMxOTEgODcgMjE4IDExOSAyNDUuMiAxMjBDMjcyLjMgMTIxIDI5OS43IDkxIDMyNyA5MEMzNTQuMyA4OSAzODEuNyAxMTcgNDA5IDEyNkM0MzYuMyAxMzUgNDYzLjcgMTI1IDQ5MSAxMTFDNTE4LjMgOTcgNTQ1LjcgNzkgNTczIDcxQzYwMC4zIDYzIDYyNy43IDY1IDY1NC44IDcwQzY4MiA3NSA3MDkgODMgNzM2LjIgOTFDNzYzLjMgOTkgNzkwLjcgMTA3IDgxOCAxMTJDODQ1LjMgMTE3IDg3Mi43IDExOSA4ODYuMyAxMjBMOTAwIDEyMUw5MDAgMEw4ODYuMyAwQzg3Mi43IDAgODQ1LjMgMCA4MTggMEM3OTAuNyAwIDc2My4zIDAgNzM2LjIgMEM3MDkgMCA2ODIgMCA2NTQuOCAwQzYyNy43IDAgNjAwLjMgMCA1NzMgMEM1NDUuNyAwIDUxOC4zIDAgNDkxIDBDNDYzLjcgMCA0MzYuMyAwIDQwOSAwQzM4MS43IDAgMzU0LjMgMCAzMjcgMEMyOTkuNyAwIDI3Mi4zIDAgMjQ1LjIgMEMyMTggMCAxOTEgMCAxNjMuOCAwQzEzNi43IDAgMTA5LjMgMCA4MiAwQzU0LjcgMCAyNy4zIDAgMTMuNyAwTDAgMFoiIGZpbGw9IiM2MTk4ZmYiPjwvcGF0aD48cGF0aCBkPSJNMCAyODlMMTMuNyAyOTFDMjcuMyAyOTMgNTQuNyAyOTcgODIgMjc5QzEwOS4zIDI2MSAxMzYuNyAyMjEgMTYzLjggMjEyQzE5MSAyMDMgMjE4IDIyNSAyNDUuMiAyNTBDMjcyLjMgMjc1IDI5OS43IDMwMyAzMjcgMzI2QzM1NC4zIDM0OSAzODEuNyAzNjcgNDA5IDM2OUM0MzYuMyAzNzEgNDYzLjcgMzU3IDQ5MSAzNDFDNTE4LjMgMzI1IDU0NS43IDMwNyA1NzMgMjgzQzYwMC4zIDI1OSA2MjcuNyAyMjkgNjU0LjggMjMwQzY4MiAyMzEgNzA5IDI2MyA3MzYuMiAyNjZDNzYzLjMgMjY5IDc5MC43IDI0MyA4MTggMjQxQzg0NS4zIDIzOSA4NzIuNyAyNjEgODg2LjMgMjcyTDkwMCAyODNMOTAwIDExOUw4ODYuMyAxMThDODcyLjcgMTE3IDg0NS4zIDExNSA4MTggMTEwQzc5MC43IDEwNSA3NjMuMyA5NyA3MzYuMiA4OUM3MDkgODEgNjgyIDczIDY1NC44IDY4QzYyNy43IDYzIDYwMC4zIDYxIDU3MyA2OUM1NDUuNyA3NyA1MTguMyA5NSA0OTEgMTA5QzQ2My43IDEyMyA0MzYuMyAxMzMgNDA5IDEyNEMzODEuNyAxMTUgMzU0LjMgODcgMzI3IDg4QzI5OS43IDg5IDI3Mi4zIDExOSAyNDUuMiAxMThDMjE4IDExNyAxOTEgODUgMTYzLjggODBDMTM2LjcgNzUgMTA5LjMgOTcgODIgOTlDNTQuNyAxMDEgMjcuMyA4MyAxMy43IDc0TDAgNjVaIiBmaWxsPSIjM2M4MGZmIj48L3BhdGg+PHBhdGggZD0iTTAgNDMzTDEzLjcgNDQwQzI3LjMgNDQ3IDU0LjcgNDYxIDgyIDQ1NkMxMDkuMyA0NTEgMTM2LjcgNDI3IDE2My44IDQyNkMxOTEgNDI1IDIxOCA0NDcgMjQ1LjIgNDU5QzI3Mi4zIDQ3MSAyOTkuNyA0NzMgMzI3IDQ3NEMzNTQuMyA0NzUgMzgxLjcgNDc1IDQwOSA0NzFDNDM2LjMgNDY3IDQ2My43IDQ1OSA0OTEgNDQ3QzUxOC4zIDQzNSA1NDUuNyA0MTkgNTczIDQwOUM2MDAuMyAzOTkgNjI3LjcgMzk1IDY1NC44IDQwNEM2ODIgNDEzIDcwOSA0MzUgNzM2LjIgNDQwQzc2My4zIDQ0NSA3OTAuNyA0MzMgODE4IDQzMkM4NDUuMyA0MzEgODcyLjcgNDQxIDg4Ni4zIDQ0Nkw5MDAgNDUxTDkwMCAyODFMODg2LjMgMjcwQzg3Mi43IDI1OSA4NDUuMyAyMzcgODE4IDIzOUM3OTAuNyAyNDEgNzYzLjMgMjY3IDczNi4yIDI2NEM3MDkgMjYxIDY4MiAyMjkgNjU0LjggMjI4QzYyNy43IDIyNyA2MDAuMyAyNTcgNTczIDI4MUM1NDUuNyAzMDUgNTE4LjMgMzIzIDQ5MSAzMzlDNDYzLjcgMzU1IDQzNi4zIDM2OSA0MDkgMzY3QzM4MS43IDM2NSAzNTQuMyAzNDcgMzI3IDMyNEMyOTkuNyAzMDEgMjcyLjMgMjczIDI0NS4yIDI0OEMyMTggMjIzIDE5MSAyMDEgMTYzLjggMjEwQzEzNi43IDIxOSAxMDkuMyAyNTkgODIgMjc3QzU0LjcgMjk1IDI3LjMgMjkxIDEzLjcgMjg5TDAgMjg3WiIgZmlsbD0iIzAwNjZmZiI+PC9wYXRoPjxwYXRoIGQ9Ik0wIDU2NUwxMy43IDU2NEMyNy4zIDU2MyA1NC43IDU2MSA4MiA1NTNDMTA5LjMgNTQ1IDEzNi43IDUzMSAxNjMuOCA1MjNDMTkxIDUxNSAyMTggNTEzIDI0NS4yIDUxNUMyNzIuMyA1MTcgMjk5LjcgNTIzIDMyNyA1MjRDMzU0LjMgNTI1IDM4MS43IDUyMSA0MDkgNTI0QzQzNi4zIDUyNyA0NjMuNyA1MzcgNDkxIDUzNkM1MTguMyA1MzUgNTQ1LjcgNTIzIDU3MyA1MTZDNjAwLjMgNTA5IDYyNy43IDUwNyA2NTQuOCA1MDhDNjgyIDUwOSA3MDkgNTEzIDczNi4yIDUxNUM3NjMuMyA1MTcgNzkwLjcgNTE3IDgxOCA1MjFDODQ1LjMgNTI1IDg3Mi43IDUzMyA4ODYuMyA1MzdMOTAwIDU0MUw5MDAgNDQ5TDg4Ni4zIDQ0NEM4NzIuNyA0MzkgODQ1LjMgNDI5IDgxOCA0MzBDNzkwLjcgNDMxIDc2My4zIDQ0MyA3MzYuMiA0MzhDNzA5IDQzMyA2ODIgNDExIDY1NC44IDQwMkM2MjcuNyAzOTMgNjAwLjMgMzk3IDU3MyA0MDdDNTQ1LjcgNDE3IDUxOC4zIDQzMyA0OTEgNDQ1QzQ2My43IDQ1NyA0MzYuMyA0NjUgNDA5IDQ2OUMzODEuNyA0NzMgMzU0LjMgNDczIDMyNyA0NzJDMjk5LjcgNDcxIDI3Mi4zIDQ2OSAyNDUuMiA0NTdDMjE4IDQ0NSAxOTEgNDIzIDE2My44IDQyNEMxMzYuNyA0MjUgMTA5LjMgNDQ5IDgyIDQ1NEM1NC43IDQ1OSAyNy4zIDQ0NSAxMy43IDQzOEwwIDQzMVoiIGZpbGw9IiMwMDU5ZGQiPjwvcGF0aD48cGF0aCBkPSJNMCA2MDFMMTMuNyA2MDFDMjcuMyA2MDEgNTQuNyA2MDEgODIgNjAxQzEwOS4zIDYwMSAxMzYuNyA2MDEgMTYzLjggNjAxQzE5MSA2MDEgMjE4IDYwMSAyNDUuMiA2MDFDMjcyLjMgNjAxIDI5OS43IDYwMSAzMjcgNjAxQzM1NC4zIDYwMSAzODEuNyA2MDEgNDA5IDYwMUM0MzYuMyA2MDEgNDYzLjcgNjAxIDQ5MSA2MDFDNTE4LjMgNjAxIDU0NS43IDYwMSA1NzMgNjAxQzYwMC4zIDYwMSA2MjcuNyA2MDEgNjU0LjggNjAxQzY4MiA2MDEgNzA5IDYwMSA3MzYuMiA2MDFDNzYzLjMgNjAxIDc5MC43IDYwMSA4MTggNjAxQzg0NS4zIDYwMSA4NzIuNyA2MDEgODg2LjMgNjAxTDkwMCA2MDFMOTAwIDUzOUw4ODYuMyA1MzVDODcyLjcgNTMxIDg0NS4zIDUyMyA4MTggNTE5Qzc5MC43IDUxNSA3NjMuMyA1MTUgNzM2LjIgNTEzQzcwOSA1MTEgNjgyIDUwNyA2NTQuOCA1MDZDNjI3LjcgNTA1IDYwMC4zIDUwNyA1NzMgNTE0QzU0NS43IDUyMSA1MTguMyA1MzMgNDkxIDUzNEM0NjMuNyA1MzUgNDM2LjMgNTI1IDQwOSA1MjJDMzgxLjcgNTE5IDM1NC4zIDUyMyAzMjcgNTIyQzI5OS43IDUyMSAyNzIuMyA1MTUgMjQ1LjIgNTEzQzIxOCA1MTEgMTkxIDUxMyAxNjMuOCA1MjFDMTM2LjcgNTI5IDEwOS4zIDU0MyA4MiA1NTFDNTQuNyA1NTkgMjcuMyA1NjEgMTMuNyA1NjJMMCA1NjNaIiBmaWxsPSIjMDA0Y2JiIj48L3BhdGg+PC9zdmc+',
+    '/bg-presets/3.svg': 'data:image/svg+xml;base64,PHN2ZyBpZD0idmlzdWFsIiB2aWV3Qm94PSIwIDAgOTAwIDYwMCIgd2lkdGg9IjkwMCIgaGVpZ2h0PSI2MDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHZlcnNpb249IjEuMSI+PHBhdGggZD0iTTAgNzlMNzUgNzlMNzUgMTE1TDE1MCAxMTVMMTUwIDU1TDIyNSA1NUwyMjUgMTQ1TDMwMCAxNDVMMzAwIDg1TDM3NSA4NUwzNzUgOTdMNDUwIDk3TDQ1MCAxMDNMNTI1IDEwM0w1MjUgMTAzTDYwMCAxMDNMNjAwIDkxTDY3NSA5MUw2NzUgMTAzTDc1MCAxMDNMNzUwIDEzM0w4MjUgMTMzTDgyNSA0OUw5MDAgNDlMOTAwIDExNUw5MDAgMEw5MDAgMEw4MjUgMEw4MjUgMEw3NTAgMEw3NTAgMEw2NzUgMEw2NzUgMEw2MDAgMEw2MDAgMEw1MjUgMEw1MjUgMEw0NTAgMEw0NTAgMEwzNzUgMEwzNzUgMEwzMDAgMEwzMDAgMEwyMjUgMEwyMjUgMEwxNTAgMEwxNTAgMEw3NSAwTDc1IDBMMCAwWiIgZmlsbD0iI2ZhNzI2OCI+PC9wYXRoPjxwYXRoIGQ9Ik0wIDIyM0w3NSAyMjNMNzUgMjQ3TDE1MCAyNDdMMTUwIDI3N0wyMjUgMjc3TDIyNSAzMTNMMzAwIDMxM0wzMDAgMjUzTDM3NSAyNTNMMzc1IDMzMUw0NTAgMzMxTDQ1MCA0MTVMNTI1IDQxNUw1MjUgMzM3TDYwMCAzMzdMNjAwIDMwMUw2NzUgMzAxTDY3NSAyNzdMNzUwIDI3N0w3NTAgMjM1TDgyNSAyMzVMODI1IDMwN0w5MDAgMzA3TDkwMCAzNjFMOTAwIDExM0w5MDAgNDdMODI1IDQ3TDgyNSAxMzFMNzUwIDEzMUw3NTAgMTAxTDY3NSAxMDFMNjc1IDg5TDYwMCA4OUw2MDAgMTAxTDUyNSAxMDFMNTI1IDEwMUw0NTAgMTAxTDQ1MCA5NUwzNzUgOTVMMzc1IDgzTDMwMCA4M0wzMDAgMTQzTDIyNSAxNDNMMjI1IDUzTDE1MCA1M0wxNTAgMTEzTDc1IDExM0w3NSA3N0wwIDc3WiIgZmlsbD0iI2U0NTc2NSI+PC9wYXRoPjxwYXRoIGQ9Ik0wIDQ2M0w3NSA0NjNMNzUgNDUxTDE1MCA0NTFMMTUwIDU0N0wyMjUgNTQ3TDIyNSA1MzVMMzAwIDUzNUwzMDAgNTUzTDM3NSA1NTNMMzc1IDUyM0w0NTAgNTIzTDQ1MCA1MTFMNTI1IDUxMUw1MjUgNDYzTDYwMCA0NjNMNjAwIDU2NUw2NzUgNTY1TDY3NSA1NDFMNzUwIDU0MUw3NTAgNDg3TDgyNSA0ODdMODI1IDQ2OUw5MDAgNDY5TDkwMCA0NjNMOTAwIDM1OUw5MDAgMzA1TDgyNSAzMDVMODI1IDIzM0w3NTAgMjMzTDc1MCAyNzVMNjc1IDI3NUw2NzUgMjk5TDYwMCAyOTlMNjAwIDMzNUw1MjUgMzM1TDUyNSA0MTNMNDUwIDQxM0w0NTAgMzI5TDM3NSAzMjlMMzc1IDI1MUwzMDAgMjUxTDMwMCAzMTFMMjI1IDMxMUwyMjUgMjc1TDE1MCAyNzVMMTUwIDI0NUw3NSAyNDVMNzUgMjIxTDAgMjIxWiIgZmlsbD0iI2NiM2Q2MiI+PC9wYXRoPjxwYXRoIGQ9Ik0wIDYwMUw3NSA2MDFMNzUgNjAxTDE1MCA2MDFMMTUwIDYwMUwyMjUgNjAxTDIyNSA2MDFMMzAwIDYwMUwzMDAgNjAxTDM3NSA2MDFMMzc1IDYwMUw0NTAgNjAxTDQ1MCA2MDFMNTI1IDYwMUw1MjUgNjAxTDYwMCA2MDFMNjAwIDYwMUw2NzUgNjAxTDY3NSA2MDFMNzUwIDYwMUw3NTAgNjAxTDgyNSA2MDFMODI1IDYwMUw5MDAgNjAxTDkwMCA2MDFMOTAwIDQ2MUw5MDAgNDY3TDgyNSA0NjdMODI1IDQ4NUw3NTAgNDg1TDc1MCA1MzlMNjc1IDUzOUw2NzUgNTYzTDYwMCA1NjNMNjAwIDQ2MUw1MjUgNDYxTDUyNSA1MDlMNDUwIDUwOUw0NTAgNTIxTDM3NSA1MjFMMzc1IDU1MUwzMDAgNTUxTDMwMCA1MzNMMjI1IDUzM0wyMjUgNTQ1TDE1MCA1NDVMMTUwIDQ0OUw3NSA0NDlMNzUgNDYxTDAgNDYxWiIgZmlsbD0iI2IwMjM1ZiI+PC9wYXRoPjwvc3ZnPg==',
+    '/bg-presets/4.svg': 'data:image/svg+xml;base64,PHN2ZyBpZD0idmlzdWFsIiB2aWV3Qm94PSIwIDAgOTAwIDYwMCIgd2lkdGg9IjkwMCIgaGVpZ2h0PSI2MDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHZlcnNpb249IjEuMSI+PHBhdGggZD0iTTAgMzdMODIgNzNMMTY0IDkxTDI0NSA2MUwzMjcgNDlMNDA5IDYxTDQ5MSA3M0w1NzMgODVMNjU1IDc5TDczNiA1NUw4MTggMTAzTDkwMCA5MUw5MDAgMEw4MTggMEw3MzYgMEw2NTUgMEw1NzMgMEw0OTEgMEw0MDkgMEwzMjcgMEwyNDUgMEwxNjQgMEw4MiAwTDAgMFoiIGZpbGw9IiMwMGNjOGUiPjwvcGF0aD48cGF0aCBkPSJNMCA4NUw4MiAxNTFMMTY0IDE4MUwyNDUgMTU3TDMyNyAxMDNMNDA5IDEyMUw0OTEgMTU3TDU3MyAxMzNMNjU1IDE5M0w3MzYgMTU3TDgxOCAxNTdMOTAwIDE4N0w5MDAgODlMODE4IDEwMUw3MzYgNTNMNjU1IDc3TDU3MyA4M0w0OTEgNzFMNDA5IDU5TDMyNyA0N0wyNDUgNTlMMTY0IDg5TDgyIDcxTDAgMzVaIiBmaWxsPSIjMDBiOThhIj48L3BhdGg+PHBhdGggZD0iTTAgMzYxTDgyIDMzN0wxNjQgMzc5TDI0NSAzNDlMMzI3IDM2MUw0MDkgMzQzTDQ5MSAzMTlMNTczIDI5NUw2NTUgMzAxTDczNiAzNjdMODE4IDI5NUw5MDAgMzU1TDkwMCAxODVMODE4IDE1NUw3MzYgMTU1TDY1NSAxOTFMNTczIDEzMUw0OTEgMTU1TDQwOSAxMTlMMzI3IDEwMUwyNDUgMTU1TDE2NCAxNzlMODIgMTQ5TDAgODNaIiBmaWxsPSIjMDBhNzg0Ij48L3BhdGg+PHBhdGggZD0iTTAgNDg3TDgyIDUwNUwxNjQgNTExTDI0NSA0NjlMMzI3IDUzNUw0MDkgNTI5TDQ5MSA0NDVMNTczIDUzNUw2NTUgNDY5TDczNiA1NDdMODE4IDUyOUw5MDAgNDY5TDkwMCAzNTNMODE4IDI5M0w3MzYgMzY1TDY1NSAyOTlMNTczIDI5M0w0OTEgMzE3TDQwOSAzNDFMMzI3IDM1OUwyNDUgMzQ3TDE2NCAzNzdMODIgMzM1TDAgMzU5WiIgZmlsbD0iIzAwOTU3YyI+PC9wYXRoPjxwYXRoIGQ9Ik0wIDYwMUw4MiA2MDFMMTY0IDYwMUwyNDUgNjAxTDMyNyA2MDFMNDA5IDYwMUw0OTEgNjAxTDU3MyA2MDFMNjU1IDYwMUw3MzYgNjAxTDgxOCA2MDFMOTAwIDYwMUw5MDAgNDY3TDgxOCA1MjdMNzM2IDU0NUw2NTUgNDY3TDU3MyA1MzNMNDkxIDQ0M0w0MDkgNTI3TDMyNyA1MzNMMjQ1IDQ2N0wxNjQgNTA5TDgyIDUwM0wwIDQ4NVoiIGZpbGw9IiMwMzgzNzMiPjwvcGF0aD48L3N2Zz4=',
+    '/bg-presets/5.svg': 'data:image/svg+xml;base64,PHN2ZyBpZD0idmlzdWFsIiB2aWV3Qm94PSIwIDAgOTAwIDYwMCIgd2lkdGg9IjkwMCIgaGVpZ2h0PSI2MDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHZlcnNpb249IjEuMSI+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjkwMCIgaGVpZ2h0PSI2MDAiIGZpbGw9IiMwMDEyMjAiPjwvcmVjdD48cGF0aCBkPSJNMCAzNTBMMjEuNSAzNjJDNDMgMzc0IDg2IDM5OCAxMjguOCA0MDVDMTcxLjcgNDEyIDIxNC4zIDQwMiAyNTcuMiAzOTRDMzAwIDM4NiAzNDMgMzgwIDM4NS44IDM3Ni41QzQyOC43IDM3MyA0NzEuMyAzNzIgNTE0LjIgMzcwQzU1NyAzNjggNjAwIDM2NSA2NDIuOCAzNzVDNjg1LjcgMzg1IDcyOC4zIDQwOCA3NzEuMiA0MDcuNUM4MTQgNDA3IDg1NyAzODMgODc4LjUgMzcxTDkwMCAzNTlMOTAwIDYwMUw4NzguNSA2MDFDODU3IDYwMSA4MTQgNjAxIDc3MS4yIDYwMUM3MjguMyA2MDEgNjg1LjcgNjAxIDY0Mi44IDYwMUM2MDAgNjAxIDU1NyA2MDEgNTE0LjIgNjAxQzQ3MS4zIDYwMSA0MjguNyA2MDEgMzg1LjggNjAxQzM0MyA2MDEgMzAwIDYwMSAyNTcuMiA2MDFDMjE0LjMgNjAxIDE3MS43IDYwMSAxMjguOCA2MDFDODYgNjAxIDQzIDYwMSAyMS41IDYwMUwwIDYwMVoiIGZpbGw9IiNmYTcyNjgiPjwvcGF0aD48cGF0aCBkPSJNMCA0NTZMMjEuNSA0NDcuM0M0MyA0MzguNyA4NiA0MjEuMyAxMjguOCA0MTIuOEMxNzEuNyA0MDQuMyAyMTQuMyA0MDQuNyAyNTcuMiA0MTMuOEMzMDAgNDIzIDM0MyA0NDEgMzg1LjggNDQwLjJDNDI4LjcgNDM5LjMgNDcxLjMgNDE5LjcgNTE0LjIgNDE5LjhDNTU3IDQyMCA2MDAgNDQwIDY0Mi44IDQ0NS4zQzY4NS43IDQ1MC43IDcyOC4zIDQ0MS4zIDc3MS4yIDQ0NC4zQzgxNCA0NDcuMyA4NTcgNDYyLjcgODc4LjUgNDcwLjNMOTAwIDQ3OEw5MDAgNjAxTDg3OC41IDYwMUM4NTcgNjAxIDgxNCA2MDEgNzcxLjIgNjAxQzcyOC4zIDYwMSA2ODUuNyA2MDEgNjQyLjggNjAxQzYwMCA2MDEgNTU3IDYwMSA1MTQuMiA2MDFDNDcxLjMgNjAxIDQyOC43IDYwMSAzODUuOCA2MDFDMzQzIDYwMSAzMDAgNjAxIDI1Ny4yIDYwMUMyMTQuMyA2MDEgMTcxLjcgNjAxIDEyOC44IDYwMUM4NiA2MDEgNDMgNjAxIDIxLjUgNjAxTDAgNjAxWiIgZmlsbD0iI2VmNWY2NyI+PC9wYXRoPjxwYXRoIGQ9Ik0wIDQ1MUwyMS41IDQ1NUM0MyA0NTkgODYgNDY3IDEyOC44IDQ3My43QzE3MS43IDQ4MC4zIDIxNC4zIDQ4NS43IDI1Ny4yIDQ3OS44QzMwMCA0NzQgMzQzIDQ1NyAzODUuOCA0NTIuMkM0MjguNyA0NDcuMyA0NzEuMyA0NTQuNyA1MTQuMiA0NTVDNTU3IDQ1NS4zIDYwMCA0NDguNyA2NDIuOCA0NDhDNjg1LjcgNDQ3LjMgNzI4LjMgNDUyLjcgNzcxLjIgNDU3QzgxNCA0NjEuMyA4NTcgNDY0LjcgODc4LjUgNDY2LjNMOTAwIDQ2OEw5MDAgNjAxTDg3OC41IDYwMUM4NTcgNjAxIDgxNCA2MDEgNzcxLjIgNjAxQzcyOC4zIDYwMSA2ODUuNyA2MDEgNjQyLjggNjAxQzYwMCA2MDEgNTU3IDYwMSA1MTQuMiA2MDFDNDcxLjMgNjAxIDQyOC43IDYwMSAzODUuOCA2MDFDMzQzIDYwMSAzMDAgNjAxIDI1Ny4yIDYwMUMyMTQuMyA2MDEgMTcxLjcgNjAxIDEyOC44IDYwMUM4NiA2MDEgNDMgNjAxIDIxLjUgNjAxTDAgNjAxWiIgZmlsbD0iI2UzNGM2NyI+PC9wYXRoPjxwYXRoIGQ9Ik0wIDQ4NUwyMS41IDQ4OS41QzQzIDQ5NCA4NiA1MDMgMTI4LjggNTA4LjVDMTcxLjcgNTE0IDIxNC4zIDUxNiAyNTcuMiA1MTQuMkMzMDAgNTEyLjMgMzQzIDUwNi43IDM4NS44IDUwNS44QzQyOC43IDUwNSA0NzEuMyA1MDkgNTE0LjIgNTA2LjdDNTU3IDUwNC4zIDYwMCA0OTUuNyA2NDIuOCA0OTguN0M2ODUuNyA1MDEuNyA3MjguMyA1MTYuMyA3NzEuMiA1MjUuNUM4MTQgNTM0LjcgODU3IDUzOC4zIDg3OC41IDU0MC4yTDkwMCA1NDJMOTAwIDYwMUw4NzguNSA2MDFDODU3IDYwMSA4MTQgNjAxIDc3MS4yIDYwMUM3MjguMyA2MDEgNjg1LjcgNjAxIDY0Mi44IDYwMUM2MDAgNjAxIDU1NyA2MDEgNTE0LjIgNjAxQzQ3MS4zIDYwMSA0MjguNyA2MDEgMzg1LjggNjAxQzM0MyA2MDEgMzAwIDYwMSAyNTcuMiA2MDFDMjE0LjMgNjAxIDE3MS43IDYwMSAxMjguOCA2MDFDODYgNjAxIDQzIDYwMSAyMS41IDYwMUwwIDYwMVoiIGZpbGw9IiNkNTM4NjciPjwvcGF0aD48cGF0aCBkPSJNMCA1NDZMMjEuNSA1NDguM0M0MyA1NTAuNyA4NiA1NTUuMyAxMjguOCA1NTguOEMxNzEuNyA1NjIuMyAyMTQuMyA1NjQuNyAyNTcuMiA1NTguOEMzMDAgNTUzIDM0MyA1MzkgMzg1LjggNTM3LjVDNDI4LjcgNTM2IDQ3MS4zIDU0NyA1MTQuMiA1NDcuN0M1NTcgNTQ4LjMgNjAwIDUzOC43IDY0Mi44IDUzM0M2ODUuNyA1MjcuMyA3MjguMyA1MjUuNyA3NzEuMiA1MjcuOEM4MTQgNTMwIDg1NyA1MzYgODc4LjUgNTM5TDkwMCA1NDJMOTAwIDYwMUw4NzguNSA2MDFDODU3IDYwMSA4MTQgNjAxIDc3MS4yIDYwMUM3MjguMyA2MDEgNjg1LjcgNjAxIDY0Mi44IDYwMUM2MDAgNjAxIDU1NyA2MDEgNTE0LjIgNjAxQzQ3MS4zIDYwMSA0MjguNyA2MDEgMzg1LjggNjAxQzM0MyA2MDEgMzAwIDYwMSAyNTcuMiA2MDFDMjE0LjMgNjAxIDE3MS43IDYwMSAxMjguOCA2MDFDODYgNjAxIDQzIDYwMSAyMS41IDYwMUwwIDYwMVoiIGZpbGw9IiNjNjIzNjgiPjwvcGF0aD48L3N2Zz4=',
+    '/bg-presets/6.svg': 'data:image/svg+xml;base64,PHN2ZyBpZD0idmlzdWFsIiB2aWV3Qm94PSIwIDAgOTAwIDYwMCIgd2lkdGg9IjkwMCIgaGVpZ2h0PSI2MDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHZlcnNpb249IjEuMSI+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjkwMCIgaGVpZ2h0PSI2MDAiIGZpbGw9IiM5MzFDMUMiPjwvcmVjdD48cGF0aCBkPSJNMCAzNTFMMTI5IDM5NEwyNTcgMzk2TDM4NiA0MDVMNTE0IDM1Nkw2NDMgMzUzTDc3MSA0MjdMOTAwIDQwNEw5MDAgNjAxTDc3MSA2MDFMNjQzIDYwMUw1MTQgNjAxTDM4NiA2MDFMMjU3IDYwMUwxMjkgNjAxTDAgNjAxWiIgZmlsbD0iI2Y1NzMwYSI+PC9wYXRoPjxwYXRoIGQ9Ik0wIDQzM0wxMjkgNDQzTDI1NyA0NzlMMzg2IDQyN0w1MTQgNDYyTDY0MyA0MThMNzcxIDQwN0w5MDAgNDAzTDkwMCA2MDFMNzcxIDYwMUw2NDMgNjAxTDUxNCA2MDFMMzg2IDYwMUwyNTcgNjAxTDEyOSA2MDFMMCA2MDFaIiBmaWxsPSIjZGE1YjA5Ij48L3BhdGg+PHBhdGggZD0iTTAgNDQ4TDEyOSA0NTlMMjU3IDUxMEwzODYgNDU1TDUxNCA0NThMNjQzIDUxMEw3NzEgNDg5TDkwMCA0NzBMOTAwIDYwMUw3NzEgNjAxTDY0MyA2MDFMNTE0IDYwMUwzODYgNjAxTDI1NyA2MDFMMTI5IDYwMUwwIDYwMVoiIGZpbGw9IiNiZTQ0MDciPjwvcGF0aD48cGF0aCBkPSJNMCA1MTBMMTI5IDUzOEwyNTcgNTQyTDM4NiA1MjVMNTE0IDQ5OUw2NDMgNTAyTDc3MSA1MDdMOTAwIDUxOUw5MDAgNjAxTDc3MSA2MDFMNjQzIDYwMUw1MTQgNjAxTDM4NiA2MDFMMjU3IDYwMUwxMjkgNjAxTDAgNjAxWiIgZmlsbD0iI2EzMmQwNCI+PC9wYXRoPjxwYXRoIGQ9Ik0wIDU1OEwxMjkgNTY0TDI1NyA1NDZMMzg2IDUyN0w1MTQgNTUyTDY0MyA1MzBMNzcxIDU3Mkw5MDAgNTM4TDkwMCA2MDFMNzcxIDYwMUw2NDMgNjAxTDUxNCA2MDFMMzg2IDYwMUwyNTcgNjAxTDEyOSA2MDFMMCA2MDFaIiBmaWxsPSIjODcxNDAwIj48L3BhdGg+PC9zdmc+',
+    '/bg-presets/7.svg': 'data:image/svg+xml;base64,PHN2ZyBpZD0idmlzdWFsIiB2aWV3Qm94PSIwIDAgOTAwIDYwMCIgd2lkdGg9IjkwMCIgaGVpZ2h0PSI2MDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHZlcnNpb249IjEuMSI+PHJlY3Qgd2lkdGg9IjkwMCIgaGVpZ2h0PSI2MDAiIGZpbGw9IiNjNWU1ZmYiPjwvcmVjdD48Zz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg4MjcgMjM1KSI+PHBhdGggZD0iTTAgLTE0N0wxMjcuMyAtNzMuNUwxMjcuMyA3My41TDAgMTQ3TC0xMjcuMyA3My41TC0xMjcuMyAtNzMuNVoiIGZpbGw9IiM3ZWM2ZTciPjwvcGF0aD48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNzI3IDU1OCkiPjxwYXRoIGQ9Ik0wIC03OUw2OC40IC0zOS41TDY4LjQgMzkuNUwwIDc5TC02OC40IDM5LjVMLTY4LjQgLTM5LjVaIiBmaWxsPSIjN2VjNmU3Ij48L3BhdGg+PC9nPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDIzOCA1MDUpIj48cGF0aCBkPSJNMCAtOTlMODUuNyAtNDkuNUw4NS43IDQ5LjVMMCA5OUwtODUuNyA0OS41TC04NS43IC00OS41WiIgZmlsbD0iIzdlYzZlNyI+PC9wYXRoPjwvZz48L2c+PC9zdmc+',
+    '/bg-presets/8.svg': 'data:image/svg+xml;base64,PHN2ZyBpZD0idmlzdWFsIiB2aWV3Qm94PSIwIDAgOTAwIDYwMCIgd2lkdGg9IjkwMCIgaGVpZ2h0PSI2MDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHZlcnNpb249IjEuMSI+PHJlY3Qgd2lkdGg9IjkwMCIgaGVpZ2h0PSI2MDAiIGZpbGw9IiNkM2RlODAiPjwvcmVjdD48Zz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSg3NDEgMjI2KSI+PHBhdGggZD0iTTcwLjYgLTI0LjdDNzggLTAuMiA2MS4yIDMwLjQgMzYuMyA0OEMxMS41IDY1LjUgLTIxLjMgNzAgLTQzLjIgNTUuMUMtNjUuMSA0MC4yIC03Ni4xIDYgLTY3LjEgLTIwLjhDLTU4LjEgLTQ3LjUgLTI5IC02Ni43IDEuMyAtNjcuMUMzMS42IC02Ny41IDYzLjIgLTQ5LjIgNzAuNiAtMjQuN1oiIHN0cm9rZT0iI0Y3NzYwRSIgZmlsbD0ibm9uZSIgc3Ryb2tlLXdpZHRoPSIyMCI+PC9wYXRoPjwvZz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgxOTQgNTAwKSI+PHBhdGggZD0iTTQ1LjEgLTE1LjNDNTAuNyAyLjcgNDIuMyAyNC43IDI2LjcgMzUuOEMxMS4xIDQ2LjkgLTExLjYgNDcuMSAtMjYuMSAzNi41Qy00MC41IDI1LjkgLTQ2LjYgNC40IC00MC44IC0xMy44Qy0zNS4xIC0zMiAtMTcuNiAtNDYuOSAxLjEgLTQ3LjNDMTkuNyAtNDcuNiAzOS40IC0zMy40IDQ1LjEgLTE1LjNaIiBzdHJva2U9IiNGNzc2MEUiIGZpbGw9Im5vbmUiIHN0cm9rZS13aWR0aD0iMjAiPjwvcGF0aD48L2c+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoNzg0IDU2MCkiPjxwYXRoIGQ9Ik00My4yIC0xNC4xQzQ4LjcgMi43IDQwLjcgMjMuOSAyNS45IDM0LjJDMTEuMiA0NC42IC0xMC4zIDQ0LjIgLTI0LjEgMzRDLTM3LjkgMjMuOCAtNDQgMy44IC0zOC42IC0xMi45Qy0zMy4zIC0yOS41IC0xNi43IC00Mi43IDEuMSAtNDMuMUMxOC45IC00My40IDM3LjggLTMwLjkgNDMuMiAtMTQuMVoiIHN0cm9rZT0iI0Y3NzYwRSIgZmlsbD0ibm9uZSIgc3Ryb2tlLXdpZHRoPSIyMCI+PC9wYXRoPjwvZz48L2c+PC9zdmc+',
+    '/bg-presets/9.svg': 'data:image/svg+xml;base64,PHN2ZyBpZD0idmlzdWFsIiB2aWV3Qm94PSIwIDAgOTAwIDYwMCIgd2lkdGg9IjkwMCIgaGVpZ2h0PSI2MDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHZlcnNpb249IjEuMSI+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjkwMCIgaGVpZ2h0PSI2MDAiIGZpbGw9IiNlMWQ3NDkiPjwvcmVjdD48cGF0aCBkPSJNMCA1MTFMMTI5IDQ4NEwyNTcgNTIwTDM4NiAzOTJMNTE0IDQwN0w2NDMgMzk5TDc3MSA1MjRMOTAwIDQwOCIgZmlsbD0ibm9uZSIgc3Ryb2tlLWxpbmVjYXA9InNxdWFyZSIgc3Ryb2tlLWxpbmVqb2luPSJiZXZlbCIgc3Ryb2tlPSIjMDA2NkZGIiBzdHJva2Utd2lkdGg9IjQwIj48L3BhdGg+PC9zdmc+'
+  };
+
+  /** Resolve a bg-preset path to an inline data URI, or fall back to appUrl */
+  function resolveBgPreset(path, appUrl) {
+    if (!path) return '';
+    if (BG_PRESET_DATA_URIS[path]) return BG_PRESET_DATA_URIS[path];
+    if (path.startsWith('/') && appUrl) return appUrl + path;
+    return path;
+  }
+
   /**
    * Initialize all COD forms on the page
    */
@@ -828,7 +851,7 @@
       }
       card.style.borderRadius = (design.selectedBorderRadius || 10) + 'px';
       
-      // Most Popular Ribbon Tag - pill-shaped ribbon with folded corners at bottom
+      // Most Popular Ribbon Tag - clean pill-shaped badge
       if (isMostPopular) {
         card.style.marginTop = '14px';
         var ribbon = document.createElement('div');
@@ -837,8 +860,7 @@
         ribbon.style.top = '-14px';
         ribbon.style.left = '50%';
         ribbon.style.transform = 'translateX(-50%)';
-        var ribbonBg = offer.tagBgColor || design.selectedTagBgColor || '#2ec4b6';
-        ribbon.style.background = ribbonBg;
+        ribbon.style.background = offer.tagBgColor || design.selectedTagBgColor || '#2ec4b6';
         ribbon.style.color = design.selectedTagTextColor || '#ffffff';
         ribbon.style.fontSize = '11px';
         ribbon.style.fontWeight = '700';
@@ -851,14 +873,6 @@
         ribbon.style.textTransform = 'uppercase';
         ribbon.style.lineHeight = '1.2';
         ribbon.textContent = offer.label || 'Most Popular';
-        // Left bottom fold
-        var leftFold = document.createElement('span');
-        leftFold.style.cssText = 'position:absolute;bottom:-4px;left:8px;width:0;height:0;border-left:5px solid ' + ribbonBg + ';border-bottom:4px solid transparent;';
-        ribbon.appendChild(leftFold);
-        // Right bottom fold
-        var rightFold = document.createElement('span');
-        rightFold.style.cssText = 'position:absolute;bottom:-4px;right:8px;width:0;height:0;border-right:5px solid ' + ribbonBg + ';border-bottom:4px solid transparent;';
-        ribbon.appendChild(rightFold);
         card.appendChild(ribbon);
       }
       
@@ -3139,7 +3153,7 @@
       var discountLabel = offer.discount_type === 'percentage' ? offer.discount_value + '%' : formatMoney(offer.discount_value);
 
       var rawBgImage = design.bgImage || '';
-      var resolvedBgImage = rawBgImage && rawBgImage.startsWith('/') ? (config.appUrl || '') + rawBgImage : rawBgImage;
+      var resolvedBgImage = resolveBgPreset(rawBgImage, config.appUrl);
       var bgStyle = resolvedBgImage
           ? 'background-image: url(' + resolvedBgImage + '); background-size: cover; background-position: center;'
           : 'background: ' + (design.bgColor || '#fff') + ';';
@@ -3234,60 +3248,44 @@
       }
       var offer = offers[offerIndex];
 
-      // Preload background image if any, then show popup
-      var rawBgImg = campaign.design ? (campaign.design.bgImage || '') : '';
-      var bgToPreload = rawBgImg && rawBgImg.startsWith('/') ? (config.appUrl || '') + rawBgImg : rawBgImg;
+      // Show popup instantly — bg images use embedded data URIs
+      var overlay = document.createElement('div');
+      overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100000; display: flex; align-items: center; justify-content: center; padding: 20px;';
+      var modal = document.createElement('div');
+      modal.style.cssText = 'background: #fff; border-radius: 12px; max-width: 420px; width: 100%; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.2);';
+      modal.innerHTML = buildUpsellModalHTML(campaign, offer, offerIndex, config);
+      overlay.appendChild(modal);
+      document.body.appendChild(overlay);
+      startUpsellTimer(overlay);
 
-      function showUpsellPopup() {
-          var overlay = document.createElement('div');
-          overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100000; display: flex; align-items: center; justify-content: center; padding: 20px;';
-          var modal = document.createElement('div');
-          modal.style.cssText = 'background: #fff; border-radius: 12px; max-width: 420px; width: 100%; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.2);';
-          modal.innerHTML = buildUpsellModalHTML(campaign, offer, offerIndex, config);
-          overlay.appendChild(modal);
-          document.body.appendChild(overlay);
-          startUpsellTimer(overlay);
+      modal.querySelector('.cod-upsell-accept').addEventListener('click', function() {
+          if (overlay._timerInterval) clearInterval(overlay._timerInterval);
+          console.log('[COD Form] Upsell offer accepted:', offer.upsell_product_title);
+          acceptedItems.push({ product_id: offer.upsell_product_id, variant_id: offer.upsell_variant_id, title: offer.upsell_product_title, price: getOfferPrice(offer), quantity: 1, type: 'click_upsell' });
+          overlay.remove();
+          if (offerIndex + 1 < offers.length) {
+              showOfferSequence(form, config, productId, campaign, offers, offerIndex + 1, acceptedItems, onComplete);
+          } else {
+              onComplete(acceptedItems);
+          }
+      });
 
-          modal.querySelector('.cod-upsell-accept').addEventListener('click', function() {
-              if (overlay._timerInterval) clearInterval(overlay._timerInterval);
-              console.log('[COD Form] Upsell offer accepted:', offer.upsell_product_title);
-              acceptedItems.push({ product_id: offer.upsell_product_id, variant_id: offer.upsell_variant_id, title: offer.upsell_product_title, price: getOfferPrice(offer), quantity: 1, type: 'click_upsell' });
-              overlay.remove();
-              if (offerIndex + 1 < offers.length) {
-                  showOfferSequence(form, config, productId, campaign, offers, offerIndex + 1, acceptedItems, onComplete);
+      modal.querySelector('.cod-upsell-decline').addEventListener('click', function() {
+          if (overlay._timerInterval) clearInterval(overlay._timerInterval);
+          overlay.remove();
+          if (offerIndex + 1 < offers.length) {
+              showOfferSequence(form, config, productId, campaign, offers, offerIndex + 1, acceptedItems, onComplete);
+          } else if (campaign.linked_downsell_id && config.upsellOffers.downsells) {
+              var ds = config.upsellOffers.downsells.find(function(d) { return d.id === campaign.linked_downsell_id; });
+              if (ds) {
+                  showDownsellModal(form, config, productId, ds, acceptedItems, onComplete);
               } else {
                   onComplete(acceptedItems);
               }
-          });
-
-          modal.querySelector('.cod-upsell-decline').addEventListener('click', function() {
-              if (overlay._timerInterval) clearInterval(overlay._timerInterval);
-              overlay.remove();
-              if (offerIndex + 1 < offers.length) {
-                  showOfferSequence(form, config, productId, campaign, offers, offerIndex + 1, acceptedItems, onComplete);
-              } else if (campaign.linked_downsell_id && config.upsellOffers.downsells) {
-                  var ds = config.upsellOffers.downsells.find(function(d) { return d.id === campaign.linked_downsell_id; });
-                  if (ds) {
-                      showDownsellModal(form, config, productId, ds, acceptedItems, onComplete);
-                  } else {
-                      onComplete(acceptedItems);
-                  }
-              } else {
-                  onComplete(acceptedItems);
-              }
-          });
-      }
-
-      // Preload bg image then show
-      if (bgToPreload) {
-          var preImg = new Image();
-          var preloadDone = false;
-          preImg.onload = preImg.onerror = function() { if (!preloadDone) { preloadDone = true; showUpsellPopup(); } };
-          preImg.src = bgToPreload;
-          setTimeout(function() { if (!preloadDone) { preloadDone = true; showUpsellPopup(); } }, 2000);
-      } else {
-          showUpsellPopup();
-      }
+          } else {
+              onComplete(acceptedItems);
+          }
+      });
   }
 
   function buildDownsellModalHTML(dsCampaign, offer, config) {
@@ -3322,7 +3320,7 @@
 
       // Background: image takes priority, then gradient/color
       var rawBgImg = design.bgImage || '';
-      var resolvedBgImg = rawBgImg && rawBgImg.startsWith('/') ? (config.appUrl || '') + rawBgImg : rawBgImg;
+      var resolvedBgImg = resolveBgPreset(rawBgImg, config.appUrl);
       var bgCss = resolvedBgImg
           ? 'background-image: url(' + resolvedBgImg + '); background-size: cover; background-position: center;'
           : 'background: ' + (design.bgColor || '#fff') + ';';
@@ -3395,50 +3393,33 @@
       if (offers.length === 0) { onComplete(acceptedItems); return; }
       var offer = offers[0];
 
-      // Preload background image if any
-      var dsDesign = dsCampaign.design || {};
-      var rawDsBg = dsDesign.bgImage || '';
-      var dsBgToPreload = rawDsBg && rawDsBg.startsWith('/') ? (config.appUrl || '') + rawDsBg : rawDsBg;
+      // Show popup instantly — bg images use embedded data URIs
+      var overlay = document.createElement('div');
+      overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100000; display: flex; align-items: center; justify-content: center; padding: 20px;';
+      var modal = document.createElement('div');
+      modal.style.cssText = 'background: #fff; border-radius: 12px; max-width: 420px; width: 100%; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.2);';
 
-      function showDownsellPopup() {
-          var overlay = document.createElement('div');
-          overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100000; display: flex; align-items: center; justify-content: center; padding: 20px;';
-          var modal = document.createElement('div');
-          modal.style.cssText = 'background: #fff; border-radius: 12px; max-width: 420px; width: 100%; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.2);';
+      // Use dedicated downsell builder if design has downsell-specific fields, else fallback to upsell builder
+      var hasDownsellDesign = dsCampaign.design && (dsCampaign.design.titleText || dsCampaign.design.subtitleText || dsCampaign.design.descriptionText);
+      modal.innerHTML = hasDownsellDesign ? buildDownsellModalHTML(dsCampaign, offer, config) : buildUpsellModalHTML(dsCampaign, offer, 0, config);
 
-          // Use dedicated downsell builder if design has downsell-specific fields, else fallback to upsell builder
-          var hasDownsellDesign = dsCampaign.design && (dsCampaign.design.titleText || dsCampaign.design.subtitleText || dsCampaign.design.descriptionText);
-          modal.innerHTML = hasDownsellDesign ? buildDownsellModalHTML(dsCampaign, offer, config) : buildUpsellModalHTML(dsCampaign, offer, 0, config);
+      overlay.appendChild(modal);
+      document.body.appendChild(overlay);
+      startUpsellTimer(overlay);
 
-          overlay.appendChild(modal);
-          document.body.appendChild(overlay);
-          startUpsellTimer(overlay);
+      modal.querySelector('.cod-upsell-accept').addEventListener('click', function() {
+          if (overlay._timerInterval) clearInterval(overlay._timerInterval);
+          console.log('[COD Form] Downsell accepted:', offer.upsell_product_title);
+          acceptedItems.push({ product_id: offer.upsell_product_id, variant_id: offer.upsell_variant_id, title: offer.upsell_product_title, image: offer.upsell_product_image || '', price: getOfferPrice(offer), quantity: 1, type: 'downsell' });
+          overlay.remove();
+          onComplete(acceptedItems);
+      });
 
-          modal.querySelector('.cod-upsell-accept').addEventListener('click', function() {
-              if (overlay._timerInterval) clearInterval(overlay._timerInterval);
-              console.log('[COD Form] Downsell accepted:', offer.upsell_product_title);
-              acceptedItems.push({ product_id: offer.upsell_product_id, variant_id: offer.upsell_variant_id, title: offer.upsell_product_title, image: offer.upsell_product_image || '', price: getOfferPrice(offer), quantity: 1, type: 'downsell' });
-              overlay.remove();
-              onComplete(acceptedItems);
-          });
-
-          modal.querySelector('.cod-upsell-decline').addEventListener('click', function() {
-              if (overlay._timerInterval) clearInterval(overlay._timerInterval);
-              overlay.remove();
-              onComplete(acceptedItems);
-          });
-      }
-
-      // Preload bg image then show
-      if (dsBgToPreload) {
-          var dsPreImg = new Image();
-          var dsPreloadDone = false;
-          dsPreImg.onload = dsPreImg.onerror = function() { if (!dsPreloadDone) { dsPreloadDone = true; showDownsellPopup(); } };
-          dsPreImg.src = dsBgToPreload;
-          setTimeout(function() { if (!dsPreloadDone) { dsPreloadDone = true; showDownsellPopup(); } }, 2000);
-      } else {
-          showDownsellPopup();
-      }
+      modal.querySelector('.cod-upsell-decline').addEventListener('click', function() {
+          if (overlay._timerInterval) clearInterval(overlay._timerInterval);
+          overlay.remove();
+          onComplete(acceptedItems);
+      });
   }
 
   function submitUpsellItem(config, item, originalOrder) {
