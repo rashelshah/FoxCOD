@@ -1120,8 +1120,7 @@ export default function QuantityOffersPage() {
                                                                         zIndex: 10, boxShadow: '0 2px 8px rgba(0,0,0,0.15)', whiteSpace: 'nowrap',
                                                                         letterSpacing: '0.3px', textTransform: 'uppercase' as const, lineHeight: '1.2',
                                                                     }}>
-                                                                        <span style={{ position: 'absolute', bottom: '-4px', left: '8px', width: 0, height: 0, borderLeft: `5px solid ${offer.tagBgColor || activeGroup.design.selectedTagBgColor || '#2ec4b6'}`, borderBottom: '4px solid transparent' }} />
-                                                                        <span style={{ position: 'absolute', bottom: '-4px', right: '8px', width: 0, height: 0, borderRight: `5px solid ${offer.tagBgColor || activeGroup.design.selectedTagBgColor || '#2ec4b6'}`, borderBottom: '4px solid transparent' }} />
+
                                                                         {offer.label || 'Most Popular'}
                                                                     </div>
                                                                 )}
@@ -1269,8 +1268,7 @@ export default function QuantityOffersPage() {
                                                                                 zIndex: 10, boxShadow: '0 2px 8px rgba(0,0,0,0.15)', whiteSpace: 'nowrap',
                                                                                 letterSpacing: '0.3px', textTransform: 'uppercase' as const, lineHeight: '1.2',
                                                                             }}>
-                                                                                <span style={{ position: 'absolute', bottom: '-4px', left: '8px', width: 0, height: 0, borderLeft: `5px solid ${offer.tagBgColor || activeGroup.design.selectedTagBgColor || '#2ec4b6'}`, borderBottom: '4px solid transparent' }} />
-                                                                                <span style={{ position: 'absolute', bottom: '-4px', right: '8px', width: 0, height: 0, borderRight: `5px solid ${offer.tagBgColor || activeGroup.design.selectedTagBgColor || '#2ec4b6'}`, borderBottom: '4px solid transparent' }} />
+
                                                                                 {offer.label || 'Most Popular'}
                                                                             </div>
                                                                         )}
@@ -1476,8 +1474,7 @@ export default function QuantityOffersPage() {
                                                                                 zIndex: 10, boxShadow: '0 2px 8px rgba(0,0,0,0.15)', whiteSpace: 'nowrap',
                                                                                 letterSpacing: '0.3px', textTransform: 'uppercase' as const, lineHeight: '1.2',
                                                                             }}>
-                                                                                <span style={{ position: 'absolute', bottom: '-4px', left: '8px', width: 0, height: 0, borderLeft: `5px solid ${offer.tagBgColor || activeGroup.design.selectedTagBgColor || '#2ec4b6'}`, borderBottom: '4px solid transparent' }} />
-                                                                                <span style={{ position: 'absolute', bottom: '-4px', right: '8px', width: 0, height: 0, borderRight: `5px solid ${offer.tagBgColor || activeGroup.design.selectedTagBgColor || '#2ec4b6'}`, borderBottom: '4px solid transparent' }} />
+
                                                                                 {offer.label || 'Most Popular'}
                                                                             </div>
                                                                         )}
