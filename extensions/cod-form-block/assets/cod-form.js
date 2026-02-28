@@ -330,7 +330,8 @@
         quantityOffers: (window.FoxCod && window.FoxCod.quantityOffers) || safeJSONParse(dataContainer.dataset.quantityOffers, []),
         
         // Upsell Offers Configuration
-        upsellOffers: (window.FoxCod && window.FoxCod.upsellOffers) || safeJSONParse(dataContainer.dataset.upsellOffers, { tick_upsells: [], click_upsells: [], downsells: [] })
+        upsellOffers: (window.FoxCod && window.FoxCod.upsellOffers) || safeJSONParse(dataContainer.dataset.upsellOffers, { tick_upsells: [], click_upsells: [], downsells: [] }),
+        appUrl: dataContainer.dataset.appUrl || ''
       };
 
       // Debug: Log quantity offers data
@@ -739,6 +740,8 @@
     offersContainer.style.width = '100%';
     offersContainer.style.boxSizing = 'border-box';
     offersContainer.style.gap = '8px';
+    offersContainer.style.overflow = 'visible';
+    offersContainer.style.paddingTop = '10px';
     if (template === 'cards') {
       offersContainer.style.flexDirection = 'row';
       offersContainer.style.flexWrap = 'wrap';
@@ -825,23 +828,37 @@
       }
       card.style.borderRadius = (design.selectedBorderRadius || 10) + 'px';
       
-      // Most Popular Ribbon Tag - positioned at top-right
+      // Most Popular Ribbon Tag - pill-shaped ribbon with folded corners at bottom
       if (isMostPopular) {
+        card.style.marginTop = '14px';
         var ribbon = document.createElement('div');
         ribbon.className = 'cod-offer-ribbon';
         ribbon.style.position = 'absolute';
-        ribbon.style.top = '-10px';
-        ribbon.style.right = '-6px';
-        ribbon.style.background = offer.tagBgColor || design.selectedTagBgColor || '#1f2937';
+        ribbon.style.top = '-14px';
+        ribbon.style.left = '50%';
+        ribbon.style.transform = 'translateX(-50%)';
+        var ribbonBg = offer.tagBgColor || design.selectedTagBgColor || '#2ec4b6';
+        ribbon.style.background = ribbonBg;
         ribbon.style.color = design.selectedTagTextColor || '#ffffff';
-        ribbon.style.fontSize = '10px';
+        ribbon.style.fontSize = '11px';
         ribbon.style.fontWeight = '700';
-        ribbon.style.padding = '4px 10px';
-        ribbon.style.borderRadius = '4px';
+        ribbon.style.padding = '5px 20px';
+        ribbon.style.borderRadius = '14px';
         ribbon.style.zIndex = '10';
-        ribbon.style.boxShadow = '0 2px 4px rgba(0,0,0,0.15)';
+        ribbon.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
         ribbon.style.whiteSpace = 'nowrap';
+        ribbon.style.letterSpacing = '0.3px';
+        ribbon.style.textTransform = 'uppercase';
+        ribbon.style.lineHeight = '1.2';
         ribbon.textContent = offer.label || 'Most Popular';
+        // Left bottom fold
+        var leftFold = document.createElement('span');
+        leftFold.style.cssText = 'position:absolute;bottom:-4px;left:8px;width:0;height:0;border-left:5px solid ' + ribbonBg + ';border-bottom:4px solid transparent;';
+        ribbon.appendChild(leftFold);
+        // Right bottom fold
+        var rightFold = document.createElement('span');
+        rightFold.style.cssText = 'position:absolute;bottom:-4px;right:8px;width:0;height:0;border-right:5px solid ' + ribbonBg + ';border-bottom:4px solid transparent;';
+        ribbon.appendChild(rightFold);
         card.appendChild(ribbon);
       }
       
@@ -1305,7 +1322,7 @@
         
         
         input.style.width = '100%';
-        input.style.padding = field.type === 'textarea' ? '10px 12px 10px 40px' : '10px 12px 10px 40px';
+        input.style.padding = field.type === 'textarea' ? '14px 12px 14px 40px' : '14px 12px 14px 40px';
         input.style.border = borderWidth + 'px solid ' + borderColor;
         input.style.borderRadius = borderRadius + 'px';
         input.style.fontSize = Math.max(textSize, 16) + 'px'; // minimum 16px to prevent iOS auto-zoom
@@ -3111,7 +3128,7 @@
       return items;
   }
 
-  function buildUpsellModalHTML(campaign, offer, offerIndex) {
+  function buildUpsellModalHTML(campaign, offer, offerIndex, config) {
       var design = campaign.design || {};
       var timer = design.timer || {};
       var discountTag = design.discountTag || {};
@@ -3121,8 +3138,10 @@
       var hasDiscount = offer.discount_value > 0;
       var discountLabel = offer.discount_type === 'percentage' ? offer.discount_value + '%' : formatMoney(offer.discount_value);
 
-      var bgStyle = design.bgImage
-          ? 'background-image: url(' + design.bgImage + '); background-size: cover; background-position: center;'
+      var rawBgImage = design.bgImage || '';
+      var resolvedBgImage = rawBgImage && rawBgImage.startsWith('/') ? (config.appUrl || '') + rawBgImage : rawBgImage;
+      var bgStyle = resolvedBgImage
+          ? 'background-image: url(' + resolvedBgImage + '); background-size: cover; background-position: center;'
           : 'background: ' + (design.bgColor || '#fff') + ';';
       var html = '<div style="padding: 24px; text-align: center; ' + bgStyle + '">';
       html += '<h2 style="font-size: ' + (design.headerTextSize || 20) + 'px; color: ' + (design.headerTextColor || '#000') + '; font-weight: ' + (design.headerBold ? '700' : '400') + '; margin: 0 0 4px;">' + (design.headerText || "You've unlocked a special deal") + '</h2>';
@@ -3215,46 +3234,63 @@
       }
       var offer = offers[offerIndex];
 
-      var overlay = document.createElement('div');
-      overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100000; display: flex; align-items: center; justify-content: center; padding: 20px;';
-      var modal = document.createElement('div');
-      modal.style.cssText = 'background: #fff; border-radius: 12px; max-width: 420px; width: 100%; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.2);';
-      modal.innerHTML = buildUpsellModalHTML(campaign, offer, offerIndex);
-      overlay.appendChild(modal);
-      document.body.appendChild(overlay);
-      startUpsellTimer(overlay);
+      // Preload background image if any, then show popup
+      var rawBgImg = campaign.design ? (campaign.design.bgImage || '') : '';
+      var bgToPreload = rawBgImg && rawBgImg.startsWith('/') ? (config.appUrl || '') + rawBgImg : rawBgImg;
 
-      modal.querySelector('.cod-upsell-accept').addEventListener('click', function() {
-          if (overlay._timerInterval) clearInterval(overlay._timerInterval);
-          console.log('[COD Form] Upsell offer accepted:', offer.upsell_product_title);
-          acceptedItems.push({ product_id: offer.upsell_product_id, variant_id: offer.upsell_variant_id, title: offer.upsell_product_title, price: getOfferPrice(offer), quantity: 1, type: 'click_upsell' });
-          overlay.remove();
-          if (offerIndex + 1 < offers.length) {
-              showOfferSequence(form, config, productId, campaign, offers, offerIndex + 1, acceptedItems, onComplete);
-          } else {
-              onComplete(acceptedItems);
-          }
-      });
+      function showUpsellPopup() {
+          var overlay = document.createElement('div');
+          overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100000; display: flex; align-items: center; justify-content: center; padding: 20px;';
+          var modal = document.createElement('div');
+          modal.style.cssText = 'background: #fff; border-radius: 12px; max-width: 420px; width: 100%; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.2);';
+          modal.innerHTML = buildUpsellModalHTML(campaign, offer, offerIndex, config);
+          overlay.appendChild(modal);
+          document.body.appendChild(overlay);
+          startUpsellTimer(overlay);
 
-      modal.querySelector('.cod-upsell-decline').addEventListener('click', function() {
-          if (overlay._timerInterval) clearInterval(overlay._timerInterval);
-          overlay.remove();
-          if (offerIndex + 1 < offers.length) {
-              showOfferSequence(form, config, productId, campaign, offers, offerIndex + 1, acceptedItems, onComplete);
-          } else if (campaign.linked_downsell_id && config.upsellOffers.downsells) {
-              var ds = config.upsellOffers.downsells.find(function(d) { return d.id === campaign.linked_downsell_id; });
-              if (ds) {
-                  showDownsellModal(form, config, productId, ds, acceptedItems, onComplete);
+          modal.querySelector('.cod-upsell-accept').addEventListener('click', function() {
+              if (overlay._timerInterval) clearInterval(overlay._timerInterval);
+              console.log('[COD Form] Upsell offer accepted:', offer.upsell_product_title);
+              acceptedItems.push({ product_id: offer.upsell_product_id, variant_id: offer.upsell_variant_id, title: offer.upsell_product_title, price: getOfferPrice(offer), quantity: 1, type: 'click_upsell' });
+              overlay.remove();
+              if (offerIndex + 1 < offers.length) {
+                  showOfferSequence(form, config, productId, campaign, offers, offerIndex + 1, acceptedItems, onComplete);
               } else {
                   onComplete(acceptedItems);
               }
-          } else {
-              onComplete(acceptedItems);
-          }
-      });
+          });
+
+          modal.querySelector('.cod-upsell-decline').addEventListener('click', function() {
+              if (overlay._timerInterval) clearInterval(overlay._timerInterval);
+              overlay.remove();
+              if (offerIndex + 1 < offers.length) {
+                  showOfferSequence(form, config, productId, campaign, offers, offerIndex + 1, acceptedItems, onComplete);
+              } else if (campaign.linked_downsell_id && config.upsellOffers.downsells) {
+                  var ds = config.upsellOffers.downsells.find(function(d) { return d.id === campaign.linked_downsell_id; });
+                  if (ds) {
+                      showDownsellModal(form, config, productId, ds, acceptedItems, onComplete);
+                  } else {
+                      onComplete(acceptedItems);
+                  }
+              } else {
+                  onComplete(acceptedItems);
+              }
+          });
+      }
+
+      // Preload bg image then show
+      if (bgToPreload) {
+          var preImg = new Image();
+          var preloadDone = false;
+          preImg.onload = preImg.onerror = function() { if (!preloadDone) { preloadDone = true; showUpsellPopup(); } };
+          preImg.src = bgToPreload;
+          setTimeout(function() { if (!preloadDone) { preloadDone = true; showUpsellPopup(); } }, 2000);
+      } else {
+          showUpsellPopup();
+      }
   }
 
-  function buildDownsellModalHTML(dsCampaign, offer) {
+  function buildDownsellModalHTML(dsCampaign, offer, config) {
       var design = dsCampaign.design || {};
       var acceptBtn = design.acceptButton || {};
       var rejectBtn = design.rejectButton || {};
@@ -3285,8 +3321,10 @@
       html += '</style>';
 
       // Background: image takes priority, then gradient/color
-      var bgCss = design.bgImage
-          ? 'background-image: url(' + design.bgImage + '); background-size: cover; background-position: center;'
+      var rawBgImg = design.bgImage || '';
+      var resolvedBgImg = rawBgImg && rawBgImg.startsWith('/') ? (config.appUrl || '') + rawBgImg : rawBgImg;
+      var bgCss = resolvedBgImg
+          ? 'background-image: url(' + resolvedBgImg + '); background-size: cover; background-position: center;'
           : 'background: ' + (design.bgColor || '#fff') + ';';
 
       // Main container
@@ -3324,10 +3362,7 @@
           html += '<div style="font-size: ' + (design.contentTextSize || 16) + 'px; color: ' + (design.contentTextColor || '#000') + '; font-weight: ' + (design.contentBold ? '700' : '400') + '; font-style: ' + (design.contentItalic ? 'italic' : 'normal') + '; margin: 0 0 12px;">' + design.contentText + '</div>';
       }
 
-      // Product image
-      if (offer.upsell_product_image) {
-          html += '<div style="margin: 0 0 8px;"><img src="' + offer.upsell_product_image + '" style="max-width: 180px; max-height: 180px; object-fit: contain; border-radius: 10px;" /></div>';
-      }
+      // Product image removed — downsell shows no image by design
 
       // Product title
       if (offer.upsell_product_title) {
@@ -3360,32 +3395,50 @@
       if (offers.length === 0) { onComplete(acceptedItems); return; }
       var offer = offers[0];
 
-      var overlay = document.createElement('div');
-      overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100000; display: flex; align-items: center; justify-content: center; padding: 20px;';
-      var modal = document.createElement('div');
-      modal.style.cssText = 'background: #fff; border-radius: 12px; max-width: 420px; width: 100%; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.2);';
+      // Preload background image if any
+      var dsDesign = dsCampaign.design || {};
+      var rawDsBg = dsDesign.bgImage || '';
+      var dsBgToPreload = rawDsBg && rawDsBg.startsWith('/') ? (config.appUrl || '') + rawDsBg : rawDsBg;
 
-      // Use dedicated downsell builder if design has downsell-specific fields, else fallback to upsell builder
-      var hasDownsellDesign = dsCampaign.design && (dsCampaign.design.titleText || dsCampaign.design.subtitleText || dsCampaign.design.descriptionText);
-      modal.innerHTML = hasDownsellDesign ? buildDownsellModalHTML(dsCampaign, offer) : buildUpsellModalHTML(dsCampaign, offer, 0);
+      function showDownsellPopup() {
+          var overlay = document.createElement('div');
+          overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100000; display: flex; align-items: center; justify-content: center; padding: 20px;';
+          var modal = document.createElement('div');
+          modal.style.cssText = 'background: #fff; border-radius: 12px; max-width: 420px; width: 100%; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.2);';
 
-      overlay.appendChild(modal);
-      document.body.appendChild(overlay);
-      startUpsellTimer(overlay);
+          // Use dedicated downsell builder if design has downsell-specific fields, else fallback to upsell builder
+          var hasDownsellDesign = dsCampaign.design && (dsCampaign.design.titleText || dsCampaign.design.subtitleText || dsCampaign.design.descriptionText);
+          modal.innerHTML = hasDownsellDesign ? buildDownsellModalHTML(dsCampaign, offer, config) : buildUpsellModalHTML(dsCampaign, offer, 0, config);
 
-      modal.querySelector('.cod-upsell-accept').addEventListener('click', function() {
-          if (overlay._timerInterval) clearInterval(overlay._timerInterval);
-          console.log('[COD Form] Downsell accepted:', offer.upsell_product_title);
-          acceptedItems.push({ product_id: offer.upsell_product_id, variant_id: offer.upsell_variant_id, title: offer.upsell_product_title, image: offer.upsell_product_image || '', price: getOfferPrice(offer), quantity: 1, type: 'downsell' });
-          overlay.remove();
-          onComplete(acceptedItems);
-      });
+          overlay.appendChild(modal);
+          document.body.appendChild(overlay);
+          startUpsellTimer(overlay);
 
-      modal.querySelector('.cod-upsell-decline').addEventListener('click', function() {
-          if (overlay._timerInterval) clearInterval(overlay._timerInterval);
-          overlay.remove();
-          onComplete(acceptedItems);
-      });
+          modal.querySelector('.cod-upsell-accept').addEventListener('click', function() {
+              if (overlay._timerInterval) clearInterval(overlay._timerInterval);
+              console.log('[COD Form] Downsell accepted:', offer.upsell_product_title);
+              acceptedItems.push({ product_id: offer.upsell_product_id, variant_id: offer.upsell_variant_id, title: offer.upsell_product_title, image: offer.upsell_product_image || '', price: getOfferPrice(offer), quantity: 1, type: 'downsell' });
+              overlay.remove();
+              onComplete(acceptedItems);
+          });
+
+          modal.querySelector('.cod-upsell-decline').addEventListener('click', function() {
+              if (overlay._timerInterval) clearInterval(overlay._timerInterval);
+              overlay.remove();
+              onComplete(acceptedItems);
+          });
+      }
+
+      // Preload bg image then show
+      if (dsBgToPreload) {
+          var dsPreImg = new Image();
+          var dsPreloadDone = false;
+          dsPreImg.onload = dsPreImg.onerror = function() { if (!dsPreloadDone) { dsPreloadDone = true; showDownsellPopup(); } };
+          dsPreImg.src = dsBgToPreload;
+          setTimeout(function() { if (!dsPreloadDone) { dsPreloadDone = true; showDownsellPopup(); } }, 2000);
+      } else {
+          showDownsellPopup();
+      }
   }
 
   function submitUpsellItem(config, item, originalOrder) {
@@ -3406,7 +3459,7 @@
       overlay.style.cssText = 'position: fixed; inset: 0; z-index: 999999; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(0,0,0,0.45); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); animation: codFraudFadeIn 0.25s ease;';
 
       var popup = document.createElement('div');
-      popup.style.cssText = 'background: #fff; border-radius: 20px; max-width: 400px; width: 100%; padding: 36px 28px 28px; text-align: center; box-shadow: 0 25px 60px rgba(0,0,0,0.2), 0 0 0 1px rgba(0,0,0,0.05); animation: codFraudSlideUp 0.3s ease; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;';
+      popup.style.cssText = 'background: #fff; border-radius: 20px; max-width: 400px; width: 100%; padding: 36px 28px 28px; text-align: center; box-shadow: 0 25px 60px rgba(0,0,0,0.2), 0 0 0 1px rgba(0,0,0,0.05); animation: codFraudSlideUp 0.3s ease; font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;';
 
       // Shield icon
       var icon = document.createElement('div');
@@ -3810,7 +3863,7 @@
                     z-index: 2147483647;
                     opacity: 0;
                     animation: foxCodFadeIn 0.3s ease forwards;
-                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+                    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
                     padding: 20px;
                     box-sizing: border-box;
                   }

@@ -226,7 +226,7 @@ ${colorSelectorStyles}
 .pv-panel-header h3{margin:0;font-size:14px;font-weight:700;color:#111827;display:flex;align-items:center;gap:8px}
 .pv-panel-header .pv-badge{font-size:11px;color:#6b7280;background:#f3f4f6;padding:4px 10px;border-radius:6px;font-weight:500}
 .pv-phone{background:#1f2937;border-radius:32px;padding:6px;max-width:300px;margin:16px auto}
-.pv-phone-screen{background:#fff;border-radius:24px;overflow-y:auto;height:560px}
+.pv-phone-screen{background:#fff;border-radius:24px;overflow-y:auto;height:420px}
 /* Accept button animations */
 @keyframes up-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
 @keyframes up-bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
@@ -1097,32 +1097,36 @@ export default function UpsellDownsellPage() {
                                     <div className="sec">
                                         <h3>3- Customize the downsell</h3>
 
-                                        {/* Background color swatches */}
-                                        <div className="fg"><label>Background color</label></div>
+                                        {/* Background image presets */}
+                                        <div className="fg"><label>Background image</label></div>
                                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 16 }}>
-                                            {[
-                                                'linear-gradient(135deg, #ffd700, #ff8c00)',
-                                                'linear-gradient(135deg, #667eea, #764ba2)',
-                                                'linear-gradient(135deg, #43e97b, #38f9d7)',
-                                                'linear-gradient(135deg, #fa709a, #fee140)',
-                                                'linear-gradient(135deg, #d4fc79, #96e6a1)',
-                                                'linear-gradient(135deg, #a18cd1, #fbc2eb)',
-                                                'linear-gradient(135deg, #fccb90, #d57eeb)',
-                                                'linear-gradient(135deg, #e0c3fc, #8ec5fc)',
-                                                'linear-gradient(135deg, #f093fb, #f5576c)',
-                                                '#ffffff',
-                                            ].map((bg, i) => (
-                                                <div key={i} onClick={() => updDesign({ bgColor: bg })} style={{
-                                                    width: '100%', aspectRatio: '1', borderRadius: 12, background: bg, cursor: 'pointer',
-                                                    border: editing.design.bgColor === bg ? '3px solid #1f2937' : '2px solid #e5e7eb',
-                                                    display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
-                                                    boxShadow: editing.design.bgColor === bg ? '0 0 0 2px #fff, 0 0 0 4px #1f2937' : 'none',
-                                                }}>
-                                                    {editing.design.bgColor === bg && <span style={{ background: '#1f2937', color: '#fff', borderRadius: 4, width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>✓</span>}
-                                                </div>
-                                            ))}
+                                            {Array.from({ length: 9 }, (_, i) => i + 1).map((n) => {
+                                                const imgPath = `/bg-presets/${n}.svg`;
+                                                const isSelected = editing.design.bgImage === imgPath;
+                                                return (
+                                                    <div key={n} onClick={() => updDesign({ bgImage: imgPath, bgColor: '' })} style={{
+                                                        width: '100%', aspectRatio: '1', borderRadius: 12, cursor: 'pointer',
+                                                        border: isSelected ? '3px solid #1f2937' : '2px solid #e5e7eb',
+                                                        boxShadow: isSelected ? '0 0 0 2px #fff, 0 0 0 4px #1f2937' : 'none',
+                                                        overflow: 'hidden', position: 'relative' as const,
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    }}>
+                                                        <img src={imgPath} alt={`Preset ${n}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                        {isSelected && <span style={{ position: 'absolute' as const, background: '#1f2937', color: '#fff', borderRadius: 4, width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>✓</span>}
+                                                    </div>
+                                                );
+                                            })}
+                                            {/* White color swatch as 10th option */}
+                                            <div onClick={() => updDesign({ bgColor: '#ffffff', bgImage: '' })} style={{
+                                                width: '100%', aspectRatio: '1', borderRadius: 12, background: '#ffffff', cursor: 'pointer',
+                                                border: editing.design.bgColor === '#ffffff' && !editing.design.bgImage ? '3px solid #1f2937' : '2px solid #e5e7eb',
+                                                boxShadow: editing.design.bgColor === '#ffffff' && !editing.design.bgImage ? '0 0 0 2px #fff, 0 0 0 4px #1f2937' : 'none',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' as const,
+                                            }}>
+                                                {editing.design.bgColor === '#ffffff' && !editing.design.bgImage && <span style={{ background: '#1f2937', color: '#fff', borderRadius: 4, width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>✓</span>}
+                                            </div>
                                         </div>
-                                        <ColorSelector label="Custom background" value={editing.design.bgColor.startsWith('#') ? editing.design.bgColor : '#ffd700'} onChange={c => updDesign({ bgColor: c })} />
+                                        <ColorSelector label="Custom background" value={editing.design.bgColor.startsWith('#') ? editing.design.bgColor : '#ffd700'} onChange={c => updDesign({ bgColor: c, bgImage: '' })} />
                                         <div className="fg" style={{ marginTop: 8 }}>
                                             <label>Background image URL</label>
                                             <input value={editing.design.bgImage || ''} placeholder="https://example.com/image.jpg" onChange={e => updDesign({ bgImage: e.target.value })} />
@@ -1412,14 +1416,7 @@ export default function UpsellDownsellPage() {
                                                                     )
                                                                 }
 
-                                                                {/* Product image & price */}
-                                                                {
-                                                                    offer?.upsell_product_image && (
-                                                                        <div style={{ textAlign: 'center', padding: '0 20px 8px' }}>
-                                                                            <img src={offer.upsell_product_image} alt="" style={{ maxWidth: 160, maxHeight: 160, objectFit: 'contain', borderRadius: 10 }} />
-                                                                        </div>
-                                                                    )
-                                                                }
+                                                                {/* Product image removed — downsell shows no image by design */}
                                                                 {
                                                                     offer?.upsell_product_title && (
                                                                         <div style={{ textAlign: 'center', padding: '0 20px 4px', fontSize: 14, color: '#374151' }}>{offer.upsell_product_title}</div>
@@ -1563,32 +1560,36 @@ export default function UpsellDownsellPage() {
                                     {/* Background */}
                                     <div className="sec">
                                         <h3><span className="icon"></span> 3- Customize the background</h3>
-                                        {/* Background color swatches */}
-                                        <div className="fg"><label>Background color</label></div>
+                                        {/* Background image presets */}
+                                        <div className="fg"><label>Background image</label></div>
                                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 16 }}>
-                                            {[
-                                                'linear-gradient(135deg, #667eea, #764ba2)',
-                                                'linear-gradient(135deg, #ffd700, #ff8c00)',
-                                                'linear-gradient(135deg, #43e97b, #38f9d7)',
-                                                'linear-gradient(135deg, #fa709a, #fee140)',
-                                                'linear-gradient(135deg, #d4fc79, #96e6a1)',
-                                                'linear-gradient(135deg, #a18cd1, #fbc2eb)',
-                                                'linear-gradient(135deg, #fccb90, #d57eeb)',
-                                                'linear-gradient(135deg, #e0c3fc, #8ec5fc)',
-                                                'linear-gradient(135deg, #f093fb, #f5576c)',
-                                                '#ffffff',
-                                            ].map((bg, i) => (
-                                                <div key={i} onClick={() => updDesign({ bgColor: bg })} style={{
-                                                    width: '100%', aspectRatio: '1', borderRadius: 12, background: bg, cursor: 'pointer',
-                                                    border: editing.design.bgColor === bg ? '3px solid #1f2937' : '2px solid #e5e7eb',
-                                                    display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
-                                                    boxShadow: editing.design.bgColor === bg ? '0 0 0 2px #fff, 0 0 0 4px #1f2937' : 'none',
-                                                }}>
-                                                    {editing.design.bgColor === bg && <span style={{ background: '#1f2937', color: '#fff', borderRadius: 4, width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>✓</span>}
-                                                </div>
-                                            ))}
+                                            {Array.from({ length: 9 }, (_, i) => i + 1).map((n) => {
+                                                const imgPath = `/bg-presets/${n}.svg`;
+                                                const isSelected = editing.design.bgImage === imgPath;
+                                                return (
+                                                    <div key={n} onClick={() => updDesign({ bgImage: imgPath, bgColor: '' })} style={{
+                                                        width: '100%', aspectRatio: '1', borderRadius: 12, cursor: 'pointer',
+                                                        border: isSelected ? '3px solid #1f2937' : '2px solid #e5e7eb',
+                                                        boxShadow: isSelected ? '0 0 0 2px #fff, 0 0 0 4px #1f2937' : 'none',
+                                                        overflow: 'hidden', position: 'relative' as const,
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    }}>
+                                                        <img src={imgPath} alt={`Preset ${n}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                        {isSelected && <span style={{ position: 'absolute' as const, background: '#1f2937', color: '#fff', borderRadius: 4, width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>✓</span>}
+                                                    </div>
+                                                );
+                                            })}
+                                            {/* White color swatch as 10th option */}
+                                            <div onClick={() => updDesign({ bgColor: '#ffffff', bgImage: '' })} style={{
+                                                width: '100%', aspectRatio: '1', borderRadius: 12, background: '#ffffff', cursor: 'pointer',
+                                                border: editing.design.bgColor === '#ffffff' && !editing.design.bgImage ? '3px solid #1f2937' : '2px solid #e5e7eb',
+                                                boxShadow: editing.design.bgColor === '#ffffff' && !editing.design.bgImage ? '0 0 0 2px #fff, 0 0 0 4px #1f2937' : 'none',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' as const,
+                                            }}>
+                                                {editing.design.bgColor === '#ffffff' && !editing.design.bgImage && <span style={{ background: '#1f2937', color: '#fff', borderRadius: 4, width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>✓</span>}
+                                            </div>
                                         </div>
-                                        <ColorSelector label="Custom background" value={editing.design.bgColor.startsWith('#') ? editing.design.bgColor : '#ffffff'} onChange={c => updDesign({ bgColor: c })} />
+                                        <ColorSelector label="Custom background" value={editing.design.bgColor.startsWith('#') ? editing.design.bgColor : '#ffffff'} onChange={c => updDesign({ bgColor: c, bgImage: '' })} />
                                         <div className="fg" style={{ marginTop: 8 }}>
                                             <label>Background image URL</label>
                                             <input value={editing.design.bgImage || ''} placeholder="https://example.com/image.jpg" onChange={e => updDesign({ bgImage: e.target.value })} />
@@ -1801,7 +1802,7 @@ export default function UpsellDownsellPage() {
                                                 <span className="pv-badge">Offer #{(expandedOfferIdx >= 0 ? expandedOfferIdx : 0) + 1}</span>
                                             </div>
                                             <div className="pv-phone">
-                                                <div className="pv-phone-screen">
+                                                <div className="pv-phone-screen" style={{ height: '560px' }}>
                                                     <div className="pv-modal" style={editing.design.bgImage
                                                         ? { backgroundImage: `url(${editing.design.bgImage})`, backgroundSize: 'cover', backgroundPosition: 'center' }
                                                         : { background: editing.design.bgColor }
@@ -1848,7 +1849,7 @@ export default function UpsellDownsellPage() {
                         )}
                     </div>
                 )}
-            </div>
+            </div >
         </>
     );
 }

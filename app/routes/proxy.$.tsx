@@ -398,6 +398,7 @@ async function handleRegularOrder(request: Request, data: any) {
     let shopifyOrderName = result.shopify_order_name; // fallback: COD-XXX
     try {
         const shop = await getShop(data.shop);
+        console.log('[Proxy] Shop lookup result for', data.shop, ':', shop ? 'found (has token: ' + !!shop.access_token + ')' : 'NOT FOUND');
         const accessToken = shop?.access_token;
         if (accessToken) {
             const mainVariantGid = data.variantId.startsWith('gid://')
@@ -440,7 +441,7 @@ async function handleRegularOrder(request: Request, data: any) {
                 };
             }
 
-            console.log('[Proxy] Creating draft order with lineItems:', JSON.stringify(lineItems));
+            console.log('[Proxy] Creating draft order with input:', JSON.stringify(draftOrderInput).substring(0, 500));
 
             const shopifyRes = await fetch(`https://${data.shop}/admin/api/2024-01/graphql.json`, {
                 method: 'POST',
@@ -452,16 +453,19 @@ async function handleRegularOrder(request: Request, data: any) {
             });
 
             const shopifyData = await shopifyRes.json();
+            console.log('[Proxy] Full Shopify response:', JSON.stringify(shopifyData).substring(0, 800));
             if (shopifyData.data?.draftOrderCreate?.draftOrder) {
                 const draftOrder = shopifyData.data.draftOrderCreate.draftOrder;
-                console.log('[Proxy] Shopify draft order created:', draftOrder.name);
+                console.log('[Proxy] ✅ Shopify draft order created:', draftOrder.name);
                 shopifyOrderName = draftOrder.name; // Use real Shopify name (e.g. #D39)
                 // Update Supabase record
                 const { updateOrderStatus } = await import("../config/supabase.server");
                 await updateOrderStatus(result.id, draftOrder.id, draftOrder.name, 'pending');
             } else {
-                console.warn('[Proxy] Shopify draft order errors:', JSON.stringify(shopifyData.data?.draftOrderCreate?.userErrors || shopifyData.errors));
+                console.warn('[Proxy] ❌ Shopify draft order failed. Errors:', JSON.stringify(shopifyData.data?.draftOrderCreate?.userErrors || shopifyData.errors));
             }
+        } else {
+            console.warn('[Proxy] ⚠️ No access token found for shop:', data.shop, '— skipping Shopify draft order');
         }
     } catch (shopifyErr: any) {
         console.error('[Proxy] Shopify draft order error (non-fatal):', shopifyErr.message, shopifyErr.stack);
