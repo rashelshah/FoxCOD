@@ -11,6 +11,7 @@ import {
     TextField, Checkbox, Badge, Banner, Select, Divider, LegacyCard,
     Button, RadioButton, Tabs, Page,
 } from '@shopify/polaris';
+import { DeleteIcon } from '@shopify/polaris-icons';
 import { authenticate } from '../shopify.server';
 import { getPixelSettings, savePixelSettings, deletePixelSettings, syncPixelsToMetafield } from '../services/pixel-tracking.server';
 import type { PixelTrackingSettings, PixelProvider } from '../config/pixel-tracking.types';
@@ -78,8 +79,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
 // ── TABS ──
 const TABS = [
-    { id: 'pixels', content: '📊 Pixels' },
-    { id: 'fraud', content: '🛡️ Fraud Protection' },
+    { id: 'pixels', content: 'Pixels' },
+    { id: 'fraud', content: 'Fraud Protection' },
 ];
 
 type TabId = 'pixels' | 'fraud';
@@ -256,7 +257,7 @@ export default function AppSettingsPage() {
                                                             </InlineStack>
                                                             <InlineStack gap="200" blockAlign="center">
                                                                 <Badge tone={px.enabled ? 'success' : 'critical'}>{px.enabled ? 'Active' : 'Disabled'}</Badge>
-                                                                <button className="as-del" onClick={(e) => { e.stopPropagation(); removePixel(px.id!); }}>🗑</button>
+                                                                <div onClick={(e) => e.stopPropagation()}><Button icon={DeleteIcon} variant="plain" tone="critical" accessibilityLabel="Delete pixel" onClick={() => removePixel(px.id!)} /></div>
                                                             </InlineStack>
                                                         </div>
                                                         {isExpanded && (
@@ -325,7 +326,7 @@ export default function AppSettingsPage() {
                                     <BlockStack gap="500">
                                         {/* Order Limits */}
                                         <div className="as-card">
-                                            <div className="as-card-hdr"><div className="as-icon as-icon-orders">📊</div><div><Text variant="headingMd" as="h2">Order Limits</Text><Text variant="bodySm" tone="subdued" as="p">Limit orders per customer within a time window</Text></div></div>
+                                            <div className="as-card-hdr"><div className="as-icon as-icon-orders"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 17V5h2v12H3zm4 0V8h2v9H7zm4 0V3h2v14h-2zm4 0V10h2v7h-2z" fill="#7c3aed" /></svg></div><div><Text variant="headingMd" as="h2">Order Limits</Text><Text variant="bodySm" tone="subdued" as="p">Limit orders per customer within a time window</Text></div></div>
                                             <div className="as-card-inner">
                                                 <Checkbox label={<Text variant="bodyMd" fontWeight="semibold" as="span">Only allow X orders per IP address, phone or email within X hours</Text>} checked={fraud.limit_orders_enabled} onChange={(val) => updateFraud({ limit_orders_enabled: val })} />
                                                 {fraud.limit_orders_enabled && (
@@ -339,7 +340,7 @@ export default function AppSettingsPage() {
 
                                         {/* Quantity Limit */}
                                         <div className="as-card">
-                                            <div className="as-card-hdr"><div className="as-icon as-icon-qty">📦</div><div><Text variant="headingMd" as="h2">Quantity Limit</Text><Text variant="bodySm" tone="subdued" as="p">Prevent large quantity orders</Text></div></div>
+                                            <div className="as-card-hdr"><div className="as-icon as-icon-qty"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="3" y="5" width="14" height="12" rx="2" stroke="#d97706" strokeWidth="1.5" fill="none" /><path d="M3 9h14M8 5V3m4 2V3" stroke="#d97706" strokeWidth="1.5" strokeLinecap="round" /></svg></div><div><Text variant="headingMd" as="h2">Quantity Limit</Text><Text variant="bodySm" tone="subdued" as="p">Prevent large quantity orders</Text></div></div>
                                             <div className="as-card-inner">
                                                 <Checkbox label={<Text variant="bodyMd" fontWeight="semibold" as="span">Block orders if quantity is more than X</Text>} checked={fraud.limit_quantity_enabled} onChange={(val) => updateFraud({ limit_quantity_enabled: val })} />
                                                 {fraud.limit_quantity_enabled && (
@@ -350,7 +351,7 @@ export default function AppSettingsPage() {
 
                                         {/* Block Lists */}
                                         <div className="as-card">
-                                            <div className="as-card-hdr"><div className="as-icon as-icon-block">🚫</div><div><Text variant="headingMd" as="h2">Block Lists</Text><Text variant="bodySm" tone="subdued" as="p">Block specific phone numbers, emails or IPs</Text></div></div>
+                                            <div className="as-card-hdr"><div className="as-icon as-icon-block"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="#dc2626" strokeWidth="1.5" /><line x1="5.5" y1="5.5" x2="14.5" y2="14.5" stroke="#dc2626" strokeWidth="1.5" strokeLinecap="round" /></svg></div><div><Text variant="headingMd" as="h2">Block Lists</Text><Text variant="bodySm" tone="subdued" as="p">Block specific phone numbers, emails or IPs</Text></div></div>
                                             <div className="as-card-inner">
                                                 <Banner tone="info">Enter one item per line. Press Enter to add a new line.</Banner>
                                                 <div className="as-row">
@@ -366,7 +367,7 @@ export default function AppSettingsPage() {
 
                                         {/* Postal Code */}
                                         <div className="as-card">
-                                            <div className="as-card-hdr"><div className="as-icon as-icon-postal">📍</div><div><Text variant="headingMd" as="h2">Postal Code Restrictions</Text><Text variant="bodySm" tone="subdued" as="p">Restrict COD by postal/zip code</Text></div></div>
+                                            <div className="as-card-hdr"><div className="as-icon as-icon-postal"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 2C7.24 2 5 4.24 5 7c0 3.75 5 9 5 9s5-5.25 5-9c0-2.76-2.24-5-5-5z" stroke="#2563eb" strokeWidth="1.5" fill="none" /><circle cx="10" cy="7" r="2" stroke="#2563eb" strokeWidth="1.5" /></svg></div><div><Text variant="headingMd" as="h2">Postal Code Restrictions</Text><Text variant="bodySm" tone="subdued" as="p">Restrict COD by postal/zip code</Text></div></div>
                                             <div className="as-card-inner">
                                                 <Checkbox label={<Text variant="bodyMd" fontWeight="semibold" as="span">Limit COD availability by postal code</Text>} checked={fraud.postal_code_mode !== 'none'} onChange={(c) => updateFraud({ postal_code_mode: c ? 'block_only' : 'none' })} />
                                                 {fraud.postal_code_mode !== 'none' && (
@@ -383,7 +384,7 @@ export default function AppSettingsPage() {
 
                                         {/* Block Message */}
                                         <div className="as-card">
-                                            <div className="as-card-hdr"><div className="as-icon as-icon-msg">💬</div><div><Text variant="headingMd" as="h2">Block Message</Text><Text variant="bodySm" tone="subdued" as="p">Custom message for blocked customers</Text></div></div>
+                                            <div className="as-card-hdr"><div className="as-icon as-icon-msg"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 5a2 2 0 012-2h8a2 2 0 012 2v7a2 2 0 01-2 2H8l-4 3V5z" stroke="#059669" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg></div><div><Text variant="headingMd" as="h2">Block Message</Text><Text variant="bodySm" tone="subdued" as="p">Custom message for blocked customers</Text></div></div>
                                             <div className="as-card-inner">
                                                 <TextField label="Message to display" value={fraud.blocked_message} onChange={(val) => updateFraud({ blocked_message: val })} multiline={2} placeholder="Sorry, you are not allowed to place orders." autoComplete="off" />
                                             </div>

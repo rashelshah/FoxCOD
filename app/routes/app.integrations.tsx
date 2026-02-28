@@ -39,13 +39,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
     let message = null;
     if (successParam === 'google_sheets_connected') {
-        message = { type: 'success', text: '✅ Google Sheets connected successfully!' };
+        message = { type: 'success', text: 'Google Sheets connected successfully!' };
     } else if (errorParam === 'oauth_denied') {
-        message = { type: 'error', text: '❌ Google authorization was denied. Please try again.' };
+        message = { type: 'error', text: 'Google authorization was denied. Please try again.' };
     } else if (errorParam === 'connection_failed') {
-        message = { type: 'error', text: '❌ Failed to connect Google Sheets. Please try again.' };
+        message = { type: 'error', text: 'Failed to connect Google Sheets. Please try again.' };
     } else if (errorParam === 'not_configured') {
-        message = { type: 'error', text: '❌ Google Sheets integration is not configured. Please contact support.' };
+        message = { type: 'error', text: 'Google Sheets integration is not configured. Please contact support.' };
     }
 
     return {
@@ -142,6 +142,39 @@ export default function IntegrationsPage() {
             return { text: 'Manage', disabled: false, intent: 'manage' };
         }
         return { text: `Connect ${integration.name}`, disabled: false, intent: 'connect' };
+    };
+
+    // Map integration IDs to SVG icons
+    const integrationIcon = (id: string) => {
+        switch (id) {
+            case 'google_sheets':
+                return (
+                    <svg width="36" height="36" viewBox="0 0 48 48" fill="none">
+                        <rect x="4" y="4" width="40" height="40" rx="6" fill="#34A853" />
+                        <rect x="10" y="12" width="28" height="24" rx="2" fill="white" />
+                        <line x1="10" y1="20" x2="38" y2="20" stroke="#34A853" strokeWidth="2" />
+                        <line x1="10" y1="28" x2="38" y2="28" stroke="#34A853" strokeWidth="2" />
+                        <line x1="24" y1="12" x2="24" y2="36" stroke="#34A853" strokeWidth="2" />
+                    </svg>
+                );
+            case 'sms_whatsapp':
+                return (
+                    <svg width="36" height="36" viewBox="0 0 48 48" fill="none">
+                        <rect x="4" y="4" width="40" height="40" rx="6" fill="#25D366" />
+                        <path d="M24 12c-6.63 0-12 5.37-12 12 0 2.12.55 4.1 1.5 5.83L12 36l6.37-1.67A11.94 11.94 0 0024 36c6.63 0 12-5.37 12-12s-5.37-12-12-12z" fill="white" />
+                        <path d="M20.5 17.5c-.4-.9-.8-.9-1.2-.9s-.9 0-1.2.3c-.5.4-1.6 1.5-1.6 3.7s1.6 4.3 1.8 4.6c.2.3 3.2 4.8 7.7 6.7 3.8 1.6 4.5 1.3 5.3 1.2s2.7-1.1 3.1-2.1c.4-1.1.4-2 .3-2.1-.1-.2-.5-.3-1-.6s-2.7-1.3-3.1-1.5c-.4-.2-.8-.1-1.1.3s-1.3 1.5-1.6 1.8c-.3.3-.5.3-1 .1s-2.1-.8-4-2.4c-1.5-1.3-2.4-2.9-2.7-3.4-.3-.5 0-.7.2-1s.5-.6.8-.9c.2-.3.3-.5.5-.8.2-.3.1-.6 0-.9s-1.2-2.8-1.7-3.9z" fill="#25D366" />
+                    </svg>
+                );
+            case 'address_autocomplete':
+                return (
+                    <svg width="36" height="36" viewBox="0 0 48 48" fill="none">
+                        <rect x="4" y="4" width="40" height="40" rx="6" fill="#4285F4" />
+                        <path d="M24 14c-4.42 0-8 3.58-8 8 0 6 8 14 8 14s8-8 8-14c0-4.42-3.58-8-8-8zm0 11a3 3 0 110-6 3 3 0 010 6z" fill="white" />
+                    </svg>
+                );
+            default:
+                return <span>{id}</span>;
+        }
     };
 
     return (
@@ -486,7 +519,7 @@ export default function IntegrationsPage() {
                     <div className="page-header">
                         <Link to="/app" className="back-btn">←</Link>
                         <div className="page-title">
-                            <h1>🔌 Integrations</h1>
+                            <h1>Integrations</h1>
                             <p>Connect third-party services to enhance your COD workflow</p>
                         </div>
                     </div>
@@ -499,7 +532,7 @@ export default function IntegrationsPage() {
                     )}
 
                     <div className="info-banner">
-                        <span className="info-banner-icon">💡</span>
+                        <span className="info-banner-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="#2563eb" strokeWidth="1.5" fill="none" /><path d="M10 9v4M10 7h.01" stroke="#2563eb" strokeWidth="1.5" strokeLinecap="round" /></svg></span>
                         <p className="info-banner-text">
                             Integrations help you automate order management, send notifications, and improve delivery success.
                         </p>
@@ -527,7 +560,7 @@ export default function IntegrationsPage() {
                                                 )}
                                             </h3>
                                         </div>
-                                        <div className="card-icon">{integration.icon}</div>
+                                        <div className="card-icon">{integrationIcon(integration.id)}</div>
                                     </div>
 
                                     <p className="card-description">{integration.description}</p>
@@ -568,17 +601,17 @@ export default function IntegrationsPage() {
                                         <div className="connected-info">
                                             {settings?.connected_email && (
                                                 <div className="connected-detail">
-                                                    ✉️ Account: <strong>{settings.connected_email}</strong>
+                                                    Account: <strong>{settings.connected_email}</strong>
                                                 </div>
                                             )}
                                             {config?.spreadsheetUrl && (
                                                 <div className="connected-detail">
-                                                    📊 Sheet: <strong>{config.sheetName || 'Orders'}</strong>
+                                                    Sheet: <strong>{config.sheetName || 'Orders'}</strong>
                                                 </div>
                                             )}
                                             {settings?.last_synced_at && (
                                                 <div className="connected-detail">
-                                                    🕐 Last synced: <strong>{formatRelativeTime(settings.last_synced_at)}</strong>
+                                                    Last synced: <strong>{formatRelativeTime(settings.last_synced_at)}</strong>
                                                 </div>
                                             )}
 
@@ -590,21 +623,21 @@ export default function IntegrationsPage() {
                                                         rel="noopener noreferrer"
                                                         className="action-link action-link-open"
                                                     >
-                                                        📄 Open Sheet
+                                                        Open Sheet
                                                     </a>
                                                 )}
                                                 <Form method="post" style={{ display: 'inline' }}>
                                                     <input type="hidden" name="integrationId" value={integration.id} />
                                                     <input type="hidden" name="intent" value="connect" />
                                                     <button type="submit" className="action-link action-link-reconnect" disabled={isSubmitting}>
-                                                        🔄 Reconnect
+                                                        Reconnect
                                                     </button>
                                                 </Form>
                                                 <Form method="post" style={{ display: 'inline' }}>
                                                     <input type="hidden" name="integrationId" value={integration.id} />
                                                     <input type="hidden" name="intent" value="disconnect" />
                                                     <button type="submit" className="disconnect-btn" disabled={isSubmitting}>
-                                                        ❌ Disconnect
+                                                        Disconnect
                                                     </button>
                                                 </Form>
                                             </div>
@@ -615,7 +648,7 @@ export default function IntegrationsPage() {
                                     {status === 'connected' && integration.id !== 'google_sheets' && settings?.connected_email && (
                                         <div className="connected-info">
                                             <div className="connected-detail">
-                                                ✉️ Connected as: <strong>{settings.connected_email}</strong>
+                                                Connected as: <strong>{settings.connected_email}</strong>
                                             </div>
                                             <Form method="post">
                                                 <input type="hidden" name="integrationId" value={integration.id} />

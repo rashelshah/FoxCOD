@@ -14,6 +14,7 @@ import {
     TextField, Select, Checkbox, Badge, Banner, Divider, LegacyCard, EmptyState,
     RadioButton, ButtonGroup, RangeSlider, Modal,
 } from "@shopify/polaris";
+import { EditIcon, DeleteIcon } from "@shopify/polaris-icons";
 import { ColorSelector, colorSelectorStyles } from "./ColorSelector";
 import {
     DndContext,
@@ -366,7 +367,7 @@ function SortableOfferItem({
                         <Text variant="bodyMd" fontWeight="semibold" as="span">{offer.quantity} {offer.quantity === 1 ? 'Unit' : 'Units'}</Text>
                         <InlineStack gap="200">
                             <Button size="slim" onClick={() => onToggleEdit(offer.id)}>Edit</Button>
-                            <Button size="slim" tone="critical" variant="plain" onClick={() => onDelete(offer.id)}>🗑</Button>
+                            <Button size="slim" icon={DeleteIcon} variant="tertiary" tone="critical" accessibilityLabel="Delete offer" onClick={() => onDelete(offer.id)} />
                         </InlineStack>
                     </InlineStack>
                 ) : (
@@ -401,7 +402,7 @@ function SortableOfferItem({
                         <Checkbox label="Preselect this offer" checked={offer.preselect || false} onChange={(checked) => onUpdate(offer.id, { preselect: checked })} />
                         <InlineStack gap="200">
                             <Button variant="primary" onClick={() => onToggleEdit(offer.id)}>Done</Button>
-                            <Button tone="critical" variant="plain" onClick={() => onDelete(offer.id)}>🗑</Button>
+                            <Button icon={DeleteIcon} variant="tertiary" tone="critical" accessibilityLabel="Delete offer" onClick={() => onDelete(offer.id)} />
                         </InlineStack>
                     </BlockStack>
                 )}
@@ -842,7 +843,11 @@ export default function QuantityOffersPage() {
                                             <BlockStack gap="200">
                                                 {activeGroup.selectedProducts.map((p: any) => (
                                                     <div key={p.id} className="product-row">
-                                                        <div className="product-thumb">🎁</div>
+                                                        <div className="product-thumb" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f3f4f6', color: '#9ca3af', fontSize: '12px', overflow: 'hidden' }}>
+                                                            {(p.featuredImage?.url || p.images?.[0]?.originalSrc || p.images?.[0]?.url) ? (
+                                                                <img src={p.featuredImage?.url || p.images?.[0]?.originalSrc || p.images?.[0]?.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                            ) : 'No img'}
+                                                        </div>
                                                         <div className="product-info">
                                                             <span className="product-name">{p.title}</span>
                                                             <span className="product-id">{p.id.split('/').pop()}</span>
@@ -861,8 +866,8 @@ export default function QuantityOffersPage() {
                                 {/* Tabs */}
                                 <Tabs
                                     tabs={[
-                                        { id: 'offers', content: '◇ Offers', panelID: 'offers-panel' },
-                                        { id: 'design', content: '✧ Design', panelID: 'design-panel' },
+                                        { id: 'offers', content: 'Offers', panelID: 'offers-panel' },
+                                        { id: 'design', content: 'Design', panelID: 'design-panel' },
                                     ]}
                                     selected={activeTab === 'offers' ? 0 : 1}
                                     onSelect={(idx) => setActiveTab(idx === 0 ? 'offers' : 'design')}
@@ -887,7 +892,7 @@ export default function QuantityOffersPage() {
                                                         </div>
                                                     </SortableContext>
                                                 </DndContext>
-                                                <button className="btn-add-offer" onClick={addOffer}>+ Add offer</button>
+                                                <div style={{ marginTop: '12px' }}><Button fullWidth onClick={addOffer}>+ Add offer</Button></div>
                                             </LegacyCard>
                                         )}
 
@@ -1029,14 +1034,9 @@ export default function QuantityOffersPage() {
                                                         <span>{(g.offers || []).length} offers</span>
                                                     </div>
                                                 </div>
-                                                <div className="qo-group-row-actions">
-                                                    <button
-                                                        type="button"
-                                                        className="btn-delete-group"
-                                                        title="Delete offer"
-                                                        onClick={(e) => handleDeleteGroup(String(g.id), g.name || 'Untitled', e)}
-                                                    >🗑</button>
-                                                    <span className="qo-group-row-cta" onClick={() => handleSelectGroup(g)}>Edit →</span>
+                                                <div className="qo-group-row-actions" onClick={e => e.stopPropagation()}>
+                                                    <Button icon={DeleteIcon} variant="tertiary" tone="critical" accessibilityLabel="Delete offer" onClick={() => setGroupToDelete({ id: String(g.id), name: g.name || 'Untitled' })} />
+                                                    <Button icon={EditIcon} variant="tertiary" accessibilityLabel="Edit offer" onClick={() => handleSelectGroup(g)} />
                                                 </div>
                                             </div>
                                         ))}
@@ -1055,7 +1055,7 @@ export default function QuantityOffersPage() {
                     {/* Live Preview */}
                     <div className="qo-preview">
                         <div className="preview-label">
-                            <span>📱 Live Preview</span>
+                            <span>Live Preview</span>
                         </div>
                         <div className="preview-panel">
                             <div className="preview-header">
@@ -1124,7 +1124,7 @@ export default function QuantityOffersPage() {
                                                                         productImage ? (
                                                                             <img src={productImage} alt="Product" style={{ flexShrink: 0, width: isCards ? '60px' : (isVertical ? '50px' : '40px'), height: isCards ? '60px' : (isVertical ? '50px' : '40px'), objectFit: 'cover', borderRadius: '8px' }} />
                                                                         ) : (
-                                                                            <div className="offer-thumb" style={{ flexShrink: 0, width: isCards ? '60px' : (isVertical ? '50px' : '40px'), height: isCards ? '60px' : (isVertical ? '50px' : '40px'), background: '#fef3c7', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>🎁</div>
+                                                                            <div className="offer-thumb" style={{ flexShrink: 0, width: isCards ? '60px' : (isVertical ? '50px' : '40px'), height: isCards ? '60px' : (isVertical ? '50px' : '40px'), background: '#fef3c7', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', color: '#9ca3af' }}></div>
                                                                         )
                                                                     )}
                                                                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, alignItems: isVertical || isCards ? 'center' : 'flex-start', width: '100%' }}>
@@ -1166,7 +1166,7 @@ export default function QuantityOffersPage() {
                                                             boxShadow: btn.shadow ? '0 4px 6px rgba(0,0,0,0.1)' : 'none',
                                                             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
                                                         }}>
-                                                            🔒 {formSettings?.button_text || 'Order Now (COD)'}
+                                                            {formSettings?.button_text || 'Order Now (COD)'}
                                                         </button>
                                                     );
                                                 })()}
@@ -1278,7 +1278,7 @@ export default function QuantityOffersPage() {
                                                                                         style={{ flexShrink: 0, width: isCards ? '60px' : (isVertical ? '50px' : '40px'), height: isCards ? '60px' : (isVertical ? '50px' : '40px'), objectFit: 'cover', borderRadius: '8px' }}
                                                                                     />
                                                                                 ) : (
-                                                                                    <div className="offer-thumb" style={{ flexShrink: 0, width: isCards ? '60px' : (isVertical ? '50px' : '40px'), height: isCards ? '60px' : (isVertical ? '50px' : '40px'), background: '#fef3c7', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>🎁</div>
+                                                                                    <div className="offer-thumb" style={{ flexShrink: 0, width: isCards ? '60px' : (isVertical ? '50px' : '40px'), height: isCards ? '60px' : (isVertical ? '50px' : '40px'), background: '#fef3c7', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', color: '#9ca3af' }}></div>
                                                                                 )
                                                                             )}
                                                                             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, alignItems: isVertical || isCards ? 'center' : 'flex-start', width: '100%' }}>
@@ -1486,7 +1486,7 @@ export default function QuantityOffersPage() {
                                                                                         style={{ flexShrink: 0, width: isCards ? '60px' : (isVertical ? '50px' : '40px'), height: isCards ? '60px' : (isVertical ? '50px' : '40px'), objectFit: 'cover', borderRadius: '8px' }}
                                                                                     />
                                                                                 ) : (
-                                                                                    <div className="offer-thumb" style={{ flexShrink: 0, width: isCards ? '60px' : (isVertical ? '50px' : '40px'), height: isCards ? '60px' : (isVertical ? '50px' : '40px'), background: '#fef3c7', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>🎁</div>
+                                                                                    <div className="offer-thumb" style={{ flexShrink: 0, width: isCards ? '60px' : (isVertical ? '50px' : '40px'), height: isCards ? '60px' : (isVertical ? '50px' : '40px'), background: '#fef3c7', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', color: '#9ca3af' }}></div>
                                                                                 )
                                                                             )}
                                                                             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, alignItems: isVertical || isCards ? 'center' : 'flex-start', width: '100%' }}>
@@ -1531,7 +1531,7 @@ export default function QuantityOffersPage() {
                                                             border: '1px solid #e2e8f0',
                                                         }}>
                                                             <div style={{ fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                                🧾 Order Summary
+                                                                Order Summary
                                                             </div>
                                                             {(() => {
                                                                 // Get the selected offer (same logic as offer cards)
@@ -1593,7 +1593,7 @@ export default function QuantityOffersPage() {
                                                             border: '1px solid #e2e8f0',
                                                         }}>
                                                             <div style={{ fontSize: '11px', fontWeight: 600, color: '#374151', marginBottom: '8px' }}>
-                                                                🚚 Shipping
+                                                                Shipping
                                                             </div>
                                                             {formSettings?.shipping_options?.options?.slice(0, 2).map((opt: any) => (
                                                                 <div key={opt.id} style={{
