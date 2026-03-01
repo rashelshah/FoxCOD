@@ -276,7 +276,7 @@
   </div>
 
   {% comment %} COD Form - Dynamic Content Rendered by JS {% endcomment %}
-  <form id="cod-order-form-{{ product.id }}" class="cod-order-form">
+  <form id="cod-order-form-{{ product.id }}" class="cod-order-form" novalidate>
       <div class="cod-dynamic-fields-container">
           <!-- Fields will be injected here by cod-form.js -->
       </div>
@@ -369,7 +369,6 @@
     z-index: 9999;
     max-height: 90vh;
     overflow-y: auto;
-    overflow-x: hidden;
     touch-action: pan-y;
     overscroll-behavior-x: none;
     animation: slideUp 0.3s ease;
