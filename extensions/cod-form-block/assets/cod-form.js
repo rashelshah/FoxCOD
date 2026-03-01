@@ -779,10 +779,17 @@
     offersContainer.style.overflow = 'visible';
     if (template === 'cards') {
       offersContainer.style.flexDirection = 'row';
-      offersContainer.style.flexWrap = 'wrap';
+      offersContainer.style.flexWrap = 'nowrap';
+      offersContainer.style.overflowX = 'auto';
+      offersContainer.style.paddingTop = '8px';
+      offersContainer.style.paddingBottom = '8px';
+      // Ensure padding handles ribbon overflow on sides cleanly
+      offersContainer.style.paddingLeft = '4px';
+      offersContainer.style.paddingRight = '4px';
+      // Prevent scrollbar overlapping by adding a little extra offset
     } else if (template === 'vertical') {
-      offersContainer.style.flexDirection = 'row';
-      offersContainer.style.flexWrap = 'wrap';
+      offersContainer.style.flexDirection = 'column';
+      offersContainer.style.flexWrap = 'nowrap';
     } else {
       // Classic, Modern, Minimal - stack cards vertically
       offersContainer.style.flexDirection = 'column';
@@ -824,16 +831,15 @@
       
       // Cards template - flex layout
       if (isCards) {
-        card.style.flex = '1';
-        card.style.minWidth = '100px';
+        card.style.flex = '0 0 auto';
+        card.style.minWidth = '110px';
         card.style.flexDirection = 'column';
         card.style.alignItems = 'center';
         card.style.textAlign = 'center';
         card.style.boxShadow = '0 2px 8px rgba(0,0,0,0.05)';
       } else if (isVertical) {
-        // Vertical template - column layout, centered
-        card.style.flex = '1';
-        card.style.minWidth = '120px';
+        // Vertical template - column layout, centered, full width
+        card.style.width = '100%';
         card.style.flexDirection = 'column';
         card.style.alignItems = 'center';
         card.style.textAlign = 'center';
@@ -865,7 +871,8 @@
       
       // Most Popular Ribbon Badge — hanging tab with top fold-back corners
       if (isMostPopular) {
-        card.style.marginTop = '16px';
+        card.style.marginTop = isCards ? '0' : '16px';
+        if (isCards) card.style.paddingTop = '20px';
         var badgeBg = offer.tagBgColor || design.selectedTagBgColor || '#2ec4b6';
         var badgeColor = design.selectedTagTextColor || '#ffffff';
         // Darker shade for fold-back triangles
@@ -882,31 +889,43 @@
         if (existingRibbonCss) existingRibbonCss.remove();
         var ribbonStyle = document.createElement('style');
         ribbonStyle.id = 'cod-ribbon-css';
-        ribbonStyle.textContent = '.cod-ribbon-wrap{position:absolute!important;top:-8px!important;left:50%!important;transform:translateX(-50%)!important;z-index:10!important;pointer-events:none!important;overflow:visible!important}' +
-          '.cod-ribbon-badge{display:inline-block!important;position:relative!important;padding:5px 18px!important;font-size:11px!important;font-weight:700!important;text-align:center!important;text-transform:uppercase!important;letter-spacing:.5px!important;line-height:1.3!important;white-space:nowrap!important;border-radius:0 0 14px 14px!important;box-shadow:0 2px 4px rgba(0,0,0,.12)!important;overflow:visible!important}';
+        // Use smaller ribbon for cards template to fit within narrow card containers
+        if (isCards) {
+          ribbonStyle.textContent = '.cod-ribbon-wrap{position:absolute!important;top:-6px!important;left:50%!important;transform:translateX(-50%)!important;z-index:10!important;pointer-events:none!important;overflow:visible!important}' +
+            '.cod-ribbon-badge{display:inline-block!important;position:relative!important;padding:3px 10px!important;font-size:9px!important;font-weight:700!important;text-align:center!important;text-transform:uppercase!important;letter-spacing:.3px!important;line-height:1.3!important;white-space:nowrap!important;border-radius:0 0 10px 10px!important;box-shadow:0 2px 4px rgba(0,0,0,.12)!important;overflow:visible!important}';
+        } else {
+          ribbonStyle.textContent = '.cod-ribbon-wrap{position:absolute!important;top:-8px!important;left:50%!important;transform:translateX(-50%)!important;z-index:10!important;pointer-events:none!important;overflow:visible!important}' +
+            '.cod-ribbon-badge{display:inline-block!important;position:relative!important;padding:5px 18px!important;font-size:11px!important;font-weight:700!important;text-align:center!important;text-transform:uppercase!important;letter-spacing:.5px!important;line-height:1.3!important;white-space:nowrap!important;border-radius:0 0 14px 14px!important;box-shadow:0 2px 4px rgba(0,0,0,.12)!important;overflow:visible!important}';
+        }
         document.head.appendChild(ribbonStyle);
 
         // Ribbon wrapper — centered at top of card
         var ribbonWrap = document.createElement('div');
         ribbonWrap.className = 'cod-ribbon-wrap';
-        // Also set inline for guaranteed override
-        ribbonWrap.style.cssText = 'position:absolute!important;top:-8px!important;left:50%!important;transform:translateX(-50%)!important;z-index:10!important;pointer-events:none!important;overflow:visible!important';
+        // Also set inline for guaranteed override — smaller top offset for cards
+        var ribbonTop = isCards ? '-6px' : '-8px';
+        ribbonWrap.style.cssText = 'position:absolute!important;top:' + ribbonTop + '!important;left:50%!important;transform:translateX(-50%)!important;z-index:10!important;pointer-events:none!important;overflow:visible!important';
 
-        // Ribbon badge
+        // Ribbon badge — smaller for cards template
         var badge = document.createElement('span');
         badge.className = 'cod-ribbon-badge';
-        badge.style.cssText = 'display:inline-block;position:relative;padding:5px 18px;font-size:11px;font-weight:700;text-align:center;text-transform:uppercase;letter-spacing:.5px;line-height:1.3;white-space:nowrap;border-radius:0 0 14px 14px;box-shadow:0 2px 4px rgba(0,0,0,.12);overflow:visible;background:' + badgeBg + ';color:' + badgeColor + ';';
+        if (isCards) {
+          badge.style.cssText = 'display:inline-block;position:relative;padding:3px 10px;font-size:9px;font-weight:700;text-align:center;text-transform:uppercase;letter-spacing:.3px;line-height:1.3;white-space:nowrap;border-radius:0 0 10px 10px;box-shadow:0 2px 4px rgba(0,0,0,.12);overflow:visible;background:' + badgeBg + ';color:' + badgeColor + ';';
+        } else {
+          badge.style.cssText = 'display:inline-block;position:relative;padding:5px 18px;font-size:11px;font-weight:700;text-align:center;text-transform:uppercase;letter-spacing:.5px;line-height:1.3;white-space:nowrap;border-radius:0 0 14px 14px;box-shadow:0 2px 4px rgba(0,0,0,.12);overflow:visible;background:' + badgeBg + ';color:' + badgeColor + ';';
+        }
         badge.textContent = offer.label || 'Most Popular';
 
         // Fold-back triangles — 100% inline styles, no CSS class dependency
         // Left fold: triangle pointing up-right (border-bottom + transparent border-left)
+        var foldSize = isCards ? '4px' : '6px';
         var leftFold = document.createElement('span');
-        leftFold.style.cssText = 'position:absolute;top:0;left:-6px;width:0;height:0;display:block;line-height:0;font-size:0;border-bottom:6px solid ' + darkerBg + ';border-left:6px solid transparent;';
+        leftFold.style.cssText = 'position:absolute;top:0;left:-' + foldSize + ';width:0;height:0;display:block;line-height:0;font-size:0;border-bottom:' + foldSize + ' solid ' + darkerBg + ';border-left:' + foldSize + ' solid transparent;';
         badge.appendChild(leftFold);
 
         // Right fold: triangle pointing up-left (border-bottom + transparent border-right)
         var rightFold = document.createElement('span');
-        rightFold.style.cssText = 'position:absolute;top:0;right:-6px;width:0;height:0;display:block;line-height:0;font-size:0;border-bottom:6px solid ' + darkerBg + ';border-right:6px solid transparent;';
+        rightFold.style.cssText = 'position:absolute;top:0;right:-' + foldSize + ';width:0;height:0;display:block;line-height:0;font-size:0;border-bottom:' + foldSize + ' solid ' + darkerBg + ';border-right:' + foldSize + ' solid transparent;';
         badge.appendChild(rightFold);
 
         ribbonWrap.appendChild(badge);
@@ -995,6 +1014,7 @@
         priceWrapper.style.textAlign = 'center';
         priceWrapper.style.width = '100%';
         priceWrapper.style.alignItems = 'center';
+        priceWrapper.style.marginTop = 'auto';
       } else {
         // Classic, Modern, Minimal - price right-aligned
         priceWrapper.style.textAlign = 'right';
