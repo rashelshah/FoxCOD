@@ -1060,10 +1060,10 @@ export default function QuantityOffersPage() {
                         <div className="preview-panel">
                             <style dangerouslySetInnerHTML={{
                                 __html: `
-                                .cod-ribbon-wrap{position:absolute;top:-8px;left:50%;transform:translateX(-50%);z-index:10}
-                                .cod-ribbon-badge{display:inline-block;position:relative;padding:5px 18px;font-size:11px;font-weight:700;text-align:center;text-transform:uppercase;letter-spacing:.5px;line-height:1.3;white-space:nowrap;border-radius:0 0 14px 14px;box-shadow:0 2px 4px rgba(0,0,0,.12)}
-                                .cod-ribbon-badge::before{content:"";position:absolute;top:0;left:-6px;width:0;height:0;border-bottom:6px solid var(--ribbon-fold);border-left:6px solid transparent}
-                                .cod-ribbon-badge::after{content:"";position:absolute;top:0;right:-6px;width:0;height:0;border-bottom:6px solid var(--ribbon-fold);border-right:6px solid transparent}
+                                .cod-ribbon-wrap{position:absolute;top:-8px;left:50%;transform:translateX(-50%);z-index:10;overflow:visible}
+                                .cod-ribbon-badge{display:inline-block;position:relative;padding:5px 18px;font-size:11px;font-weight:700;text-align:center;text-transform:uppercase;letter-spacing:.5px;line-height:1.3;white-space:nowrap;border-radius:0 0 14px 14px;box-shadow:0 2px 4px rgba(0,0,0,.12);overflow:visible}
+                                .template-cards .cod-ribbon-wrap{top:-6px!important;overflow:visible!important}
+                                .template-cards .cod-ribbon-badge{padding:3px 10px!important;font-size:9px!important;letter-spacing:.3px!important;border-radius:0 0 10px 10px!important;overflow:visible!important}
                             ` }} />
                             <div className="preview-header">
                                 <h3>{activeGroup?.placement === 'in_product_page' ? 'Product Page Preview' : 'Bundle Offers Preview'}</h3>
@@ -1078,7 +1078,7 @@ export default function QuantityOffersPage() {
                                                     <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '8px' }}>Live preview:</div>
                                                 </div>
                                                 {/* Bundle Offers on product page */}
-                                                <div className={`preview-offers template-${activeGroup.design.template || 'classic'}`} style={{ marginBottom: '16px', display: 'flex', gap: '8px', width: '100%' }}>
+                                                <div className={`preview-offers template-${activeGroup.design.template || 'classic'}`} style={{ marginBottom: '16px', display: 'flex', gap: '8px', width: '100%', overflowX: activeGroup.design.template === 'cards' ? 'auto' : 'visible', flexDirection: activeGroup.design.template === 'vertical' ? 'column' : (activeGroup.design.template === 'cards' ? 'row' : 'column'), flexWrap: activeGroup.design.template === 'cards' ? 'nowrap' : (activeGroup.design.template === 'vertical' ? 'nowrap' : 'wrap'), paddingBottom: activeGroup.design.template === 'cards' ? '8px' : '0', paddingTop: activeGroup.design.template === 'cards' ? '8px' : '0', paddingLeft: activeGroup.design.template === 'cards' ? '4px' : '0', paddingRight: activeGroup.design.template === 'cards' ? '4px' : '0' }}>
                                                     {activeGroup.offers.map((offer, i) => {
                                                         const total = samplePrice * offer.quantity * (1 - (offer.discountPercent || 0) / 100);
                                                         const original = samplePrice * offer.quantity;
@@ -1115,21 +1115,27 @@ export default function QuantityOffersPage() {
                                                                     textAlign: isVertical || isCards ? 'center' : 'left',
                                                                     position: 'relative',
                                                                     overflow: 'visible',
-                                                                    marginTop: isMostPopular ? '16px' : '0',
+                                                                    marginTop: isMostPopular && !isCards ? '16px' : '0',
+                                                                    paddingTop: isMostPopular && isCards ? '20px' : (isCards ? '16px' : undefined),
                                                                     boxShadow: isCards ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+                                                                    flex: isCards ? '0 0 auto' : 'initial',
+                                                                    minWidth: isCards ? '110px' : 'auto',
                                                                 }}>
                                                                 {isMostPopular && (() => {
                                                                     const bg = offer.tagBgColor || activeGroup.design.selectedTagBgColor || '#2ec4b6';
                                                                     const hex = bg.replace('#', '');
                                                                     const darker = '#' + Math.max(0, parseInt(hex.substring(0, 2), 16) - 50).toString(16).padStart(2, '0') + Math.max(0, parseInt(hex.substring(2, 4), 16) - 50).toString(16).padStart(2, '0') + Math.max(0, parseInt(hex.substring(4, 6), 16) - 50).toString(16).padStart(2, '0');
+                                                                    const foldSize = isCards ? '4px' : '6px';
                                                                     return (
                                                                         <div className="cod-ribbon-wrap">
                                                                             <span className="cod-ribbon-badge" style={{
                                                                                 background: bg,
                                                                                 color: activeGroup.design.selectedTagTextColor || '#fff',
-                                                                                '--ribbon-fold': darker,
-                                                                            } as React.CSSProperties}>
+                                                                                overflow: 'visible',
+                                                                            }}>
                                                                                 {offer.label || 'Most Popular'}
+                                                                                <span style={{ position: 'absolute', top: 0, left: `-${foldSize}`, width: 0, height: 0, display: 'block', lineHeight: 0, fontSize: 0, borderBottom: `${foldSize} solid ${darker}`, borderLeft: `${foldSize} solid transparent` }} />
+                                                                                <span style={{ position: 'absolute', top: 0, right: `-${foldSize}`, width: 0, height: 0, display: 'block', lineHeight: 0, fontSize: 0, borderBottom: `${foldSize} solid ${darker}`, borderRight: `${foldSize} solid transparent` }} />
                                                                             </span>
                                                                         </div>
                                                                     );
@@ -1156,7 +1162,7 @@ export default function QuantityOffersPage() {
                                                                         )}
                                                                     </div>
                                                                 </div>
-                                                                <div style={{ textAlign: isVertical || isCards ? 'center' : 'right', display: 'flex', flexDirection: 'column', alignItems: isVertical || isCards ? 'center' : 'flex-end', gap: '2px', flexShrink: 0, width: isVertical || isCards ? '100%' : 'auto' }}>
+                                                                <div style={{ textAlign: isVertical || isCards ? 'center' : 'right', display: 'flex', flexDirection: 'column', alignItems: isVertical || isCards ? 'center' : 'flex-end', gap: '2px', flexShrink: 0, width: isVertical || isCards ? '100%' : 'auto', marginTop: isCards || isVertical ? 'auto' : '0' }}>
                                                                     {offer.discountPercent ? (
                                                                         <span style={{ fontSize: isCards ? '10px' : '11px', color: '#9ca3af', textDecoration: 'line-through' }}>{fmtCurrency(original)}</span>
                                                                     ) : null}
@@ -1225,7 +1231,7 @@ export default function QuantityOffersPage() {
 
                                                     {/* Bundle Offers - At Top placement (immediately after subtitle) */}
                                                     {activeGroup && activeGroup.placement === 'at_top' && (
-                                                        <div className={`preview-offers template-${activeGroup.design.template || 'classic'}`} style={{ marginBottom: '16px', display: 'flex', gap: '8px', width: '100%' }}>
+                                                        <div className={`preview-offers template-${activeGroup.design.template || 'classic'}`} style={{ marginBottom: '16px', display: 'flex', gap: '8px', width: '100%', overflowX: activeGroup.design.template === 'cards' ? 'auto' : 'visible', flexDirection: activeGroup.design.template === 'vertical' ? 'column' : (activeGroup.design.template === 'cards' ? 'row' : 'column'), flexWrap: activeGroup.design.template === 'cards' ? 'nowrap' : (activeGroup.design.template === 'vertical' ? 'nowrap' : 'wrap'), paddingBottom: activeGroup.design.template === 'cards' ? '8px' : '0', paddingTop: activeGroup.design.template === 'cards' ? '8px' : '0', paddingLeft: activeGroup.design.template === 'cards' ? '4px' : '0', paddingRight: activeGroup.design.template === 'cards' ? '4px' : '0' }}>
                                                             {activeGroup.offers.map((offer, i) => {
                                                                 const total = samplePrice * offer.quantity * (1 - (offer.discountPercent || 0) / 100);
                                                                 const original = samplePrice * offer.quantity;
@@ -1265,22 +1271,28 @@ export default function QuantityOffersPage() {
                                                                             textAlign: isVertical || isCards ? 'center' : 'left',
                                                                             position: 'relative',
                                                                             overflow: 'visible',
-                                                                            marginTop: isMostPopular ? '16px' : '0',
+                                                                            marginTop: isMostPopular && !isCards ? '16px' : '0',
+                                                                            paddingTop: isMostPopular && isCards ? '20px' : (isCards ? '16px' : undefined),
                                                                             boxShadow: isCards ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+                                                                            flex: isCards ? '0 0 auto' : 'initial',
+                                                                            minWidth: isCards ? '110px' : 'auto',
                                                                         }}>
                                                                         {/* Most Popular Ribbon Badge */}
                                                                         {isMostPopular && (() => {
                                                                             const bg = offer.tagBgColor || activeGroup.design.selectedTagBgColor || '#2ec4b6';
                                                                             const hex = bg.replace('#', '');
                                                                             const darker = '#' + Math.max(0, parseInt(hex.substring(0, 2), 16) - 50).toString(16).padStart(2, '0') + Math.max(0, parseInt(hex.substring(2, 4), 16) - 50).toString(16).padStart(2, '0') + Math.max(0, parseInt(hex.substring(4, 6), 16) - 50).toString(16).padStart(2, '0');
+                                                                            const foldSize = isCards ? '4px' : '6px';
                                                                             return (
                                                                                 <div className="cod-ribbon-wrap">
                                                                                     <span className="cod-ribbon-badge" style={{
                                                                                         background: bg,
                                                                                         color: activeGroup.design.selectedTagTextColor || '#fff',
-                                                                                        '--ribbon-fold': darker,
-                                                                                    } as React.CSSProperties}>
+                                                                                        overflow: 'visible',
+                                                                                    }}>
                                                                                         {offer.label || 'Most Popular'}
+                                                                                        <span style={{ position: 'absolute', top: 0, left: `-${foldSize}`, width: 0, height: 0, display: 'block', lineHeight: 0, fontSize: 0, borderBottom: `${foldSize} solid ${darker}`, borderLeft: `${foldSize} solid transparent` }} />
+                                                                                        <span style={{ position: 'absolute', top: 0, right: `-${foldSize}`, width: 0, height: 0, display: 'block', lineHeight: 0, fontSize: 0, borderBottom: `${foldSize} solid ${darker}`, borderRight: `${foldSize} solid transparent` }} />
                                                                                     </span>
                                                                                 </div>
                                                                             );
@@ -1316,7 +1328,7 @@ export default function QuantityOffersPage() {
                                                                                 )}
                                                                             </div>
                                                                         </div>
-                                                                        <div style={{ textAlign: isVertical || isCards ? 'center' : 'right', display: 'flex', flexDirection: 'column', alignItems: isVertical || isCards ? 'center' : 'flex-end', gap: '2px', flexShrink: 0, width: isVertical || isCards ? '100%' : 'auto' }}>
+                                                                        <div style={{ textAlign: isVertical || isCards ? 'center' : 'right', display: 'flex', flexDirection: 'column', alignItems: isVertical || isCards ? 'center' : 'flex-end', gap: '2px', flexShrink: 0, width: isVertical || isCards ? '100%' : 'auto', marginTop: isCards || isVertical ? 'auto' : '0' }}>
                                                                             {offer.discountPercent ? (
                                                                                 <span style={{ fontSize: isCards ? '10px' : '11px', color: '#9ca3af', textDecoration: 'line-through' }}>{fmtCurrency(original)}</span>
                                                                             ) : null}
@@ -1434,7 +1446,7 @@ export default function QuantityOffersPage() {
 
                                                     {/* Bundle Offers - Above Button placement (after order summary, before submit button) */}
                                                     {activeGroup && activeGroup.placement === 'above_button' && (
-                                                        <div className={`preview-offers template-${activeGroup.design.template || 'classic'}`} style={{ marginBottom: '16px', display: 'flex', gap: '8px', width: '100%' }}>
+                                                        <div className={`preview-offers template-${activeGroup.design.template || 'classic'}`} style={{ marginBottom: '16px', display: 'flex', gap: '8px', width: '100%', overflowX: activeGroup.design.template === 'cards' ? 'auto' : 'visible', flexDirection: activeGroup.design.template === 'vertical' ? 'column' : (activeGroup.design.template === 'cards' ? 'row' : 'column'), flexWrap: activeGroup.design.template === 'cards' ? 'nowrap' : (activeGroup.design.template === 'vertical' ? 'nowrap' : 'wrap'), paddingBottom: activeGroup.design.template === 'cards' ? '8px' : '0', paddingTop: activeGroup.design.template === 'cards' ? '8px' : '0', paddingLeft: activeGroup.design.template === 'cards' ? '4px' : '0', paddingRight: activeGroup.design.template === 'cards' ? '4px' : '0' }}>
                                                             {activeGroup.offers.map((offer, i) => {
                                                                 const total = samplePrice * offer.quantity * (1 - (offer.discountPercent || 0) / 100);
                                                                 const original = samplePrice * offer.quantity;
@@ -1474,22 +1486,28 @@ export default function QuantityOffersPage() {
                                                                             textAlign: isVertical || isCards ? 'center' : 'left',
                                                                             position: 'relative',
                                                                             overflow: 'visible',
-                                                                            marginTop: isMostPopular ? '16px' : '0',
+                                                                            marginTop: isMostPopular && !isCards ? '16px' : '0',
+                                                                            paddingTop: isMostPopular && isCards ? '20px' : (isCards ? '16px' : undefined),
                                                                             boxShadow: isCards ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+                                                                            flex: isCards ? '0 0 auto' : 'initial',
+                                                                            minWidth: isCards ? '110px' : 'auto',
                                                                         }}>
                                                                         {/* Most Popular Ribbon Badge */}
                                                                         {isMostPopular && (() => {
                                                                             const bg = offer.tagBgColor || activeGroup.design.selectedTagBgColor || '#2ec4b6';
                                                                             const hex = bg.replace('#', '');
                                                                             const darker = '#' + Math.max(0, parseInt(hex.substring(0, 2), 16) - 50).toString(16).padStart(2, '0') + Math.max(0, parseInt(hex.substring(2, 4), 16) - 50).toString(16).padStart(2, '0') + Math.max(0, parseInt(hex.substring(4, 6), 16) - 50).toString(16).padStart(2, '0');
+                                                                            const foldSize = isCards ? '4px' : '6px';
                                                                             return (
                                                                                 <div className="cod-ribbon-wrap">
                                                                                     <span className="cod-ribbon-badge" style={{
                                                                                         background: bg,
                                                                                         color: activeGroup.design.selectedTagTextColor || '#fff',
-                                                                                        '--ribbon-fold': darker,
-                                                                                    } as React.CSSProperties}>
+                                                                                        overflow: 'visible',
+                                                                                    }}>
                                                                                         {offer.label || 'Most Popular'}
+                                                                                        <span style={{ position: 'absolute', top: 0, left: `-${foldSize}`, width: 0, height: 0, display: 'block', lineHeight: 0, fontSize: 0, borderBottom: `${foldSize} solid ${darker}`, borderLeft: `${foldSize} solid transparent` }} />
+                                                                                        <span style={{ position: 'absolute', top: 0, right: `-${foldSize}`, width: 0, height: 0, display: 'block', lineHeight: 0, fontSize: 0, borderBottom: `${foldSize} solid ${darker}`, borderRight: `${foldSize} solid transparent` }} />
                                                                                     </span>
                                                                                 </div>
                                                                             );
@@ -1525,7 +1543,7 @@ export default function QuantityOffersPage() {
                                                                                 )}
                                                                             </div>
                                                                         </div>
-                                                                        <div style={{ textAlign: isVertical || isCards ? 'center' : 'right', display: 'flex', flexDirection: 'column', alignItems: isVertical || isCards ? 'center' : 'flex-end', gap: '2px', flexShrink: 0, width: isVertical || isCards ? '100%' : 'auto' }}>
+                                                                        <div style={{ textAlign: isVertical || isCards ? 'center' : 'right', display: 'flex', flexDirection: 'column', alignItems: isVertical || isCards ? 'center' : 'flex-end', gap: '2px', flexShrink: 0, width: isVertical || isCards ? '100%' : 'auto', marginTop: isCards || isVertical ? 'auto' : '0' }}>
                                                                             {offer.discountPercent ? (
                                                                                 <span style={{ fontSize: isCards ? '10px' : '11px', color: '#9ca3af', textDecoration: 'line-through' }}>{fmtCurrency(original)}</span>
                                                                             ) : null}
@@ -1880,15 +1898,15 @@ const styles = `
     .preview-header h3 { margin: 0; font-size: 14px; font-weight: 600; }
     .preview-content { padding: 24px; }
     .preview-phone { background: #1f2937; border-radius: 32px; padding: 6px; max-width: 380px; margin: 0 auto; }
-    .preview-phone-screen { background: white; border-radius: 24px; overflow-y: auto; max-height: 600px; padding: 16px; }
+    .preview-phone-screen { background: white; border-radius: 24px; overflow: hidden; max-height: 600px; padding: 16px; overflow-y: auto; }
     .preview-header-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f3f4f6; margin-bottom: 12px; }
     .preview-header-row span { font-size: 13px; font-weight: 500; }
     .preview-close { font-size: 18px; color: #9ca3af; cursor: pointer; }
     
     /* Preview Offers */
     .preview-offers { padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; width: 100%; box-sizing: border-box; }
-    .preview-offers.template-vertical { flex-direction: row; flex-wrap: wrap; }
-    .preview-offers.template-vertical .preview-offer { flex: 1; min-width: 120px; flex-direction: column; align-items: center; text-align: center; }
+    .preview-offers.template-vertical { flex-direction: column; flex-wrap: nowrap; }
+    .preview-offers.template-vertical .preview-offer { width: 100%; flex-direction: column; align-items: center; text-align: center; }
     
     /* Minimal Template */
     .preview-offers.template-minimal { gap: 6px; }
@@ -1904,6 +1922,9 @@ const styles = `
         gap: 8px !important;
         width: 100% !important;
         overflow-x: auto !important;
+        overflow-y: visible !important;
+        padding-top: 8px !important;
+        padding-bottom: 8px !important;
     }
     .preview-offers.template-cards .preview-offer { 
         display: flex !important;
@@ -1913,7 +1934,10 @@ const styles = `
         flex: 1 !important;
         min-width: 100px !important;
         max-width: 120px !important;
-        padding: 16px 12px !important;
+        padding-top: 16px;
+        padding-right: 12px !important;
+        padding-bottom: 16px !important;
+        padding-left: 12px !important;
         box-shadow: 0 2px 8px rgba(0,0,0,0.05) !important;
         border-radius: 10px !important;
         position: relative !important;
