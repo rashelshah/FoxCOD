@@ -1058,6 +1058,13 @@ export default function QuantityOffersPage() {
                             <span>Live Preview</span>
                         </div>
                         <div className="preview-panel">
+                            <style dangerouslySetInnerHTML={{
+                                __html: `
+                                .cod-ribbon-wrap{position:absolute;top:-8px;left:50%;transform:translateX(-50%);z-index:10}
+                                .cod-ribbon-badge{display:inline-block;position:relative;padding:5px 18px;font-size:11px;font-weight:700;text-align:center;text-transform:uppercase;letter-spacing:.5px;line-height:1.3;white-space:nowrap;border-radius:0 0 14px 14px;box-shadow:0 2px 4px rgba(0,0,0,.12)}
+                                .cod-ribbon-badge::before{content:"";position:absolute;top:0;left:-6px;width:0;height:0;border-bottom:6px solid var(--ribbon-fold);border-left:6px solid transparent}
+                                .cod-ribbon-badge::after{content:"";position:absolute;top:0;right:-6px;width:0;height:0;border-bottom:6px solid var(--ribbon-fold);border-right:6px solid transparent}
+                            ` }} />
                             <div className="preview-header">
                                 <h3>{activeGroup?.placement === 'in_product_page' ? 'Product Page Preview' : 'Bundle Offers Preview'}</h3>
                             </div>
@@ -1108,22 +1115,25 @@ export default function QuantityOffersPage() {
                                                                     textAlign: isVertical || isCards ? 'center' : 'left',
                                                                     position: 'relative',
                                                                     overflow: 'visible',
-                                                                    marginTop: isMostPopular ? '14px' : '0',
+                                                                    marginTop: isMostPopular ? '16px' : '0',
                                                                     boxShadow: isCards ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
                                                                 }}>
-                                                                {isMostPopular && (
-                                                                    <div style={{
-                                                                        position: 'absolute', top: '-14px', left: '50%', transform: 'translateX(-50%)',
-                                                                        background: offer.tagBgColor || activeGroup.design.selectedTagBgColor || '#2ec4b6',
-                                                                        color: activeGroup.design.selectedTagTextColor || '#ffffff',
-                                                                        fontSize: '11px', fontWeight: 700, padding: '5px 20px', borderRadius: '14px',
-                                                                        zIndex: 10, boxShadow: '0 2px 8px rgba(0,0,0,0.15)', whiteSpace: 'nowrap',
-                                                                        letterSpacing: '0.3px', textTransform: 'uppercase' as const, lineHeight: '1.2',
-                                                                    }}>
-
-                                                                        {offer.label || 'Most Popular'}
-                                                                    </div>
-                                                                )}
+                                                                {isMostPopular && (() => {
+                                                                    const bg = offer.tagBgColor || activeGroup.design.selectedTagBgColor || '#2ec4b6';
+                                                                    const hex = bg.replace('#', '');
+                                                                    const darker = '#' + Math.max(0, parseInt(hex.substring(0, 2), 16) - 50).toString(16).padStart(2, '0') + Math.max(0, parseInt(hex.substring(2, 4), 16) - 50).toString(16).padStart(2, '0') + Math.max(0, parseInt(hex.substring(4, 6), 16) - 50).toString(16).padStart(2, '0');
+                                                                    return (
+                                                                        <div className="cod-ribbon-wrap">
+                                                                            <span className="cod-ribbon-badge" style={{
+                                                                                background: bg,
+                                                                                color: activeGroup.design.selectedTagTextColor || '#fff',
+                                                                                '--ribbon-fold': darker,
+                                                                            } as React.CSSProperties}>
+                                                                                {offer.label || 'Most Popular'}
+                                                                            </span>
+                                                                        </div>
+                                                                    );
+                                                                })()}
                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: isVertical || isCards ? '8px' : (isMinimal ? '6px' : '10px'), flex: isVertical || isCards ? '0 0 auto' : 1, minWidth: 0, flexDirection: isVertical || isCards ? 'column' : 'row', width: '100%' }}>
                                                                     {showImage && (
                                                                         productImage ? (
@@ -1255,23 +1265,26 @@ export default function QuantityOffersPage() {
                                                                             textAlign: isVertical || isCards ? 'center' : 'left',
                                                                             position: 'relative',
                                                                             overflow: 'visible',
-                                                                            marginTop: isMostPopular ? '14px' : '0',
+                                                                            marginTop: isMostPopular ? '16px' : '0',
                                                                             boxShadow: isCards ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
                                                                         }}>
-                                                                        {/* Most Popular Ribbon Tag */}
-                                                                        {isMostPopular && (
-                                                                            <div style={{
-                                                                                position: 'absolute', top: '-14px', left: '50%', transform: 'translateX(-50%)',
-                                                                                background: offer.tagBgColor || activeGroup.design.selectedTagBgColor || '#2ec4b6',
-                                                                                color: activeGroup.design.selectedTagTextColor || '#ffffff',
-                                                                                fontSize: '11px', fontWeight: 700, padding: '5px 20px', borderRadius: '14px',
-                                                                                zIndex: 10, boxShadow: '0 2px 8px rgba(0,0,0,0.15)', whiteSpace: 'nowrap',
-                                                                                letterSpacing: '0.3px', textTransform: 'uppercase' as const, lineHeight: '1.2',
-                                                                            }}>
-
-                                                                                {offer.label || 'Most Popular'}
-                                                                            </div>
-                                                                        )}
+                                                                        {/* Most Popular Ribbon Badge */}
+                                                                        {isMostPopular && (() => {
+                                                                            const bg = offer.tagBgColor || activeGroup.design.selectedTagBgColor || '#2ec4b6';
+                                                                            const hex = bg.replace('#', '');
+                                                                            const darker = '#' + Math.max(0, parseInt(hex.substring(0, 2), 16) - 50).toString(16).padStart(2, '0') + Math.max(0, parseInt(hex.substring(2, 4), 16) - 50).toString(16).padStart(2, '0') + Math.max(0, parseInt(hex.substring(4, 6), 16) - 50).toString(16).padStart(2, '0');
+                                                                            return (
+                                                                                <div className="cod-ribbon-wrap">
+                                                                                    <span className="cod-ribbon-badge" style={{
+                                                                                        background: bg,
+                                                                                        color: activeGroup.design.selectedTagTextColor || '#fff',
+                                                                                        '--ribbon-fold': darker,
+                                                                                    } as React.CSSProperties}>
+                                                                                        {offer.label || 'Most Popular'}
+                                                                                    </span>
+                                                                                </div>
+                                                                            );
+                                                                        })()}
                                                                         <div style={{ display: 'flex', alignItems: 'center', gap: isVertical || isCards ? '8px' : (isMinimal ? '6px' : '10px'), flex: isVertical || isCards ? '0 0 auto' : 1, minWidth: 0, flexDirection: isVertical || isCards ? 'column' : 'row', width: '100%' }}>
                                                                             {showImage && (
                                                                                 productImage ? (
@@ -1461,23 +1474,26 @@ export default function QuantityOffersPage() {
                                                                             textAlign: isVertical || isCards ? 'center' : 'left',
                                                                             position: 'relative',
                                                                             overflow: 'visible',
-                                                                            marginTop: isMostPopular ? '14px' : '0',
+                                                                            marginTop: isMostPopular ? '16px' : '0',
                                                                             boxShadow: isCards ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
                                                                         }}>
-                                                                        {/* Most Popular Ribbon Tag */}
-                                                                        {isMostPopular && (
-                                                                            <div style={{
-                                                                                position: 'absolute', top: '-14px', left: '50%', transform: 'translateX(-50%)',
-                                                                                background: offer.tagBgColor || activeGroup.design.selectedTagBgColor || '#2ec4b6',
-                                                                                color: activeGroup.design.selectedTagTextColor || '#ffffff',
-                                                                                fontSize: '11px', fontWeight: 700, padding: '5px 20px', borderRadius: '14px',
-                                                                                zIndex: 10, boxShadow: '0 2px 8px rgba(0,0,0,0.15)', whiteSpace: 'nowrap',
-                                                                                letterSpacing: '0.3px', textTransform: 'uppercase' as const, lineHeight: '1.2',
-                                                                            }}>
-
-                                                                                {offer.label || 'Most Popular'}
-                                                                            </div>
-                                                                        )}
+                                                                        {/* Most Popular Ribbon Badge */}
+                                                                        {isMostPopular && (() => {
+                                                                            const bg = offer.tagBgColor || activeGroup.design.selectedTagBgColor || '#2ec4b6';
+                                                                            const hex = bg.replace('#', '');
+                                                                            const darker = '#' + Math.max(0, parseInt(hex.substring(0, 2), 16) - 50).toString(16).padStart(2, '0') + Math.max(0, parseInt(hex.substring(2, 4), 16) - 50).toString(16).padStart(2, '0') + Math.max(0, parseInt(hex.substring(4, 6), 16) - 50).toString(16).padStart(2, '0');
+                                                                            return (
+                                                                                <div className="cod-ribbon-wrap">
+                                                                                    <span className="cod-ribbon-badge" style={{
+                                                                                        background: bg,
+                                                                                        color: activeGroup.design.selectedTagTextColor || '#fff',
+                                                                                        '--ribbon-fold': darker,
+                                                                                    } as React.CSSProperties}>
+                                                                                        {offer.label || 'Most Popular'}
+                                                                                    </span>
+                                                                                </div>
+                                                                            );
+                                                                        })()}
                                                                         <div style={{ display: 'flex', alignItems: 'center', gap: isVertical || isCards ? '8px' : (isMinimal ? '6px' : '10px'), flex: isVertical || isCards ? '0 0 auto' : 1, minWidth: 0, flexDirection: isVertical || isCards ? 'column' : 'row', width: '100%' }}>
                                                                             {showImage && (
                                                                                 productImage ? (

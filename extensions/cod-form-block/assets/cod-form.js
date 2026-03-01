@@ -265,6 +265,19 @@
    * Initialize all COD forms on the page
    */
   function initCODForms() {
+    // Inject form validation CSS once
+    if (!document.getElementById('foxcod-validation-css')) {
+      var valStyle = document.createElement('style');
+      valStyle.id = 'foxcod-validation-css';
+      valStyle.textContent = [
+        '.foxcod-error{border:2px solid #d82c0d!important;background-color:#fff5f5!important;transition:border 0.2s ease,background-color 0.2s ease}',
+        '@keyframes foxcodShake{0%{transform:translateX(0)}15%{transform:translateX(-6px)}30%{transform:translateX(6px)}45%{transform:translateX(-5px)}60%{transform:translateX(5px)}75%{transform:translateX(-3px)}90%{transform:translateX(3px)}100%{transform:translateX(0)}}',
+        '.foxcod-shake{animation:foxcodShake 0.4s ease!important}',
+        '.foxcod-error-text{color:#d82c0d;font-size:13px;margin-top:4px;font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}'
+      ].join('');
+      document.head.appendChild(valStyle);
+    }
+
     // Find all COD form data containers
     var dataContainers = document.querySelectorAll('.cod-form-data');
     
@@ -764,7 +777,6 @@
     offersContainer.style.boxSizing = 'border-box';
     offersContainer.style.gap = '8px';
     offersContainer.style.overflow = 'visible';
-    offersContainer.style.paddingTop = '10px';
     if (template === 'cards') {
       offersContainer.style.flexDirection = 'row';
       offersContainer.style.flexWrap = 'wrap';
@@ -851,29 +863,56 @@
       }
       card.style.borderRadius = (design.selectedBorderRadius || 10) + 'px';
       
-      // Most Popular Ribbon Tag - clean pill-shaped badge
+      // Most Popular Ribbon Badge — hanging tab with top fold-back corners
       if (isMostPopular) {
-        card.style.marginTop = '14px';
-        var ribbon = document.createElement('div');
-        ribbon.className = 'cod-offer-ribbon';
-        ribbon.style.position = 'absolute';
-        ribbon.style.top = '-14px';
-        ribbon.style.left = '50%';
-        ribbon.style.transform = 'translateX(-50%)';
-        ribbon.style.background = offer.tagBgColor || design.selectedTagBgColor || '#2ec4b6';
-        ribbon.style.color = design.selectedTagTextColor || '#ffffff';
-        ribbon.style.fontSize = '11px';
-        ribbon.style.fontWeight = '700';
-        ribbon.style.padding = '5px 20px';
-        ribbon.style.borderRadius = '14px';
-        ribbon.style.zIndex = '10';
-        ribbon.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
-        ribbon.style.whiteSpace = 'nowrap';
-        ribbon.style.letterSpacing = '0.3px';
-        ribbon.style.textTransform = 'uppercase';
-        ribbon.style.lineHeight = '1.2';
-        ribbon.textContent = offer.label || 'Most Popular';
-        card.appendChild(ribbon);
+        card.style.marginTop = '16px';
+        var badgeBg = offer.tagBgColor || design.selectedTagBgColor || '#2ec4b6';
+        var badgeColor = design.selectedTagTextColor || '#ffffff';
+        // Darker shade for fold-back triangles
+        var darkerBg = (function(hex) {
+          hex = hex.replace('#', '');
+          var r = Math.max(0, parseInt(hex.substring(0,2), 16) - 50);
+          var g = Math.max(0, parseInt(hex.substring(2,4), 16) - 50);
+          var b = Math.max(0, parseInt(hex.substring(4,6), 16) - 50);
+          return '#' + r.toString(16).padStart(2,'0') + g.toString(16).padStart(2,'0') + b.toString(16).padStart(2,'0');
+        })(badgeBg);
+
+        // Inject ribbon CSS — only the badge shape, no fold pseudo-elements needed
+        var existingRibbonCss = document.getElementById('cod-ribbon-css');
+        if (existingRibbonCss) existingRibbonCss.remove();
+        var ribbonStyle = document.createElement('style');
+        ribbonStyle.id = 'cod-ribbon-css';
+        ribbonStyle.textContent = '.cod-ribbon-wrap{position:absolute!important;top:-8px!important;left:50%!important;transform:translateX(-50%)!important;z-index:10!important;pointer-events:none!important;overflow:visible!important}' +
+          '.cod-ribbon-badge{display:inline-block!important;position:relative!important;padding:5px 18px!important;font-size:11px!important;font-weight:700!important;text-align:center!important;text-transform:uppercase!important;letter-spacing:.5px!important;line-height:1.3!important;white-space:nowrap!important;border-radius:0 0 14px 14px!important;box-shadow:0 2px 4px rgba(0,0,0,.12)!important;overflow:visible!important}';
+        document.head.appendChild(ribbonStyle);
+
+        // Ribbon wrapper — centered at top of card
+        var ribbonWrap = document.createElement('div');
+        ribbonWrap.className = 'cod-ribbon-wrap';
+        // Also set inline for guaranteed override
+        ribbonWrap.style.cssText = 'position:absolute!important;top:-8px!important;left:50%!important;transform:translateX(-50%)!important;z-index:10!important;pointer-events:none!important;overflow:visible!important';
+
+        // Ribbon badge
+        var badge = document.createElement('span');
+        badge.className = 'cod-ribbon-badge';
+        badge.style.cssText = 'display:inline-block;position:relative;padding:5px 18px;font-size:11px;font-weight:700;text-align:center;text-transform:uppercase;letter-spacing:.5px;line-height:1.3;white-space:nowrap;border-radius:0 0 14px 14px;box-shadow:0 2px 4px rgba(0,0,0,.12);overflow:visible;background:' + badgeBg + ';color:' + badgeColor + ';';
+        badge.textContent = offer.label || 'Most Popular';
+
+        // Fold-back triangles — 100% inline styles, no CSS class dependency
+        // Left fold: triangle pointing up-right (border-bottom + transparent border-left)
+        var leftFold = document.createElement('span');
+        leftFold.style.cssText = 'position:absolute;top:0;left:-6px;width:0;height:0;display:block;line-height:0;font-size:0;border-bottom:6px solid ' + darkerBg + ';border-left:6px solid transparent;';
+        badge.appendChild(leftFold);
+
+        // Right fold: triangle pointing up-left (border-bottom + transparent border-right)
+        var rightFold = document.createElement('span');
+        rightFold.style.cssText = 'position:absolute;top:0;right:-6px;width:0;height:0;display:block;line-height:0;font-size:0;border-bottom:6px solid ' + darkerBg + ';border-right:6px solid transparent;';
+        badge.appendChild(rightFold);
+
+        ribbonWrap.appendChild(badge);
+        card.appendChild(ribbonWrap);
+        // Ensure the card itself also has overflow:visible so triangles aren't clipped
+        card.style.overflow = 'visible';
       }
       
       // For classic, vertical, and cards templates, display product image (not modern or minimal)
@@ -1114,14 +1153,28 @@
         // Check for bundle offers in the modal OR on the product page
         var hasProductPageOffers = document.querySelector('.cod-product-page-offers[data-product-id="' + config.productId + '"]');
         if (quantityOffersEl || hasProductPageOffers) {
-            qtySelector.style.display = 'none';
+            // Use setProperty with 'important' to override the CSS `display: flex !important` rule
+            qtySelector.style.setProperty('display', 'none', 'important');
             console.log('[COD Form] Hiding quantity selector — bundle offers active');
         } else {
-            qtySelector.style.display = 'flex';
+            qtySelector.style.setProperty('display', 'flex', 'important');
         }
     }
 
-    // 2. Render Rate Card (Order Summary) if enabled
+    // 2. Render Shipping Options if enabled (new rates system OR old options system)
+    var hasNewShippingRates = config.shippingRatesEnabled && config.shippingRates && config.shippingRates.length > 0;
+    var hasOldShippingOptions = config.shippingOptions && config.shippingOptions.enabled;
+    if (config.blocks && config.blocks.shipping_options && (hasNewShippingRates || hasOldShippingOptions)) {
+        renderShippingOptions(form, config);
+    }
+
+    // 2.5 Render Payment Method Options if Partial COD is enabled
+    if (config.partialCodEnabled) {
+        renderPaymentMethodOptions(form, config);
+    }
+
+    // 3. Render Rate Card (Order Summary) if enabled — AFTER shipping and payment
+    //    so DOM order is: Shipping → Payment → Order Summary → Submit
     console.log('[COD Form] Checking order summary - blocks:', config.blocks, 'order_summary:', config.blocks?.order_summary);
     if (config.blocks && config.blocks.order_summary) {
         console.log('[COD Form] Rendering order summary');
@@ -1130,25 +1183,14 @@
         console.log('[COD Form] Order summary not rendered - blocks config:', config.blocks);
     }
 
-    // 3. Render Shipping Options if enabled (new rates system OR old options system)
-    var hasNewShippingRates = config.shippingRatesEnabled && config.shippingRates && config.shippingRates.length > 0;
-    var hasOldShippingOptions = config.shippingOptions && config.shippingOptions.enabled;
-    if (config.blocks && config.blocks.shipping_options && (hasNewShippingRates || hasOldShippingOptions)) {
-        renderShippingOptions(form, config);
-    }
-
-    // 3.5 Render Payment Method Options if Partial COD is enabled
-    if (config.partialCodEnabled) {
-        renderPaymentMethodOptions(form, config);
-    }
-
     // 4. Render Marketing Consent if enabled
     if (config.blocks && config.blocks.buyer_marketing) {
         renderMarketingCheckbox(form, config);
     }
-    
+
     // 4.5 Render Tick Upsells if available
     renderTickUpsells(form, config);
+
     
     // 5. Apply Modal Styles
     applyModalStyles(container, config);
@@ -1310,7 +1352,10 @@
         input.name = field.id; // e.g. 'name', 'phone', 'address'
         input.id = 'cod-' + field.id;
         input.placeholder = field.placeholder || 'Enter ' + field.label.toLowerCase();
-        if (field.required) input.required = true;
+        if (field.required) {
+          input.required = true;
+          input.setAttribute('data-required', 'true');
+        }
         
         // Add browser autocomplete attributes for native autofill
         var autocompleteMap = {
@@ -1351,11 +1396,32 @@
         }
         input.style.boxShadow = hasShadow ? '0 1px 2px rgba(0,0,0,0.05)' : 'none';
         input.style.boxSizing = 'border-box';
-        input.style.marginBottom = '4px';
+        input.style.marginBottom = '0';
+
+        // Store reference to wrapper (outer div) on the input for validation error placement
+        input._foxcodWrapper = wrapper;
 
         inputContainer.appendChild(input);
         wrapper.appendChild(inputContainer);
         container.appendChild(wrapper);
+
+        // Clear validation error on input
+        input.addEventListener('input', function() {
+          // Remove error styles from input
+          this.style.removeProperty('border');
+          this.style.removeProperty('background-color');
+          // Remove shake class from inputContainer (the positioned parent)
+          var inputCont = this.parentNode;
+          if (inputCont) {
+            inputCont.classList.remove('foxcod-shake');
+          }
+          // Remove error text from wrapper (outer div, sibling of inputContainer)
+          var outerWrapper = inputCont && inputCont.parentNode;
+          if (outerWrapper) {
+            var errText = outerWrapper.querySelector('.foxcod-error-text');
+            if (errText) errText.remove();
+          }
+        });
         
         console.log('[COD Form] Added field to container:', field.id);
     });
@@ -1684,12 +1750,16 @@
           row.onclick = function() { radio.checked = true; radio.dispatchEvent(new Event('change')); };
       });
 
-      // Insert before submit button (or Order Summary if present)
+      // Insert before payment section (so shipping sits above payment),
+      // then fall back to before order summary, then before submit button.
+      var paymentSection = form.querySelector('.cod-payment-method-options');
       var summary = form.querySelector('.cod-order-summary');
-      if (summary) {
-          form.insertBefore(container, summary);
+      var submitBtn = form.querySelector('button[type="submit"]');
+      var insertTarget = paymentSection || summary || submitBtn;
+      if (insertTarget) {
+          form.insertBefore(container, insertTarget);
       } else {
-         form.insertBefore(container, form.querySelector('button[type="submit"]'));
+          form.appendChild(container);
       }
   }
 
@@ -1930,12 +2000,16 @@
           });
       });
 
-      // Insert before submit button (or Order Summary if present)
+      // Insert before payment section (so shipping sits above payment),
+      // then fall back to before order summary, then before submit button.
+      var paymentSection = form.querySelector('.cod-payment-method-options');
       var summary = form.querySelector('.cod-order-summary');
-      if (summary) {
-          form.insertBefore(container, summary);
+      var submitBtn = form.querySelector('button[type="submit"]');
+      var insertTarget = paymentSection || summary || submitBtn;
+      if (insertTarget) {
+          form.insertBefore(container, insertTarget);
       } else {
-         form.insertBefore(container, form.querySelector('button[type="submit"]'));
+          form.appendChild(container);
       }
       
       // Update total with first rate's price
@@ -2108,12 +2182,14 @@
 
       container.appendChild(optionsWrapper);
 
-      // Insert before order summary or submit button
-      var summary = form.querySelector('.cod-order-summary');
-      if (summary) {
-          form.insertBefore(container, summary);
+      // Always insert directly before the submit button.
+      // Shipping insertion logic already accounts for this div (inserts before it),
+      // so the order will always be: shipping → payment → submit.
+      var submitBtn = form.querySelector('button[type="submit"]');
+      if (submitBtn) {
+          form.insertBefore(container, submitBtn);
       } else {
-          form.insertBefore(container, form.querySelector('button[type="submit"]'));
+          form.appendChild(container);
       }
   }
 
@@ -3555,6 +3631,60 @@
   function handleFormSubmit(e, productId, config) {
       e.preventDefault();
       var form = e.target;
+
+      // ── Field Validation ──
+      var requiredFields = form.querySelectorAll('[data-required="true"]');
+      var firstInvalid = null;
+
+      console.log('[COD Form] Validation: found', requiredFields.length, 'required fields');
+
+      requiredFields.forEach(function(field) {
+        // Skip hidden/invisible fields
+        if (field.offsetParent === null) {
+          console.log('[COD Form] Skipping hidden field:', field.name);
+          return;
+        }
+
+        var value = (field.value || '').trim();
+        console.log('[COD Form] Validating field:', field.name, 'value:', JSON.stringify(value), 'empty:', !value);
+        if (!value) {
+          if (!firstInvalid) firstInvalid = field;
+
+          // Apply error border directly on input via inline style (bypasses any class specificity issues)
+          field.style.setProperty('border', '2px solid #d82c0d', 'important');
+          field.style.setProperty('background-color', '#fff5f5', 'important');
+
+          // Apply shake to inputContainer (parent) so icon stays in place during shake
+          // Force re-trigger the animation by removing class, forcing reflow, then re-adding
+          var inputCont = field.parentNode;
+          if (inputCont) {
+            inputCont.classList.remove('foxcod-shake');
+            void inputCont.offsetWidth; // Force reflow to restart animation
+            inputCont.classList.add('foxcod-shake');
+            setTimeout(function(el) { el.classList.remove('foxcod-shake'); }.bind(null, inputCont), 400);
+
+            // Add inline error message to the outer wrapper (parent of inputCont)
+            // so it doesn't affect the icon's top:50% positioning inside inputCont
+            var outerWrapper = inputCont.parentNode;
+            if (outerWrapper && !outerWrapper.querySelector('.foxcod-error-text')) {
+              var errorText = document.createElement('div');
+              errorText.className = 'foxcod-error-text';
+              errorText.textContent = 'This field is required';
+              outerWrapper.appendChild(errorText);
+            }
+          }
+        }
+      });
+
+      if (firstInvalid) {
+        console.log('[COD Form] Validation failed — scrolling to:', firstInvalid.name);
+        firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setTimeout(function() { firstInvalid.focus(); }, 400);
+        return; // stop submission
+      }
+
+      console.log('[COD Form] Validation passed');
+
       var submitBtn = form.querySelector('button[type="submit"]');
       var originalBtnText = submitBtn.textContent;
       
