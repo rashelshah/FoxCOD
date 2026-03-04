@@ -649,6 +649,8 @@
         if (config.stickyOnMobile && window.innerWidth <= 600) {
           var stickyBtn = codBtn.cloneNode(true);
           stickyBtn.classList.add('sticky-mobile');
+          // Store reference to original button so closeModal can check its position
+          stickyBtn._originalCodBtn = codBtn;
           stickyBtn.addEventListener('click', function(e) {
             e.preventDefault();
             e.stopPropagation();
@@ -658,30 +660,30 @@
           // Append to body
           document.body.appendChild(stickyBtn);
           
-          // Track original button position with IntersectionObserver
-          // Only show sticky when user has scrolled DOWN past the button
-          var observer = new IntersectionObserver(function(entries) {
-            entries.forEach(function(entry) {
-              // Check if button is above viewport (user scrolled down past it)
-              var rect = entry.boundingClientRect;
-              
-              if (entry.isIntersecting) {
-                // Original button is visible in viewport - always hide sticky
-                stickyBtn.classList.remove('visible');
-              } else if (rect.bottom < 0) {
-                // Button is above viewport (user scrolled down past it) - show sticky
-                stickyBtn.classList.add('visible');
-              } else {
-                // Button is below viewport (hasn't reached it yet) - hide sticky
-                stickyBtn.classList.remove('visible');
-              }
-            });
-          }, { 
-            threshold: 0,
-            rootMargin: '0px'
-          });
+          // Helper: check if original button is visible and toggle sticky
+          function updateStickyVisibility() {
+            // Don't update if hidden by modal
+            if (stickyBtn.getAttribute('data-hidden-by-modal') === 'true') return;
+            var rect = codBtn.getBoundingClientRect();
+            var viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+            if (rect.bottom < 0) {
+              // Original button is above viewport (user scrolled past it) - show sticky
+              stickyBtn.classList.add('visible');
+            } else if (rect.top < viewportHeight && rect.bottom > 0) {
+              // Original button is visible in viewport - hide sticky
+              stickyBtn.classList.remove('visible');
+            } else {
+              // Original button is below viewport (hasn't reached it yet) - hide sticky
+              stickyBtn.classList.remove('visible');
+            }
+          }
           
-          observer.observe(codBtn);
+          // Use scroll listener for reliable visibility checks
+          window.addEventListener('scroll', updateStickyVisibility, { passive: true });
+          // Also store the update function on the sticky btn for closeModal to call
+          stickyBtn._updateVisibility = updateStickyVisibility;
+          // Initial check
+          updateStickyVisibility();
         }
       });
     });
@@ -2700,6 +2702,14 @@
     if (overlay) overlay.style.display = 'flex';
     document.body.style.overflow = 'hidden';
 
+    // Hide sticky mobile button IMMEDIATELY while form is open
+    // Must use display:none because sticky z-index (10000) is above modal z-index (9999)
+    document.querySelectorAll('.cod-buy-btn.sticky-mobile').forEach(function(btn) {
+        btn.classList.remove('visible');
+        btn.style.setProperty('display', 'none', 'important');
+        btn.setAttribute('data-hidden-by-modal', 'true');
+    });
+
     // ── Pixel Tracking: InitiateCheckout ──
     foxCodTrackEvent('InitiateCheckout', { currency: (FoxCod.currencyConfig && FoxCod.currencyConfig.code) || 'USD' });
 
@@ -3056,6 +3066,20 @@
     }
     if (overlay) overlay.style.display = 'none';
     document.body.style.overflow = '';
+
+    // Re-show sticky mobile button that was hidden when modal opened
+    // But ONLY if the original COD button is NOT visible in the viewport
+    document.querySelectorAll('.cod-buy-btn.sticky-mobile[data-hidden-by-modal="true"]').forEach(function(btn) {
+        btn.removeAttribute('data-hidden-by-modal');
+        btn.style.removeProperty('display');
+        // Use the stored updateVisibility function to properly re-evaluate position
+        if (typeof btn._updateVisibility === 'function') {
+            // Small delay to let scroll position settle after body overflow restore
+            setTimeout(function() {
+                btn._updateVisibility();
+            }, 50);
+        }
+    });
   }
 
   // =============================================

@@ -674,10 +674,19 @@ export default function UpsellDownsellPage() {
                                                 <div className="pv-phone-screen" ref={tickPreviewRef}>
 
                                                     {/* Product Section + Form Modal - same structure as Form Builder */}
-                                                    <div className="tick-pv-product">
-                                                        <div className="tick-pv-product-img" style={{ color: '#9ca3af', fontSize: '14px' }}></div>
-                                                        <div className="tick-pv-product-title">Sample Product</div>
-                                                        <div className="tick-pv-product-price">{fmtCurrency(1999)}</div>
+                                                    {/* Product Section - horizontal layout matching storefront */}
+                                                    <div className="tick-pv-product" style={{ background: formSettings?.styles?.backgroundColor || '#ffffff' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingBottom: '10px', borderBottom: '1px solid #e5e5e5', marginBottom: '6px' }}>
+                                                            <img
+                                                                src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRfEiGMrC1y0OMGHknT1nakNKz7HWAgTAl3LQ&s?w=200&h=200&fit=crop&crop=center"
+                                                                alt="Sample Product"
+                                                                style={{ width: '65px', height: '65px', objectFit: 'cover', borderRadius: '6px', flexShrink: 0 }}
+                                                            />
+                                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                                <div className="tick-pv-product-title">Sample Product</div>
+                                                                <div className="tick-pv-product-price">{fmtCurrency(1999)}</div>
+                                                            </div>
+                                                        </div>
 
                                                         {/* COD Form Modal - uses real Form Builder settings + modal style */}
                                                         <div style={(() => {
@@ -839,13 +848,48 @@ export default function UpsellDownsellPage() {
                                                                     );
                                                                 })}
 
-                                                            {/* Order Summary */}
+                                                            {/* Shipping Options - card-based UI matching storefront (BEFORE Order Summary) */}
+                                                            {formSettings?.blocks?.shipping_options && formSettings?.shipping_options?.enabled && (
+                                                                <div style={{ marginBottom: '10px', marginTop: '10px' }}>
+                                                                    <div style={{ fontSize: '11px', fontWeight: 600, color: '#374151', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
+                                                                        Shipping Method
+                                                                    </div>
+                                                                    {formSettings?.shipping_options?.options?.slice(0, 2).map((opt: any) => (
+                                                                        <div key={opt.id} style={{
+                                                                            display: 'flex',
+                                                                            alignItems: 'center',
+                                                                            gap: '6px',
+                                                                            padding: '8px 10px',
+                                                                            border: opt.id === formSettings?.shipping_options?.defaultOption ? `2px solid ${formSettings?.primary_color || '#6366f1'}` : '2px solid #e5e7eb',
+                                                                            borderRadius: '8px',
+                                                                            background: opt.id === formSettings?.shipping_options?.defaultOption ? 'rgba(99,102,241,0.04)' : '#fff',
+                                                                            marginBottom: '5px',
+                                                                            cursor: 'default'
+                                                                        }}>
+                                                                            <input type="radio" name="tick-shipping-preview" disabled checked={opt.id === formSettings?.shipping_options?.defaultOption} style={{ width: '12px', height: '12px', accentColor: formSettings?.primary_color || '#6366f1', flexShrink: 0 }} />
+                                                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                                                <div style={{ fontWeight: 600, fontSize: '10px', color: '#1f2937' }}>{opt.label}</div>
+                                                                            </div>
+                                                                            <div style={{ flexShrink: 0 }}>
+                                                                                {opt.price === 0 ? (
+                                                                                    <span style={{ background: '#10b981', color: 'white', padding: '2px 6px', borderRadius: '5px', fontSize: '9px', fontWeight: 600 }}>Free</span>
+                                                                                ) : (
+                                                                                    <span style={{ fontWeight: 700, fontSize: '11px', color: '#1f2937' }}>{fmtCurrency(opt.price)}</span>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+
+                                                            {/* Order Summary - AFTER shipping, matching storefront order */}
                                                             {formSettings?.blocks?.order_summary && (
                                                                 <div style={{
                                                                     background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
                                                                     borderRadius: '10px',
                                                                     padding: '12px',
-                                                                    marginTop: '12px',
+                                                                    marginTop: '4px',
                                                                     marginBottom: '12px',
                                                                     border: '1px solid #e2e8f0',
                                                                 }}>
@@ -871,26 +915,6 @@ export default function UpsellDownsellPage() {
                                                                             </>
                                                                         );
                                                                     })()}
-                                                                </div>
-                                                            )}
-
-                                                            {/* Shipping Options */}
-                                                            {formSettings?.blocks?.shipping_options && formSettings?.shipping_options?.enabled && (
-                                                                <div style={{
-                                                                    background: '#f8fafc',
-                                                                    borderRadius: '8px',
-                                                                    padding: '10px',
-                                                                    marginBottom: '12px',
-                                                                    border: '1px solid #e2e8f0',
-                                                                }}>
-                                                                    <div style={{ fontSize: '11px', fontWeight: 600, color: '#374151', marginBottom: '8px' }}>Shipping</div>
-                                                                    {formSettings?.shipping_options?.options?.slice(0, 2).map((opt: any) => (
-                                                                        <div key={opt.id} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', color: '#6b7280', marginBottom: '4px' }}>
-                                                                            <input type="radio" name="tick-shipping-preview" disabled checked={opt.id === formSettings?.shipping_options?.defaultOption} style={{ width: '12px', height: '12px' }} />
-                                                                            <span>{opt.label}</span>
-                                                                            <span style={{ marginLeft: 'auto', fontWeight: 600 }}>{opt.price === 0 ? 'Free' : fmtCurrency(opt.price)}</span>
-                                                                        </div>
-                                                                    ))}
                                                                 </div>
                                                             )}
 
