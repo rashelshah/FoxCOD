@@ -1429,9 +1429,14 @@
 
         // Clear validation error on input
         input.addEventListener('input', function() {
-          // Remove error styles from input
-          this.style.removeProperty('border');
-          this.style.removeProperty('background-color');
+          // Restore original border instead of just removing the property
+          this.style.setProperty('border', borderWidth + 'px solid ' + borderColor, 'important');
+          // Restore field background color instead of just removing the property
+          if (styles.fieldBackgroundColor) {
+            this.style.setProperty('background-color', styles.fieldBackgroundColor, 'important');
+          } else {
+            this.style.removeProperty('background-color');
+          }
           // Remove shake class from inputContainer (the positioned parent)
           var inputCont = this.parentNode;
           if (inputCont) {
