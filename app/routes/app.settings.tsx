@@ -908,22 +908,29 @@ const PreviewDisplay = memo(({
             <div className="preview-content">
                 <div className="preview-phone">
                     <div className={`preview-phone-screen ${activeTab === 'button' ? 'preview-compact' : ''}`}>
-                        <div className="preview-product" style={activeTab === 'button' ? { padding: '24px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' } : undefined}>
-                            {/* Only show image and price when NOT on button tab */}
-                            {activeTab !== 'button' && showProductImage && (
-                                <div className="preview-product-img">
-                                    <svg width="24" height="24" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M16.5 7H3.5L2 9.5V11h1v5.5h14V11h1V9.5L16.5 7z" stroke="#9ca3af" strokeWidth="1.5" strokeLinejoin="round" /></svg>
-                                </div>
-                            )}
+                        <div className="preview-product" style={activeTab === 'button' ? { padding: '24px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' } : {
+                            padding: '16px',
+                            background: formStyles?.backgroundColor || '#ffffff',
+                            borderRadius: (formStyles?.borderRadius || borderRadius) + 'px',
+                            ...(modalStyle === 'glassmorphism' ? { backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.3)', boxShadow: formStyles?.shadow ? '0 8px 32px rgba(0,0,0,0.1)' : 'none' } : modalStyle === 'minimal' ? { border: '1px solid #e5e7eb', boxShadow: 'none' } : { boxShadow: formStyles?.shadow ? '0 10px 25px rgba(0,0,0,0.1)' : 'none' }),
+                        }}>
+                            {/* Product Info - horizontal layout matching storefront */}
                             {activeTab !== 'button' && (
-                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px' }}>
-                                    <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingBottom: '12px', borderBottom: '1px solid rgba(0,0,0,0.08)', marginBottom: '8px' }}>
+                                    {showProductImage && (
+                                        <img
+                                            src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRfEiGMrC1y0OMGHknT1nakNKz7HWAgTAl3LQ&s?w=200&h=200&fit=crop&crop=center"
+                                            alt="Sample Product"
+                                            style={{ width: '65px', height: '65px', objectFit: 'cover', borderRadius: '6px', flexShrink: 0 }}
+                                        />
+                                    )}
+                                    <div style={{ flex: 1, minWidth: 0 }}>
                                         <div className="preview-product-title">Sample Product</div>
                                         {showPrice && (
                                             <div className="preview-product-price">{fmtCurrency(1999)}</div>
                                         )}
                                     </div>
-                                    <div style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid #d1d5db', borderRadius: '999px', overflow: 'hidden', background: '#fff' }}>
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid #d1d5db', borderRadius: '999px', overflow: 'hidden', background: '#fff', flexShrink: 0, marginLeft: 'auto' }}>
                                         <div style={{ width: '34px', height: '32px', background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 500, color: '#6b7280', cursor: 'default' }}>−</div>
                                         <div style={{ width: '36px', height: '32px', borderLeft: '1px solid #e5e7eb', borderRight: '1px solid #e5e7eb', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 600, color: '#1f2937', fontFamily: "'Inter', sans-serif" }}>1</div>
                                         <div style={{ width: '34px', height: '32px', background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 500, color: '#6b7280', cursor: 'default' }}>+</div>
@@ -949,7 +956,7 @@ const PreviewDisplay = memo(({
                             )}
                             {/* Only show form when NOT on button tab */}
                             {activeTab !== 'button' && (
-                                <div className="preview-modal" style={getModalStyle()}>
+                                <div className="preview-modal" style={{ ...getModalStyle(), marginTop: '0', background: 'transparent', boxShadow: 'none', border: 'none', backdropFilter: 'none', padding: '0 0 16px 0' }}>
                                     <div className="preview-modal-title" style={{
                                         fontWeight: 600,
                                         marginBottom: '12px',
@@ -1013,13 +1020,89 @@ const PreviewDisplay = memo(({
                                         </div>
                                     ))}
 
-                                    {/* Rate Card - Order Summary */}
+                                    {/* Shipping Options - New Shipping Rates System (card-based UI matching storefront) */}
+                                    {blocks?.shipping_options && shippingRatesEnabled && shippingRates?.length > 0 && (
+                                        <div style={{ marginBottom: '12px', marginTop: '12px' }}>
+                                            <div style={{ fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
+                                                Shipping Method
+                                            </div>
+                                            {shippingRates.filter((r: any) => r.is_active).slice(0, 3).map((rate: any, idx: number) => (
+                                                <div key={rate.id} style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '8px',
+                                                    padding: '10px 12px',
+                                                    border: idx === 0 ? `2px solid ${primaryColor}` : '2px solid #e5e7eb',
+                                                    borderRadius: '10px',
+                                                    background: idx === 0 ? 'rgba(99,102,241,0.04)' : '#fff',
+                                                    marginBottom: '6px',
+                                                    cursor: 'default'
+                                                }}>
+                                                    <input type="radio" name="shipping-preview" disabled checked={idx === 0} style={{ width: '14px', height: '14px', accentColor: primaryColor, flexShrink: 0 }} />
+                                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                                        <div style={{ fontWeight: 600, fontSize: '12px', color: '#1f2937', marginBottom: '1px' }}>{rate.name}</div>
+                                                        {rate.description && (
+                                                            <div style={{ fontSize: '10px', color: '#6b7280', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+                                                                {rate.description}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <div style={{ flexShrink: 0 }}>
+                                                        {rate.price === 0 ? (
+                                                            <span style={{ background: '#10b981', color: 'white', padding: '3px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 600 }}>FREE</span>
+                                                        ) : (
+                                                            <span style={{ fontWeight: 700, fontSize: '12px', color: '#1f2937' }}>{fmtCurrency(rate.price)}</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {/* Shipping Options - Fallback to old system (card-based UI matching storefront) */}
+                                    {blocks?.shipping_options && shippingOpts?.enabled && (!shippingRatesEnabled || !shippingRates?.length) && (
+                                        <div style={{ marginBottom: '12px', marginTop: '12px' }}>
+                                            <div style={{ fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
+                                                Shipping Method
+                                            </div>
+                                            {shippingOpts.options?.slice(0, 2).map((opt: any, idx: number) => (
+                                                <div key={opt.id} style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '8px',
+                                                    padding: '10px 12px',
+                                                    border: opt.id === shippingOpts.defaultOption ? `2px solid ${primaryColor}` : '2px solid #e5e7eb',
+                                                    borderRadius: '10px',
+                                                    background: opt.id === shippingOpts.defaultOption ? 'rgba(99,102,241,0.04)' : '#fff',
+                                                    marginBottom: '6px',
+                                                    cursor: 'default'
+                                                }}>
+                                                    <input type="radio" name="shipping-preview" disabled checked={opt.id === shippingOpts.defaultOption} style={{ width: '14px', height: '14px', accentColor: primaryColor, flexShrink: 0 }} />
+                                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                                        <div style={{ fontWeight: 600, fontSize: '12px', color: '#1f2937' }}>{opt.label}</div>
+                                                    </div>
+                                                    <div style={{ flexShrink: 0 }}>
+                                                        {opt.price === 0 ? (
+                                                            <span style={{ background: '#10b981', color: 'white', padding: '3px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 600 }}>Free</span>
+                                                        ) : (
+                                                            <span style={{ fontWeight: 700, fontSize: '12px', color: '#1f2937' }}>{fmtCurrency(opt.price)}</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {/* Rate Card - Order Summary (after shipping, matching storefront order) */}
                                     {blocks?.order_summary && (
                                         <div style={{
                                             background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
                                             borderRadius: '10px',
                                             padding: '12px',
-                                            marginTop: '12px',
+                                            marginTop: '4px',
                                             marginBottom: '12px',
                                             border: '1px solid #e2e8f0'
                                         }}>
@@ -1050,79 +1133,6 @@ const PreviewDisplay = memo(({
                                                 <span>Total</span>
                                                 <span style={{ color: primaryColor }}>{fmtCurrency(total)}</span>
                                             </div>
-                                        </div>
-                                    )}
-
-                                    {/* Shipping Options - New Shipping Rates System */}
-                                    {blocks?.shipping_options && shippingRatesEnabled && shippingRates?.length > 0 && (
-                                        <div style={{
-                                            background: '#f8fafc',
-                                            borderRadius: '8px',
-                                            padding: '10px',
-                                            marginBottom: '10px',
-                                            border: '1px solid #e2e8f0'
-                                        }}>
-                                            <div style={{ fontSize: '11px', fontWeight: 600, color: '#374151', marginBottom: '8px' }}>
-                                                Shipping
-                                            </div>
-                                            {shippingRates.filter((r: any) => r.is_active).slice(0, 3).map((rate: any, idx: number) => {
-                                                // Build condition indicator
-                                                let conditionText = '';
-                                                if (rate.condition_type && rate.condition_type !== 'none') {
-                                                    if (rate.min_value !== undefined && rate.min_value !== null &&
-                                                        rate.max_value !== undefined && rate.max_value !== null) {
-                                                        conditionText = ` [${rate.min_value}-${rate.max_value}]`;
-                                                    } else if (rate.min_value !== undefined && rate.min_value !== null) {
-                                                        conditionText = ` [min ${rate.min_value}]`;
-                                                    } else if (rate.max_value !== undefined && rate.max_value !== null) {
-                                                        conditionText = ` [max ${rate.max_value}]`;
-                                                    }
-                                                }
-
-                                                return (
-                                                    <div key={rate.id} style={{
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: '6px',
-                                                        fontSize: '10px',
-                                                        color: '#6b7280',
-                                                        marginBottom: '4px'
-                                                    }}>
-                                                        <input type="radio" name="shipping-preview" disabled checked={idx === 0} style={{ width: '12px', height: '12px' }} />
-                                                        <span>{rate.name}{conditionText}</span>
-                                                        <span style={{ marginLeft: 'auto', fontWeight: 600 }}>{rate.price === 0 ? 'Free' : fmtCurrency(rate.price)}</span>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
-
-                                    {/* Shipping Options - Fallback to old system */}
-                                    {blocks?.shipping_options && shippingOpts?.enabled && (!shippingRatesEnabled || !shippingRates?.length) && (
-                                        <div style={{
-                                            background: '#f8fafc',
-                                            borderRadius: '8px',
-                                            padding: '10px',
-                                            marginBottom: '10px',
-                                            border: '1px solid #e2e8f0'
-                                        }}>
-                                            <div style={{ fontSize: '11px', fontWeight: 600, color: '#374151', marginBottom: '8px' }}>
-                                                Shipping
-                                            </div>
-                                            {shippingOpts.options?.slice(0, 2).map((opt: any) => (
-                                                <div key={opt.id} style={{
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: '6px',
-                                                    fontSize: '10px',
-                                                    color: '#6b7280',
-                                                    marginBottom: '4px'
-                                                }}>
-                                                    <input type="radio" name="shipping-preview" disabled checked={opt.id === shippingOpts.defaultOption} style={{ width: '12px', height: '12px' }} />
-                                                    <span>{opt.label}</span>
-                                                    <span style={{ marginLeft: 'auto', fontWeight: 600 }}>{opt.price === 0 ? 'Free' : fmtCurrency(opt.price)}</span>
-                                                </div>
-                                            ))}
                                         </div>
                                     )}
 
@@ -2288,7 +2298,7 @@ export default function SettingsPage() {
                 .preview-phone-screen { background: white; border-radius: 24px; overflow-y: auto; height: 500px; }
                 .preview-phone-screen.preview-compact { min-height: auto; max-height: none; padding: 20px 16px; }
                 .preview-product { padding: 16px; }
-                .preview-product-img { width: 100%; height: 100px; background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%); border-radius: 12px; margin-bottom: 12px; display: flex; align-items: center; justify-content: center; }
+                .preview-product-img { width: 80px; height: 80px; border-radius: 6px; flex-shrink: 0; object-fit: cover; }
                 .preview-modal { padding: 16px; margin-top: 12px; border-radius: 12px; background: #f9fafb; }
                 .preview-input { width: 100%; padding: 10px 12px; margin-bottom: 8px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 12px; box-sizing: border-box; }
                 .preview-submit { width: 100%; padding: 12px; border: none; color: white; border-radius: 8px; font-weight: 600; font-size: 13px; margin-top: 4px; }
