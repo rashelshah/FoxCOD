@@ -13,6 +13,7 @@ import { ColorSelector, colorSelectorStyles } from "./ColorSelector";
 import { Page, Layout, Tabs, Card, Button, Badge, EmptyState, Text, InlineStack, BlockStack, Box, Divider, TextField, Select, ButtonGroup, Banner, LegacyCard, RangeSlider, Modal } from "@shopify/polaris";
 import { EditIcon, DeleteIcon } from "@shopify/polaris-icons";
 import { getFormSettings } from "../config/supabase.server";
+import { DEFAULT_FIELDS } from "../config/form-builder.types";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const { session, admin } = await authenticate.admin(request);
@@ -282,6 +283,17 @@ export default function UpsellDownsellPage() {
         try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: shopCurrency || 'USD', minimumFractionDigits: 0 }).format(amount); }
         catch { return `${shopCurrency} ${amount}`; }
     }, [shopCurrency]);
+
+    // Merge saved fields with DEFAULT_FIELDS so new fields (shipping, order_summary) are always present
+    const mergedFields = useMemo(() => {
+        const saved = formSettings?.fields as any[] | undefined;
+        if (!saved || saved.length === 0) return DEFAULT_FIELDS;
+        const existingIds = new Set(saved.map((f: any) => f.id));
+        const missing = DEFAULT_FIELDS.filter(df => !existingIds.has(df.id));
+        if (missing.length === 0) return saved;
+        const maxOrder = Math.max(...saved.map((f: any) => f.order), 0);
+        return [...saved, ...missing.map((f, i) => ({ ...f, order: maxOrder + i + 1 }))];
+    }, [formSettings?.fields]);
     const currencySymbol = useMemo(() => {
         try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: shopCurrency || 'USD' }).formatToParts(0).find(p => p.type === 'currency')?.value || '$'; }
         catch { return '$'; }
@@ -744,11 +756,123 @@ export default function UpsellDownsellPage() {
                                                                 </div>
                                                             )}
 
-                                                            {/* Dynamic Form Fields - from Form Builder */}
-                                                            {(formSettings?.fields || [])
+                                                            {/* Dynamic Form Fields - from Form Builder (including shipping/order summary in drag-drop order) */}
+                                                            {(mergedFields as any[])
                                                                 .filter((f: any) => f.visible)
                                                                 .sort((a: any, b: any) => a.order - b.order)
                                                                 .map((field: any) => {
+                                                                    // Shipping section field
+                                                                    if (field.id === 'shipping') {
+                                                                        if (!formSettings?.shipping_options?.enabled) return null;
+                                                                        return (
+                                                                            <div key={field.id} style={{ marginBottom: '10px', marginTop: '10px' }}>
+                                                                                <div style={{ fontSize: '11px', fontWeight: 600, color: '#374151', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
+                                                                                    Shipping Method
+                                                                                </div>
+                                                                                {formSettings?.shipping_options?.options?.slice(0, 2).map((opt: any) => (
+                                                                                    <div key={opt.id} style={{
+                                                                                        display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 10px',
+                                                                                        border: opt.id === formSettings?.shipping_options?.defaultOption ? `2px solid ${formSettings?.primary_color || '#6366f1'}` : '2px solid #e5e7eb',
+                                                                                        borderRadius: '8px', background: opt.id === formSettings?.shipping_options?.defaultOption ? 'rgba(99,102,241,0.04)' : '#fff',
+                                                                                        marginBottom: '5px', cursor: 'default'
+                                                                                    }}>
+                                                                                        <input type="radio" name="tick-shipping-preview" disabled checked={opt.id === formSettings?.shipping_options?.defaultOption} style={{ width: '12px', height: '12px', accentColor: formSettings?.primary_color || '#6366f1', flexShrink: 0 }} />
+                                                                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                                                                            <div style={{ fontWeight: 600, fontSize: '10px', color: '#1f2937' }}>{opt.label}</div>
+                                                                                        </div>
+                                                                                        <div style={{ flexShrink: 0 }}>
+                                                                                            {opt.price === 0 ? (
+                                                                                                <span style={{ background: '#10b981', color: 'white', padding: '2px 6px', borderRadius: '5px', fontSize: '9px', fontWeight: 600 }}>Free</span>
+                                                                                            ) : (
+                                                                                                <span style={{ fontWeight: 700, fontSize: '11px', color: '#1f2937' }}>{fmtCurrency(opt.price)}</span>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    </div>
+                                                                                ))}
+                                                                            </div>
+                                                                        );
+                                                                    }
+
+                                                                    // Order Summary section field
+                                                                    if (field.id === 'order_summary') {
+                                                                        return (
+                                                                            <div key={field.id} style={{
+                                                                                background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                                                                                borderRadius: '10px', padding: '12px', marginTop: '4px', marginBottom: '12px',
+                                                                                border: '1px solid #e2e8f0',
+                                                                            }}>
+                                                                                <div style={{ fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>Order Summary</div>
+                                                                                {(() => {
+                                                                                    const unitPrice = 1999;
+                                                                                    const shippingEnabled = formSettings?.shipping_options?.enabled;
+                                                                                    const shippingOption = formSettings?.shipping_options?.options?.find((o: any) => o.id === formSettings?.shipping_options?.defaultOption);
+                                                                                    const shippingCost = shippingEnabled ? (shippingOption?.price || 0) : 0;
+                                                                                    const tickOffer = editing.offers[0];
+                                                                                    const tickUpsellPrice = (editing.checkbox_default_checked && tickOffer) ? (tickOffer.original_price || 0) : 0;
+                                                                                    const total = unitPrice + shippingCost + tickUpsellPrice;
+                                                                                    return (
+                                                                                        <>
+                                                                                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280', marginBottom: '6px' }}><span>Subtotal (1 item)</span><span>{fmtCurrency(unitPrice)}</span></div>
+                                                                                            {shippingEnabled && (
+                                                                                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280', marginBottom: '8px' }}><span>Shipping</span><span>{shippingCost === 0 ? 'FREE' : fmtCurrency(shippingCost)}</span></div>
+                                                                                            )}
+                                                                                            {tickUpsellPrice > 0 && (
+                                                                                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#059669', marginBottom: '6px' }}><span>{tickOffer?.upsell_product_title || 'Upsell'}</span><span>{fmtCurrency(tickUpsellPrice)}</span></div>
+                                                                                            )}
+                                                                                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 700, color: '#111827', paddingTop: '8px', borderTop: '1px dashed #d1d5db' }}><span>Total</span><span style={{ color: formSettings?.primary_color || '#10b981' }}>{fmtCurrency(total)}</span></div>
+                                                                                        </>
+                                                                                    );
+                                                                                })()}
+                                                                            </div>
+                                                                        );
+                                                                    }
+
+                                                                    // Payment Mode section field
+                                                                    if (field.id === 'payment_mode') {
+                                                                        return (
+                                                                            <div key={field.id} style={{
+                                                                                marginBottom: '12px', padding: '14px',
+                                                                                background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%)',
+                                                                                borderRadius: '10px',
+                                                                                border: '1px solid rgba(99, 102, 241, 0.2)',
+                                                                            }}>
+                                                                                <div style={{ fontSize: '12px', fontWeight: 600, color: '#1f2937', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>
+                                                                                    Payment Method
+                                                                                </div>
+                                                                                <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '10px', background: '#fff', borderRadius: '8px', border: '2px solid #e5e7eb', marginBottom: '6px', cursor: 'default', fontSize: '11px' }}>
+                                                                                    <input type="radio" name="tick-payment-preview" disabled style={{ width: '12px', height: '12px', marginTop: '1px', accentColor: formSettings?.primary_color || '#6366f1' }} />
+                                                                                    <div style={{ flex: 1 }}>
+                                                                                        <div style={{ fontWeight: 600, color: '#1f2937' }}>Full COD</div>
+                                                                                        <div style={{ color: '#6b7280', fontSize: '10px', marginTop: '1px' }}>Pay on delivery</div>
+                                                                                    </div>
+                                                                                </label>
+                                                                                <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '10px', background: '#fff', borderRadius: '8px', border: '2px solid #e5e7eb', cursor: 'default', fontSize: '11px' }}>
+                                                                                    <input type="radio" name="tick-payment-preview" disabled style={{ width: '12px', height: '12px', marginTop: '1px', accentColor: formSettings?.primary_color || '#6366f1' }} />
+                                                                                    <div style={{ flex: 1 }}>
+                                                                                        <div style={{ fontWeight: 600, color: '#1f2937' }}>Partial COD</div>
+                                                                                        <div style={{ color: '#6b7280', fontSize: '10px', marginTop: '1px' }}>Pay advance, rest on delivery</div>
+                                                                                    </div>
+                                                                                </label>
+                                                                            </div>
+                                                                        );
+                                                                    }
+
+                                                                    // Marketing checkbox
+                                                                    if (field.id === 'marketing') {
+                                                                        return (
+                                                                            <div key={field.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', fontSize: '10px', color: '#6b7280' }}>
+                                                                                <input type="checkbox" disabled style={{ width: '14px', height: '14px' }} />
+                                                                                <span>Keep me updated with offers & news</span>
+                                                                            </div>
+                                                                        );
+                                                                    }
+
+                                                                    // Skip quantity field
+                                                                    if (field.id === 'quantity') return null;
+
+                                                                    // Regular form fields
                                                                     const styles = formSettings?.styles || {} as any;
                                                                     const labelColor = styles.labelColor || styles.textColor || '#374151';
                                                                     const textColor = styles.textColor || '#111827';
@@ -847,84 +971,6 @@ export default function UpsellDownsellPage() {
                                                                         </div>
                                                                     );
                                                                 })}
-
-                                                            {/* Shipping Options - card-based UI matching storefront (BEFORE Order Summary) */}
-                                                            {formSettings?.blocks?.shipping_options && formSettings?.shipping_options?.enabled && (
-                                                                <div style={{ marginBottom: '10px', marginTop: '10px' }}>
-                                                                    <div style={{ fontSize: '11px', fontWeight: 600, color: '#374151', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
-                                                                        Shipping Method
-                                                                    </div>
-                                                                    {formSettings?.shipping_options?.options?.slice(0, 2).map((opt: any) => (
-                                                                        <div key={opt.id} style={{
-                                                                            display: 'flex',
-                                                                            alignItems: 'center',
-                                                                            gap: '6px',
-                                                                            padding: '8px 10px',
-                                                                            border: opt.id === formSettings?.shipping_options?.defaultOption ? `2px solid ${formSettings?.primary_color || '#6366f1'}` : '2px solid #e5e7eb',
-                                                                            borderRadius: '8px',
-                                                                            background: opt.id === formSettings?.shipping_options?.defaultOption ? 'rgba(99,102,241,0.04)' : '#fff',
-                                                                            marginBottom: '5px',
-                                                                            cursor: 'default'
-                                                                        }}>
-                                                                            <input type="radio" name="tick-shipping-preview" disabled checked={opt.id === formSettings?.shipping_options?.defaultOption} style={{ width: '12px', height: '12px', accentColor: formSettings?.primary_color || '#6366f1', flexShrink: 0 }} />
-                                                                            <div style={{ flex: 1, minWidth: 0 }}>
-                                                                                <div style={{ fontWeight: 600, fontSize: '10px', color: '#1f2937' }}>{opt.label}</div>
-                                                                            </div>
-                                                                            <div style={{ flexShrink: 0 }}>
-                                                                                {opt.price === 0 ? (
-                                                                                    <span style={{ background: '#10b981', color: 'white', padding: '2px 6px', borderRadius: '5px', fontSize: '9px', fontWeight: 600 }}>Free</span>
-                                                                                ) : (
-                                                                                    <span style={{ fontWeight: 700, fontSize: '11px', color: '#1f2937' }}>{fmtCurrency(opt.price)}</span>
-                                                                                )}
-                                                                            </div>
-                                                                        </div>
-                                                                    ))}
-                                                                </div>
-                                                            )}
-
-                                                            {/* Order Summary - AFTER shipping, matching storefront order */}
-                                                            {formSettings?.blocks?.order_summary && (
-                                                                <div style={{
-                                                                    background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-                                                                    borderRadius: '10px',
-                                                                    padding: '12px',
-                                                                    marginTop: '4px',
-                                                                    marginBottom: '12px',
-                                                                    border: '1px solid #e2e8f0',
-                                                                }}>
-                                                                    <div style={{ fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>Order Summary</div>
-                                                                    {(() => {
-                                                                        const unitPrice = 1999;
-                                                                        const shippingEnabled = formSettings?.shipping_options?.enabled;
-                                                                        const shippingOption = formSettings?.shipping_options?.options?.find((o: any) => o.id === formSettings?.shipping_options?.defaultOption);
-                                                                        const shippingCost = shippingEnabled ? (shippingOption?.price || 0) : 0;
-                                                                        const tickOffer = editing.offers[0];
-                                                                        const tickUpsellPrice = (editing.checkbox_default_checked && tickOffer) ? (tickOffer.original_price || 0) : 0;
-                                                                        const total = unitPrice + shippingCost + tickUpsellPrice;
-                                                                        return (
-                                                                            <>
-                                                                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280', marginBottom: '6px' }}><span>Subtotal (1 item)</span><span>{fmtCurrency(unitPrice)}</span></div>
-                                                                                {shippingEnabled && (
-                                                                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280', marginBottom: '8px' }}><span>Shipping</span><span>{shippingCost === 0 ? 'FREE' : fmtCurrency(shippingCost)}</span></div>
-                                                                                )}
-                                                                                {tickUpsellPrice > 0 && (
-                                                                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#059669', marginBottom: '6px' }}><span>{tickOffer?.upsell_product_title || 'Upsell'}</span><span>{fmtCurrency(tickUpsellPrice)}</span></div>
-                                                                                )}
-                                                                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 700, color: '#111827', paddingTop: '8px', borderTop: '1px dashed #d1d5db' }}><span>Total</span><span style={{ color: formSettings?.primary_color || '#10b981' }}>{fmtCurrency(total)}</span></div>
-                                                                            </>
-                                                                        );
-                                                                    })()}
-                                                                </div>
-                                                            )}
-
-                                                            {/* Buyer Marketing */}
-                                                            {formSettings?.blocks?.buyer_marketing && (
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', fontSize: '10px', color: '#6b7280' }}>
-                                                                    <input type="checkbox" disabled style={{ width: '14px', height: '14px' }} />
-                                                                    <span>Keep me updated with offers & news</span>
-                                                                </div>
-                                                            )}
 
                                                             {/* Tick upsell row */}
                                                             {editing.offers[0] && (() => {

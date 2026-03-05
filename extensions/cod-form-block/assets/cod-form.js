@@ -1071,6 +1071,32 @@
         
         // Update order summary with new discount - pass offer directly
         updateOrderSummaryWithOffer(form, config, offer);
+        
+        // Re-render shipping rates with new quantity so rate conditions are re-evaluated
+        var fieldsContainer = form.querySelector('.cod-dynamic-fields-container');
+        var shippingSection = form.querySelector('.cod-shipping-section');
+        var shippingMarker = fieldsContainer ? fieldsContainer.querySelector('.cod-section-marker[data-section="shipping"]') : null;
+        if (shippingSection) {
+            shippingSection.remove();
+        }
+        var hasNewShippingRates = config.shippingRatesEnabled && config.shippingRates && config.shippingRates.length > 0;
+        var hasOldShippingOptions = config.shippingOptions && config.shippingOptions.enabled;
+        var shippingFieldVisible = (config.fields || []).some(function(f) { return f.id === 'shipping' && f.visible !== false; });
+        var shippingEnabled2 = (config.blocks && config.blocks.shipping_options) || shippingFieldVisible;
+        if (shippingEnabled2 && (hasNewShippingRates || hasOldShippingOptions)) {
+            renderShippingOptions(form, config);
+            if (shippingMarker) {
+                var newShippingSection = form.querySelector('.cod-shipping-section');
+                if (newShippingSection) {
+                    shippingMarker.appendChild(newShippingSection);
+                }
+            }
+        }
+        
+        // Update order summary again after shipping re-render
+        setTimeout(function() {
+            updateOrderSummaryWithOffer(form, config, offer);
+        }, 50);
       });
       
       offersContainer.appendChild(card);
@@ -1183,32 +1209,76 @@
         }
     }
 
-    // 2. Render Shipping Options if enabled (new rates system OR old options system)
+    // 2. Render section fields (shipping, order_summary, marketing)
+    //    The correct order is handled by marker divs created in renderFields.
+    //    We render sections normally (they insert before submit), then move them into markers.
+    //    First, render the sections:
+    var sectionFieldIds = ['shipping', 'order_summary', 'marketing', 'payment_mode'];
+    var sortedFields = (config.fields || []).slice().sort(function(a, b) { return a.order - b.order; });
     var hasNewShippingRates = config.shippingRatesEnabled && config.shippingRates && config.shippingRates.length > 0;
     var hasOldShippingOptions = config.shippingOptions && config.shippingOptions.enabled;
-    if (config.blocks && config.blocks.shipping_options && (hasNewShippingRates || hasOldShippingOptions)) {
+
+    // Check which section fields exist in the fields array
+    var hasSectionInFields = {};
+    sortedFields.forEach(function(field) {
+        if (sectionFieldIds.indexOf(field.id) !== -1) {
+            hasSectionInFields[field.id] = true;
+        }
+    });
+
+    // Render shipping section — check blocks flag OR fall back to field visibility
+    var shippingField = sortedFields.find(function(f) { return f.id === 'shipping'; });
+    var shippingEnabled = (config.blocks && config.blocks.shipping_options) || (shippingField && shippingField.visible !== false);
+    if (shippingEnabled && (hasNewShippingRates || hasOldShippingOptions)) {
         renderShippingOptions(form, config);
     }
+    // Render order summary section — check blocks flag OR fall back to field visibility
+    var orderSummaryField = sortedFields.find(function(f) { return f.id === 'order_summary'; });
+    var orderSummaryEnabled = (config.blocks && config.blocks.order_summary) || (orderSummaryField && orderSummaryField.visible !== false);
+    if (orderSummaryEnabled) {
+        renderRateCard(form, config);
+    }
+    // Render marketing checkbox — check blocks flag OR fall back to field visibility
+    var marketingField = sortedFields.find(function(f) { return f.id === 'marketing'; });
+    var marketingEnabled = (config.blocks && config.blocks.buyer_marketing) || (marketingField && marketingField.visible !== false);
+    if (marketingEnabled) {
+        renderMarketingCheckbox(form, config);
+    }
 
-    // 2.5 Render Payment Method Options if Partial COD is enabled
-    if (config.partialCodEnabled) {
+    // 2.5 Render Payment Method Options if Partial COD is enabled AND the payment_mode field is visible
+    // Must render BEFORE section move logic so the element exists when we try to move it
+    var paymentModeField = (config.fields || []).find(function(f) { return f.id === 'payment_mode'; });
+    var paymentModeVisible = paymentModeField ? paymentModeField.visible !== false : true;
+    if (config.partialCodEnabled && paymentModeVisible) {
         renderPaymentMethodOptions(form, config);
     }
 
-    // 3. Render Rate Card (Order Summary) if enabled — AFTER shipping and payment
-    //    so DOM order is: Shipping → Payment → Order Summary → Submit
-    console.log('[COD Form] Checking order summary - blocks:', config.blocks, 'order_summary:', config.blocks?.order_summary);
-    if (config.blocks && config.blocks.order_summary) {
-        console.log('[COD Form] Rendering order summary');
-        renderRateCard(form, config);
-    } else {
-        console.log('[COD Form] Order summary not rendered - blocks config:', config.blocks);
-    }
-
-    // 4. Render Marketing Consent if enabled
-    if (config.blocks && config.blocks.buyer_marketing) {
-        renderMarketingCheckbox(form, config);
-    }
+    // Now move rendered sections into their marker positions in fieldsContainer
+    // This ensures they appear at the correct drag-drop position among input fields
+    var sectionSelectors = {
+        'shipping': '.cod-shipping-section',
+        'order_summary': '.cod-order-summary',
+        'marketing': 'input[name="marketing_consent"]',
+        'payment_mode': '.cod-payment-method-options'
+    };
+    ['shipping', 'order_summary', 'marketing', 'payment_mode'].forEach(function(sectionId) {
+        var marker = fieldsContainer.querySelector('.cod-section-marker[data-section="' + sectionId + '"]');
+        if (!marker) return; // no marker = not in fields array or not visible
+        
+        var sectionEl = null;
+        if (sectionId === 'marketing') {
+            // Marketing checkbox wrapper is the parent of the checkbox input
+            var checkbox = form.querySelector('input[name="marketing_consent"]');
+            sectionEl = checkbox ? checkbox.parentElement : null;
+        } else {
+            sectionEl = form.querySelector(sectionSelectors[sectionId]);
+        }
+        
+        if (sectionEl) {
+            marker.appendChild(sectionEl);
+            console.log('[COD Form] Moved', sectionId, 'section into marker at correct position');
+        }
+    });
 
     // 4.5 Render Tick Upsells if available
     renderTickUpsells(form, config);
@@ -1283,6 +1353,20 @@
         // Skip quantity field — now rendered in cod-product-qty next to product image
         if (field.id === 'quantity') {
             console.log('[COD Form] Skipping quantity field (moved to product info)');
+            return;
+        }
+        
+        // Section fields — create a marker div at the correct position so rendered sections can be moved here
+        if (field.id === 'shipping' || field.id === 'order_summary' || field.id === 'marketing' || field.id === 'payment_mode') {
+            if (!field.visible) {
+                console.log('[COD Form] Skipping hidden section field:', field.id);
+                return;
+            }
+            var marker = document.createElement('div');
+            marker.className = 'cod-section-marker';
+            marker.setAttribute('data-section', field.id);
+            container.appendChild(marker);
+            console.log('[COD Form] Created marker for section field:', field.id);
             return;
         }
         
@@ -1777,14 +1861,13 @@
           row.onclick = function() { radio.checked = true; radio.dispatchEvent(new Event('change')); };
       });
 
-      // Insert before payment section (so shipping sits above payment),
-      // then fall back to before order summary, then before submit button.
-      var paymentSection = form.querySelector('.cod-payment-method-options');
-      var summary = form.querySelector('.cod-order-summary');
+      // Insert before the submit button — it is always a direct child of form.
+      // NOTE: We cannot use .cod-payment-method-options or .cod-order-summary as reference
+      // because after section marker move logic they become nested (not direct children of form),
+      // causing form.insertBefore() to throw a DOMException.
       var submitBtn = form.querySelector('button[type="submit"]');
-      var insertTarget = paymentSection || summary || submitBtn;
-      if (insertTarget) {
-          form.insertBefore(container, insertTarget);
+      if (submitBtn && submitBtn.parentNode === form) {
+          form.insertBefore(container, submitBtn);
       } else {
           form.appendChild(container);
       }
@@ -1955,7 +2038,7 @@
           noRatesMsg.style.fontStyle = 'italic';
           container.appendChild(noRatesMsg);
           
-          form.insertBefore(container, form.querySelector('.cod-order-summary') || form.querySelector('button[type="submit"]'));
+          form.insertBefore(container, form.querySelector('button[type="submit"]') || null);
           return;
       }
 
@@ -2027,14 +2110,13 @@
           });
       });
 
-      // Insert before payment section (so shipping sits above payment),
-      // then fall back to before order summary, then before submit button.
-      var paymentSection = form.querySelector('.cod-payment-method-options');
-      var summary = form.querySelector('.cod-order-summary');
+      // Insert before the submit button — it is always a direct child of form.
+      // NOTE: We cannot use .cod-payment-method-options or .cod-order-summary as reference
+      // because after section marker move logic they become nested (not direct children of form),
+      // causing form.insertBefore() to throw a DOMException.
       var submitBtn = form.querySelector('button[type="submit"]');
-      var insertTarget = paymentSection || summary || submitBtn;
-      if (insertTarget) {
-          form.insertBefore(container, insertTarget);
+      if (submitBtn && submitBtn.parentNode === form) {
+          form.insertBefore(container, submitBtn);
       } else {
           form.appendChild(container);
       }
@@ -2048,12 +2130,20 @@
       var qtyInput = form.querySelector('[name="quantity"]');
       if (qtyInput) {
           qtyInput.addEventListener('change', function() {
-              // Remove existing shipping section and re-render
+              // Remember the marker (parent of existing section)
               var existingSection = form.querySelector('.cod-shipping-section');
+              var markerParent = existingSection ? existingSection.closest('.cod-section-marker[data-section="shipping"]') : null;
               if (existingSection) {
                   existingSection.remove();
               }
               renderNewShippingRates(form, config);
+              // Move newly rendered section back into the marker
+              if (markerParent) {
+                  var newSection = form.querySelector('.cod-shipping-section');
+                  if (newSection) {
+                      markerParent.appendChild(newSection);
+                  }
+              }
           });
       }
 
@@ -2067,15 +2157,48 @@
                       if (mutation.type === 'attributes' && mutation.attributeName === 'data-selected-offer') {
                           console.log('[COD Form] Bundle offer changed, re-rendering shipping rates');
                           var existingSection = form.querySelector('.cod-shipping-section');
+                          var markerParent = existingSection ? existingSection.closest('.cod-section-marker[data-section="shipping"]') : null;
                           if (existingSection) {
                               existingSection.remove();
                           }
                           renderNewShippingRates(form, config);
+                          // Move newly rendered section back into the marker
+                          if (markerParent) {
+                              var newSection = form.querySelector('.cod-shipping-section');
+                              if (newSection) {
+                                  markerParent.appendChild(newSection);
+                              }
+                          }
                       }
                   });
               });
               observer.observe(quantityOffersEl, { attributes: true, attributeFilter: ['data-selected-offer'] });
           }
+      }
+
+      // Also observe product page offers (for in_product_page placement)
+      var productPageOffers = document.querySelector('.cod-product-page-offers');
+      if (productPageOffers) {
+          var ppObserver = new MutationObserver(function(mutations) {
+              mutations.forEach(function(mutation) {
+                  if (mutation.type === 'attributes' && mutation.attributeName === 'data-selected-offer') {
+                      console.log('[COD Form] Product page offer changed, re-rendering shipping rates');
+                      var existingSection = form.querySelector('.cod-shipping-section');
+                      var markerParent = existingSection ? existingSection.closest('.cod-section-marker[data-section="shipping"]') : null;
+                      if (existingSection) {
+                          existingSection.remove();
+                      }
+                      renderNewShippingRates(form, config);
+                      if (markerParent) {
+                          var newSection = form.querySelector('.cod-shipping-section');
+                          if (newSection) {
+                              markerParent.appendChild(newSection);
+                          }
+                      }
+                  }
+              });
+          });
+          ppObserver.observe(productPageOffers, { attributes: true, attributeFilter: ['data-selected-offer'] });
       }
   }
 
@@ -2104,8 +2227,17 @@
       optionsWrapper.style.flexDirection = 'column';
       optionsWrapper.style.gap = '10px';
 
-      // Calculate order total for display
+      // Calculate order total for display — read from the order summary total if available
       var orderTotal = config.productPrice || 0;
+      var summaryTotalEl = form.querySelector('#cod-summary-total');
+      if (summaryTotalEl) {
+          // Parse the total from the rendered order summary (which includes discounts, shipping, upsells, downsells)
+          var totalText = summaryTotalEl.textContent;
+          var parsedTotal = parseFloat(totalText.replace(/[^0-9.]/g, '')) || 0;
+          if (parsedTotal > 0) {
+              orderTotal = parsedTotal;
+          }
+      }
       var remainingAmount = orderTotal - config.partialCodAdvance;
       if (remainingAmount < 0) remainingAmount = 0;
 
@@ -2159,6 +2291,7 @@
 
           var descText = document.createElement('div');
           descText.textContent = opt.description;
+          descText.setAttribute('data-payment-desc', opt.id);
           descText.style.color = '#6b7280';
           descText.style.fontSize = '13px';
           descText.style.marginTop = '2px';
@@ -2209,14 +2342,20 @@
 
       container.appendChild(optionsWrapper);
 
-      // Always insert directly before the submit button.
-      // Shipping insertion logic already accounts for this div (inserts before it),
-      // so the order will always be: shipping → payment → submit.
-      var submitBtn = form.querySelector('button[type="submit"]');
-      if (submitBtn) {
-          form.insertBefore(container, submitBtn);
-      } else {
+      // Insert into the form — the section marker/move logic in initForm will
+      // reposition this element into the correct drag-drop position.
+      // If no marker exists, fall back to inserting before the submit button.
+      var marker = form.querySelector('.cod-section-marker[data-section="payment_mode"]');
+      if (marker) {
+          // Will be moved by the marker logic — just append to form for now
           form.appendChild(container);
+      } else {
+          var submitBtn2 = form.querySelector('button[type="submit"]');
+          if (submitBtn2) {
+              form.insertBefore(container, submitBtn2);
+          } else {
+              form.appendChild(container);
+          }
       }
   }
 
@@ -2415,6 +2554,54 @@
           if (totalEl) totalEl.textContent = formatMoney(total);
           if (subEl) subEl.textContent = formatMoney(subtotal);
       }
+
+      // Sync payment method amounts with updated total
+      updatePaymentMethodAmounts(form, config);
+  }
+
+  /**
+   * Update payment method amounts to match the order summary total
+   * Called after order summary is updated so Full COD / Partial COD text stays in sync
+   */
+  function updatePaymentMethodAmounts(form, config) {
+      var summaryTotalEl = form.querySelector('#cod-summary-total');
+      if (!summaryTotalEl) return;
+      
+      var totalText = summaryTotalEl.textContent;
+      var orderTotal = parseFloat(totalText.replace(/[^0-9.]/g, '')) || 0;
+      if (orderTotal <= 0) return;
+      
+      var partialAdvance = config.partialCodAdvance || 0;
+      var remainingAmount = orderTotal - partialAdvance;
+      if (remainingAmount < 0) remainingAmount = 0;
+      
+      // Find the payment method options container
+      var paymentContainer = form.querySelector('.cod-payment-method-options');
+      if (!paymentContainer) return;
+      
+      // Update Full COD description
+      var fullCodRadio = paymentContainer.querySelector('input[name="payment_method"][value="full_cod"]');
+      if (fullCodRadio) {
+          var fullCodRow = fullCodRadio.closest('label');
+          if (fullCodRow) {
+              var descEl = fullCodRow.querySelector('[data-payment-desc]');
+              if (descEl) {
+                  descEl.textContent = 'Pay ' + formatMoney(orderTotal) + ' on delivery';
+              }
+          }
+      }
+      
+      // Update Partial COD description
+      var partialCodRadio = paymentContainer.querySelector('input[name="payment_method"][value="partial_cod"]');
+      if (partialCodRadio) {
+          var partialRow = partialCodRadio.closest('label');
+          if (partialRow) {
+              var descEl = partialRow.querySelector('[data-payment-desc]');
+              if (descEl) {
+                  descEl.textContent = 'Pay ' + formatMoney(partialAdvance) + ' now, ' + formatMoney(remainingAmount) + ' on delivery';
+              }
+          }
+      }
   }
 
   // Separate function to update order summary with tick upsells (called from tick upsell change handlers)
@@ -2574,6 +2761,9 @@
       if (codTotalPrice) {
           codTotalPrice.textContent = formatMoney(total);
       }
+
+      // Sync payment method amounts with updated total
+      updatePaymentMethodAmounts(form, config);
   }
 
   /**
@@ -2891,14 +3081,25 @@
                     updateOrderSummaryWithOffer(form, config, offer);
                     
                     // Re-render shipping rates with new quantity so conditions are re-evaluated
+                    var fieldsContainer2 = form.querySelector('.cod-dynamic-fields-container');
                     var shippingSection = form.querySelector('.cod-shipping-section');
+                    var shippingMarker = fieldsContainer2 ? fieldsContainer2.querySelector('.cod-section-marker[data-section="shipping"]') : null;
                     if (shippingSection) {
                         shippingSection.remove();
                     }
                     var hasNewShippingRates = config.shippingRatesEnabled && config.shippingRates && config.shippingRates.length > 0;
                     var hasOldShippingOptions = config.shippingOptions && config.shippingOptions.enabled;
-                    if (config.blocks && config.blocks.shipping_options && (hasNewShippingRates || hasOldShippingOptions)) {
+                    var shippingFieldVisible = (config.fields || []).some(function(f) { return f.id === 'shipping' && f.visible !== false; });
+                    var shippingEnabled3 = (config.blocks && config.blocks.shipping_options) || shippingFieldVisible;
+                    if (shippingEnabled3 && (hasNewShippingRates || hasOldShippingOptions)) {
                         renderShippingOptions(form, config);
+                        // Move newly rendered section back into the marker
+                        if (shippingMarker) {
+                            var newShippingSection = form.querySelector('.cod-shipping-section');
+                            if (newShippingSection) {
+                                shippingMarker.appendChild(newShippingSection);
+                            }
+                        }
                     }
                     
                     // Update order summary again after shipping re-render
