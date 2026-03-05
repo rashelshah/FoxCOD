@@ -120,6 +120,9 @@ export const DEFAULT_FIELDS: FormField[] = [
     { id: 'email', label: 'Email', type: 'email', visible: false, required: false, order: 7 },
     { id: 'notes', label: 'Notes', type: 'textarea', visible: false, required: false, order: 8 },
     { id: 'marketing', label: 'Buyer accepts marketing', type: 'checkbox', visible: false, required: false, order: 9 },
+    { id: 'shipping', label: 'Shipping', type: 'text', visible: true, required: false, order: 10 },
+    { id: 'order_summary', label: 'Order Summary', type: 'text', visible: true, required: false, order: 11 },
+    { id: 'payment_mode', label: 'Payment Mode', type: 'text', visible: true, required: false, order: 12 },
 ];
 
 /**

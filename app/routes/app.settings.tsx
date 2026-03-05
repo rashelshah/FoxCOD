@@ -9,8 +9,8 @@ import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
 import { useLoaderData, useSubmit, useNavigation, Link, useActionData } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
-import { RangeSlider, Button, InlineStack, Modal, Text } from "@shopify/polaris";
-import { EditIcon, DeleteIcon } from "@shopify/polaris-icons";
+import { RangeSlider, Button, InlineStack, Modal, Text, Icon } from "@shopify/polaris";
+import { EditIcon, DeleteIcon, ViewIcon, HideIcon, StarFilledIcon } from "@shopify/polaris-icons";
 import {
     DndContext,
     closestCenter,
@@ -44,6 +44,7 @@ import {
     type ButtonStyles,
     type ShippingOptions,
     DEFAULT_FIELDS,
+
     DEFAULT_BLOCKS,
     DEFAULT_STYLES,
     DEFAULT_BUTTON_STYLES,
@@ -81,6 +82,7 @@ const defaultSettings: Omit<FormSettings, "shop_domain"> = {
     // New advanced features
     form_type: "popup",
     fields: DEFAULT_FIELDS,
+
     blocks: DEFAULT_BLOCKS,
     custom_fields: [],
     styles: DEFAULT_STYLES,
@@ -966,183 +968,205 @@ const PreviewDisplay = memo(({
                                         {formTitle || 'Cash on Delivery'}
                                     </div>
 
-                                    {/* Dynamic Fields based on visibility */}
-                                    {visibleFields.map((field: FormField) => (
-                                        <div key={field.id} style={{ marginBottom: '8px' }}>
-                                            <label style={getLabelStyle() as any}>
-                                                {field.label} {field.required && <span style={{ color: '#ef4444' }}>*</span>}
-                                            </label>
-                                            {field.type === 'textarea' ? (
-                                                <div style={{ position: 'relative' }}>
-                                                    <FieldIconSvg fieldId={field.id} isTextarea />
-                                                    <textarea
-                                                        disabled
-                                                        placeholder={field.id === 'address' ? (addressPlaceholder || 'Enter address') :
-                                                            field.id === 'notes' ? (notesPlaceholder || 'Any notes...') :
-                                                                `Enter ${field.label.toLowerCase()}`}
-                                                        style={{
-                                                            ...getInputStyle(),
-                                                            height: '50px',
-                                                            paddingLeft: 40,
-                                                            resize: 'none',
-                                                            backgroundColor: formStyles?.fieldBackgroundColor || '#ffffff',
-                                                            cursor: 'not-allowed',
-                                                            opacity: 1
-                                                        } as any}
-                                                    />
-                                                </div>
-                                            ) : field.type === 'checkbox' ? (
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                                                    <input type="checkbox" disabled style={{ width: '16px', height: '16px' }} />
-                                                    <span style={{ fontSize: '11px', color: '#6b7280' }}>{field.label}</span>
-                                                </div>
-                                            ) : (
-                                                <div style={{ position: 'relative' }}>
-                                                    <FieldIconSvg fieldId={field.id} />
-                                                    <input
-                                                        type={field.type === 'tel' ? 'tel' : field.type === 'email' ? 'email' : 'text'}
-                                                        disabled
-                                                        placeholder={field.id === 'name' ? (namePlaceholder || 'John Doe') :
-                                                            field.id === 'phone' ? (phonePlaceholder || '+91 98765 43210') :
-                                                                field.id === 'email' ? 'email@example.com' :
-                                                                    `Enter ${field.label.toLowerCase()}`}
-                                                        style={{
-                                                            ...getInputStyle(),
-                                                            paddingLeft: 40,
-                                                            height: '42px',
-                                                            backgroundColor: formStyles?.fieldBackgroundColor || '#ffffff',
-                                                            cursor: 'not-allowed',
-                                                            opacity: 1
-                                                        } as any}
-                                                    />
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
-
-                                    {/* Shipping Options - New Shipping Rates System (card-based UI matching storefront) */}
-                                    {blocks?.shipping_options && shippingRatesEnabled && shippingRates?.length > 0 && (
-                                        <div style={{ marginBottom: '12px', marginTop: '12px' }}>
-                                            <div style={{ fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
-                                                Shipping Method
-                                            </div>
-                                            {shippingRates.filter((r: any) => r.is_active).slice(0, 3).map((rate: any, idx: number) => (
-                                                <div key={rate.id} style={{
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: '8px',
-                                                    padding: '10px 12px',
-                                                    border: idx === 0 ? `2px solid ${primaryColor}` : '2px solid #e5e7eb',
-                                                    borderRadius: '10px',
-                                                    background: idx === 0 ? 'rgba(99,102,241,0.04)' : '#fff',
-                                                    marginBottom: '6px',
-                                                    cursor: 'default'
-                                                }}>
-                                                    <input type="radio" name="shipping-preview" disabled checked={idx === 0} style={{ width: '14px', height: '14px', accentColor: primaryColor, flexShrink: 0 }} />
-                                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                                        <div style={{ fontWeight: 600, fontSize: '12px', color: '#1f2937', marginBottom: '1px' }}>{rate.name}</div>
-                                                        {rate.description && (
-                                                            <div style={{ fontSize: '10px', color: '#6b7280', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
-                                                                {rate.description}
+                                    {/* Dynamic Fields based on visibility and drag-drop order */}
+                                    {visibleFields.map((field: FormField) => {
+                                        // Shipping section field
+                                        if (field.id === 'shipping') {
+                                            const hasNewRates = shippingRatesEnabled && shippingRates?.length > 0;
+                                            const hasOldRates = shippingOpts?.enabled && (!shippingRatesEnabled || !shippingRates?.length);
+                                            if (!hasNewRates && !hasOldRates) return null;
+                                            return (
+                                                <div key={field.id} style={{ marginBottom: '12px', marginTop: '12px' }}>
+                                                    <div style={{ fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
+                                                        Shipping Method
+                                                    </div>
+                                                    {hasNewRates ? (
+                                                        shippingRates.filter((r: any) => r.is_active).slice(0, 3).map((rate: any, idx: number) => (
+                                                            <div key={rate.id} style={{
+                                                                display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px',
+                                                                border: idx === 0 ? `2px solid ${primaryColor}` : '2px solid #e5e7eb',
+                                                                borderRadius: '10px', background: idx === 0 ? 'rgba(99,102,241,0.04)' : '#fff',
+                                                                marginBottom: '6px', cursor: 'default'
+                                                            }}>
+                                                                <input type="radio" name="shipping-preview" disabled checked={idx === 0} style={{ width: '14px', height: '14px', accentColor: primaryColor, flexShrink: 0 }} />
+                                                                <div style={{ flex: 1, minWidth: 0 }}>
+                                                                    <div style={{ fontWeight: 600, fontSize: '12px', color: '#1f2937', marginBottom: '1px' }}>{rate.name}</div>
+                                                                    {rate.description && (
+                                                                        <div style={{ fontSize: '10px', color: '#6b7280', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+                                                                            {rate.description}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                <div style={{ flexShrink: 0 }}>
+                                                                    {rate.price === 0 ? (
+                                                                        <span style={{ background: '#10b981', color: 'white', padding: '3px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 600 }}>FREE</span>
+                                                                    ) : (
+                                                                        <span style={{ fontWeight: 700, fontSize: '12px', color: '#1f2937' }}>{fmtCurrency(rate.price)}</span>
+                                                                    )}
+                                                                </div>
                                                             </div>
-                                                        )}
-                                                    </div>
-                                                    <div style={{ flexShrink: 0 }}>
-                                                        {rate.price === 0 ? (
-                                                            <span style={{ background: '#10b981', color: 'white', padding: '3px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 600 }}>FREE</span>
-                                                        ) : (
-                                                            <span style={{ fontWeight: 700, fontSize: '12px', color: '#1f2937' }}>{fmtCurrency(rate.price)}</span>
-                                                        )}
-                                                    </div>
+                                                        ))
+                                                    ) : (
+                                                        shippingOpts.options?.slice(0, 2).map((opt: any) => (
+                                                            <div key={opt.id} style={{
+                                                                display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px',
+                                                                border: opt.id === shippingOpts.defaultOption ? `2px solid ${primaryColor}` : '2px solid #e5e7eb',
+                                                                borderRadius: '10px', background: opt.id === shippingOpts.defaultOption ? 'rgba(99,102,241,0.04)' : '#fff',
+                                                                marginBottom: '6px', cursor: 'default'
+                                                            }}>
+                                                                <input type="radio" name="shipping-preview" disabled checked={opt.id === shippingOpts.defaultOption} style={{ width: '14px', height: '14px', accentColor: primaryColor, flexShrink: 0 }} />
+                                                                <div style={{ flex: 1, minWidth: 0 }}>
+                                                                    <div style={{ fontWeight: 600, fontSize: '12px', color: '#1f2937' }}>{opt.label}</div>
+                                                                </div>
+                                                                <div style={{ flexShrink: 0 }}>
+                                                                    {opt.price === 0 ? (
+                                                                        <span style={{ background: '#10b981', color: 'white', padding: '3px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 600 }}>Free</span>
+                                                                    ) : (
+                                                                        <span style={{ fontWeight: 700, fontSize: '12px', color: '#1f2937' }}>{fmtCurrency(opt.price)}</span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        ))
+                                                    )}
                                                 </div>
-                                            ))}
-                                        </div>
-                                    )}
+                                            );
+                                        }
 
-                                    {/* Shipping Options - Fallback to old system (card-based UI matching storefront) */}
-                                    {blocks?.shipping_options && shippingOpts?.enabled && (!shippingRatesEnabled || !shippingRates?.length) && (
-                                        <div style={{ marginBottom: '12px', marginTop: '12px' }}>
-                                            <div style={{ fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
-                                                Shipping Method
-                                            </div>
-                                            {shippingOpts.options?.slice(0, 2).map((opt: any, idx: number) => (
-                                                <div key={opt.id} style={{
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: '8px',
-                                                    padding: '10px 12px',
-                                                    border: opt.id === shippingOpts.defaultOption ? `2px solid ${primaryColor}` : '2px solid #e5e7eb',
-                                                    borderRadius: '10px',
-                                                    background: opt.id === shippingOpts.defaultOption ? 'rgba(99,102,241,0.04)' : '#fff',
-                                                    marginBottom: '6px',
-                                                    cursor: 'default'
+                                        // Order Summary section field
+                                        if (field.id === 'order_summary') {
+                                            return (
+                                                <div key={field.id} style={{
+                                                    background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                                                    borderRadius: '10px', padding: '12px', marginTop: '4px', marginBottom: '12px',
+                                                    border: '1px solid #e2e8f0'
                                                 }}>
-                                                    <input type="radio" name="shipping-preview" disabled checked={opt.id === shippingOpts.defaultOption} style={{ width: '14px', height: '14px', accentColor: primaryColor, flexShrink: 0 }} />
-                                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                                        <div style={{ fontWeight: 600, fontSize: '12px', color: '#1f2937' }}>{opt.label}</div>
+                                                    <div style={{ fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                        Order Summary
                                                     </div>
-                                                    <div style={{ flexShrink: 0 }}>
-                                                        {opt.price === 0 ? (
-                                                            <span style={{ background: '#10b981', color: 'white', padding: '3px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 600 }}>Free</span>
-                                                        ) : (
-                                                            <span style={{ fontWeight: 700, fontSize: '12px', color: '#1f2937' }}>{fmtCurrency(opt.price)}</span>
-                                                        )}
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280', marginBottom: '6px' }}>
+                                                        <span>Subtotal</span><span>{fmtCurrency(subtotal)}</span>
+                                                    </div>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#10b981', marginBottom: '6px' }}>
+                                                        <span>Discount</span><span>-{fmtCurrency(discount)}</span>
+                                                    </div>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280', marginBottom: '8px' }}>
+                                                        <span>Shipping</span><span>{shippingCost === 0 ? 'FREE' : fmtCurrency(shippingCost)}</span>
+                                                    </div>
+                                                    <div style={{
+                                                        display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 700,
+                                                        color: '#111827', paddingTop: '8px', borderTop: '1px dashed #d1d5db'
+                                                    }}>
+                                                        <span>Total</span><span style={{ color: primaryColor }}>{fmtCurrency(total)}</span>
                                                     </div>
                                                 </div>
-                                            ))}
-                                        </div>
-                                    )}
+                                            );
+                                        }
 
-                                    {/* Rate Card - Order Summary (after shipping, matching storefront order) */}
-                                    {blocks?.order_summary && (
-                                        <div style={{
-                                            background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-                                            borderRadius: '10px',
-                                            padding: '12px',
-                                            marginTop: '4px',
-                                            marginBottom: '12px',
-                                            border: '1px solid #e2e8f0'
-                                        }}>
-                                            <div style={{ fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                Order Summary
-                                            </div>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280', marginBottom: '6px' }}>
-                                                <span>Subtotal</span>
-                                                <span>{fmtCurrency(subtotal)}</span>
-                                            </div>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#10b981', marginBottom: '6px' }}>
-                                                <span>Discount</span>
-                                                <span>-{fmtCurrency(discount)}</span>
-                                            </div>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280', marginBottom: '8px' }}>
-                                                <span>Shipping</span>
-                                                <span>{shippingCost === 0 ? 'FREE' : fmtCurrency(shippingCost)}</span>
-                                            </div>
-                                            <div style={{
-                                                display: 'flex',
-                                                justifyContent: 'space-between',
-                                                fontSize: '13px',
-                                                fontWeight: 700,
-                                                color: '#111827',
-                                                paddingTop: '8px',
-                                                borderTop: '1px dashed #d1d5db'
-                                            }}>
-                                                <span>Total</span>
-                                                <span style={{ color: primaryColor }}>{fmtCurrency(total)}</span>
-                                            </div>
-                                        </div>
-                                    )}
+                                        // Payment Mode section field
+                                        if (field.id === 'payment_mode') {
+                                            return (
+                                                <div key={field.id} style={{
+                                                    marginBottom: '12px', padding: '14px',
+                                                    background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%)',
+                                                    borderRadius: '10px',
+                                                    border: '1px solid rgba(99, 102, 241, 0.2)',
+                                                }}>
+                                                    <div style={{ fontSize: '12px', fontWeight: 600, color: '#1f2937', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>
+                                                        Payment Method
+                                                    </div>
+                                                    {/* Full COD option */}
+                                                    <label style={{
+                                                        display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '10px',
+                                                        background: '#fff', borderRadius: '8px', border: '2px solid #e5e7eb',
+                                                        marginBottom: '6px', cursor: 'default', fontSize: '11px',
+                                                    }}>
+                                                        <input type="radio" name="preview-payment" disabled style={{ width: '12px', height: '12px', marginTop: '1px', accentColor: primaryColor }} />
+                                                        <div style={{ flex: 1 }}>
+                                                            <div style={{ fontWeight: 600, color: '#1f2937' }}>Full COD</div>
+                                                            <div style={{ color: '#6b7280', fontSize: '10px', marginTop: '1px' }}>Pay on delivery</div>
+                                                        </div>
+                                                    </label>
+                                                    {/* Partial COD option */}
+                                                    <label style={{
+                                                        display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '10px',
+                                                        background: '#fff', borderRadius: '8px', border: '2px solid #e5e7eb',
+                                                        cursor: 'default', fontSize: '11px',
+                                                    }}>
+                                                        <input type="radio" name="preview-payment" disabled style={{ width: '12px', height: '12px', marginTop: '1px', accentColor: primaryColor }} />
+                                                        <div style={{ flex: 1 }}>
+                                                            <div style={{ fontWeight: 600, color: '#1f2937' }}>Partial COD</div>
+                                                            <div style={{ color: '#6b7280', fontSize: '10px', marginTop: '1px' }}>Pay advance, rest on delivery</div>
+                                                        </div>
+                                                    </label>
+                                                </div>
+                                            );
+                                        }
+                                        if (field.id === 'marketing') {
+                                            return (
+                                                <div key={field.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', fontSize: '10px', color: '#6b7280' }}>
+                                                    <input type="checkbox" disabled style={{ width: '14px', height: '14px' }} />
+                                                    <span>Keep me updated with offers & news</span>
+                                                </div>
+                                            );
+                                        }
 
-                                    {/* Buyer Marketing Checkbox */}
-                                    {blocks?.buyer_marketing && (
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', fontSize: '10px', color: '#6b7280' }}>
-                                            <input type="checkbox" disabled style={{ width: '14px', height: '14px' }} />
-                                            <span>Keep me updated with offers & news</span>
-                                        </div>
-                                    )}
+                                        // Regular form fields
+                                        return (
+                                            <div key={field.id} style={{ marginBottom: '8px' }}>
+                                                <label style={getLabelStyle() as any}>
+                                                    {field.label} {field.required && <span style={{ color: '#ef4444' }}>*</span>}
+                                                </label>
+                                                {field.type === 'textarea' ? (
+                                                    <div style={{ position: 'relative' }}>
+                                                        <FieldIconSvg fieldId={field.id} isTextarea />
+                                                        <textarea
+                                                            disabled
+                                                            placeholder={field.id === 'address' ? (addressPlaceholder || 'Enter address') :
+                                                                field.id === 'notes' ? (notesPlaceholder || 'Any notes...') :
+                                                                    `Enter ${field.label.toLowerCase()}`}
+                                                            style={{
+                                                                ...getInputStyle(),
+                                                                height: '50px',
+                                                                paddingLeft: 40,
+                                                                resize: 'none',
+                                                                backgroundColor: formStyles?.fieldBackgroundColor || '#ffffff',
+                                                                cursor: 'not-allowed',
+                                                                opacity: 1
+                                                            } as any}
+                                                        />
+                                                    </div>
+                                                ) : field.type === 'checkbox' ? (
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                                                        <input type="checkbox" disabled style={{ width: '16px', height: '16px' }} />
+                                                        <span style={{ fontSize: '11px', color: '#6b7280' }}>{field.label}</span>
+                                                    </div>
+                                                ) : (
+                                                    <div style={{ position: 'relative' }}>
+                                                        <FieldIconSvg fieldId={field.id} />
+                                                        <input
+                                                            type={field.type === 'tel' ? 'tel' : field.type === 'email' ? 'email' : 'text'}
+                                                            disabled
+                                                            placeholder={field.id === 'name' ? (namePlaceholder || 'John Doe') :
+                                                                field.id === 'phone' ? (phonePlaceholder || '+91 98765 43210') :
+                                                                    field.id === 'email' ? 'email@example.com' :
+                                                                        `Enter ${field.label.toLowerCase()}`}
+                                                            style={{
+                                                                ...getInputStyle(),
+                                                                paddingLeft: 40,
+                                                                height: '42px',
+                                                                backgroundColor: formStyles?.fieldBackgroundColor || '#ffffff',
+                                                                cursor: 'not-allowed',
+                                                                opacity: 1
+                                                            } as any}
+                                                        />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
 
                                     <button className="preview-submit" style={getButtonStyle()}>
                                         {submitButtonText || 'Place Order'}
@@ -1166,8 +1190,12 @@ interface SortableFieldItemProps {
     onRemove?: (id: string) => void;
 }
 
+// Section fields that should not have a "required" toggle
+const SECTION_FIELD_IDS = ['shipping', 'order_summary', 'payment_mode'];
+
 const SortableFieldItem = ({ field, onToggleVisibility, onToggleRequired, isCustom, onRemove }: SortableFieldItemProps) => {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: field.id });
+    const isSectionField = SECTION_FIELD_IDS.includes(field.id);
 
     const style = {
         transform: CSS.Transform.toString(transform),
@@ -1182,40 +1210,31 @@ const SortableFieldItem = ({ field, onToggleVisibility, onToggleRequired, isCust
             </div>
             <div className="field-info">
                 <span className="field-label">{field.label}</span>
-                <span className="field-type">{field.type}</span>
+                <span className="field-type">{isSectionField ? 'section' : field.type}</span>
             </div>
-            <div className="field-actions">
-                <button
-                    type="button"
-                    className={`icon-btn visibility-btn ${field.visible ? 'active' : ''}`}
+            <div className="field-actions" style={{ minWidth: '72px', justifyContent: 'flex-end' }}>
+                <Button
+                    icon={field.visible ? ViewIcon : HideIcon}
+                    variant="tertiary"
+                    accessibilityLabel={field.visible ? 'Hide field' : 'Show field'}
                     onClick={() => onToggleVisibility(field.id)}
-                    title={field.visible ? 'Hide field' : 'Show field'}
-                >
-                    {field.visible ? (
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 16, height: 16 }}>
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                            <circle cx="12" cy="12" r="3"></circle>
-                        </svg>
-                    ) : (
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 16, height: 16 }}>
-                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-                            <line x1="1" y1="1" x2="23" y2="23"></line>
-                        </svg>
-                    )}
-                </button>
-                <button
-                    type="button"
-                    className={`icon-btn required-btn ${field.required ? 'active' : ''}`}
-                    onClick={() => onToggleRequired(field.id)}
-                    title={field.required ? 'Make optional' : 'Make required'}
-                >
-                    ✱
-                </button>
+                />
+                {!isSectionField ? (
+                    <Button
+                        icon={StarFilledIcon}
+                        variant="tertiary"
+                        tone={field.required ? 'critical' : undefined}
+                        accessibilityLabel={field.required ? 'Make optional' : 'Make required'}
+                        onClick={() => onToggleRequired(field.id)}
+                    />
+                ) : (
+                    <div style={{ width: '32px' }} />
+                )}
                 {isCustom && onRemove && (
                     <Button icon={DeleteIcon} variant="plain" tone="critical" accessibilityLabel="Remove field" onClick={() => onRemove(field.id)} />
                 )}
             </div>
-        </div >
+        </div>
     );
 };
 
@@ -1682,7 +1701,20 @@ export default function SettingsPage() {
 
     // New advanced feature state
     const [formType, setFormType] = useState<'popup' | 'embedded'>(settings.form_type || 'popup');
-    const [fields, setFields] = useState<FormField[]>(settings.fields || DEFAULT_FIELDS);
+    // Merge saved fields with DEFAULT_FIELDS so newly added fields (e.g. shipping, order_summary) are always present
+    const mergeFieldsWithDefaults = (savedFields: FormField[] | undefined): FormField[] => {
+        if (!savedFields || savedFields.length === 0) return [...DEFAULT_FIELDS];
+        const existingIds = new Set(savedFields.map(f => f.id));
+        const missingFields = DEFAULT_FIELDS.filter(df => !existingIds.has(df.id));
+        if (missingFields.length === 0) return savedFields;
+        // Append missing fields with order values continuing after existing fields
+        const maxOrder = Math.max(...savedFields.map(f => f.order), 0);
+        return [
+            ...savedFields,
+            ...missingFields.map((f, i) => ({ ...f, order: maxOrder + i + 1 })),
+        ];
+    };
+    const [fields, setFields] = useState<FormField[]>(mergeFieldsWithDefaults(settings.fields));
     const [blocks, setBlocks] = useState<ContentBlocks>(settings.blocks || DEFAULT_BLOCKS);
     const [customFields, setCustomFields] = useState<FormField[]>(settings.custom_fields || []);
     const [formStyles, setFormStyles] = useState<FormStyles>(settings.styles || DEFAULT_STYLES);
@@ -1783,7 +1815,7 @@ export default function SettingsPage() {
         setAnimationStyle(orig.animation_style || 'fade');
         setBorderRadius(orig.border_radius || 12);
         setFormType(orig.form_type || 'popup');
-        setFields(orig.fields || DEFAULT_FIELDS);
+        setFields(mergeFieldsWithDefaults(orig.fields));
         setBlocks(orig.blocks || DEFAULT_BLOCKS);
         setCustomFields(orig.custom_fields || []);
         setFormStyles(orig.styles || DEFAULT_STYLES);
@@ -1869,11 +1901,23 @@ export default function SettingsPage() {
         }
     }, []);
 
-    // Toggle field visibility
+    // Toggle field visibility (and sync blocks state for shipping/order_summary)
     const toggleFieldVisibility = useCallback((fieldId: string) => {
-        setFields((prev) => prev.map((f) =>
-            f.id === fieldId ? { ...f, visible: !f.visible } : f
-        ));
+        setFields((prev) => {
+            const updated = prev.map((f) =>
+                f.id === fieldId ? { ...f, visible: !f.visible } : f
+            );
+            // Sync blocks state for section fields
+            const field = updated.find(f => f.id === fieldId);
+            if (field) {
+                if (fieldId === 'shipping') {
+                    setBlocks(b => ({ ...b, shipping_options: field.visible }));
+                } else if (fieldId === 'order_summary') {
+                    setBlocks(b => ({ ...b, order_summary: field.visible }));
+                }
+            }
+            return updated;
+        });
     }, []);
 
     // Toggle field required
@@ -3478,7 +3522,7 @@ export default function SettingsPage() {
                                     <div className="settings-card">
                                         <h3 className="card-title"><span></span> Form Fields</h3>
                                         <p style={{ color: '#6b7280', fontSize: '13px', marginBottom: '16px' }}>
-                                            Drag to reorder • <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle', marginBottom: 2 }}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg> visibility • ✱ required
+                                            Drag to reorder • 👁 visibility • ★ required
                                         </p>
                                         <div className="sortable-fields-container">
                                             <DndContext
@@ -3719,28 +3763,7 @@ export default function SettingsPage() {
                                         </button>
                                     </div>
 
-                                    {/* Content Blocks */}
-                                    <div className="settings-card">
-                                        <h3 className="card-title"> Content Blocks</h3>
-                                        <div className="toggle-options">
-                                            <div className="toggle-option" onClick={() => setBlocks({ ...blocks, order_summary: !blocks.order_summary })}>
-                                                <span className="toggle-option-label">Order Summary</span>
-                                                <div className={`mini-toggle ${blocks.order_summary ? 'on' : 'off'}`} />
-                                            </div>
-                                            <div className="toggle-option" onClick={() => setBlocks({ ...blocks, shipping_options: !blocks.shipping_options })}>
-                                                <span className="toggle-option-label">Shipping Options</span>
-                                                <div className={`mini-toggle ${blocks.shipping_options ? 'on' : 'off'}`} />
-                                            </div>
-                                            <div className="toggle-option" onClick={() => setBlocks({ ...blocks, cart_quantity_offers: !blocks.cart_quantity_offers })}>
-                                                <span className="toggle-option-label">Cart Content / Quantity Offers</span>
-                                                <div className={`mini-toggle ${blocks.cart_quantity_offers ? 'on' : 'off'}`} />
-                                            </div>
-                                            <div className="toggle-option" onClick={() => setBlocks({ ...blocks, buyer_marketing: !blocks.buyer_marketing })}>
-                                                <span className="toggle-option-label">Buyer Accepts Marketing</span>
-                                                <div className={`mini-toggle ${blocks.buyer_marketing ? 'on' : 'off'}`} />
-                                            </div>
-                                        </div>
-                                    </div>
+
 
                                     {/* Partial Cash on Delivery */}
                                     <div className="settings-card">
