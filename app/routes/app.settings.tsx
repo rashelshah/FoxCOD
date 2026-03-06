@@ -2360,7 +2360,7 @@ export default function SettingsPage() {
                     margin-bottom: 8px;
                     transition: all 0.2s ease;
                 }
-                .sortable-field-item:hover { border-color: #6366f1; box-shadow: 0 2px 8px rgba(99, 102, 241, 0.1); }
+                .sortable-field-item:hover { border-color: #202223; box-shadow: 0 2px 8px rgba(21, 21, 28, 0.1); }
                 .field-drag-handle {
                     cursor: grab;
                     color: #9ca3af;
@@ -2422,7 +2422,7 @@ export default function SettingsPage() {
                     transition: all 0.2s ease;
                     margin-top: 12px;
                 }
-                .add-field-btn:hover { border-color: #6366f1; color: #6366f1; background: rgba(99, 102, 241, 0.05); }
+                .add-field-btn:hover { border-color: #202223; color: #202223; background: rgba(32, 32, 43, 0.05); }
                 .modal-overlay {
                     position: fixed;
                     top: 0;
@@ -3507,7 +3507,7 @@ export default function SettingsPage() {
                                         <button
                                             type="button"
                                             onClick={() => setButtonStylesState({ ...DEFAULT_BUTTON_STYLES })}
-                                            style={{ width: '100%', padding: '12px 16px', fontSize: 13, fontWeight: 600, color: '#6366f1', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid #6366f1', borderRadius: 10, cursor: 'pointer' }}
+                                            style={{ width: '100%', padding: '12px 16px', fontSize: 13, fontWeight: 600, color: '#202223', background: '#F6F6F7', border: '2px solid #202223', borderRadius: 10, cursor: 'pointer' }}
                                         >
                                             Restore All to Default
                                         </button>
@@ -3522,7 +3522,7 @@ export default function SettingsPage() {
                                     <div className="settings-card">
                                         <h3 className="card-title"><span></span> Form Fields</h3>
                                         <p style={{ color: '#6b7280', fontSize: '13px', marginBottom: '16px' }}>
-                                            Drag to reorder • 👁 visibility • ★ required
+                                            Drag to reorder • 👁️ visibility • ★ required
                                         </p>
                                         <div className="sortable-fields-container">
                                             <DndContext
@@ -3757,7 +3757,7 @@ export default function SettingsPage() {
                                         <button
                                             type="button"
                                             onClick={() => setFormStyles({ ...DEFAULT_STYLES })}
-                                            style={{ marginTop: 16, padding: '10px 16px', fontSize: 13, fontWeight: 600, color: '#6366f1', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid #6366f1', borderRadius: 10, cursor: 'pointer' }}
+                                            style={{ marginTop: 16, padding: '10px 16px', fontSize: 13, fontWeight: 600, color: '#202223', background: '#F6F6F7', border: '2px solid #202223', borderRadius: 10, cursor: 'pointer' }}
                                         >
                                             Restore to Default
                                         </button>
@@ -4099,7 +4099,7 @@ export default function SettingsPage() {
                                                 setShowProductImage(true);
                                                 setShowPrice(true);
                                             }}
-                                            style={{ padding: '10px 16px', fontSize: 13, fontWeight: 600, color: '#6366f1', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid #6366f1', borderRadius: 10, cursor: 'pointer' }}
+                                            style={{ padding: '10px 16px', fontSize: 13, fontWeight: 600, color: '#202223', background: '#F6F6F7', border: '2px solid #202223', borderRadius: 10, cursor: 'pointer' }}
                                         >
                                             Restore to Default
                                         </button>
