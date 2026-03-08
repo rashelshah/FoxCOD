@@ -721,7 +721,12 @@
 
   .cod-quantity-offers.template-cards {
     flex-direction: row;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .cod-quantity-offers.template-cards::-webkit-scrollbar {
+    display: none;
   }
 
   .cod-offer-card {
@@ -1117,8 +1122,13 @@
   .cod-quantity-offers.template-cards {
       display: flex !important;
       flex-direction: row !important;
-      flex-wrap: wrap !important;
+      flex-wrap: nowrap !important;
       gap: 8px !important;
+      overflow-x: auto !important;
+      scrollbar-width: none !important;
+  }
+  .cod-quantity-offers.template-cards::-webkit-scrollbar {
+      display: none !important;
   }
   
   .cod-quantity-offers.template-cards .cod-offer-card {
@@ -1127,8 +1137,8 @@
       align-items: center !important;
       text-align: center !important;
       flex: 1 !important;
-      min-width: 100px !important;
-      padding: 16px 12px !important;
+      min-width: 0 !important;
+      padding: 16px 8px !important;
       box-shadow: 0 2px 8px rgba(0,0,0,0.05) !important;
   }
   
@@ -1260,6 +1270,16 @@
       .cod-offer-badge {
           font-size: 9px !important;
           padding: 2px 6px !important;
+      }
+      
+      /* Mobile ribbon sizing for cards template */
+      .template-cards .cod-ribbon-badge {
+          font-size: 7.5px !important;
+          padding: 2px 5px !important;
+          letter-spacing: 0 !important;
+      }
+      .template-cards .cod-ribbon-wrap {
+          top: -4px !important;
       }
   }
   

@@ -1440,6 +1440,13 @@
             input.rows = field.id === 'address' ? 3 : 2;
         } else if (field.type === 'dropdown') {
             input = document.createElement('select');
+            // Add placeholder option
+            var placeholderOpt = document.createElement('option');
+            placeholderOpt.value = '';
+            placeholderOpt.textContent = field.placeholder || ('Select ' + field.label.toLowerCase());
+            placeholderOpt.disabled = true;
+            placeholderOpt.selected = true;
+            input.appendChild(placeholderOpt);
             // Add options logic if custom fields have options
             if (field.options) {
                 field.options.forEach(function(opt) {
@@ -1449,6 +1456,41 @@
                     input.appendChild(option);
                 });
             }
+        } else if (field.type === 'checkbox') {
+            // Render checkbox as inline checkbox + label (no icon wrapper needed)
+            var checkboxWrapper = document.createElement('div');
+            checkboxWrapper.style.display = 'flex';
+            checkboxWrapper.style.alignItems = 'center';
+            checkboxWrapper.style.gap = '8px';
+            checkboxWrapper.style.marginBottom = '6px';
+            checkboxWrapper.style.padding = '8px 0';
+
+            var cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.name = field.id;
+            cb.id = 'cod-' + field.id;
+            cb.style.width = '16px';
+            cb.style.height = '16px';
+            cb.style.cursor = 'pointer';
+            if (field.required) {
+                cb.setAttribute('data-required', 'true');
+            }
+
+            var cbLabel = document.createElement('span');
+            cbLabel.style.fontSize = (styles.labelFontSize || textSize) + 'px';
+            cbLabel.style.color = styles.labelColor || textColor;
+            cbLabel.textContent = field.label;
+            if (field.required) {
+                cbLabel.innerHTML = field.label + ' <span style="color:#e53935">*</span>';
+            }
+
+            checkboxWrapper.appendChild(cb);
+            checkboxWrapper.appendChild(cbLabel);
+            wrapper.innerHTML = ''; // remove the label we already added
+            wrapper.appendChild(checkboxWrapper);
+            container.appendChild(wrapper);
+            console.log('[COD Form] Added checkbox field to container:', field.id);
+            return; // skip the rest — no inputContainer needed
         } else {
             input = document.createElement('input');
             input.type = field.type === 'number' ? 'number' : field.type === 'email' ? 'email' : field.type === 'tel' ? 'tel' : 'text';
@@ -3896,6 +3938,21 @@
         }
 
         var value = (field.value || '').trim();
+        // For checkboxes, check .checked instead of value
+        if (field.type === 'checkbox') {
+          console.log('[COD Form] Validating checkbox:', field.name, 'checked:', field.checked);
+          if (!field.checked) {
+            if (!firstInvalid) firstInvalid = field;
+            var cbWrapper = field.closest('.cod-form-field') || field.parentNode;
+            if (cbWrapper) {
+              cbWrapper.style.setProperty('outline', '2px solid #d82c0d', 'important');
+              cbWrapper.style.setProperty('outline-offset', '2px');
+              cbWrapper.style.setProperty('border-radius', '4px');
+              setTimeout(function(el) { el.style.removeProperty('outline'); el.style.removeProperty('outline-offset'); }.bind(null, cbWrapper), 3000);
+            }
+          }
+          return; // skip normal value check
+        }
         console.log('[COD Form] Validating field:', field.name, 'value:', JSON.stringify(value), 'empty:', !value);
         if (!value) {
           if (!firstInvalid) firstInvalid = field;
@@ -3967,6 +4024,26 @@
           finalTotal: 0,
           upsell_items: getCheckedTickUpsells(form, config)
       };
+
+      // Collect custom field values
+      var customFieldData = [];
+      var knownFieldIds = ['name', 'phone', 'address', 'email', 'state', 'city', 'zip', 'zipcode', 'notes', 'quantity', 'shipping', 'order_summary', 'marketing', 'payment_mode'];
+      (config.fields || []).forEach(function(field) {
+          if (knownFieldIds.indexOf(field.id) !== -1) return; // skip known fields
+          if (!field.visible) return;
+          if (field.type === 'checkbox') {
+              var cb = form.querySelector('input[name="' + field.id + '"]');
+              customFieldData.push({ label: field.label, value: cb && cb.checked ? 'Yes' : 'No' });
+          } else {
+              var val = formData.get(field.id);
+              if (val) {
+                  customFieldData.push({ label: field.label, value: val });
+              }
+          }
+      });
+      if (customFieldData.length > 0) {
+          payload.customFieldData = customFieldData;
+      }
 
       // ── Fraud Protection: client-side validation ──
       var fraudResult = validateFraudProtection(payload);

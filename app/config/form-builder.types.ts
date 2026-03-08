@@ -15,6 +15,7 @@ export interface FormField {
     order: number;
     placeholder?: string;
     options?: string[]; // For dropdown type
+    isCustom?: boolean; // True for seller-created custom fields
 }
 
 /**
