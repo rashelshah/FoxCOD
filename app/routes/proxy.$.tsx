@@ -368,6 +368,11 @@ async function handleRegularOrder(request: Request, data: any) {
         orderNotes = orderNotes ? orderNotes + '\n' : '';
         orderNotes += `BUNDLE DISCOUNT: ${discountPercent}% off`;
     }
+    // Append custom field data to order notes
+    if (data.customFieldData && Array.isArray(data.customFieldData) && data.customFieldData.length > 0) {
+        const cfNotes = 'CUSTOM FIELDS:\n' + data.customFieldData.map((cf: any) => `  ${cf.label}: ${cf.value}`).join('\n');
+        orderNotes = orderNotes ? orderNotes + '\n' + cfNotes : cfNotes;
+    }
 
     console.log('[Proxy] Total price:', totalPrice, 'Qty:', data.quantity, 'Discount:', discountPercent + '%', 'Upsell items:', upsellItems.length);
 

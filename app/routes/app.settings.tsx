@@ -9,7 +9,7 @@ import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
 import { useLoaderData, useSubmit, useNavigation, Link, useActionData } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
-import { RangeSlider, Button, InlineStack, Modal, Text, Icon } from "@shopify/polaris";
+import { RangeSlider, Button, InlineStack, Modal, Text, Icon, Select, TextField } from "@shopify/polaris";
 import { EditIcon, DeleteIcon, ViewIcon, HideIcon, StarFilledIcon } from "@shopify/polaris-icons";
 import {
     DndContext,
@@ -473,7 +473,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         form_type: formData.get("form_type") as any || defaultSettings.form_type,
         fields: JSON.parse(formData.get("fields") as string || JSON.stringify(defaultSettings.fields)),
         blocks: JSON.parse(formData.get("blocks") as string || JSON.stringify(defaultSettings.blocks)),
-        custom_fields: JSON.parse(formData.get("custom_fields") as string || "[]"),
+        custom_fields: [],  // Legacy: custom fields are now part of fields array
         styles: JSON.parse(formData.get("styles") as string || JSON.stringify(defaultSettings.styles)),
         button_styles: JSON.parse(formData.get("button_styles") as string || JSON.stringify(defaultSettings.button_styles)),
         shipping_options: JSON.parse(formData.get("shipping_options") as string || JSON.stringify(defaultSettings.shipping_options)),
@@ -592,7 +592,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 metafields: [
                     { ownerId: shopGid, namespace: "fox_cod", key: "fields", value: JSON.stringify(settings.fields || DEFAULT_FIELDS), type: "json" },
                     { ownerId: shopGid, namespace: "fox_cod", key: "blocks", value: JSON.stringify(settings.blocks || DEFAULT_BLOCKS), type: "json" },
-                    { ownerId: shopGid, namespace: "fox_cod", key: "custom_fields", value: JSON.stringify(settings.custom_fields || []), type: "json" },
+                    { ownerId: shopGid, namespace: "fox_cod", key: "custom_fields", value: JSON.stringify([]), type: "json" },  // Legacy: cleared
                     { ownerId: shopGid, namespace: "fox_cod", key: "styles", value: JSON.stringify(settings.styles || DEFAULT_STYLES), type: "json" },
                     { ownerId: shopGid, namespace: "fox_cod", key: "button_styles_json", value: JSON.stringify(settings.button_styles || DEFAULT_BUTTON_STYLES), type: "json" },
                     { ownerId: shopGid, namespace: "fox_cod", key: "shipping_options", value: JSON.stringify(settings.shipping_options || DEFAULT_SHIPPING_OPTIONS), type: "json" },
@@ -1702,21 +1702,31 @@ export default function SettingsPage() {
     // New advanced feature state
     const [formType, setFormType] = useState<'popup' | 'embedded'>(settings.form_type || 'popup');
     // Merge saved fields with DEFAULT_FIELDS so newly added fields (e.g. shipping, order_summary) are always present
-    const mergeFieldsWithDefaults = (savedFields: FormField[] | undefined): FormField[] => {
-        if (!savedFields || savedFields.length === 0) return [...DEFAULT_FIELDS];
-        const existingIds = new Set(savedFields.map(f => f.id));
+    // Also absorb any legacy custom_fields into the main fields array
+    const mergeFieldsWithDefaults = (savedFields: FormField[] | undefined, legacyCustomFields?: FormField[]): FormField[] => {
+        const base = (!savedFields || savedFields.length === 0) ? [...DEFAULT_FIELDS] : [...savedFields];
+        // Add missing default fields
+        const existingIds = new Set(base.map(f => f.id));
         const missingFields = DEFAULT_FIELDS.filter(df => !existingIds.has(df.id));
-        if (missingFields.length === 0) return savedFields;
-        // Append missing fields with order values continuing after existing fields
-        const maxOrder = Math.max(...savedFields.map(f => f.order), 0);
-        return [
-            ...savedFields,
+        let maxOrder = Math.max(...base.map(f => f.order), 0);
+        const result = [
+            ...base,
             ...missingFields.map((f, i) => ({ ...f, order: maxOrder + i + 1 })),
         ];
+        // Absorb legacy custom_fields (if any) that aren't already in the array
+        if (legacyCustomFields && legacyCustomFields.length > 0) {
+            const existingIdsAfter = new Set(result.map(f => f.id));
+            maxOrder = Math.max(...result.map(f => f.order), 0);
+            legacyCustomFields.forEach((cf, i) => {
+                if (!existingIdsAfter.has(cf.id)) {
+                    result.push({ ...cf, isCustom: true, order: maxOrder + i + 1 });
+                }
+            });
+        }
+        return result;
     };
-    const [fields, setFields] = useState<FormField[]>(mergeFieldsWithDefaults(settings.fields));
+    const [fields, setFields] = useState<FormField[]>(mergeFieldsWithDefaults(settings.fields, settings.custom_fields));
     const [blocks, setBlocks] = useState<ContentBlocks>(settings.blocks || DEFAULT_BLOCKS);
-    const [customFields, setCustomFields] = useState<FormField[]>(settings.custom_fields || []);
     const [formStyles, setFormStyles] = useState<FormStyles>(settings.styles || DEFAULT_STYLES);
     const [selectedPreset, setSelectedPreset] = useState('custom');
     const [buttonStylesState, setButtonStylesState] = useState<ButtonStyles>(settings.button_styles || DEFAULT_BUTTON_STYLES);
@@ -1724,6 +1734,8 @@ export default function SettingsPage() {
     const [showAddFieldModal, setShowAddFieldModal] = useState(false);
     const [newFieldType, setNewFieldType] = useState<'text' | 'number' | 'dropdown' | 'checkbox'>('text');
     const [newFieldLabel, setNewFieldLabel] = useState('');
+    const [newFieldPlaceholder, setNewFieldPlaceholder] = useState('');
+    const [newFieldOptions, setNewFieldOptions] = useState('');
 
     // Partial COD settings
     const [partialCodEnabled, setPartialCodEnabled] = useState(settings.partial_cod_enabled ?? false);
@@ -1771,7 +1783,7 @@ export default function SettingsPage() {
             show_email_field: showEmailField, show_notes_field: showNotesField, email_required: emailRequired,
             name_placeholder: namePlaceholder, phone_placeholder: phonePlaceholder, address_placeholder: addressPlaceholder,
             notes_placeholder: notesPlaceholder, modal_style: modalStyle, animation_style: animationStyle, border_radius: borderRadius,
-            form_type: formType, fields, blocks, custom_fields: customFields, styles: formStyles, button_styles: { ...buttonStylesState, backgroundColor: primaryColor },
+            form_type: formType, fields, blocks, custom_fields: [], styles: formStyles, button_styles: { ...buttonStylesState, backgroundColor: primaryColor },
             shipping_options: shippingOpts, partial_cod_enabled: partialCodEnabled, partial_cod_advance_amount: partialCodAdvanceAmount,
             partial_cod_commission: partialCodCommission, shipping_rates_enabled: shippingRatesEnabled
         };
@@ -1781,7 +1793,7 @@ export default function SettingsPage() {
         enabled, buttonText, primaryColor, requiredFields, maxQuantity, buttonStyle, buttonSize, buttonPosition,
         formTitle, formSubtitle, successMessage, submitButtonText, showProductImage, showPrice, showQuantitySelector,
         showEmailField, showNotesField, emailRequired, namePlaceholder, phonePlaceholder, addressPlaceholder,
-        notesPlaceholder, modalStyle, animationStyle, borderRadius, formType, fields, blocks, customFields,
+        notesPlaceholder, modalStyle, animationStyle, borderRadius, formType, fields, blocks,
         formStyles, buttonStylesState, shippingOpts, partialCodEnabled, partialCodAdvanceAmount, partialCodCommission,
         shippingRatesEnabled, savedSettingsString, pendingShippingOps
     ]);
@@ -1815,9 +1827,8 @@ export default function SettingsPage() {
         setAnimationStyle(orig.animation_style || 'fade');
         setBorderRadius(orig.border_radius || 12);
         setFormType(orig.form_type || 'popup');
-        setFields(mergeFieldsWithDefaults(orig.fields));
+        setFields(mergeFieldsWithDefaults(orig.fields, orig.custom_fields));
         setBlocks(orig.blocks || DEFAULT_BLOCKS);
-        setCustomFields(orig.custom_fields || []);
         setFormStyles(orig.styles || DEFAULT_STYLES);
         setButtonStylesState(orig.button_styles || DEFAULT_BUTTON_STYLES);
         setShippingOpts(orig.shipping_options || DEFAULT_SHIPPING_OPTIONS);
@@ -1846,7 +1857,7 @@ export default function SettingsPage() {
                     show_email_field: showEmailField, show_notes_field: showNotesField, email_required: emailRequired,
                     name_placeholder: namePlaceholder, phone_placeholder: phonePlaceholder, address_placeholder: addressPlaceholder,
                     notes_placeholder: notesPlaceholder, modal_style: modalStyle, animation_style: animationStyle, border_radius: borderRadius,
-                    form_type: formType, fields, blocks, custom_fields: customFields, styles: formStyles, button_styles: { ...buttonStylesState, backgroundColor: primaryColor },
+                    form_type: formType, fields, blocks, custom_fields: [], styles: formStyles, button_styles: { ...buttonStylesState, backgroundColor: primaryColor },
                     shipping_options: shippingOpts, partial_cod_enabled: partialCodEnabled, partial_cod_advance_amount: partialCodAdvanceAmount,
                     partial_cod_commission: partialCodCommission, shipping_rates_enabled: shippingRatesEnabled
                 };
@@ -1865,7 +1876,7 @@ export default function SettingsPage() {
     }, [actionData, enabled, buttonText, primaryColor, requiredFields, maxQuantity, buttonStyle, buttonSize, buttonPosition,
         formTitle, formSubtitle, successMessage, submitButtonText, showProductImage, showPrice, showQuantitySelector,
         showEmailField, showNotesField, emailRequired, namePlaceholder, phonePlaceholder, addressPlaceholder,
-        notesPlaceholder, modalStyle, animationStyle, borderRadius, formType, fields, blocks, customFields,
+        notesPlaceholder, modalStyle, animationStyle, borderRadius, formType, fields, blocks,
         formStyles, buttonStylesState, shippingOpts, partialCodEnabled, partialCodAdvanceAmount, partialCodCommission, shippingRatesEnabled, shopify]);
 
     // Hex validation helpers
@@ -1927,25 +1938,31 @@ export default function SettingsPage() {
         ));
     }, []);
 
-    // Add custom field
+    // Add custom field — adds directly into `fields` array
     const addCustomField = useCallback(() => {
         if (!newFieldLabel.trim()) return;
+        const maxOrder = Math.max(...fields.map(f => f.order), 0);
         const newField: FormField = {
             id: `custom_${Date.now()}`,
             label: newFieldLabel,
             type: newFieldType,
             visible: true,
             required: false,
-            order: fields.length + customFields.length + 1,
+            order: maxOrder + 1,
+            isCustom: true,
+            placeholder: newFieldPlaceholder || undefined,
+            options: newFieldType === 'dropdown' && newFieldOptions.trim() ? newFieldOptions.split(',').map(o => o.trim()).filter(Boolean) : undefined,
         };
-        setCustomFields((prev) => [...prev, newField]);
+        setFields((prev) => [...prev, newField]);
         setNewFieldLabel('');
+        setNewFieldPlaceholder('');
+        setNewFieldOptions('');
         setShowAddFieldModal(false);
-    }, [newFieldLabel, newFieldType, fields.length, customFields.length]);
+    }, [newFieldLabel, newFieldType, newFieldPlaceholder, newFieldOptions, fields]);
 
-    // Remove custom field
+    // Remove custom field — only works on custom fields
     const removeCustomField = useCallback((fieldId: string) => {
-        setCustomFields((prev) => prev.filter((f) => f.id !== fieldId));
+        setFields((prev) => prev.filter((f) => f.id !== fieldId));
     }, []);
 
     // Toggle field
@@ -1987,7 +2004,7 @@ export default function SettingsPage() {
         formData.append("form_type", formType);
         formData.append("fields", JSON.stringify(fields));
         formData.append("blocks", JSON.stringify(blocks));
-        formData.append("custom_fields", JSON.stringify(customFields));
+        formData.append("custom_fields", JSON.stringify([]));  // Legacy: cleared
         formData.append("styles", JSON.stringify(formStyles));
         formData.append("button_styles", JSON.stringify({ ...buttonStylesState, backgroundColor: primaryColor }));
         formData.append("shipping_options", JSON.stringify(shippingOpts));
@@ -2027,7 +2044,7 @@ export default function SettingsPage() {
         showQuantitySelector, showEmailField, showNotesField, emailRequired,
         namePlaceholder, phonePlaceholder, addressPlaceholder, notesPlaceholder,
         modalStyle, animationStyle, borderRadius, formType, fields, blocks,
-        customFields, formStyles, buttonStylesState, shippingOpts,
+        formStyles, buttonStylesState, shippingOpts,
         partialCodEnabled, partialCodAdvanceAmount, partialCodCommission,
         shippingRatesEnabled, submit, shopify, pendingShippingOps
     ]);
@@ -3540,22 +3557,12 @@ export default function SettingsPage() {
                                                             field={field}
                                                             onToggleVisibility={toggleFieldVisibility}
                                                             onToggleRequired={toggleFieldRequired}
+                                                            isCustom={field.isCustom}
+                                                            onRemove={field.isCustom ? removeCustomField : undefined}
                                                         />
                                                     ))}
                                                 </SortableContext>
                                             </DndContext>
-
-                                            {/* Custom Fields */}
-                                            {customFields.map((field) => (
-                                                <SortableFieldItem
-                                                    key={field.id}
-                                                    field={field}
-                                                    onToggleVisibility={(id) => setCustomFields(prev => prev.map(f => f.id === id ? { ...f, visible: !f.visible } : f))}
-                                                    onToggleRequired={(id) => setCustomFields(prev => prev.map(f => f.id === id ? { ...f, required: !f.required } : f))}
-                                                    isCustom
-                                                    onRemove={removeCustomField}
-                                                />
-                                            ))}
 
                                             <button
                                                 type="button"
@@ -3853,43 +3860,65 @@ export default function SettingsPage() {
                                         </div>
                                     </div>
 
-                                    {/* Add Field Modal */}
-                                    {showAddFieldModal && (
-                                        <div className="modal-overlay" onClick={() => setShowAddFieldModal(false)}>
-                                            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                                                <div className="modal-header">
-                                                    <h3>Add Custom Field</h3>
-                                                </div>
-                                                <div className="modal-body">
-                                                    <div className="modal-field">
-                                                        <label>Field Type</label>
-                                                        <select
-                                                            value={newFieldType}
-                                                            onChange={(e) => setNewFieldType(e.target.value as any)}
-                                                        >
-                                                            <option value="text">Text</option>
-                                                            <option value="number">Number</option>
-                                                            <option value="dropdown">Dropdown</option>
-                                                            <option value="checkbox">Checkbox</option>
-                                                        </select>
-                                                    </div>
-                                                    <div className="modal-field">
-                                                        <label>Field Label</label>
-                                                        <input
-                                                            type="text"
-                                                            value={newFieldLabel}
-                                                            onChange={(e) => setNewFieldLabel(e.target.value)}
-                                                            placeholder="Enter field label"
-                                                        />
-                                                    </div>
-                                                </div>
-                                                <div className="modal-actions">
-                                                    <button className="modal-btn cancel" onClick={() => setShowAddFieldModal(false)}>Cancel</button>
-                                                    <button className="modal-btn confirm" onClick={addCustomField}>Add Field</button>
-                                                </div>
+                                    {/* Add Field Modal — Polaris UI */}
+                                    <Modal
+                                        open={showAddFieldModal}
+                                        onClose={() => { setShowAddFieldModal(false); setNewFieldLabel(''); setNewFieldPlaceholder(''); setNewFieldOptions(''); }}
+                                        title="Add Custom Field"
+                                        primaryAction={{
+                                            content: 'Add Field',
+                                            onAction: addCustomField,
+                                            disabled: !newFieldLabel.trim(),
+                                        }}
+                                        secondaryActions={[{
+                                            content: 'Cancel',
+                                            onAction: () => { setShowAddFieldModal(false); setNewFieldLabel(''); setNewFieldPlaceholder(''); setNewFieldOptions(''); },
+                                        }]}
+                                    >
+                                        <Modal.Section>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                                <Select
+                                                    label="Field Type"
+                                                    options={[
+                                                        { label: 'Text', value: 'text' },
+                                                        { label: 'Number', value: 'number' },
+                                                        { label: 'Dropdown', value: 'dropdown' },
+                                                        { label: 'Checkbox', value: 'checkbox' },
+                                                    ]}
+                                                    value={newFieldType}
+                                                    onChange={(v) => setNewFieldType(v as any)}
+                                                />
+                                                <TextField
+                                                    label="Field Label"
+                                                    value={newFieldLabel}
+                                                    onChange={setNewFieldLabel}
+                                                    placeholder="e.g. Company Name"
+                                                    autoComplete="off"
+                                                />
+                                                {newFieldType !== 'checkbox' && (
+                                                    <TextField
+                                                        label="Placeholder Text"
+                                                        value={newFieldPlaceholder}
+                                                        onChange={setNewFieldPlaceholder}
+                                                        placeholder="e.g. Enter your company name"
+                                                        autoComplete="off"
+                                                        helpText="Optional. Shown as hint text inside the field."
+                                                    />
+                                                )}
+                                                {newFieldType === 'dropdown' && (
+                                                    <TextField
+                                                        label="Dropdown Options"
+                                                        value={newFieldOptions}
+                                                        onChange={setNewFieldOptions}
+                                                        placeholder="Option 1, Option 2, Option 3"
+                                                        autoComplete="off"
+                                                        helpText="Comma-separated list of options."
+                                                        multiline={2}
+                                                    />
+                                                )}
                                             </div>
-                                        </div>
-                                    )}
+                                        </Modal.Section>
+                                    </Modal>
                                 </>
                             )}
 
