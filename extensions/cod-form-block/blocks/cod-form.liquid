@@ -183,6 +183,18 @@
     window.FoxCod.quantityOffers = Array.isArray(offersData) ? offersData : (offersData ? [offersData] : []);
     window.FoxCod.productId = '{{ product.id }}';
     
+    // Product variants & options for bundle variant selector
+    window.FoxCod.productVariants = [
+      {%- for variant in product.variants -%}
+        { id: '{{ variant.id }}', title: {{ variant.title | json }}, price: {{ variant.price | divided_by: 100.0 }}, available: {{ variant.available }}, option1: {{ variant.option1 | json }}, option2: {{ variant.option2 | json | default: 'null' }}, option3: {{ variant.option3 | json | default: 'null' }} }{%- unless forloop.last -%},{%- endunless -%}
+      {%- endfor -%}
+    ];
+    window.FoxCod.productOptions = [
+      {%- for option in product.options -%}
+        {{ option.name | json }}{%- unless forloop.last -%},{%- endunless -%}
+      {%- endfor -%}
+    ];
+    
     // Product collection IDs for collection-based shipping rate matching
     window.FoxCod.productCollectionIds = '{{ product_collection_ids }}'.split(',').filter(function(id) { return id.trim() !== ''; });
     
@@ -350,7 +362,7 @@
     right: 0;
     bottom: 0;
     background: rgba(0, 0, 0, 0.5);
-    z-index: 9998;
+    z-index: 99998;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -369,7 +381,7 @@
   /* Modal Container - prevent horizontal swipe */
   .cod-form-container.cod-modal {
     position: relative;
-    z-index: 9999;
+    z-index: 99999;
     touch-action: pan-y;
     overscroll-behavior-x: none;
     animation: slideUp 0.3s ease;
@@ -1263,6 +1275,82 @@
       box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
   }
   
+  /* ── Bundle Variant Selector ── */
+  .foxcod-variant-section {
+      margin-top: 12px;
+      padding: 12px;
+      background: rgba(0,0,0,0.02);
+      border-radius: 10px;
+      border: 1px solid rgba(0,0,0,0.06);
+  }
+  .foxcod-variant-section-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #374151;
+      margin: 0 0 10px 0;
+  }
+  .foxcod-variant-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+      padding: 6px 0;
+  }
+  .foxcod-variant-row:last-child {
+      margin-bottom: 0;
+  }
+  .foxcod-variant-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #6b7280;
+      min-width: 48px;
+      flex-shrink: 0;
+  }
+  .foxcod-variant-selects {
+      display: flex;
+      gap: 6px;
+      flex: 1;
+      flex-wrap: wrap;
+  }
+  .foxcod-variant-select {
+      flex: 1;
+      min-width: 80px;
+      padding: 8px 28px 8px 10px;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      font-size: 13px;
+      color: #1f2937;
+      background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") no-repeat right 8px center;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      appearance: none;
+      cursor: pointer;
+      transition: border-color 0.15s ease;
+  }
+  .foxcod-variant-select:focus {
+      border-color: #6366f1;
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(99,102,241,0.1);
+  }
+  .foxcod-variant-select option:disabled {
+      color: #d1d5db;
+  }
+
+  /* Mobile Responsive Styles for Offers */
+  @media only screen and (max-width: 480px) {
+      .foxcod-variant-row {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 4px;
+      }
+      .foxcod-variant-selects {
+          width: 100%;
+      }
+      .foxcod-variant-select {
+          min-width: 0;
+      }
+  }
+
   /* Mobile Responsive Styles for Offers */
   @media only screen and (max-width: 480px) {
       .cod-quantity-offers {

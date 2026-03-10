@@ -213,6 +213,9 @@
     initCODForms();
   }
 
+  // Clear checkout state on page load/refresh so form starts fresh
+  try { localStorage.removeItem('foxcod_checkout_state'); } catch(e) {}
+
   /**
    * Helper to decode HTML entities (from Liquid escape filter)
    */
@@ -798,10 +801,20 @@
     }
     
     // State: selected offer index
-    var selectedIndex = design.autoSelectBestValue ? 
-      applicableGroup.offers.reduce(function(maxIdx, offer, idx, arr) {
-        return (offer.discountPercent || 0) > (arr[maxIdx].discountPercent || 0) ? idx : maxIdx;
-      }, 0) : 0;
+    // Priority: 1) offer with preselect=true, 2) best discount offer, 3) first offer
+    var selectedIndex = -1;
+    // Check for preselected offer
+    applicableGroup.offers.forEach(function(offer, idx) {
+        if (offer.preselect && selectedIndex === -1) selectedIndex = idx;
+    });
+    // Default to best discount offer
+    if (selectedIndex === -1) {
+        selectedIndex = applicableGroup.offers.reduce(function(maxIdx, offer, idx, arr) {
+            return (offer.discountPercent || 0) > (arr[maxIdx].discountPercent || 0) ? idx : maxIdx;
+        }, 0);
+    }
+    // Ultimate fallback: first offer
+    if (selectedIndex === -1) selectedIndex = 0;
     
     // Render each offer card
     applicableGroup.offers.forEach(function(offer, idx) {
@@ -1054,61 +1067,280 @@
         
         // Update quantity selector
         var form = container.closest('.cod-modal') || container.closest('form');
-        var qtyInput = form.querySelector('.cod-qty-input');
-        if (qtyInput) {
-          qtyInput.value = offer.quantity;
-          qtyInput.dispatchEvent(new Event('change', { bubbles: true }));
+        var isInsideModal = !!container.closest('.cod-modal');
+        if (isInsideModal) {
+          var qtyInput = form ? form.querySelector('.cod-qty-input') : null;
+          if (qtyInput) {
+            qtyInput.value = offer.quantity;
+            // Don't dispatch change event — we'll update summary ourselves below
+          }
         }
         
-        // Store selected offer for price calculation
+        // Store selected offer — MutationObserver will re-render shipping automatically
         offersContainer.setAttribute('data-selected-offer', JSON.stringify({
           quantity: offer.quantity,
           discountPercent: offer.discountPercent || 0
         }));
         
-        // Update price display
-        updateOfferPrice(form, config, offer);
+        // Render bundle variant selectors (works on both product page and modal)
+        renderBundleVariantSelectors(form, config, parseInt(offer.quantity) || 1, offersContainer);
         
-        // Update order summary with new discount - pass offer directly
-        updateOrderSummaryWithOffer(form, config, offer);
-        
-        // Re-render shipping rates with new quantity so rate conditions are re-evaluated
-        var fieldsContainer = form.querySelector('.cod-dynamic-fields-container');
-        var shippingSection = form.querySelector('.cod-shipping-section');
-        var shippingMarker = fieldsContainer ? fieldsContainer.querySelector('.cod-section-marker[data-section="shipping"]') : null;
-        if (shippingSection) {
-            shippingSection.remove();
+        // Update price display and order summary ONCE after everything is set up
+        // Use a short delay to let MutationObserver finish shipping re-render first
+        if (isInsideModal && form) {
+            setTimeout(function() {
+                updateOfferPrice(form, config, offer);
+                updateOrderSummaryWithOffer(form, config, offer);
+            }, 100);
         }
-        var hasNewShippingRates = config.shippingRatesEnabled && config.shippingRates && config.shippingRates.length > 0;
-        var hasOldShippingOptions = config.shippingOptions && config.shippingOptions.enabled;
-        var shippingFieldVisible = (config.fields || []).some(function(f) { return f.id === 'shipping' && f.visible !== false; });
-        var shippingEnabled2 = (config.blocks && config.blocks.shipping_options) || shippingFieldVisible;
-        if (shippingEnabled2 && (hasNewShippingRates || hasOldShippingOptions)) {
-            renderShippingOptions(form, config);
-            if (shippingMarker) {
-                var newShippingSection = form.querySelector('.cod-shipping-section');
-                if (newShippingSection) {
-                    shippingMarker.appendChild(newShippingSection);
-                }
-            }
-        }
-        
-        // Update order summary again after shipping re-render
-        setTimeout(function() {
-            updateOrderSummaryWithOffer(form, config, offer);
-        }, 50);
       });
       
       offersContainer.appendChild(card);
     });
     
     // Set initial selected offer
+    var initialOffer = applicableGroup.offers[selectedIndex];
     offersContainer.setAttribute('data-selected-offer', JSON.stringify({
-      quantity: applicableGroup.offers[selectedIndex].quantity,
-      discountPercent: applicableGroup.offers[selectedIndex].discountPercent || 0
+      quantity: initialOffer.quantity,
+      discountPercent: initialOffer.discountPercent || 0
     }));
     
+    // Store the selected offer and container reference for variant selector auto-render
+    offersContainer._initialSelectedOffer = initialOffer;
+    offersContainer._selectedIndex = selectedIndex;
+    
     return offersContainer;
+  }
+
+  /**
+   * ── Bundle Variant Selector ──
+   * When a bundle offer is selected (Buy 2, Buy 3, etc), render per-item variant dropdowns
+   */
+  function renderBundleVariantSelectors(form, config, quantity, offersContainerOverride) {
+      var variants = window.FoxCod && window.FoxCod.productVariants;
+      var options = window.FoxCod && window.FoxCod.productOptions;
+      if (!variants || variants.length <= 1 || !options || options.length === 0) return;
+
+      // Find or use provided offers container
+      var offersContainer = offersContainerOverride || null;
+      if (!offersContainer) {
+          var modal = form ? (form.closest('.cod-modal') || form.parentElement) : null;
+          offersContainer = (modal && modal.querySelector('.cod-quantity-offers')) || 
+                            (form && form.querySelector('.cod-quantity-offers')) ||
+                            document.querySelector('.cod-product-page-offers');
+      }
+
+      // Remove any existing variant sections (from both modal and product page)
+      document.querySelectorAll('.foxcod-variant-section').forEach(function(el) { el.remove(); });
+
+      if (quantity <= 1) {
+          window.FoxCod._selectedBundleVariants = null;
+          return;
+      }
+
+      // Find the lowest variant price as the base for price diff display
+      var lowestPrice = variants.reduce(function(min, v) {
+          return v.available && v.price < min ? v.price : min;
+      }, Infinity);
+      if (lowestPrice === Infinity) lowestPrice = variants[0].price;
+
+      // Build unique option values
+      var optionValues = [];
+      options.forEach(function(optName, optIdx) {
+          var values = [];
+          var key = 'option' + (optIdx + 1);
+          variants.forEach(function(v) {
+              if (v[key] && values.indexOf(v[key]) === -1) values.push(v[key]);
+          });
+          optionValues.push({ name: optName, values: values });
+      });
+
+      // Create section container
+      var section = document.createElement('div');
+      section.className = 'foxcod-variant-section';
+      section.innerHTML = '<p class="foxcod-variant-section-title">Select variants for each item:</p>';
+
+      // Initialize selected variants array
+      var selectedBundleVariants = [];
+      var defaultVariant = variants.find(function(v) { return v.available; }) || variants[0];
+
+      for (var i = 0; i < quantity; i++) {
+          (function(itemIndex) {
+              var row = document.createElement('div');
+              row.className = 'foxcod-variant-row';
+              row.setAttribute('data-item-index', itemIndex);
+
+              var label = document.createElement('span');
+              label.className = 'foxcod-variant-label';
+              label.textContent = 'Item ' + (itemIndex + 1);
+              row.appendChild(label);
+
+              var selectsDiv = document.createElement('div');
+              selectsDiv.className = 'foxcod-variant-selects';
+
+              // Create a dropdown for each option dynamically from product.options
+              optionValues.forEach(function(opt, optIdx) {
+                  var sel = document.createElement('select');
+                  sel.className = 'foxcod-variant-select';
+                  sel.setAttribute('data-item', itemIndex);
+                  sel.setAttribute('data-option-index', optIdx);
+                  sel.setAttribute('aria-label', opt.name + ' for Item ' + (itemIndex + 1));
+
+                  opt.values.forEach(function(val) {
+                      var option = document.createElement('option');
+                      option.value = val;
+
+                      // Find variants matching this option value to determine price & availability
+                      var matchingVariants = variants.filter(function(v) {
+                          return v['option' + (optIdx + 1)] === val;
+                      });
+                      var anyAvailable = matchingVariants.some(function(v) { return v.available; });
+                      // Use the cheapest available matching variant's price for display
+                      var displayPrice = matchingVariants.reduce(function(min, v) {
+                          return v.price < min ? v.price : min;
+                      }, matchingVariants[0] ? matchingVariants[0].price : 0);
+
+                      // Build label with price info
+                      var labelText = val;
+                      if (displayPrice > 0) {
+                          var priceDiff = displayPrice - lowestPrice;
+                          if (priceDiff > 0) {
+                              labelText += ' — ' + formatMoney(displayPrice) + ' (+' + formatMoney(priceDiff) + ')';
+                          } else {
+                              labelText += ' — ' + formatMoney(displayPrice);
+                          }
+                      }
+
+                      if (!anyAvailable) {
+                          labelText += ' — Out of stock';
+                          option.disabled = true;
+                      }
+                      option.textContent = labelText;
+                      sel.appendChild(option);
+                  });
+
+                  // Set default to the default variant's option
+                  var defaultKey = 'option' + (optIdx + 1);
+                  if (defaultVariant[defaultKey]) sel.value = defaultVariant[defaultKey];
+
+                  sel.addEventListener('change', function() {
+                      updateBundleVariantSelection(form, config, section, quantity);
+                  });
+
+                  selectsDiv.appendChild(sel);
+              });
+
+              row.appendChild(selectsDiv);
+              section.appendChild(row);
+
+              // Initialize this item's variant
+              selectedBundleVariants.push({
+                  variantId: defaultVariant.id,
+                  title: defaultVariant.title,
+                  price: defaultVariant.price
+              });
+          })(i);
+      }
+
+      window.FoxCod._selectedBundleVariants = selectedBundleVariants;
+
+      // Insert after offers container
+      if (offersContainer && offersContainer.parentNode) {
+          offersContainer.parentNode.insertBefore(section, offersContainer.nextSibling);
+      } else if (form) {
+          form.insertBefore(section, form.firstChild);
+      }
+
+      // Initial price update (only if inside modal form)
+      if (form && form.closest('.cod-modal')) {
+          updateBundleVariantSelection(form, config, section, quantity);
+      }
+  }
+
+  function findMatchingVariant(selectedOptions) {
+      var variants = window.FoxCod && window.FoxCod.productVariants;
+      if (!variants) return null;
+      return variants.find(function(v) {
+          for (var i = 0; i < selectedOptions.length; i++) {
+              if (v['option' + (i + 1)] !== selectedOptions[i]) return false;
+          }
+          return true;
+      }) || null;
+  }
+
+  function updateBundleVariantSelection(form, config, section, quantity) {
+      var options = window.FoxCod && window.FoxCod.productOptions;
+      var variants = window.FoxCod && window.FoxCod.productVariants;
+      if (!options || !variants) return;
+      var bundleVariants = [];
+
+      for (var i = 0; i < quantity; i++) {
+          var selectedOpts = [];
+          for (var j = 0; j < options.length; j++) {
+              var sel = section.querySelector('select[data-item="' + i + '"][data-option-index="' + j + '"]');
+              if (sel) selectedOpts.push(sel.value);
+          }
+          var matched = findMatchingVariant(selectedOpts);
+          if (matched) {
+              bundleVariants.push({ variantId: matched.id, title: matched.title, price: matched.price });
+          } else {
+              // Fallback to current variant
+              bundleVariants.push({ variantId: config.variantId, title: config.productTitle, price: parseFloat(config.productPrice) || 0 });
+          }
+
+          // Update dropdown labels with resolved prices for this item row
+          for (var j2 = 0; j2 < options.length; j2++) {
+              var sel2 = section.querySelector('select[data-item="' + i + '"][data-option-index="' + j2 + '"]');
+              if (!sel2) continue;
+              var optionEls = sel2.querySelectorAll('option');
+              optionEls.forEach(function(optEl) {
+                  // Build hypothetical selection: replace only this option
+                  var hypothetical = selectedOpts.slice();
+                  hypothetical[j2] = optEl.value;
+                  var hypotheticalVariant = findMatchingVariant(hypothetical);
+                  var labelText = optEl.value;
+                  if (hypotheticalVariant) {
+                      labelText += ' — ' + formatMoney(hypotheticalVariant.price);
+                      if (!hypotheticalVariant.available) {
+                          labelText += ' — Out of stock';
+                      }
+                  }
+                  optEl.textContent = labelText;
+              });
+          }
+      }
+
+      window.FoxCod._selectedBundleVariants = bundleVariants;
+
+      // Use centralized pricing engine
+      var state = calculateCheckoutState(form, config);
+      renderOrderSummary(form, config, state);
+
+      // Re-render shipping rates inside the modal only (variant price/weight may affect shipping rules)
+      if (form && form.closest('.cod-modal')) {
+          var fieldsContainer = form.querySelector('.cod-dynamic-fields-container');
+          var shippingSection = form.querySelector('.cod-shipping-section');
+          var shippingMarker = fieldsContainer ? fieldsContainer.querySelector('.cod-section-marker[data-section="shipping"]') : null;
+          if (shippingSection) {
+              shippingSection.remove();
+          }
+          var hasNewShippingRates = config.shippingRatesEnabled && config.shippingRates && config.shippingRates.length > 0;
+          var hasOldShippingOptions = config.shippingOptions && config.shippingOptions.enabled;
+          var shippingFieldVisible = (config.fields || []).some(function(f) { return f.id === 'shipping' && f.visible !== false; });
+          var shippingEnabled2 = (config.blocks && config.blocks.shipping_options) || shippingFieldVisible;
+          if (shippingEnabled2 && (hasNewShippingRates || hasOldShippingOptions)) {
+              renderShippingOptions(form, config);
+              if (shippingMarker) {
+                  var newShippingSection = form.querySelector('.cod-shipping-section');
+                  if (newShippingSection) {
+                      shippingMarker.appendChild(newShippingSection);
+                  }
+              }
+          }
+      }
+
+      // Auto-save checkout state
+      saveFoxCodCheckoutState(form);
   }
   
   /**
@@ -1135,6 +1367,9 @@
    * Update price display based on selected offer
    */
   function updateOfferPrice(form, config, offer) {
+    // Use centralized pricing engine for the price display
+    var state = calculateCheckoutState(form, config);
+    
     // .cod-product-price is in the modal container, NOT inside the form
     var modal = form.closest('.cod-modal') || form.parentElement;
     var priceElement = modal ? modal.querySelector('.cod-product-price') : form.querySelector('.cod-product-price');
@@ -1143,16 +1378,15 @@
         return;
     }
     
-    var unitPrice = config.productPrice;
-    var total = unitPrice * offer.quantity * (1 - (offer.discountPercent || 0) / 100);
+    var total = state.subtotal - state.discount;
     
     priceElement.innerHTML = formatMoney(total);
-    if (offer.discountPercent) {
+    if (state.discount > 0) {
       priceElement.innerHTML += ' <span style="text-decoration:line-through;color:#9ca3af;font-size:14px;">' + 
-        formatMoney(unitPrice * offer.quantity) + '</span>';
+        formatMoney(state.subtotal) + '</span>';
     }
     priceElement.style.display = ''; // Ensure it's visible
-    console.log('[COD Form] updateOfferPrice: updated to', total, 'with discount', offer.discountPercent + '%');
+    console.log('[COD Form] updateOfferPrice: updated to', total, 'with discount', state.discountPercent + '%');
   }
 
   /**
@@ -1191,6 +1425,22 @@
         } else {
             // Default: at_top - insert before the dynamic fields container
             fieldsContainer.parentNode.insertBefore(quantityOffersEl, fieldsContainer);
+        }
+        
+        // Auto-render variant selectors for the preselected offer
+        // This ensures variant dropdowns appear immediately without clicking
+        if (placement !== 'in_product_page') {
+            var initialOffer = quantityOffersEl._initialSelectedOffer;
+            if (initialOffer && parseInt(initialOffer.quantity) > 1) {
+                renderBundleVariantSelectors(form, config, parseInt(initialOffer.quantity) || 1, quantityOffersEl);
+            }
+            // Trigger initial price + summary update for the preselected offer
+            if (initialOffer) {
+                setTimeout(function() {
+                    updateOfferPrice(form, config, initialOffer);
+                    updateOrderSummaryWithOffer(form, config, initialOffer);
+                }, 100);
+            }
         }
     }
     
@@ -1235,13 +1485,13 @@
     var shippingField = sortedFields.find(function(f) { return f.id === 'shipping'; });
     var shippingEnabled = (config.blocks && config.blocks.shipping_options) || (shippingField && shippingField.visible !== false);
     if (shippingEnabled && (hasNewShippingRates || hasOldShippingOptions)) {
-        renderShippingOptions(form, config);
+        try { renderShippingOptions(form, config); } catch(e) { console.error('[COD Form] Error rendering shipping:', e); }
     }
     // Render order summary section — check blocks flag OR fall back to field visibility
     var orderSummaryField = sortedFields.find(function(f) { return f.id === 'order_summary'; });
     var orderSummaryEnabled = (config.blocks && config.blocks.order_summary) || (orderSummaryField && orderSummaryField.visible !== false);
     if (orderSummaryEnabled) {
-        renderRateCard(form, config);
+        try { renderRateCard(form, config); } catch(e) { console.error('[COD Form] Error rendering order summary:', e); }
     }
     // Render marketing checkbox — check blocks flag OR fall back to field visibility
     var marketingField = sortedFields.find(function(f) { return f.id === 'marketing'; });
@@ -1255,7 +1505,7 @@
     var paymentModeField = (config.fields || []).find(function(f) { return f.id === 'payment_mode'; });
     var paymentModeVisible = paymentModeField ? paymentModeField.visible !== false : true;
     if (config.partialCodEnabled && paymentModeVisible) {
-        renderPaymentMethodOptions(form, config);
+        try { renderPaymentMethodOptions(form, config); } catch(e) { console.error('[COD Form] Error rendering payment options:', e); }
     }
 
     // Now move rendered sections into their marker positions in fieldsContainer
@@ -1301,8 +1551,16 @@
     // 6. Setup Smart Auto-fill
     setupAutoFill(form, config);
 
-    // 7. Check LocalStorage for existing data (Returning User)
-    checkLocalStorageAndFill(form);
+    // 7. Customer auto-fill is handled by setupAutoFill (phone-based lookup)
+    // Form starts blank on every page load — no auto-fill from localStorage
+
+    // 8. Attach auto-save listeners for persistent checkout state
+    form.addEventListener('input', function() {
+        saveFoxCodCheckoutState(form);
+    });
+    form.addEventListener('change', function() {
+        saveFoxCodCheckoutState(form);
+    });
 
     // Setup Form Submission
     form.addEventListener('submit', function(e) {
@@ -1647,6 +1905,198 @@
   }
 
   /**
+   * ─── PERSISTENT CHECKOUT STATE (foxcod_checkout_state) ───
+   * Save ALL form data to localStorage so it persists across modal close/reopen
+   */
+  var _foxcodSaveTimer = null;
+
+  function saveFoxCodCheckoutState(form) {
+      // Skip saving if an order was just placed (form is being reset)
+      if (window._foxcodOrderComplete) return;
+      if (_foxcodSaveTimer) clearTimeout(_foxcodSaveTimer);
+      _foxcodSaveTimer = setTimeout(function() {
+          try {
+              var state = { fields: {}, selections: {} };
+
+              // Capture ALL inputs, textareas, and selects inside the form
+              var inputs = form.querySelectorAll('input, textarea, select');
+              inputs.forEach(function(el) {
+                  var key = el.name || el.id;
+                  if (!key) return;
+                  // Skip hidden/disabled inputs and buttons
+                  if (el.type === 'hidden' || el.type === 'submit' || el.type === 'button') return;
+
+                  if (el.type === 'checkbox') {
+                      state.fields[key] = el.checked ? 'checked' : '';
+                  } else if (el.type === 'radio') {
+                      if (el.checked) {
+                          state.fields[key] = el.value;
+                      }
+                  } else {
+                      state.fields[key] = el.value;
+                  }
+              });
+
+              // Capture bundle offer selection
+              var offersContainer = form.querySelector('.cod-quantity-offers') ||
+                  (form.closest && form.closest('.cod-modal') && form.closest('.cod-modal').querySelector('.cod-quantity-offers'));
+              if (offersContainer) {
+                  var selectedOffer = offersContainer.getAttribute('data-selected-offer');
+                  if (selectedOffer) {
+                      state.selections.selectedBundleOffer = selectedOffer;
+                  }
+              }
+
+              // Capture quantity from the qty input
+              var container = form.closest('.cod-form-container') || form.parentElement;
+              var qtyInput = container ? container.querySelector('.cod-qty-input') : null;
+              if (qtyInput) {
+                  state.selections.selectedQuantity = qtyInput.value;
+              }
+
+              // Capture shipping rate
+              var selectedShipping = form.querySelector('input[name="shipping_method"]:checked');
+              if (selectedShipping) {
+                  state.selections.selectedShippingRate = selectedShipping.value;
+              }
+
+              // Capture bundle variant selections
+              if (window.FoxCod && window.FoxCod._selectedBundleVariants && window.FoxCod._selectedBundleVariants.length > 1) {
+                  state.selections.bundleVariants = window.FoxCod._selectedBundleVariants;
+              }
+
+              localStorage.setItem('foxcod_checkout_state', JSON.stringify(state));
+          } catch (e) {
+              console.warn('[COD Form] Checkout state save error:', e);
+          }
+      }, 300); // Debounce 300ms
+  }
+
+  function restoreFoxCodCheckoutState(form, config) {
+      try {
+          var stored = localStorage.getItem('foxcod_checkout_state');
+          if (!stored) return false;
+
+          var state = JSON.parse(stored);
+          if (!state || !state.fields) return false;
+
+          var restored = false;
+
+          // Restore field values
+          Object.keys(state.fields).forEach(function(fieldName) {
+              var val = state.fields[fieldName];
+              if (!val && val !== '') return;
+
+              var el = form.querySelector('[name="' + fieldName + '"]') ||
+                       form.querySelector('#' + fieldName);
+              if (!el) return;
+
+              // Skip hidden/disabled fields
+              if (el.disabled || el.type === 'hidden') return;
+              if (el.offsetParent === null && el.type !== 'radio' && el.type !== 'checkbox') return;
+
+              if (el.type === 'checkbox') {
+                  el.checked = val === 'checked';
+              } else if (el.type === 'radio') {
+                  // For radio buttons, find the one with matching value
+                  var radios = form.querySelectorAll('[name="' + fieldName + '"]');
+                  radios.forEach(function(r) {
+                      r.checked = r.value === val;
+                  });
+              } else {
+                  // Only restore if localStorage has a value (don't override with empty)
+                  if (val) {
+                      el.value = val;
+                      restored = true;
+                  }
+              }
+          });
+
+          // Restore bundle offer selection (skip if downsell is active — downsell replaces bundle)
+          if (state.selections && state.selections.selectedBundleOffer && !form.getAttribute('data-downsell-active')) {
+              try {
+                  var offer = JSON.parse(state.selections.selectedBundleOffer);
+                  var modal = form.closest('.cod-modal') || form.parentElement;
+                  var offersContainer = form.querySelector('.cod-quantity-offers') ||
+                      (modal && modal.querySelector('.cod-quantity-offers'));
+                  if (offersContainer && offer.quantity) {
+                      offersContainer.setAttribute('data-selected-offer', state.selections.selectedBundleOffer);
+                      // Click the matching card to apply visual selection and pricing
+                      var matchCard = offersContainer.querySelector('[data-quantity="' + offer.quantity + '"]');
+                      if (matchCard) {
+                          // Update visual state
+                          offersContainer.querySelectorAll('.cod-offer-card').forEach(function(c) {
+                              c.classList.remove('selected');
+                          });
+                          matchCard.classList.add('selected');
+                          matchCard.click();
+                      }
+                  }
+              } catch (e) {
+                  console.warn('[COD Form] Failed to restore bundle selection:', e);
+              }
+          }
+
+          // Restore quantity
+          if (state.selections && state.selections.selectedQuantity) {
+              var container = form.closest('.cod-form-container') || form.parentElement;
+              var qtyInput = container ? container.querySelector('.cod-qty-input') : null;
+              if (qtyInput) {
+                  qtyInput.value = state.selections.selectedQuantity;
+                  // Update quantity badge
+                  var qtyBadge = container.querySelector('.cod-qty-badge');
+                  if (qtyBadge) qtyBadge.textContent = state.selections.selectedQuantity;
+              }
+          }
+
+          // Restore shipping rate (after a delay to let the section render)
+          if (state.selections && state.selections.selectedShippingRate) {
+              setTimeout(function() {
+                  var radio = form.querySelector('input[name="shipping_method"][value="' + state.selections.selectedShippingRate + '"]');
+                  if (radio) {
+                      radio.checked = true;
+                      radio.dispatchEvent(new Event('change', { bubbles: true }));
+                  }
+              }, 200);
+          }
+
+          // Restore bundle variant selections (after bundle card click which triggers render)
+          if (state.selections && state.selections.bundleVariants) {
+              setTimeout(function() {
+                  window.FoxCod._selectedBundleVariants = state.selections.bundleVariants;
+                  // Restore dropdowns if variant section exists
+                  var varSection = form.querySelector('.foxcod-variant-section') ||
+                      (form.closest && form.closest('.cod-modal') && form.closest('.cod-modal').querySelector('.foxcod-variant-section'));
+                  if (varSection) {
+                      var options = window.FoxCod.productOptions || [];
+                      state.selections.bundleVariants.forEach(function(bv, idx) {
+                          var variant = (window.FoxCod.productVariants || []).find(function(v) {
+                              return String(v.id) === String(bv.variantId);
+                          });
+                          if (variant) {
+                              options.forEach(function(_, optIdx) {
+                                  var sel = varSection.querySelector('select[data-item="' + idx + '"][data-option-index="' + optIdx + '"]');
+                                  if (sel && variant['option' + (optIdx + 1)]) {
+                                      sel.value = variant['option' + (optIdx + 1)];
+                                  }
+                              });
+                          }
+                      });
+                  }
+              }, 300);
+          }
+
+          if (restored) {
+              console.log('[COD Form] Checkout state restored from localStorage');
+          }
+          return restored;
+      } catch (e) {
+          console.warn('[COD Form] Checkout state restore error:', e);
+          return false;
+      }
+  }
+
+  /**
    * Smart Auto-fill - triggers when 10th digit entered (no delay)
    * Database is the source of truth
    */
@@ -1789,69 +2239,60 @@
           }
       }
       
-      // Calculate subtotal with quantity and discount
-      var unitPrice = parseFloat(config.productPrice) || 0;
-      var subtotal = unitPrice * quantity;
-      
-      var discount = 0;
-      var discountPercent = 0;
-      if (selectedOffer && selectedOffer.discountPercent) {
-          discountPercent = selectedOffer.discountPercent;
-          discount = subtotal * (discountPercent / 100);
+      // Use centralized pricing engine for initial render
+      var state;
+      try {
+          state = calculateCheckoutState(form, config);
+      } catch(e) {
+          console.error('[COD Form] Error in calculateCheckoutState during renderRateCard:', e);
+          // Fallback state so the card still renders
+          state = {
+              items: [], quantity: 1, subtotal: parseFloat(config.productPrice) || 0,
+              discountPercent: 0, discount: 0, shipping: 0,
+              tickUpsellTotal: 0, tickUpsellItems: [],
+              preUpsellTotal: 0, preUpsellItems: [],
+              downsellTotal: 0, downsellItems: [], downsellSavings: 0,
+              displaySubtotal: parseFloat(config.productPrice) || 0,
+              total: parseFloat(config.productPrice) || 0
+          };
       }
       
-      // Calculate Shipping using new shipping rates system
-      var shippingCost = 0;
-      if (config.shippingRatesEnabled && config.shippingRates && config.shippingRates.length > 0) {
-          // Find first applicable active rate using condition matching
-          var currentQty = getEffectiveQuantity(form);
-          var applicableRate = config.shippingRates.find(function(rate) { 
-              return isRateApplicable(rate, config, currentQty); 
+      console.log('[COD Form] Order Summary Calculation (initial):', state);
+
+      // Build per-variant line items
+      var lineItemsHtml = '';
+      if (state.items && state.items.length > 1) {
+          state.items.forEach(function(item) {
+              lineItemsHtml +=
+                '<div style="display:flex; justify-content:space-between; margin-bottom:3px; font-size:12px; color:#4b5563;">' +
+                '   <span>1 × ' + (config.productTitle || '') + ' — ' + (item.title || '') + '</span>' +
+                '   <span>' + formatMoney(item.price) + '</span>' +
+                '</div>';
           });
-          if (applicableRate) {
-              shippingCost = parseFloat(applicableRate.price) || 0;
-          }
-      } else if (config.shippingOptions && config.shippingOptions.enabled) {
-          // Fallback to old shipping options
-          var defaultOpt = config.shippingOptions.options.find(function(o) { 
-              return o.id === config.shippingOptions.defaultOption; 
-          });
-          if (defaultOpt) shippingCost = parseFloat(defaultOpt.price) || 0;
       }
 
-      var total = subtotal - discount + shippingCost;
-      
-      console.log('[COD Form] Order Summary Calculation:', {
-          unitPrice: unitPrice,
-          quantity: quantity,
-          subtotal: subtotal,
-          discount: discount,
-          shipping: shippingCost,
-          total: total
-      });
-
-      card.innerHTML = `
-        <div style="font-weight:600; margin-bottom:8px; display:flex; align-items:center;">
-           🧾 Order Summary
-        </div>
-        <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#6b7280;">
-           <span>Subtotal (${quantity} ${quantity === 1 ? 'item' : 'items'})</span>
-           <span id="cod-summary-subtotal">${formatMoney(subtotal)}</span>
-        </div>
-        ${discount > 0 ? `
-        <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#10b981;">
-           <span>Bundle Discount (${discountPercent}%)</span>
-           <span id="cod-summary-discount">-${formatMoney(discount)}</span>
-        </div>` : ''}
-        <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#6b7280;">
-           <span>Shipping</span>
-           <span id="cod-summary-shipping">${shippingCost === 0 ? 'FREE' : formatMoney(shippingCost)}</span>
-        </div>
-        <div style="display:flex; justify-content:space-between; margin-top:8px; padding-top:8px; border-top:1px dashed #d1d5db; font-weight:700; color:#111827;">
-           <span>Total</span>
-           <span id="cod-summary-total" style="color:${config.primaryColor}">${formatMoney(total)}</span>
-        </div>
-      `;
+      card.innerHTML =
+        '<div style="font-weight:600; margin-bottom:8px; display:flex; align-items:center;">' +
+        '   🧾 Order Summary' +
+        '</div>' +
+        lineItemsHtml +
+        '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#6b7280;">' +
+        '   <span>Subtotal (' + state.quantity + ' ' + (state.quantity === 1 ? 'item' : 'items') + ')</span>' +
+        '   <span id="cod-summary-subtotal">' + formatMoney(state.subtotal) + '</span>' +
+        '</div>' +
+        (state.discount > 0 ?
+        '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#10b981;">' +
+        '   <span>Bundle Discount (' + state.discountPercent + '%)</span>' +
+        '   <span id="cod-summary-discount">-' + formatMoney(state.discount) + '</span>' +
+        '</div>' : '') +
+        '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#6b7280;">' +
+        '   <span>Shipping</span>' +
+        '   <span id="cod-summary-shipping">' + (state.shipping === 0 ? 'FREE' : formatMoney(state.shipping)) + '</span>' +
+        '</div>' +
+        '<div style="display:flex; justify-content:space-between; margin-top:8px; padding-top:8px; border-top:1px dashed #d1d5db; font-weight:700; color:#111827;">' +
+        '   <span>Total</span>' +
+        '   <span id="cod-summary-total" style="color:' + config.primaryColor + '">' + formatMoney(state.total) + '</span>' +
+        '</div>';
 
       form.insertBefore(card, form.querySelector('button[type="submit"]'));
   }
@@ -1892,6 +2333,7 @@
           radio.name = 'shipping_method';
           radio.value = opt.id;
           radio.checked = opt.id === config.shippingOptions.defaultOption;
+          radio.setAttribute('data-price', opt.price);
           radio.style.marginRight = '8px';
           
           // Add change listener to update total
@@ -1928,7 +2370,7 @@
    */
   function getEffectiveQuantity(form) {
       // Check for bundle offer selection first
-      var modal = form.closest('.cod-modal');
+      var modal = form ? form.closest('.cod-modal') : null;
       if (modal) {
           var quantityOffersEl = modal.querySelector('.cod-quantity-offers');
           if (quantityOffersEl) {
@@ -1961,16 +2403,19 @@
           }
       }
       // Fallback to quantity input (check container first since qty is outside <form>)
-      var container = form.closest('.cod-form-container') || form.parentElement;
-      var qtyInput = (container && container.querySelector('.cod-product-qty .cod-qty-input')) || form.querySelector('[name="quantity"]');
-      return parseInt(qtyInput ? qtyInput.value : 1) || 1;
+      if (form) {
+          var container = form.closest('.cod-form-container') || form.parentElement;
+          var qtyInput = (container && container.querySelector('.cod-product-qty .cod-qty-input')) || form.querySelector('[name="quantity"]');
+          return parseInt(qtyInput ? qtyInput.value : 1) || 1;
+      }
+      return 1;
   }
 
   /**
    * Check if a shipping rate's conditions are met
    */
   function isRateApplicable(rate, config, quantity) {
-      var orderPrice = (config.productPrice || 0) * quantity;
+      var orderPrice = getVariantSubtotal(config) * quantity / Math.max(1, getEffectiveQuantity(null));
       
       // Check if rate is active
       if (!rate.is_active) return false;
@@ -2225,30 +2670,8 @@
           }
       }
 
-      // Also observe product page offers (for in_product_page placement)
-      var productPageOffers = document.querySelector('.cod-product-page-offers');
-      if (productPageOffers) {
-          var ppObserver = new MutationObserver(function(mutations) {
-              mutations.forEach(function(mutation) {
-                  if (mutation.type === 'attributes' && mutation.attributeName === 'data-selected-offer') {
-                      console.log('[COD Form] Product page offer changed, re-rendering shipping rates');
-                      var existingSection = form.querySelector('.cod-shipping-section');
-                      var markerParent = existingSection ? existingSection.closest('.cod-section-marker[data-section="shipping"]') : null;
-                      if (existingSection) {
-                          existingSection.remove();
-                      }
-                      renderNewShippingRates(form, config);
-                      if (markerParent) {
-                          var newSection = form.querySelector('.cod-shipping-section');
-                          if (newSection) {
-                              markerParent.appendChild(newSection);
-                          }
-                      }
-                  }
-              });
-          });
-          ppObserver.observe(productPageOffers, { attributes: true, attributeFilter: ['data-selected-offer'] });
-      }
+      // NOTE: Product page offers observer removed — shipping must only render inside the modal.
+      // Shipping recalculation for bundle variant changes is handled in updateBundleVariantSelection().
   }
 
   /**
@@ -2432,180 +2855,20 @@
       form.insertBefore(div, form.querySelector('button[type="submit"]'));
   }
 
+  /**
+   * Update totals when shipping changes or quantity changes.
+   * Delegates to the centralized pricing engine.
+   * The shippingPrice is stored as a data attribute so calculateCheckoutState can read it.
+   */
   function updateTotalHelper(form, config, shippingPrice) {
-      // Read quantity and discount from bundle offer if available
-      var quantity = 1;
-      var discountPercent = 0;
-      
-      var modal = form.closest('.cod-modal') || form;
-      var quantityOffersEl = modal.querySelector('.cod-quantity-offers');
-      if (quantityOffersEl) {
-          try {
-              var offerData = quantityOffersEl.getAttribute('data-selected-offer');
-              if (offerData) {
-                  var selectedOffer = JSON.parse(offerData);
-                  quantity = selectedOffer.quantity || 1;
-                  discountPercent = selectedOffer.discountPercent || 0;
-              }
-          } catch (e) {
-              // Fallback to quantity input
-          }
+      try {
+          // Store the explicit shipping price for calculateCheckoutState to pick up
+          form.setAttribute('data-shipping-price', parseFloat(shippingPrice) || 0);
+          var state = calculateCheckoutState(form, config);
+          renderOrderSummary(form, config, state);
+      } catch(e) {
+          console.error('[COD Form] Error in updateTotalHelper:', e);
       }
-      
-      // Also check product page offers (for in_product_page placement)
-      if (quantity === 1 && discountPercent === 0) {
-          var productPageOffers = document.querySelector('.cod-product-page-offers');
-          if (productPageOffers) {
-              try {
-                  var ppOfferData = productPageOffers.getAttribute('data-selected-offer');
-                  if (ppOfferData) {
-                      var ppOffer = JSON.parse(ppOfferData);
-                      quantity = ppOffer.quantity || 1;
-                      discountPercent = ppOffer.discountPercent || 0;
-                  }
-              } catch (e) {
-                  // Fallback
-              }
-          }
-      }
-      
-      // Fallback: also check qty input if no offer found
-      if (quantity === 1 && !quantityOffersEl) {
-          // The quantity input lives in .cod-product-qty which is OUTSIDE the form
-          var qtyInput = form.querySelector('[name="quantity"]');
-          if (!qtyInput) {
-              var parentContainer = form.closest('.cod-form-container') || form.closest('.cod-modal') || form.parentElement;
-              if (parentContainer) {
-                  qtyInput = parentContainer.querySelector('.cod-product-qty .cod-qty-input');
-              }
-          }
-          quantity = parseInt(qtyInput ? qtyInput.value : 1) || 1;
-      }
-      
-      var productPrice = parseFloat(config.productPrice) || 0;
-      var shipping = parseFloat(shippingPrice) || 0;
-      var subtotal = productPrice * quantity;
-      var discount = subtotal * (discountPercent / 100);
-
-      // Calculate tick upsell total
-      var tickUpsellTotal = 0;
-      var tickUpsellItems = [];
-      var tickRows = form.querySelectorAll('.cod-tick-upsell-row');
-      tickRows.forEach(function(row) {
-          var cb = row.querySelector('input[type="checkbox"]');
-          if (cb && cb.checked) {
-              var price = parseFloat(row.getAttribute('data-offer-price')) || 0;
-              tickUpsellTotal += price;
-              // Get title from data attribute (avoids duplicate ₹ from DOM text)
-              var titleText = row.getAttribute('data-offer-title') || 'Upsell';
-              tickUpsellItems.push({ title: titleText, price: price });
-          }
-      });
-
-      // Calculate downsell total
-      var downsellTotal = 0;
-      var downsellItems = [];
-      var dsItemsAttr = form.getAttribute('data-downsell-items');
-      if (dsItemsAttr) {
-          try {
-              var dsArr = JSON.parse(dsItemsAttr);
-              dsArr.forEach(function(di) {
-                  downsellTotal += di.price;
-                  downsellItems.push({ title: di.title || 'Downsell item', price: di.price });
-              });
-          } catch(e) {}
-      }
-
-      // Calculate pre-purchase upsell total
-      var preUpsellTotal = 0;
-      var preUpsellItems = [];
-      var preItemsAttr = form.getAttribute('data-pre-upsell-items');
-      if (preItemsAttr) {
-          try {
-              var preArr = JSON.parse(preItemsAttr);
-              preArr.forEach(function(pi) {
-                  var pPrice = parseFloat(pi.price) || 0;
-                  preUpsellTotal += pPrice;
-                  preUpsellItems.push({ title: pi.title || 'Upsell item', price: pPrice });
-              });
-          } catch(e) {}
-      }
-
-      // When downsell is active, the downsell price REPLACES the original subtotal
-      var displaySubtotal = subtotal;
-      var downsellSavings = 0;
-      if (downsellItems.length > 0) {
-          displaySubtotal = downsellTotal;
-          downsellSavings = subtotal - downsellTotal;
-      }
-
-      var total = displaySubtotal - discount + shipping + tickUpsellTotal + preUpsellTotal;
-      
-      var summaryEl = form.querySelector('.cod-order-summary') || modal.querySelector('.cod-order-summary');
-      if (summaryEl) {
-          // Re-render the full summary HTML to keep everything in sync
-          var html = 
-            '<div style="font-weight:600; margin-bottom:8px; display:flex; align-items:center;">' +
-            '   🧾 Order Summary' +
-            '</div>' +
-            '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#6b7280;">' +
-            '   <span>Subtotal (' + quantity + ' ' + (quantity === 1 ? 'item' : 'items') + ')</span>' +
-            '   <span id="cod-summary-subtotal">' + formatMoney(displaySubtotal) + '</span>' +
-            '</div>';
-          
-          if (downsellSavings > 0) {
-            html += '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#10b981;">' +
-            '   <span>Downsell discount</span>' +
-            '   <span>-' + formatMoney(downsellSavings) + '</span>' +
-            '</div>';
-          }
-
-          if (discount > 0) {
-            html += '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#10b981;">' +
-            '   <span>Bundle Discount (' + discountPercent + '%)</span>' +
-            '   <span id="cod-summary-discount">-' + formatMoney(discount) + '</span>' +
-            '</div>';
-          }
-
-          // Add tick upsell line items
-          tickUpsellItems.forEach(function(item) {
-            html += '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#059669;">' +
-            '   <span>' + item.title + '</span>' +
-            '   <span>' + formatMoney(item.price) + '</span>' +
-            '</div>';
-          });
-
-          // Add pre-purchase upsell line items
-          preUpsellItems.forEach(function(item) {
-            html += '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#059669;">' +
-            '   <span>✓ ' + item.title + '</span>' +
-            '   <span>' + formatMoney(item.price) + '</span>' +
-            '</div>';
-          });
-
-          html += '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#6b7280;">' +
-            '   <span>Shipping</span>' +
-            '   <span id="cod-summary-shipping">' + (shipping === 0 ? 'FREE' : formatMoney(shipping)) + '</span>' +
-            '</div>' +
-            '<div style="display:flex; justify-content:space-between; margin-top:8px; padding-top:8px; border-top:1px dashed #d1d5db; font-weight:700; color:#111827;">' +
-            '   <span>Total</span>' +
-            '   <span id="cod-summary-total" style="color:' + config.primaryColor + '">' + formatMoney(total) + '</span>' +
-            '</div>';
-          
-          summaryEl.innerHTML = html;
-      } else {
-          // Fallback: update individual elements if summary container not found
-          var shipEl = form.querySelector('#cod-summary-shipping');
-          var totalEl = form.querySelector('#cod-summary-total');
-          var subEl = form.querySelector('#cod-summary-subtotal');
-          
-          if (shipEl) shipEl.textContent = shipping === 0 ? 'FREE' : formatMoney(shipping);
-          if (totalEl) totalEl.textContent = formatMoney(total);
-          if (subEl) subEl.textContent = formatMoney(subtotal);
-      }
-
-      // Sync payment method amounts with updated total
-      updatePaymentMethodAmounts(form, config);
   }
 
   /**
@@ -2653,16 +2916,9 @@
       }
   }
 
-  // Separate function to update order summary with tick upsells (called from tick upsell change handlers)
-  function updateOrderSummaryWithTickUpsells(form, config) {
-      var sp = 0;
-      var sel = form.querySelector('input[name="shipping_method"]:checked');
-      if (sel && config.shippingOptions && config.shippingOptions.options) {
-          var o = config.shippingOptions.options.find(function(x) { return x.id === sel.value; });
-          if (o) sp = o.price;
-      }
-      updateTotalHelper(form, config, sp);
-  }
+  // =============================================
+  // CENTRALIZED PRICING ENGINE
+  // =============================================
 
   function formatMoney(amount) {
       var num = parseFloat(amount) || 0;
@@ -2676,143 +2932,305 @@
       }
   }
 
-  function updateOrderSummaryWithOffer(form, config, offer) {
-      var summaryEl = form.querySelector('.cod-order-summary');
-      if (!summaryEl) {
-          // Also try looking up from the modal container
-          var modal = form.closest('.cod-modal');
-          if (modal) {
-              summaryEl = modal.querySelector('.cod-order-summary');
-          }
-          if (!summaryEl) {
-              console.log('[COD Form] No order summary to update');
-              return;
-          }
+  /**
+   * Helper: get the subtotal from bundle variants or single product price
+   */
+  function getVariantSubtotal(config) {
+      var bundleVariants = window.FoxCod && window.FoxCod._selectedBundleVariants;
+      if (bundleVariants && bundleVariants.length > 1) {
+          return bundleVariants.reduce(function(s, v) { return s + (v.price || 0); }, 0);
       }
-      
-      // Use the offer directly if provided, otherwise try to read from DOM
-      var quantity = 1;
-      var discountPercent = 0;
-      
-      if (offer) {
-          quantity = offer.quantity || 1;
-          discountPercent = offer.discountPercent || 0;
-      } else {
-          // Fallback: read from data attribute
-          var modal = form.closest('.cod-modal') || form;
-          var quantityOffersEl = modal.querySelector('.cod-quantity-offers');
-          if (quantityOffersEl) {
+      return parseFloat(config.productPrice) || 0;
+  }
+
+  /**
+   * SINGLE SOURCE OF TRUTH for all pricing calculations.
+   * Every function that needs price data must call this instead of computing locally.
+   */
+  function calculateCheckoutState(form, config) {
+      var state = {
+          items: [],
+          quantity: 1,
+          subtotal: 0,
+          discountPercent: 0,
+          discount: 0,
+          shipping: 0,
+          tickUpsellTotal: 0,
+          tickUpsellItems: [],
+          preUpsellTotal: 0,
+          preUpsellItems: [],
+          downsellTotal: 0,
+          downsellItems: [],
+          downsellSavings: 0,
+          total: 0
+      };
+
+      // ── 1. Read offer quantity & discount ──
+      var modal = form ? (form.closest('.cod-modal') || form) : null;
+      var quantityOffersEl = modal ? modal.querySelector('.cod-quantity-offers') : null;
+      if (quantityOffersEl) {
+          try {
+              var offerData = quantityOffersEl.getAttribute('data-selected-offer');
+              if (offerData) {
+                  var selectedOffer = JSON.parse(offerData);
+                  state.quantity = selectedOffer.quantity || 1;
+                  state.discountPercent = selectedOffer.discountPercent || 0;
+              }
+          } catch (e) {}
+      }
+      // Also check product page offers (for in_product_page placement)
+      if (state.quantity === 1 && state.discountPercent === 0) {
+          var productPageOffers = document.querySelector('.cod-product-page-offers');
+          if (productPageOffers) {
               try {
-                  var offerData = quantityOffersEl.getAttribute('data-selected-offer');
-                  if (offerData) {
-                      var selectedOffer = JSON.parse(offerData);
-                      quantity = selectedOffer.quantity || 1;
-                      discountPercent = selectedOffer.discountPercent || 0;
+                  var ppOfferData = productPageOffers.getAttribute('data-selected-offer');
+                  if (ppOfferData) {
+                      var ppOffer = JSON.parse(ppOfferData);
+                      state.quantity = ppOffer.quantity || 1;
+                      state.discountPercent = ppOffer.discountPercent || 0;
                   }
-              } catch (e) {
-                  console.warn('[COD Form] Failed to parse selected offer:', e);
-              }
-          }
-          // Also check product page offers (for in_product_page placement)
-          if (quantity === 1 && discountPercent === 0) {
-              var productPageOffers = document.querySelector('.cod-product-page-offers');
-              if (productPageOffers) {
-                  try {
-                      var ppOfferData = productPageOffers.getAttribute('data-selected-offer');
-                      if (ppOfferData) {
-                          var ppOffer = JSON.parse(ppOfferData);
-                          quantity = ppOffer.quantity || 1;
-                          discountPercent = ppOffer.discountPercent || 0;
-                      }
-                  } catch (e) {
-                      console.warn('[COD Form] Failed to parse product page offer:', e);
-                  }
-              }
+              } catch (e) {}
           }
       }
-      
-      // Recalculate values
-      var unitPrice = parseFloat(config.productPrice) || 0;
-      var subtotal = unitPrice * quantity;
-      var discount = subtotal * (discountPercent / 100);
-      
-      // Get current shipping cost
-      var shippingCost = 0;
-      var shippingEl = summaryEl.querySelector('#cod-summary-shipping');
-      if (shippingEl) {
-          var shippingText = shippingEl.textContent;
-          if (shippingText !== 'FREE') {
-              shippingCost = parseFloat(shippingText.replace(/[^0-9.]/g, '')) || 0;
+      // Fallback: quantity input (outside form in .cod-product-qty)
+      if (state.quantity === 1 && !quantityOffersEl) {
+          var container = form ? (form.closest('.cod-form-container') || form.closest('.cod-modal') || form.parentElement) : null;
+          var qtyInput = form ? form.querySelector('[name="quantity"]') : null;
+          if (!qtyInput && container) {
+              qtyInput = container.querySelector('.cod-product-qty .cod-qty-input');
+          }
+          state.quantity = parseInt(qtyInput ? qtyInput.value : 1) || 1;
+      }
+
+      // ── 2. Calculate subtotal from variant prices (never config.productPrice for bundles) ──
+      var bundleVariants = window.FoxCod && window.FoxCod._selectedBundleVariants;
+      if (bundleVariants && bundleVariants.length > 1) {
+          bundleVariants.forEach(function(v) {
+              state.items.push({
+                  title: (config.productTitle || '') + ' — ' + (v.title || ''),
+                  price: v.price || 0,
+                  variantId: v.variantId,
+                  quantity: 1
+              });
+              state.subtotal += (v.price || 0);
+          });
+      } else {
+          var unitPrice = parseFloat(config.productPrice) || 0;
+          state.subtotal = unitPrice * state.quantity;
+          state.items.push({
+              title: config.productTitle || '',
+              price: unitPrice,
+              variantId: config.variantId,
+              quantity: state.quantity
+          });
+      }
+
+      // ── 3. Bundle discount ──
+      state.discount = state.subtotal * (state.discountPercent / 100);
+
+      // ── 4. Shipping — read from explicit data attr first, then from selected radio ──
+      var explicitShipping = form ? form.getAttribute('data-shipping-price') : null;
+      if (explicitShipping !== null && explicitShipping !== '') {
+          state.shipping = parseFloat(explicitShipping) || 0;
+      } else if (form) {
+          var selectedShipping = form.querySelector('input[name="shipping_method"]:checked');
+          if (selectedShipping) {
+              state.shipping = parseFloat(selectedShipping.getAttribute('data-price')) || 0;
           }
       }
-      
-      var total = subtotal - discount + shippingCost;
 
-      // Include tick upsell prices in total
-      var tickUpsellTotal = 0;
-      var tickItems = getCheckedTickUpsells(form, config);
-      tickItems.forEach(function(tu) { tickUpsellTotal += tu.price; });
+      // ── 5. Tick upsells ──
+      if (form) {
+          var tickRows = form.querySelectorAll('.cod-tick-upsell-row');
+          tickRows.forEach(function(row) {
+              var cb = row.querySelector('input[type="checkbox"]');
+              if (cb && cb.checked) {
+                  var price = parseFloat(row.getAttribute('data-offer-price')) || 0;
+                  var titleText = row.getAttribute('data-offer-title') || 'Upsell';
+                  state.tickUpsellTotal += price;
+                  state.tickUpsellItems.push({ title: titleText, price: price });
+              }
+          });
+      }
 
-      // Include downsell items in total
-      var downsellTotal = 0;
-      var dsItemsAttr = form.getAttribute('data-downsell-items');
-      var dsItems = [];
-      if (dsItemsAttr) { try { dsItems = JSON.parse(dsItemsAttr); } catch(e) {} }
-      dsItems.forEach(function(di) { downsellTotal += di.price; });
+      // ── 6. Pre-purchase upsells ──
+      if (form) {
+          var preItemsAttr = form.getAttribute('data-pre-upsell-items');
+          if (preItemsAttr) {
+              try {
+                  var preArr = JSON.parse(preItemsAttr);
+                  preArr.forEach(function(pi) {
+                      var pPrice = parseFloat(pi.price) || 0;
+                      state.preUpsellTotal += pPrice;
+                      state.preUpsellItems.push({ title: pi.title || 'Upsell item', price: pPrice });
+                  });
+              } catch(e) {}
+          }
+      }
 
-      total += tickUpsellTotal + downsellTotal;
-      
-      console.log('[COD Form] Updating order summary:', {
-          quantity: quantity,
-          unitPrice: unitPrice,
-          subtotal: subtotal,
-          discountPercent: discountPercent,
-          discount: discount,
-          shipping: shippingCost,
-          total: total
+      // ── 7. Downsell ──
+      if (form) {
+          var dsItemsAttr = form.getAttribute('data-downsell-items');
+          if (dsItemsAttr) {
+              try {
+                  var dsArr = JSON.parse(dsItemsAttr);
+                  dsArr.forEach(function(di) {
+                      state.downsellTotal += (di.price || 0);
+                      state.downsellItems.push({ title: di.title || 'Downsell item', price: di.price || 0 });
+                  });
+              } catch(e) {}
+          }
+      }
+
+      // ── 8. Final total ──
+      // When downsell is active, downsell price REPLACES the original subtotal
+      var displaySubtotal = state.subtotal;
+      if (state.downsellItems.length > 0) {
+          displaySubtotal = state.downsellTotal;
+          state.downsellSavings = state.subtotal - state.downsellTotal;
+      }
+      state.displaySubtotal = displaySubtotal;
+
+      state.total = displaySubtotal - state.discount + state.shipping + state.tickUpsellTotal + state.preUpsellTotal;
+
+      console.log('[COD Form] calculateCheckoutState:', {
+          quantity: state.quantity,
+          subtotal: state.subtotal,
+          displaySubtotal: state.displaySubtotal,
+          discountPercent: state.discountPercent,
+          discount: state.discount,
+          shipping: state.shipping,
+          tickUpsellTotal: state.tickUpsellTotal,
+          preUpsellTotal: state.preUpsellTotal,
+          downsellTotal: state.downsellTotal,
+          downsellSavings: state.downsellSavings,
+          total: state.total,
+          bundleVariants: bundleVariants ? bundleVariants.length : 0
       });
-      
-      // Re-render the full order summary HTML for reliability
-      summaryEl.innerHTML = 
-        '<div style="font-weight:600; margin-bottom:8px; display:flex; align-items:center;">' +
-        '   🧾 Order Summary' +
-        '</div>' +
-        '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#6b7280;">' +
-        '   <span>Subtotal (' + quantity + ' ' + (quantity === 1 ? 'item' : 'items') + ')</span>' +
-        '   <span id="cod-summary-subtotal">' + formatMoney(subtotal) + '</span>' +
-        '</div>' +
-        (discount > 0 ? 
-        '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#10b981;">' +
-        '   <span>Bundle Discount (' + discountPercent + '%)</span>' +
-        '   <span id="cod-summary-discount">-' + formatMoney(discount) + '</span>' +
-        '</div>' : '') +
-        '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#6b7280;">' +
-        '   <span>Shipping</span>' +
-        '   <span id="cod-summary-shipping">' + (shippingCost === 0 ? 'FREE' : formatMoney(shippingCost)) + '</span>' +
-        '</div>' +
-        (tickUpsellTotal > 0 ?
-        '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#059669;">' +
-        '   <span>Tick Upsells</span>' +
-        '   <span>+' + formatMoney(tickUpsellTotal) + '</span>' +
-        '</div>' : '') +
-        (downsellTotal > 0 ?
-        '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#047857;">' +
-        '   <span>Downsell</span>' +
-        '   <span>+' + formatMoney(downsellTotal) + '</span>' +
-        '</div>' : '') +
-        '<div style="display:flex; justify-content:space-between; margin-top:8px; padding-top:8px; border-top:1px dashed #d1d5db; font-weight:700; color:#111827;">' +
-        '   <span>Total</span>' +
-        '   <span id="cod-summary-total" style="color:' + config.primaryColor + '">' + formatMoney(total) + '</span>' +
-        '</div>';
+
+      return state;
+  }
+
+  /**
+   * SINGLE RENDERER for the order summary UI.
+   * All UI updates to the order summary must go through this function.
+   */
+  function renderOrderSummary(form, config, state) {
+      var summaryEl = form ? form.querySelector('.cod-order-summary') : null;
+      if (!summaryEl) {
+          var modal = form ? (form.closest('.cod-modal') || form.parentElement) : null;
+          if (modal) summaryEl = modal.querySelector('.cod-order-summary');
+      }
+      if (!summaryEl) {
+          console.log('[COD Form] No order summary element found');
+          return;
+      }
+
+      var html = '<div style="font-weight:600; margin-bottom:8px; display:flex; align-items:center;">' +
+          '   🧾 Order Summary' +
+          '</div>';
+
+      // Per-variant line items for bundles
+      var bundleVariants = window.FoxCod && window.FoxCod._selectedBundleVariants;
+      if (bundleVariants && bundleVariants.length > 1) {
+          bundleVariants.forEach(function(bv) {
+              html += '<div style="display:flex; justify-content:space-between; margin-bottom:3px; font-size:12px; color:#4b5563;">' +
+                  '   <span>1 × ' + (config.productTitle || '') + ' — ' + (bv.title || '') + '</span>' +
+                  '   <span>' + formatMoney(bv.price) + '</span>' +
+                  '</div>';
+          });
+      }
+
+      // Subtotal
+      html += '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#6b7280;">' +
+          '   <span>Subtotal (' + state.quantity + ' ' + (state.quantity === 1 ? 'item' : 'items') + ')</span>' +
+          '   <span id="cod-summary-subtotal">' + formatMoney(state.displaySubtotal) + '</span>' +
+          '</div>';
+
+      // Downsell savings
+      if (state.downsellSavings > 0) {
+          html += '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#10b981;">' +
+              '   <span>Downsell discount</span>' +
+              '   <span>-' + formatMoney(state.downsellSavings) + '</span>' +
+              '</div>';
+      }
+
+      // Bundle discount
+      if (state.discount > 0) {
+          html += '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#10b981;">' +
+              '   <span>Bundle Discount (' + state.discountPercent + '%)</span>' +
+              '   <span id="cod-summary-discount">-' + formatMoney(state.discount) + '</span>' +
+              '</div>';
+      }
+
+      // Tick upsell line items
+      state.tickUpsellItems.forEach(function(item) {
+          html += '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#059669;">' +
+              '   <span>' + item.title + '</span>' +
+              '   <span>' + formatMoney(item.price) + '</span>' +
+              '</div>';
+      });
+
+      // Pre-purchase upsell line items
+      state.preUpsellItems.forEach(function(item) {
+          html += '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#059669;">' +
+              '   <span>✓ ' + item.title + '</span>' +
+              '   <span>' + formatMoney(item.price) + '</span>' +
+              '</div>';
+      });
+
+      // Shipping
+      html += '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#6b7280;">' +
+          '   <span>Shipping</span>' +
+          '   <span id="cod-summary-shipping">' + (state.shipping === 0 ? 'FREE' : formatMoney(state.shipping)) + '</span>' +
+          '</div>';
+
+      // Total
+      html += '<div style="display:flex; justify-content:space-between; margin-top:8px; padding-top:8px; border-top:1px dashed #d1d5db; font-weight:700; color:#111827;">' +
+          '   <span>Total</span>' +
+          '   <span id="cod-summary-total" style="color:' + config.primaryColor + '">' + formatMoney(state.total) + '</span>' +
+          '</div>';
+
+      summaryEl.innerHTML = html;
 
       // Also update the Liquid-rendered total price if it exists
-      var codTotalPrice = form.querySelector('.cod-total-price');
+      var codTotalPrice = form ? form.querySelector('.cod-total-price') : null;
       if (codTotalPrice) {
-          codTotalPrice.textContent = formatMoney(total);
+          codTotalPrice.textContent = formatMoney(state.total);
       }
 
       // Sync payment method amounts with updated total
       updatePaymentMethodAmounts(form, config);
+  }
+
+  // =============================================
+  // WRAPPER FUNCTIONS (delegate to pricing engine)
+  // =============================================
+
+  /**
+   * Update order summary after tick upsell changes.
+   * Delegates to the centralized pricing engine.
+   */
+  function updateOrderSummaryWithTickUpsells(form, config) {
+      try {
+          var state = calculateCheckoutState(form, config);
+          renderOrderSummary(form, config, state);
+      } catch(e) {
+          console.error('[COD Form] Error in updateOrderSummaryWithTickUpsells:', e);
+      }
+  }
+
+  /**
+   * Update order summary when a bundle offer is selected.
+   * Delegates to the centralized pricing engine.
+   */
+  function updateOrderSummaryWithOffer(form, config, offer) {
+      try {
+          var state = calculateCheckoutState(form, config);
+          renderOrderSummary(form, config, state);
+      } catch(e) {
+          console.error('[COD Form] Error in updateOrderSummaryWithOffer:', e);
+      }
   }
 
   /**
@@ -2973,20 +3391,29 @@
         });
     }
     
-    // Clear form on open so fields are empty on every modal open / page refresh
-    if (form) form.reset();
-
-    // After form.reset(), re-apply visual styling for default-checked tick upsells
-    // (form.reset() restores checkbox checked state via defaultChecked, but row styles are inline)
+    // Restore saved checkout state instead of resetting the form
+    // This preserves user-entered data across modal close/reopen
     if (form) {
+        // If an order was just completed, reset the form completely
+        var orderJustCompleted = false;
+        try { orderJustCompleted = localStorage.getItem('foxcod_order_just_completed') === 'true'; } catch(e) {}
+        
+        if (orderJustCompleted) {
+            form.reset();
+            try { localStorage.removeItem('foxcod_order_just_completed'); } catch(e) {}
+            console.log('[COD Form] Form reset after completed order');
+        } else {
+            // Restore in-session checkout state (saved during this page session)
+            restoreFoxCodCheckoutState(form, config);
+        }
+
+        // Re-apply visual styling for default-checked tick upsells
         var tickRows = form.querySelectorAll('.cod-tick-upsell-row');
         tickRows.forEach(function(row) {
             var cb = row.querySelector('input[type="checkbox"]');
             if (cb && cb.checked) {
-                // Re-apply "checked" styling to the row
-                row.style.borderColor = '';    // will be overridden by next line if needed
+                row.style.borderColor = '';
                 row.style.background = '';
-                // Trigger change event to re-apply styling
                 cb.dispatchEvent(new Event('change', { bubbles: true }));
             }
         });
@@ -3630,9 +4057,10 @@
 
       // Show popup instantly — bg images use embedded data URIs
       var overlay = document.createElement('div');
-      overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100000; display: flex; align-items: center; justify-content: center; padding: 20px;';
+      overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100000; display: flex; align-items: center; justify-content: center; padding: 16px;';
       var modal = document.createElement('div');
-      modal.style.cssText = 'background: #fff; border-radius: 12px; max-width: 420px; width: 100%; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.2);';
+      var isMobileUpsell = window.innerWidth <= 480;
+      modal.style.cssText = 'background: #fff; border-radius: 24px; max-width: ' + (isMobileUpsell ? '340px' : '420px') + '; width: 100%; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.2); max-height: ' + (isMobileUpsell ? '85vh' : '90vh') + '; overflow-y: auto;';
       modal.innerHTML = buildUpsellModalHTML(campaign, offer, offerIndex, config);
       overlay.appendChild(modal);
       document.body.appendChild(overlay);
@@ -3775,9 +4203,10 @@
 
       // Show popup instantly — bg images use embedded data URIs
       var overlay = document.createElement('div');
-      overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100000; display: flex; align-items: center; justify-content: center; padding: 20px;';
+      overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100000; display: flex; align-items: center; justify-content: center; padding: 16px;';
       var modal = document.createElement('div');
-      modal.style.cssText = 'background: #fff; border-radius: 12px; max-width: 420px; width: 100%; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.2);';
+      var isMobileDs = window.innerWidth <= 480;
+      modal.style.cssText = 'background: #fff; border-radius: 24px; max-width: ' + (isMobileDs ? '340px' : '420px') + '; width: 100%; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.2); max-height: ' + (isMobileDs ? '85vh' : '90vh') + '; overflow-y: auto;';
 
       // Use dedicated downsell builder if design has downsell-specific fields, else fallback to upsell builder
       var hasDownsellDesign = dsCampaign.design && (dsCampaign.design.titleText || dsCampaign.design.subtitleText || dsCampaign.design.descriptionText);
@@ -4037,6 +4466,22 @@
           upsell_items: getCheckedTickUpsells(form, config)
       };
 
+      // Bundle variant items — when customer selected different variants per item
+      if (window.FoxCod && window.FoxCod._selectedBundleVariants && window.FoxCod._selectedBundleVariants.length > 1) {
+          var bvList = window.FoxCod._selectedBundleVariants;
+          payload.bundleVariants = bvList.map(function(v) {
+              return { variantId: v.variantId, title: v.title, price: v.price, quantity: 1 };
+          });
+          // Also expose as variants_selected for backend compatibility
+          payload.variants_selected = bvList.map(function(v) {
+              return { variantId: v.variantId, title: v.title, price: v.price, quantity: 1 };
+          });
+          // Override price with sum of variant prices for correct total calculation
+          payload.price = bvList.reduce(function(sum, v) { return sum + v.price; }, 0);
+          // Use the first variant's ID as the primary variant (Shopify needs at least one)
+          payload.variantId = bvList[0].variantId;
+      }
+
       // Collect custom field values
       var customFieldData = [];
       var knownFieldIds = ['name', 'phone', 'address', 'email', 'state', 'city', 'zip', 'zipcode', 'notes', 'quantity', 'shipping', 'order_summary', 'marketing', 'payment_mode'];
@@ -4067,53 +4512,25 @@
           return;
       }
 
-      // ── Read bundle offer selection (quantity + discount) ──
-      var _modal = form.closest('.cod-modal') || form;
-      var _qOffers = _modal.querySelector('.cod-quantity-offers');
-      if (_qOffers) {
-          try {
-              var _od = _qOffers.getAttribute('data-selected-offer');
-              if (_od) {
-                  var _so = JSON.parse(_od);
-                  payload.quantity = _so.quantity || payload.quantity;
-                  payload.discountPercent = _so.discountPercent || 0;
-              }
-          } catch(e) {}
-      }
-      // Also check product-page offers (for in_product_page placement)
-      if (payload.discountPercent === 0) {
-          var _ppOffers = document.querySelector('.cod-product-page-offers');
-          if (_ppOffers) {
-              try {
-                  var _ppd = _ppOffers.getAttribute('data-selected-offer');
-                  if (_ppd) {
-                      var _ppo = JSON.parse(_ppd);
-                      payload.quantity = _ppo.quantity || payload.quantity;
-                      payload.discountPercent = _ppo.discountPercent || 0;
-                  }
-              } catch(e) {}
-          }
-      }
+      // ── Use centralized pricing engine for all payload values ──
+      var checkoutState = calculateCheckoutState(form, config);
+      payload.quantity = checkoutState.quantity;
+      payload.discountPercent = checkoutState.discountPercent;
+      payload.finalTotal = checkoutState.total;
+      payload.shippingPrice = checkoutState.shipping;
 
-      // ── Read final total from order summary DOM (includes qty, discounts, shipping, upsells) ──
-      var _summaryTotalEl = form.querySelector('#cod-summary-total');
-      if (_summaryTotalEl) {
-          payload.finalTotal = parseFloat(_summaryTotalEl.textContent.replace(/[^0-9.]/g, '')) || 0;
+      // Use engine-computed subtotal for price (respects bundle variants)
+      if (window.FoxCod && window.FoxCod._selectedBundleVariants && window.FoxCod._selectedBundleVariants.length > 1) {
+          payload.price = checkoutState.subtotal;
       }
-
-      console.log('[COD Form] Bundle offer applied — qty:', payload.quantity, 'discount:', payload.discountPercent + '%', 'finalTotal:', payload.finalTotal);
 
       // If downsell is active, it replaces the product price (not added on top)
-      var dsItemsAttr = form.getAttribute('data-downsell-items');
-      if (dsItemsAttr) {
-          try {
-              var dsItems = JSON.parse(dsItemsAttr);
-              if (dsItems.length > 0) {
-                  payload.price = dsItems[0].price;
-                  payload.notes = (payload.notes ? payload.notes + '\n' : '') + 'DOWNSELL APPLIED: ' + dsItems[0].title + ' (' + formatMoney(dsItems[0].price) + ')';
-              }
-          } catch(e) {}
+      if (checkoutState.downsellItems.length > 0) {
+          payload.price = checkoutState.downsellItems[0].price;
+          payload.notes = (payload.notes ? payload.notes + '\n' : '') + 'DOWNSELL APPLIED: ' + checkoutState.downsellItems[0].title + ' (' + formatMoney(checkoutState.downsellItems[0].price) + ')';
       }
+
+      console.log('[COD Form] Payload from pricing engine — qty:', payload.quantity, 'discount:', payload.discountPercent + '%', 'finalTotal:', payload.finalTotal);
 
       // Get selected shipping option
       var shippingRadio = form.querySelector('input[name="shipping_method"]:checked');
@@ -4259,6 +4676,10 @@
           if (result.success) {
               // Save customer data to LocalStorage for future auto-fill
               saveCustomerToLocalStorage(form);
+              // Clear persistent checkout state after successful order
+              // Set flag to prevent auto-save from re-writing during reset
+              window._foxcodOrderComplete = true;
+              localStorage.removeItem('foxcod_checkout_state');
 
               // ── Pixel Tracking: Purchase ──
               // Use payload.finalTotal which includes upsells, or read from DOM, or compute fallback
@@ -4288,6 +4709,12 @@
                       e.style.display = e.classList.contains('cod-product-info') || e.classList.contains('cod-total') ? 'flex' : '';
                   });
               }
+              // Clear checkout state again after reset (form.reset may trigger auto-save)
+              localStorage.removeItem('foxcod_checkout_state');
+              // Set flag so the next openModal knows to reset the form
+              localStorage.setItem('foxcod_order_just_completed', 'true');
+              // Allow auto-save to resume after a delay
+              setTimeout(function() { window._foxcodOrderComplete = false; }, 1000);
 
               // Create and show premium global success modal
               var overlay = document.createElement('div');

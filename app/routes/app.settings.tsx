@@ -9,7 +9,7 @@ import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
 import { useLoaderData, useSubmit, useNavigation, Link, useActionData } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
-import { RangeSlider, Button, InlineStack, Modal, Text, Icon, Select, TextField } from "@shopify/polaris";
+import { RangeSlider, Button, InlineStack, Modal, Text, Icon, Select, TextField, ColorPicker } from "@shopify/polaris";
 import { EditIcon, DeleteIcon, ViewIcon, HideIcon, StarFilledIcon } from "@shopify/polaris-icons";
 import {
     DndContext,
@@ -1764,6 +1764,7 @@ export default function SettingsPage() {
     const [isCustomColorActive, setIsCustomColorActive] = useState(
         !['#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f59e0b', '#10b981', '#06b6d4', '#3b82f6', '#000000'].includes(settings.primary_color)
     );
+    const [showCustomPickerPopover, setShowCustomPickerPopover] = useState(false);
 
     // Track saved settings as STATE (not ref) so changes trigger re-render
     const [savedSettingsString, setSavedSettingsString] = useState<string>(() => JSON.stringify(settings));
@@ -2351,6 +2352,8 @@ export default function SettingsPage() {
                     top: 64px;
                     height: fit-content;
                 }
+                .card-title { font-size: 17px; font-weight: 700; color: #111827; margin: 0 0 16px 0; letter-spacing: -0.01em; }
+                .input-label { font-size: 14px; font-weight: 600; color: #374151; display: block; margin-bottom: 8px; }
                 .settings-card { background: white; border: 1px solid #e5e7eb; border-radius: 16px; padding: 24px; margin-bottom: 20px; }
                 .preview-panel { background: white; border: 1px solid #e5e7eb; border-radius: 16px; width: 100%; box-shadow: 0 10px 40px rgba(0,0,0,0.1); padding-bottom: 20px; }
                 .preview-header { background: #f9fafb; padding: 16px 20px; border-bottom: 1px solid #e5e7eb; }
@@ -3196,7 +3199,7 @@ export default function SettingsPage() {
                                         </div>
                                     </div>
 
-                                    <div className="settings-card">
+                                    <div className="settings-card" style={{ position: 'relative' }}>
                                         <h3 className="card-title">Button Color</h3>
                                         <div className="color-picker">
                                             {/* Preset color palette with checkmark indicator */}
@@ -3225,18 +3228,22 @@ export default function SettingsPage() {
                                                 <span>or choose custom</span>
                                             </div>
 
-                                            {/* Custom Color Row: Picker + Hex Input */}
+                                            {/* Custom Color Row: Swatch + Hex Input */}
                                             <div className="custom-color-row">
                                                 <div className="color-picker-wrapper">
-                                                    <input
-                                                        type="color"
-                                                        value={primaryColor}
-                                                        onChange={(e) => {
-                                                            setPrimaryColor(e.target.value);
-                                                            setCustomHexInput(e.target.value);
-                                                            setIsCustomColorActive(true);
-                                                            setHexError('');
+                                                    <div
+                                                        className="polaris-color-swatch"
+                                                        style={{
+                                                            backgroundColor: primaryColor,
+                                                            width: 48,
+                                                            height: 48,
+                                                            borderRadius: 10,
+                                                            border: '2px solid #e5e7eb',
+                                                            cursor: 'pointer',
+                                                            flexShrink: 0,
                                                         }}
+                                                        onClick={() => setShowCustomPickerPopover((v: boolean) => !v)}
+                                                        title="Click to pick a color"
                                                     />
                                                 </div>
                                                 <div className="hex-input-wrapper">
@@ -3268,6 +3275,49 @@ export default function SettingsPage() {
                                                     {hexError && <span className="hex-error">{hexError}</span>}
                                                 </div>
                                             </div>
+                                            {showCustomPickerPopover && (
+                                                <div className="polaris-picker-popover" style={{ marginTop: 8, position: 'absolute', left: 24, right: 24, zIndex: 9999 }}>
+                                                    <ColorPicker
+                                                        onChange={(color: any) => {
+                                                            // Convert HSB to hex
+                                                            const { hue, saturation, brightness } = color;
+                                                            const c = brightness * saturation;
+                                                            const x = c * (1 - Math.abs(((hue / 60) % 2) - 1));
+                                                            const m = brightness - c;
+                                                            let r = 0, g = 0, b = 0;
+                                                            if (hue < 60) { r = c; g = x; }
+                                                            else if (hue < 120) { r = x; g = c; }
+                                                            else if (hue < 180) { g = c; b = x; }
+                                                            else if (hue < 240) { g = x; b = c; }
+                                                            else if (hue < 300) { r = x; b = c; }
+                                                            else { r = c; b = x; }
+                                                            const toHex = (v: number) => Math.round((v + m) * 255).toString(16).padStart(2, '0');
+                                                            const hex = `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+                                                            setPrimaryColor(hex);
+                                                            setCustomHexInput(hex.toUpperCase());
+                                                            setIsCustomColorActive(true);
+                                                            setHexError('');
+                                                        }}
+                                                        color={(() => {
+                                                            // Convert current hex to HSB for ColorPicker
+                                                            let h = primaryColor.replace('#', '');
+                                                            if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+                                                            const rv = parseInt(h.substring(0, 2), 16) / 255;
+                                                            const gv = parseInt(h.substring(2, 4), 16) / 255;
+                                                            const bv = parseInt(h.substring(4, 6), 16) / 255;
+                                                            const max = Math.max(rv, gv, bv), min = Math.min(rv, gv, bv), d = max - min;
+                                                            let hue = 0;
+                                                            if (d !== 0) {
+                                                                if (max === rv) hue = ((gv - bv) / d + (gv < bv ? 6 : 0)) * 60;
+                                                                else if (max === gv) hue = ((bv - rv) / d + 2) * 60;
+                                                                else hue = ((rv - gv) / d + 4) * 60;
+                                                            }
+                                                            return { hue, saturation: max === 0 ? 0 : d / max, brightness: max };
+                                                        })()}
+                                                    />
+                                                </div>
+                                            )}
+
                                         </div>
                                     </div>
 

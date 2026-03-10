@@ -410,9 +410,31 @@ async function handleRegularOrder(request: Request, data: any) {
                 ? data.variantId
                 : `gid://shopify/ProductVariant/${data.variantId}`;
 
-            const lineItems: Array<{ variantId: string; quantity: number }> = [
-                { variantId: mainVariantGid, quantity: parseInt(data.quantity) || 1 }
-            ];
+            const lineItems: Array<{ variantId: string; quantity: number }> = [];
+
+            // Bundle variants: when customer selected different variants per item
+            if (data.bundleVariants && Array.isArray(data.bundleVariants) && data.bundleVariants.length > 1) {
+                // Group by variantId and sum quantities
+                const variantMap: Record<string, number> = {};
+                data.bundleVariants.forEach((bv: any) => {
+                    const vid = String(bv.variantId).startsWith('gid://')
+                        ? bv.variantId
+                        : `gid://shopify/ProductVariant/${bv.variantId}`;
+                    variantMap[vid] = (variantMap[vid] || 0) + (parseInt(bv.quantity) || 1);
+                });
+                Object.keys(variantMap).forEach(vid => {
+                    lineItems.push({ variantId: vid, quantity: variantMap[vid] });
+                });
+                console.log('[Proxy] Bundle variants line items:', lineItems.length);
+
+                // Add variant details to notes
+                const variantNotes = 'BUNDLE VARIANTS:\n' + data.bundleVariants.map((bv: any, idx: number) =>
+                    `  Item ${idx + 1}: ${bv.title || 'Variant'} (${fmtPrice(parseFloat(bv.price) || 0)})`
+                ).join('\n');
+                orderNotes = orderNotes ? orderNotes + '\n' + variantNotes : variantNotes;
+            } else {
+                lineItems.push({ variantId: mainVariantGid, quantity: parseInt(data.quantity) || 1 });
+            }
 
             if (upsellItems.length > 0) {
                 upsellItems.forEach((item: any) => {
