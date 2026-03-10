@@ -1122,6 +1122,11 @@
           productInfo.style.display = 'none';
           console.log('[COD Form] Product info section hidden');
       }
+      // Also hide the quantity badge if it exists (bundle offers control quantity)
+      var qtyBadge = container.querySelector('.cod-qty-badge');
+      if (qtyBadge) {
+          qtyBadge.style.display = 'none';
+      }
       
       console.log('[COD Form] Product header hidden for non-in_product_page placement');
   }
@@ -1383,7 +1388,7 @@
         label.style.display = 'block';
         label.style.fontWeight = fontStyle === 'bold' ? '700' : '500';
         label.style.fontStyle = fontStyle === 'italic' ? 'italic' : 'normal';
-        label.style.marginBottom = '2px';
+        label.style.marginBottom = '0px';
         label.style.fontSize = (styles.labelFontSize || textSize) + 'px';
         label.style.color = styles.labelColor || textColor;
         label.style.textAlign = labelAlignment;
@@ -1535,8 +1540,8 @@
         input.style.border = borderWidth + 'px solid ' + borderColor;
         input.style.borderRadius = borderRadius + 'px';
         input.style.fontSize = Math.max(textSize, 16) + 'px'; // minimum 16px to prevent iOS auto-zoom
-        input.style.fontWeight = fontStyle === 'bold' ? '700' : '400';
-        input.style.fontStyle = fontStyle === 'italic' ? 'italic' : 'normal';
+        input.style.fontWeight = '400';
+        input.style.fontStyle = 'normal';
         input.style.fontFamily = '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
         input.style.color = textColor; // Input text color
         if (styles.fieldBackgroundColor) {
@@ -2919,6 +2924,11 @@
     });
 
     function triggerUpdate() {
+        // Update quantity badge on product image
+        var qtyBadge = container.querySelector('.cod-qty-badge');
+        if (qtyBadge) {
+            qtyBadge.textContent = input.value;
+        }
         // Read shipping price directly from the selected radio's data-price attribute
         var shippingPrice = 0;
         var selectedShipping = form.querySelector('input[name="shipping_method"]:checked');
