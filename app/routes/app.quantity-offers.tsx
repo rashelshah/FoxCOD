@@ -617,7 +617,16 @@ export default function QuantityOffersPage() {
 
     const updateOffer = useCallback((offerId: string, updates: Partial<QuantityOffer>) => {
         if (!activeGroup) return;
-        const newOffers = activeGroup.offers.map(o => o.id === offerId ? { ...o, ...updates } : o);
+        const newOffers = activeGroup.offers.map(o => {
+            if (o.id === offerId) {
+                return { ...o, ...updates };
+            }
+            // If we're setting preselect=true on one offer, uncheck all others
+            if (updates.preselect === true) {
+                return { ...o, preselect: false };
+            }
+            return o;
+        });
         updateActiveGroup({ offers: newOffers });
     }, [activeGroup, updateActiveGroup]);
 
@@ -1094,7 +1103,11 @@ export default function QuantityOffersPage() {
                                                     {activeGroup.offers.map((offer, i) => {
                                                         const total = samplePrice * offer.quantity * (1 - (offer.discountPercent || 0) / 100);
                                                         const original = samplePrice * offer.quantity;
-                                                        const isSelected = offer.preselect || i === 0;
+                                                        // Compute effective preselected index: explicit preselect > best discount > first
+                                                        const preselectedIdx = activeGroup.offers.findIndex(o => o.preselect);
+                                                        const bestDiscountIdx = activeGroup.offers.reduce((maxIdx, o, idx, arr) => (o.discountPercent || 0) > (arr[maxIdx].discountPercent || 0) ? idx : maxIdx, 0);
+                                                        const effectiveIdx = preselectedIdx !== -1 ? preselectedIdx : bestDiscountIdx;
+                                                        const isSelected = i === effectiveIdx;
                                                         const template = activeGroup.design.template || 'classic';
                                                         const showImage = template !== 'modern' && template !== 'minimal';
                                                         const isVertical = template === 'vertical';
@@ -1247,7 +1260,11 @@ export default function QuantityOffersPage() {
                                                             {activeGroup.offers.map((offer, i) => {
                                                                 const total = samplePrice * offer.quantity * (1 - (offer.discountPercent || 0) / 100);
                                                                 const original = samplePrice * offer.quantity;
-                                                                const isSelected = offer.preselect || i === 0;
+                                                                // Compute effective preselected index: explicit preselect > best discount > first
+                                                                const preselectedIdx = activeGroup.offers.findIndex(o => o.preselect);
+                                                                const bestDiscountIdx = activeGroup.offers.reduce((maxIdx, o, idx, arr) => (o.discountPercent || 0) > (arr[maxIdx].discountPercent || 0) ? idx : maxIdx, 0);
+                                                                const effectiveIdx = preselectedIdx !== -1 ? preselectedIdx : bestDiscountIdx;
+                                                                const isSelected = i === effectiveIdx;
                                                                 const template = activeGroup.design.template || 'classic';
                                                                 const showImage = template !== 'modern' && template !== 'minimal';
                                                                 const isModern = template === 'modern';
@@ -1597,7 +1614,11 @@ export default function QuantityOffersPage() {
                                                             {activeGroup.offers.map((offer, i) => {
                                                                 const total = samplePrice * offer.quantity * (1 - (offer.discountPercent || 0) / 100);
                                                                 const original = samplePrice * offer.quantity;
-                                                                const isSelected = offer.preselect || i === 0;
+                                                                // Compute effective preselected index: explicit preselect > best discount > first
+                                                                const preselectedIdx = activeGroup.offers.findIndex(o => o.preselect);
+                                                                const bestDiscountIdx = activeGroup.offers.reduce((maxIdx, o, idx, arr) => (o.discountPercent || 0) > (arr[maxIdx].discountPercent || 0) ? idx : maxIdx, 0);
+                                                                const effectiveIdx = preselectedIdx !== -1 ? preselectedIdx : bestDiscountIdx;
+                                                                const isSelected = i === effectiveIdx;
                                                                 const template = activeGroup.design.template || 'classic';
                                                                 const showImage = template !== 'modern' && template !== 'minimal';
                                                                 const isModern = template === 'modern';
