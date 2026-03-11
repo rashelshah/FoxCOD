@@ -599,6 +599,11 @@
                 discountPercent: parseFloat(defaultSelectedCard.getAttribute('data-discount')) || 0
               };
               offersResult.element.setAttribute('data-selected-offer', JSON.stringify(defaultOffer));
+              
+              // Auto-render variant selectors for preselected bundle offer on product page
+              if (defaultOffer.quantity > 1) {
+                renderBundleVariantSelectors(null, config, defaultOffer.quantity, offersResult.element);
+              }
             }
             
             // Wire up click handlers to sync with modal
@@ -616,6 +621,9 @@
                   discountPercent: parseFloat(card.getAttribute('data-discount')) || 0
                 };
                 offersResult.element.setAttribute('data-selected-offer', JSON.stringify(offer));
+                
+                // Render variant selectors on the product page
+                renderBundleVariantSelectors(null, config, offer.quantity, offersResult.element);
                 
                 // Also sync to any modal offers container
                 var modalContainer = document.getElementById('cod-form-' + productId);
@@ -1053,8 +1061,13 @@
       // Append price wrapper to card
       card.appendChild(priceWrapper);
       
-      // Click handler
+      // Click handler with debounce to prevent DOM thrashing on rapid switching
       card.addEventListener('click', function() {
+        // Debounce: skip if last switch was < 200ms ago
+        var now = Date.now();
+        if (offersContainer._lastSwitchTime && (now - offersContainer._lastSwitchTime) < 200) return;
+        offersContainer._lastSwitchTime = now;
+
         // Update selected state
         offersContainer.querySelectorAll('.cod-offer-card').forEach(function(c, i) {
           c.classList.remove('selected');
@@ -1072,11 +1085,10 @@
           var qtyInput = form ? form.querySelector('.cod-qty-input') : null;
           if (qtyInput) {
             qtyInput.value = offer.quantity;
-            // Don't dispatch change event — we'll update summary ourselves below
           }
         }
         
-        // Store selected offer — MutationObserver will re-render shipping automatically
+        // Store selected offer
         offersContainer.setAttribute('data-selected-offer', JSON.stringify({
           quantity: offer.quantity,
           discountPercent: offer.discountPercent || 0
@@ -1085,13 +1097,10 @@
         // Render bundle variant selectors (works on both product page and modal)
         renderBundleVariantSelectors(form, config, parseInt(offer.quantity) || 1, offersContainer);
         
-        // Update price display and order summary ONCE after everything is set up
-        // Use a short delay to let MutationObserver finish shipping re-render first
+        // Update price display and order summary
         if (isInsideModal && form) {
-            setTimeout(function() {
-                updateOfferPrice(form, config, offer);
-                updateOrderSummaryWithOffer(form, config, offer);
-            }, 100);
+            updateOfferPrice(form, config, offer);
+            updateOrderSummaryWithOffer(form, config, offer);
         }
       });
       
@@ -1251,10 +1260,8 @@
           form.insertBefore(section, form.firstChild);
       }
 
-      // Initial price update (only if inside modal form)
-      if (form && form.closest('.cod-modal')) {
-          updateBundleVariantSelection(form, config, section, quantity);
-      }
+      // Initial price update
+      updateBundleVariantSelection(form, config, section, quantity);
   }
 
   function findMatchingVariant(selectedOptions) {
@@ -1312,35 +1319,38 @@
 
       window.FoxCod._selectedBundleVariants = bundleVariants;
 
-      // Use centralized pricing engine
-      var state = calculateCheckoutState(form, config);
-      renderOrderSummary(form, config, state);
+      // Only update pricing/shipping/save when inside a form (modal context)
+      if (form) {
+          // Use centralized pricing engine
+          var state = calculateCheckoutState(form, config);
+          renderOrderSummary(form, config, state);
 
-      // Re-render shipping rates inside the modal only (variant price/weight may affect shipping rules)
-      if (form && form.closest('.cod-modal')) {
-          var fieldsContainer = form.querySelector('.cod-dynamic-fields-container');
-          var shippingSection = form.querySelector('.cod-shipping-section');
-          var shippingMarker = fieldsContainer ? fieldsContainer.querySelector('.cod-section-marker[data-section="shipping"]') : null;
-          if (shippingSection) {
-              shippingSection.remove();
-          }
-          var hasNewShippingRates = config.shippingRatesEnabled && config.shippingRates && config.shippingRates.length > 0;
-          var hasOldShippingOptions = config.shippingOptions && config.shippingOptions.enabled;
-          var shippingFieldVisible = (config.fields || []).some(function(f) { return f.id === 'shipping' && f.visible !== false; });
-          var shippingEnabled2 = (config.blocks && config.blocks.shipping_options) || shippingFieldVisible;
-          if (shippingEnabled2 && (hasNewShippingRates || hasOldShippingOptions)) {
-              renderShippingOptions(form, config);
-              if (shippingMarker) {
-                  var newShippingSection = form.querySelector('.cod-shipping-section');
-                  if (newShippingSection) {
-                      shippingMarker.appendChild(newShippingSection);
+          // Re-render shipping rates inside the modal only
+          if (form.closest('.cod-modal')) {
+              var fieldsContainer = form.querySelector('.cod-dynamic-fields-container');
+              var shippingSection = form.querySelector('.cod-shipping-section');
+              var shippingMarker = fieldsContainer ? fieldsContainer.querySelector('.cod-section-marker[data-section="shipping"]') : null;
+              if (shippingSection) {
+                  shippingSection.remove();
+              }
+              var hasNewShippingRates = config.shippingRatesEnabled && config.shippingRates && config.shippingRates.length > 0;
+              var hasOldShippingOptions = config.shippingOptions && config.shippingOptions.enabled;
+              var shippingFieldVisible = (config.fields || []).some(function(f) { return f.id === 'shipping' && f.visible !== false; });
+              var shippingEnabled2 = (config.blocks && config.blocks.shipping_options) || shippingFieldVisible;
+              if (shippingEnabled2 && (hasNewShippingRates || hasOldShippingOptions)) {
+                  renderShippingOptions(form, config);
+                  if (shippingMarker) {
+                      var newShippingSection = form.querySelector('.cod-shipping-section');
+                      if (newShippingSection) {
+                          shippingMarker.appendChild(newShippingSection);
+                      }
                   }
               }
           }
-      }
 
-      // Auto-save checkout state
-      saveFoxCodCheckoutState(form);
+          // Auto-save checkout state
+          saveFoxCodCheckoutState(form);
+      }
   }
   
   /**
@@ -2301,6 +2311,10 @@
    * Render Shipping Options
    */
   function renderShippingOptions(form, config) {
+      // Remove any existing shipping section to prevent duplicates
+      var existingShipping = form.querySelectorAll('.cod-shipping-section');
+      existingShipping.forEach(function(el) { el.remove(); });
+
       // Check for new shipping rates system first
       if (config.shippingRatesEnabled && config.shippingRates && config.shippingRates.length > 0) {
           renderNewShippingRates(form, config);
@@ -2504,6 +2518,10 @@
    */
   function renderNewShippingRates(form, config) {
       if (!config.shippingRates || config.shippingRates.length === 0) return;
+
+      // Remove any existing shipping section to prevent duplicates
+      var existingShipping = form.querySelectorAll('.cod-shipping-section');
+      existingShipping.forEach(function(el) { el.remove(); });
 
       var container = document.createElement('div');
       container.className = 'cod-shipping-section';
@@ -3747,6 +3765,12 @@
     }
 
     // Normal close (no downsell or threshold not reached)
+    // Save form state BEFORE closing so it persists across reopen
+    var form = document.getElementById('cod-order-form-' + productId);
+    if (form) {
+        saveFoxCodCheckoutState(form);
+    }
+
     if (modal) {
         modal.classList.remove('visible');
         setTimeout(function() { modal.style.display = 'none'; }, 300);
@@ -4480,6 +4504,13 @@
           payload.price = bvList.reduce(function(sum, v) { return sum + v.price; }, 0);
           // Use the first variant's ID as the primary variant (Shopify needs at least one)
           payload.variantId = bvList[0].variantId;
+          
+          // Append bundle variant details to notes for order display
+          var variantNotes = 'BUNDLE VARIANTS:';
+          bvList.forEach(function(v, idx) {
+              variantNotes += '\n- Item ' + (idx + 1) + ': ' + v.title + ' (' + formatMoney(v.price) + ')';
+          });
+          payload.notes = (payload.notes ? payload.notes + '\n' : '') + variantNotes;
       }
 
       // Collect custom field values

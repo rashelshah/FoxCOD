@@ -1648,6 +1648,28 @@ const ImportShippingModal = ({ onClose, onImport }: ImportShippingModalProps) =>
     );
 };
 
+/** Collapsible accordion section for settings tabs */
+const AccordionSection = ({ id, tab, title, helperText, expandedSection, toggleSection, children }: {
+    id: string; tab: string; title: string; helperText?: string;
+    expandedSection: Record<string, string>;
+    toggleSection: (tab: string, id: string) => void;
+    children: React.ReactNode;
+}) => {
+    const isOpen = expandedSection[tab] === id;
+    return (
+        <div className={`accordion-section ${isOpen ? 'open' : ''}`}>
+            <button type="button" className="accordion-header" onClick={() => toggleSection(tab, id)}>
+                <span className="accordion-title">{title}</span>
+                <span className={`accordion-chevron ${isOpen ? 'rotated' : ''}`}>▶</span>
+            </button>
+            {helperText && !isOpen && <p className="accordion-helper-collapsed">{helperText}</p>}
+            <div className={`accordion-body ${isOpen ? 'expanded' : 'collapsed'}`}>
+                {isOpen && <div className="accordion-content">{children}</div>}
+            </div>
+        </div>
+    );
+};
+
 /**
  * Settings Page Component - Premium Form Builder
  */
@@ -1670,6 +1692,20 @@ export default function SettingsPage() {
 
     const isSubmitting = navigation.state === "submitting";
     const [activeTab, setActiveTab] = useState<'button' | 'form' | 'style' | 'shipping'>('button');
+
+    // Accordion state: track which section is expanded per tab (only one at a time)
+    const [expandedSection, setExpandedSection] = useState<Record<string, string>>({
+        button: 'button-basics',
+        form: 'field-management',
+        style: 'form-animation',
+    });
+    const toggleSection = useCallback((tab: string, sectionId: string) => {
+        setExpandedSection(prev => {
+            const next = prev[tab] === sectionId ? '' : sectionId;
+            if (prev[tab] === next) return prev;
+            return { ...prev, [tab]: next };
+        });
+    }, []);
 
     // Local state for all form fields
     // Defensive: ensure enabled is always a boolean (not an object from DB)
@@ -2355,6 +2391,74 @@ export default function SettingsPage() {
                 .card-title { font-size: 17px; font-weight: 700; color: #111827; margin: 0 0 16px 0; letter-spacing: -0.01em; }
                 .input-label { font-size: 14px; font-weight: 600; color: #374151; display: block; margin-bottom: 8px; }
                 .settings-card { background: white; border: 1px solid #e5e7eb; border-radius: 16px; padding: 24px; margin-bottom: 20px; }
+
+                /* Accordion Section Styles */
+                .accordion-section {
+                    background: white;
+                    border: 1px solid #e5e7eb;
+                    border-radius: 16px;
+                    margin-bottom: 16px;
+                    overflow: hidden;
+                    transition: box-shadow 0.2s ease;
+                }
+                .accordion-section.open {
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+                    border-color: #d1d5db;
+                }
+                .accordion-header {
+                    width: 100%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    padding: 18px 24px;
+                    background: transparent;
+                    border: none;
+                    cursor: pointer;
+                    font-size: 15px;
+                    font-weight: 700;
+                    color: #111827;
+                    letter-spacing: -0.01em;
+                    transition: background 0.15s ease;
+                }
+                .accordion-header:hover {
+                    background: #f9fafb;
+                }
+                .accordion-title {
+                    font-size: 15px;
+                    font-weight: 700;
+                    color: #111827;
+                }
+                .accordion-chevron {
+                    font-size: 11px;
+                    color: #9ca3af;
+                    transition: transform 0.25s ease;
+                    display: inline-block;
+                }
+                .accordion-chevron.rotated {
+                    transform: rotate(90deg);
+                }
+                .accordion-body.collapsed {
+                    max-height: 0;
+                    overflow: hidden;
+                }
+                .accordion-body.expanded {
+                    max-height: none;
+                }
+                .accordion-content {
+                    padding: 0 24px 24px 24px;
+                }
+                .accordion-helper-collapsed {
+                    font-size: 12px;
+                    color: #9ca3af;
+                    margin: -8px 24px 12px 24px;
+                    line-height: 1.4;
+                }
+                .setting-helper {
+                    font-size: 12px;
+                    color: #9ca3af;
+                    margin: 4px 0 0 0;
+                    line-height: 1.4;
+                }
                 .preview-panel { background: white; border: 1px solid #e5e7eb; border-radius: 16px; width: 100%; box-shadow: 0 10px 40px rgba(0,0,0,0.1); padding-bottom: 20px; }
                 .preview-header { background: #f9fafb; padding: 16px 20px; border-bottom: 1px solid #e5e7eb; }
                 .preview-content { padding: 24px; }
@@ -3185,8 +3289,8 @@ export default function SettingsPage() {
                             {/* Button Tab */}
                             {activeTab === 'button' && (
                                 <>
-                                    <div className="settings-card">
-                                        <h3 className="card-title">Button Text</h3>
+                                    {/* Button Basics (Default Open) */}
+                                    <AccordionSection id="button-basics" tab="button" title="Button Basics" expandedSection={expandedSection} toggleSection={toggleSection}>
                                         <div className="input-group">
                                             <label className="input-label">Button Label</label>
                                             <input
@@ -3197,11 +3301,46 @@ export default function SettingsPage() {
                                                 placeholder="e.g., Buy with COD"
                                             />
                                         </div>
-                                    </div>
+                                        <div className="input-group" style={{ marginTop: 16 }}>
+                                            <label className="input-label">Button Style</label>
+                                            <div className="style-options">
+                                                {['solid', 'outline', 'gradient'].map((style) => (
+                                                    <button
+                                                        key={style}
+                                                        className={`style-option ${buttonStyle === style ? 'active' : ''}`}
+                                                        onClick={() => {
+                                                            setButtonStyle(style as any);
+                                                            if (style === 'outline') {
+                                                                setButtonStylesState(s => ({ ...s, borderWidth: 2 }));
+                                                            } else {
+                                                                setButtonStylesState(s => ({ ...s, borderWidth: 0 }));
+                                                            }
+                                                        }}
+                                                    >
+                                                        {style.charAt(0).toUpperCase() + style.slice(1)}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="input-group" style={{ marginTop: 16 }}>
+                                            <label className="input-label">Button Size</label>
+                                            <div className="style-options">
+                                                {['small', 'medium', 'large'].map((size) => (
+                                                    <button
+                                                        key={size}
+                                                        className={`style-option ${buttonSize === size ? 'active' : ''}`}
+                                                        onClick={() => setButtonSize(size as any)}
+                                                    >
+                                                        {size.charAt(0).toUpperCase() + size.slice(1)}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </AccordionSection>
 
-                                    <div className="settings-card" style={{ position: 'relative' }}>
-                                        <h3 className="card-title">Button Color</h3>
-                                        <div className="color-picker">
+                                    {/* Button Colors */}
+                                    <AccordionSection id="button-colors" tab="button" title="Button Colors" helperText="Changes the color of the COD button on the product page." expandedSection={expandedSection} toggleSection={toggleSection}>
+                                        <div className="color-picker" style={{ position: 'relative' }}>
                                             {/* Preset color palette with checkmark indicator */}
                                             <div className="color-presets">
                                                 {colorPresets.map((color) => (
@@ -3276,7 +3415,7 @@ export default function SettingsPage() {
                                                 </div>
                                             </div>
                                             {showCustomPickerPopover && (
-                                                <div className="polaris-picker-popover" style={{ marginTop: 8, position: 'absolute', left: 24, right: 24, zIndex: 9999 }}>
+                                                <div className="polaris-picker-popover" style={{ marginTop: 8, position: 'absolute', left: 0, right: 0, zIndex: 9999 }}>
                                                     <ColorPicker
                                                         onChange={(color: any) => {
                                                             // Convert HSB to hex
@@ -3317,52 +3456,11 @@ export default function SettingsPage() {
                                                     />
                                                 </div>
                                             )}
-
                                         </div>
-                                    </div>
+                                    </AccordionSection>
 
-                                    <div className="settings-card">
-                                        <h3 className="card-title"> Button Style</h3>
-                                        <div className="style-options">
-                                            {['solid', 'outline', 'gradient'].map((style) => (
-                                                <button
-                                                    key={style}
-                                                    className={`style-option ${buttonStyle === style ? 'active' : ''}`}
-                                                    onClick={() => {
-                                                        setButtonStyle(style as any);
-                                                        // Smart Border Logic:
-                                                        // - Outline: Needs visible border (default 2px)
-                                                        // - Solid/Gradient: Usually no border (default 0px)
-                                                        if (style === 'outline') {
-                                                            setButtonStylesState(s => ({ ...s, borderWidth: 2 }));
-                                                        } else {
-                                                            setButtonStylesState(s => ({ ...s, borderWidth: 0 }));
-                                                        }
-                                                    }}
-                                                >
-                                                    {style.charAt(0).toUpperCase() + style.slice(1)}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    <div className="settings-card">
-                                        <h3 className="card-title"> Button Size</h3>
-                                        <div className="style-options">
-                                            {['small', 'medium', 'large'].map((size) => (
-                                                <button
-                                                    key={size}
-                                                    className={`style-option ${buttonSize === size ? 'active' : ''}`}
-                                                    onClick={() => setButtonSize(size as any)}
-                                                >
-                                                    {size.charAt(0).toUpperCase() + size.slice(1)}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    <div className="settings-card">
-                                        <h3 className="card-title"> Button Typography</h3>
+                                    {/* Button Typography */}
+                                    <AccordionSection id="button-typography" tab="button" title="Button Typography" expandedSection={expandedSection} toggleSection={toggleSection}>
                                         <div className="input-group">
                                             <ColorSelector
                                                 label="Text Color"
@@ -3394,10 +3492,10 @@ export default function SettingsPage() {
                                                 ))}
                                             </div>
                                         </div>
-                                    </div>
+                                    </AccordionSection>
 
-                                    <div className="settings-card">
-                                        <h3 className="card-title"> Button Border & Effects</h3>
+                                    {/* Button Shape & Border */}
+                                    <AccordionSection id="button-shape-border" tab="button" title="Button Shape & Border" expandedSection={expandedSection} toggleSection={toggleSection}>
                                         <div className="input-group">
                                             <ColorSelector
                                                 label="Border Color"
@@ -3437,13 +3535,12 @@ export default function SettingsPage() {
                                             <span className="toggle-option-label">Shadow</span>
                                             <div className={`mini-toggle ${buttonStylesState?.shadow ? 'on' : 'off'}`} />
                                         </div>
-                                    </div>
+                                    </AccordionSection>
 
-                                    {/* Animation Presets */}
-                                    <div className="settings-card">
-                                        <h3 className="card-title">Animation Presets</h3>
+                                    {/* Button Animations */}
+                                    <AccordionSection id="button-animations" tab="button" title="Button Animations" expandedSection={expandedSection} toggleSection={toggleSection}>
                                         <div className="input-group">
-                                            <label className="input-label">Button Animation</label>
+                                            <label className="input-label">Animation Presets</label>
                                             <select
                                                 className="input-field"
                                                 value={buttonStylesState?.animationPreset || 'none'}
@@ -3466,58 +3563,7 @@ export default function SettingsPage() {
                                                 ))}
                                             </div>
                                         </div>
-                                    </div>
-
-                                    {/* Border Effects */}
-                                    <div className="settings-card">
-                                        <h3 className="card-title"> Border Effects</h3>
-                                        <div className="input-group">
-                                            <label className="input-label">Border Animation</label>
-                                            <div className="style-options" style={{ flexWrap: 'wrap' }}>
-                                                {([
-                                                    { value: 'static', label: 'Static' },
-                                                    { value: 'dashed-moving', label: 'Dashed' }
-                                                ] as const).map((effect) => (
-                                                    <button key={effect.value} type="button" className={`style-option ${(buttonStylesState?.borderEffect || 'static') === effect.value ? 'active' : ''}`} onClick={() => setButtonStylesState(s => ({ ...s, borderEffect: effect.value }))}>
-                                                        {effect.label}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                        <div className="input-group" style={{ marginTop: 12 }}>
-                                            <label className="input-label">Border Intensity</label>
-                                            <div className="style-options">
-                                                {(['low', 'medium', 'high'] as const).map((intensity) => (
-                                                    <button key={intensity} type="button" className={`style-option ${(buttonStylesState?.borderIntensity || 'medium') === intensity ? 'active' : ''}`} onClick={() => setButtonStylesState(s => ({ ...s, borderIntensity: intensity }))}>
-                                                        {intensity.charAt(0).toUpperCase() + intensity.slice(1)}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Hover & Click Effects */}
-                                    <div className="settings-card">
-                                        <h3 className="card-title"> Hover & Click Effects</h3>
-                                        <div className="toggle-option" onClick={() => setButtonStylesState(s => ({ ...s, hoverLift: !s.hoverLift }))}>
-                                            <span className="toggle-option-label">Hover Lift + Shadow</span>
-                                            <div className={`mini-toggle ${buttonStylesState?.hoverLift ? 'on' : 'off'}`} />
-                                        </div>
-
-                                        <div className="toggle-option" style={{ marginTop: 10 }} onClick={() => setButtonStylesState(s => ({ ...s, clickRipple: !s.clickRipple }))}>
-                                            <span className="toggle-option-label">Ripple Effect on Click</span>
-                                            <div className={`mini-toggle ${buttonStylesState?.clickRipple ? 'on' : 'off'}`} />
-                                        </div>
-                                        <div className="toggle-option" style={{ marginTop: 10 }} onClick={() => setButtonStylesState(s => ({ ...s, clickPress: !s.clickPress }))}>
-                                            <span className="toggle-option-label">Press-down on Click</span>
-                                            <div className={`mini-toggle ${buttonStylesState?.clickPress ? 'on' : 'off'}`} />
-                                        </div>
-                                    </div>
-
-                                    {/* Timing & Behavior */}
-                                    <div className="settings-card">
-                                        <h3 className="card-title">Timing & Behavior</h3>
-                                        <div className="input-group">
+                                        <div className="input-group" style={{ marginTop: 16 }}>
                                             <label className="input-label">Start Animation</label>
                                             <select
                                                 className="input-field"
@@ -3550,11 +3596,49 @@ export default function SettingsPage() {
                                             <span className="toggle-option-label">Stop Animation After First Interaction</span>
                                             <div className={`mini-toggle ${buttonStylesState?.stopAfterInteraction ? 'on' : 'off'}`} />
                                         </div>
-                                    </div>
+                                        <div style={{ marginTop: 16, borderTop: '1px solid #f3f4f6', paddingTop: 16 }}>
+                                            <label className="input-label">Border Animation</label>
+                                            <div className="style-options" style={{ flexWrap: 'wrap' }}>
+                                                {([
+                                                    { value: 'static', label: 'Static' },
+                                                    { value: 'dashed-moving', label: 'Dashed' }
+                                                ] as const).map((effect) => (
+                                                    <button key={effect.value} type="button" className={`style-option ${(buttonStylesState?.borderEffect || 'static') === effect.value ? 'active' : ''}`} onClick={() => setButtonStylesState(s => ({ ...s, borderEffect: effect.value }))}>
+                                                        {effect.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="input-group" style={{ marginTop: 12 }}>
+                                            <label className="input-label">Border Intensity</label>
+                                            <div className="style-options">
+                                                {(['low', 'medium', 'high'] as const).map((intensity) => (
+                                                    <button key={intensity} type="button" className={`style-option ${(buttonStylesState?.borderIntensity || 'medium') === intensity ? 'active' : ''}`} onClick={() => setButtonStylesState(s => ({ ...s, borderIntensity: intensity }))}>
+                                                        {intensity.charAt(0).toUpperCase() + intensity.slice(1)}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </AccordionSection>
 
-                                    {/* Device Control */}
-                                    <div className="settings-card">
-                                        <h3 className="card-title">Device Control</h3>
+                                    {/* Hover & Click Effects */}
+                                    <AccordionSection id="hover-click-effects" tab="button" title="Hover & Click Effects" expandedSection={expandedSection} toggleSection={toggleSection}>
+                                        <div className="toggle-option" onClick={() => setButtonStylesState(s => ({ ...s, hoverLift: !s.hoverLift }))}>
+                                            <span className="toggle-option-label">Hover Lift + Shadow</span>
+                                            <div className={`mini-toggle ${buttonStylesState?.hoverLift ? 'on' : 'off'}`} />
+                                        </div>
+                                        <div className="toggle-option" style={{ marginTop: 10 }} onClick={() => setButtonStylesState(s => ({ ...s, clickRipple: !s.clickRipple }))}>
+                                            <span className="toggle-option-label">Ripple Effect on Click</span>
+                                            <div className={`mini-toggle ${buttonStylesState?.clickRipple ? 'on' : 'off'}`} />
+                                        </div>
+                                        <div className="toggle-option" style={{ marginTop: 10 }} onClick={() => setButtonStylesState(s => ({ ...s, clickPress: !s.clickPress }))}>
+                                            <span className="toggle-option-label">Press-down on Click</span>
+                                            <div className={`mini-toggle ${buttonStylesState?.clickPress ? 'on' : 'off'}`} />
+                                        </div>
+                                    </AccordionSection>
+
+                                    {/* Device Behavior */}
+                                    <AccordionSection id="device-behavior" tab="button" title="Device Behavior" expandedSection={expandedSection} toggleSection={toggleSection}>
                                         <div className="toggle-option" onClick={() => setButtonStylesState(s => ({ ...s, enableDesktop: !s.enableDesktop }))}>
                                             <span className="toggle-option-label">Enable Animations on Desktop</span>
                                             <div className={`mini-toggle ${buttonStylesState?.enableDesktop !== false ? 'on' : 'off'}`} />
@@ -3567,9 +3651,9 @@ export default function SettingsPage() {
                                             <span className="toggle-option-label">Sticky Button on Mobile (below fold)</span>
                                             <div className={`mini-toggle ${buttonStylesState?.stickyOnMobile ? 'on' : 'off'}`} />
                                         </div>
-                                    </div>
+                                    </AccordionSection>
 
-                                    {/* Restore to Default */}
+                                    {/* Restore to Default — always visible */}
                                     <div className="settings-card">
                                         <button
                                             type="button"
@@ -3585,9 +3669,8 @@ export default function SettingsPage() {
                             {/* Form Tab */}
                             {activeTab === 'form' && (
                                 <>
-                                    {/* Drag & Drop Fields */}
-                                    <div className="settings-card">
-                                        <h3 className="card-title"><span></span> Form Fields</h3>
+                                    {/* Field Management (Default Open) */}
+                                    <AccordionSection id="field-management" tab="form" title="Field Management" expandedSection={expandedSection} toggleSection={toggleSection}>
                                         <p style={{ color: '#6b7280', fontSize: '13px', marginBottom: '16px' }}>
                                             Drag to reorder • 👁️ visibility • ★ required
                                         </p>
@@ -3622,12 +3705,10 @@ export default function SettingsPage() {
                                                 + Add Custom Field
                                             </button>
                                         </div>
-                                    </div>
+                                    </AccordionSection>
 
-                                    {/* Form Field Styling - with Presets */}
-                                    <div className="settings-card">
-                                        <h3 className="card-title">Form Field Styling</h3>
-
+                                    {/* Field Styling */}
+                                    <AccordionSection id="field-styling" tab="form" title="Field Styling" expandedSection={expandedSection} toggleSection={toggleSection}>
                                         {/* ── Style Preset Selector ── */}
                                         <div className="input-group">
                                             <label className="input-label">Style Preset</label>
@@ -3789,6 +3870,7 @@ export default function SettingsPage() {
                                                     });
                                                 }}
                                             />
+                                            <p className="setting-helper">Controls the background color of input fields.</p>
                                         </div>
                                         <div className="input-group" style={{ marginTop: 12 }}>
                                             <ColorSelector
@@ -3818,13 +3900,10 @@ export default function SettingsPage() {
                                         >
                                             Restore to Default
                                         </button>
-                                    </div>
-
-
+                                    </AccordionSection>
 
                                     {/* Partial Cash on Delivery */}
-                                    <div className="settings-card">
-                                        <h3 className="card-title"> Partial Cash on Delivery</h3>
+                                    <AccordionSection id="partial-cod" tab="form" title="Partial Cash on Delivery" expandedSection={expandedSection} toggleSection={toggleSection}>
                                         <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '16px' }}>
                                             Allow customers to pay a portion of the order online and the rest on delivery.
                                         </p>
@@ -3872,13 +3951,10 @@ export default function SettingsPage() {
                                                 </div>
                                             </div>
                                         )}
-                                    </div>
-
-
+                                    </AccordionSection>
 
                                     {/* Form Content */}
-                                    <div className="settings-card">
-                                        <h3 className="card-title"> Form Content</h3>
+                                    <AccordionSection id="form-content" tab="form" title="Form Content" expandedSection={expandedSection} toggleSection={toggleSection}>
                                         <div className="input-group">
                                             <label className="input-label">Form Title</label>
                                             <input
@@ -3908,7 +3984,7 @@ export default function SettingsPage() {
                                                 placeholder="Your order has been placed! We'll contact you shortly."
                                             />
                                         </div>
-                                    </div>
+                                    </AccordionSection>
 
                                     {/* Add Field Modal — Polaris UI */}
                                     <Modal
@@ -4110,53 +4186,60 @@ export default function SettingsPage() {
                             {/* Style Tab */}
                             {activeTab === 'style' && (
                                 <>
-                                    <div className="settings-card">
-                                        <h3 className="card-title"> Modal Style</h3>
-                                        <div className="style-options">
-                                            {['modern', 'minimal', 'glassmorphism'].map((style) => (
-                                                <button
-                                                    key={style}
-                                                    className={`style-option ${modalStyle === style ? 'active' : ''}`}
-                                                    onClick={() => setModalStyle(style as any)}
-                                                >
-                                                    {style.charAt(0).toUpperCase() + style.slice(1)}
-                                                </button>
-                                            ))}
+                                    {/* Form Animation (Default Open) */}
+                                    <AccordionSection id="form-animation" tab="style" title="Form Animation" expandedSection={expandedSection} toggleSection={toggleSection}>
+                                        <p className="setting-helper" style={{ marginBottom: 12 }}>Choose the modal style and entry animation for the COD form.</p>
+                                        <div className="input-group">
+                                            <label className="input-label">Modal Style</label>
+                                            <div className="style-options">
+                                                {['modern', 'minimal', 'glassmorphism'].map((style) => (
+                                                    <button
+                                                        key={style}
+                                                        className={`style-option ${modalStyle === style ? 'active' : ''}`}
+                                                        onClick={() => setModalStyle(style as any)}
+                                                    >
+                                                        {style.charAt(0).toUpperCase() + style.slice(1)}
+                                                    </button>
+                                                ))}
+                                            </div>
                                         </div>
-                                    </div>
-
-                                    <div className="settings-card">
-                                        <h3 className="card-title"> Animation</h3>
-                                        <div className="style-options">
-                                            {['fade', 'slide', 'scale'].map((style) => (
-                                                <button
-                                                    key={style}
-                                                    className={`style-option ${animationStyle === style ? 'active' : ''}`}
-                                                    onClick={() => setAnimationStyle(style as any)}
-                                                >
-                                                    {style.charAt(0).toUpperCase() + style.slice(1)}
-                                                </button>
-                                            ))}
+                                        <div className="input-group" style={{ marginTop: 16 }}>
+                                            <label className="input-label">Animation</label>
+                                            <div className="style-options">
+                                                {['fade', 'slide', 'scale'].map((style) => (
+                                                    <button
+                                                        key={style}
+                                                        className={`style-option ${animationStyle === style ? 'active' : ''}`}
+                                                        onClick={() => setAnimationStyle(style as any)}
+                                                    >
+                                                        {style.charAt(0).toUpperCase() + style.slice(1)}
+                                                    </button>
+                                                ))}
+                                            </div>
                                         </div>
-                                    </div>
+                                    </AccordionSection>
 
-                                    <div className="settings-card">
-                                        <h3 className="card-title"> Border Radius</h3>
-                                        <div style={{ padding: '0 8px', width: '100%' }}>
-                                            <RangeSlider
-                                                labelHidden
-                                                label="Border Radius"
-                                                min={0}
-                                                max={24}
-                                                value={borderRadius}
-                                                onChange={(val) => setBorderRadius(Number(val))}
-                                                output
-                                            />
+                                    {/* Form Shape */}
+                                    <AccordionSection id="form-shape" tab="style" title="Form Shape" expandedSection={expandedSection} toggleSection={toggleSection}>
+                                        <div className="input-group">
+                                            <label className="input-label">Border Radius (px)</label>
+                                            <div style={{ padding: '0 8px', width: '100%' }}>
+                                                <RangeSlider
+                                                    labelHidden
+                                                    label="Border Radius"
+                                                    min={0}
+                                                    max={24}
+                                                    value={borderRadius}
+                                                    onChange={(val) => setBorderRadius(Number(val))}
+                                                    output
+                                                />
+                                            </div>
+                                            <p className="setting-helper">Controls the roundness of the modal corners.</p>
                                         </div>
-                                    </div>
+                                    </AccordionSection>
 
-                                    <div className="settings-card">
-                                        <h3 className="card-title">Display Options</h3>
+                                    {/* Modal Display Options */}
+                                    <AccordionSection id="modal-display" tab="style" title="Modal Display Options" expandedSection={expandedSection} toggleSection={toggleSection}>
                                         <div className="toggle-options">
                                             <div className="toggle-option" onClick={() => setShowProductImage(!showProductImage)}>
                                                 <span className="toggle-option-label">Show Product Image in Modal</span>
@@ -4167,8 +4250,10 @@ export default function SettingsPage() {
                                                 <div className={`mini-toggle ${showPrice ? 'on' : 'off'}`} />
                                             </div>
                                         </div>
-                                    </div>
-                                    <div className="settings-card">
+                                    </AccordionSection>
+
+                                    {/* Restore to Default */}
+                                    <div style={{ padding: '12px 16px' }}>
                                         <button
                                             type="button"
                                             onClick={() => {
@@ -4180,7 +4265,7 @@ export default function SettingsPage() {
                                             }}
                                             style={{ padding: '10px 16px', fontSize: 13, fontWeight: 600, color: '#202223', background: '#F6F6F7', border: '2px solid #202223', borderRadius: 10, cursor: 'pointer' }}
                                         >
-                                            Restore to Default
+                                            Restore All to Default
                                         </button>
                                     </div>
                                 </>

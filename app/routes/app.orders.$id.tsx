@@ -500,8 +500,25 @@ export default function OrderDetailPage() {
                                     const downsellMatch = notes.match(/DOWNSELL APPLIED:\s*(.+?)\s*\(([^)]+)\)/);
                                     const upsellLines = notes.split('\n').filter((l: string) => l.trim().startsWith('-'));
 
+                                    // Parse bundle variant lines
+                                    const bundleVariantLines = notes.includes('BUNDLE VARIANTS:')
+                                        ? notes.split('\n').filter((l: string) => l.trim().startsWith('- Item'))
+                                        : [];
+
                                     return (
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                            {/* Bundle variant line items */}
+                                            {bundleVariantLines.map((line: string, idx: number) => {
+                                                const m = line.match(/-\s*Item\s*(\d+):\s*(.+?)\s*\(([^)]+)\)/);
+                                                if (!m) return null;
+                                                return (
+                                                    <div key={'bv-' + idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#374151' }}>
+                                                        <span>Item {m[1]}: {m[2]}</span>
+                                                        <span>{m[3]}</span>
+                                                    </div>
+                                                );
+                                            })}
+
                                             {downsellMatch ? (
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#374151' }}>
                                                     <span>Downsell: {downsellMatch[1]}</span>
@@ -545,19 +562,72 @@ export default function OrderDetailPage() {
                         </div>
                     </div>
 
-                    {/* Upsell Items */}
-                    {order.customer_notes && order.customer_notes.includes('UPSELL ITEMS') && (
+                    {/* Bundle Variants */}
+                    {order.customer_notes && order.customer_notes.includes('BUNDLE VARIANTS:') && (
                         <div className="order-card">
                             <div className="order-card-header">
-                                <h2>🎯 Upsell Items</h2>
+                                <h2>🎨 Bundle Variant Selections</h2>
                             </div>
                             <div className="order-card-body">
-                                {order.customer_notes.split('\n').filter((line: string) => line.trim().startsWith('-')).map((line: string, idx: number) => {
+                                {order.customer_notes
+                                    .split('\n')
+                                    .filter((line: string) => {
+                                        // Only include lines after "BUNDLE VARIANTS:" and before next section
+                                        const idx = order.customer_notes.indexOf('BUNDLE VARIANTS:');
+                                        const lineIdx = order.customer_notes.indexOf(line);
+                                        if (lineIdx <= idx) return false;
+                                        // Stop at next section marker (UPSELL, SHIPPING, BUNDLE DISCOUNT, DOWNSELL)
+                                        const nextSection = order.customer_notes.substring(idx + 17).search(/\n(?:UPSELL|SHIPPING|BUNDLE DISCOUNT|DOWNSELL)/);
+                                        if (nextSection !== -1 && lineIdx > idx + 17 + nextSection) return false;
+                                        return line.trim().startsWith('- Item');
+                                    })
+                                    .map((line: string, idx: number) => {
+                                        const match = line.match(/-\s*Item\s*(\d+):\s*(.+?)\s*\(([^)]+)\)/);
+                                        if (!match) return null;
+                                        const [, itemNum, variantTitle, price] = match;
+                                        return (
+                                            <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: '10px', background: '#f0f9ff', marginBottom: '8px', border: '1px solid #bae6fd' }}>
+                                                <div>
+                                                    <div style={{ fontWeight: 600, fontSize: '14px', color: '#111827' }}>Item {itemNum}</div>
+                                                    <div style={{ fontSize: '13px', color: '#6b7280', marginTop: '2px' }}>{variantTitle}</div>
+                                                </div>
+                                                <div style={{ fontWeight: 700, fontSize: '14px', color: '#0369a1' }}>{price}</div>
+                                            </div>
+                                        );
+                                    })}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Upsell & Downsell Items */}
+                    {order.customer_notes && (order.customer_notes.includes('UPSELL ITEMS') || order.customer_notes.includes('DOWNSELL APPLIED')) && (
+                        <div className="order-card">
+                            <div className="order-card-header">
+                                <h2>🎯 Upsell & Downsell Items</h2>
+                            </div>
+                            <div className="order-card-body">
+                                {/* Downsell items */}
+                                {order.customer_notes.includes('DOWNSELL APPLIED') && (() => {
+                                    const dsMatch = order.customer_notes.match(/DOWNSELL APPLIED:\s*(.+?)\s*\(([^)]+)\)/);
+                                    if (!dsMatch) return null;
+                                    return (
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: '10px', background: '#fffbeb', marginBottom: '8px', border: '1px solid #fde68a' }}>
+                                            <div>
+                                                <div style={{ fontWeight: 600, fontSize: '14px', color: '#111827' }}>{dsMatch[1]}</div>
+                                                <span style={{ display: 'inline-block', marginTop: '4px', padding: '2px 8px', borderRadius: '6px', background: '#fef3c7', color: '#92400e', fontSize: '11px', fontWeight: 600 }}>Downsell</span>
+                                            </div>
+                                            <div style={{ fontWeight: 700, fontSize: '16px', color: '#b45309' }}>{dsMatch[2]}</div>
+                                        </div>
+                                    );
+                                })()}
+
+                                {/* Upsell items */}
+                                {order.customer_notes.includes('UPSELL ITEMS') && order.customer_notes.split('\n').filter((line: string) => line.trim().startsWith('-')).map((line: string, idx: number) => {
                                     const match = line.match(/-\s*(.+?)\s*\(([^)]+)\)\s*x(\d+)\s*\[(.+?)\]/);
                                     if (!match) return null;
                                     const [, title, price, qty, type] = match;
                                     return (
-                                        <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: '10px', background: '#f0fdf4', marginBottom: idx < order.customer_notes.split('\n').filter((l: string) => l.trim().startsWith('-')).length - 1 ? '8px' : '0', border: '1px solid #d1fae5' }}>
+                                        <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: '10px', background: '#f0fdf4', marginBottom: '8px', border: '1px solid #d1fae5' }}>
                                             <div>
                                                 <div style={{ fontWeight: 600, fontSize: '14px', color: '#111827' }}>{title}</div>
                                                 <span style={{ display: 'inline-block', marginTop: '4px', padding: '2px 8px', borderRadius: '6px', background: type === 'click_upsell' ? '#dbeafe' : type === 'downsell' ? '#fef3c7' : '#e0e7ff', color: type === 'click_upsell' ? '#1d4ed8' : type === 'downsell' ? '#92400e' : '#4338ca', fontSize: '11px', fontWeight: 600 }}>{type === 'click_upsell' ? '1-Click Upsell' : type === 'downsell' ? 'Downsell' : 'Tick Upsell'}</span>
