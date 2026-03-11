@@ -784,13 +784,21 @@ const PreviewDisplay = memo(({
         console.log('[Modal] Background color from formStyles:', formStyles?.backgroundColor);
         const userBgColor = formStyles?.backgroundColor || '#ffffff';
 
+        // Shadow intensity slider (0–100) mapped to a softer modal shadow
+        const rawIntensity = formStyles?.shadowIntensity;
+        const sliderValue = typeof rawIntensity === 'number'
+            ? rawIntensity
+            : (formStyles?.shadow ? 35 : 0);
+        const clamped = Math.max(0, Math.min(100, sliderValue));
+        const shadowOpacity = clamped === 0 ? 0 : 0.10 + (clamped / 100) * 0.25; // 0.10 – 0.35
+
         const base: any = {
             borderRadius: (formStyles?.borderRadius || borderRadius) + 'px',
             padding: '16px',
             marginTop: '12px',
             transition: 'all 0.3s ease',
             background: userBgColor,
-            boxShadow: formStyles?.shadow ? '0 10px 25px rgba(0,0,0,0.1)' : 'none'
+            boxShadow: clamped > 0 ? `0 10px 25px rgba(0,0,0,${shadowOpacity.toFixed(2)})` : 'none'
         };
 
         if (modalStyle === 'glassmorphism') {
@@ -798,7 +806,7 @@ const PreviewDisplay = memo(({
             base.background = userBgColor; // Now respects user color
             base.backdropFilter = 'blur(10px)';
             base.border = '1px solid rgba(255,255,255,0.3)';
-            base.boxShadow = formStyles?.shadow ? '0 8px 32px rgba(0,0,0,0.1)' : 'none';
+            base.boxShadow = clamped > 0 ? `0 8px 32px rgba(0,0,0,${shadowOpacity.toFixed(2)})` : 'none';
         } else if (modalStyle === 'minimal') {
             base.background = userBgColor;
             base.border = '1px solid #e5e7eb';
@@ -821,6 +829,14 @@ const PreviewDisplay = memo(({
 
     // Get input styles - sync with storefront
     const getInputStyle = () => {
+        // Shadow intensity slider (0–100) mapped to a soft box-shadow
+        const rawIntensity = formStyles?.shadowIntensity;
+        const sliderValue = typeof rawIntensity === 'number'
+            ? rawIntensity
+            : (formStyles?.shadow ? 35 : 0);
+        const clamped = Math.max(0, Math.min(100, sliderValue));
+        const shadowOpacity = clamped === 0 ? 0 : 0.05 + (clamped / 100) * 0.25; // 0.05 – 0.30 range
+
         const styles = {
             width: '100%',
             padding: '10px 12px',
@@ -834,7 +850,7 @@ const PreviewDisplay = memo(({
             color: formStyles?.textColor || '#111827',
             boxSizing: 'border-box' as const,
             // backgroundColor removed - set explicitly in preview divs to avoid React reconciliation conflicts
-            boxShadow: formStyles?.shadow ? '0 1px 2px rgba(0,0,0,0.05)' : 'none'
+            boxShadow: clamped > 0 ? `0 1px 2px rgba(0,0,0,${shadowOpacity.toFixed(2)})` : 'none'
         };
         console.log('[Preview] getInputStyle - fieldBackgroundColor value:', formStyles?.fieldBackgroundColor);
         return styles;
@@ -3719,22 +3735,24 @@ export default function SettingsPage() {
                                                     const key = e.target.value;
                                                     setSelectedPreset(key);
                                                     const presetMap: Record<string, any> = {
-                                                        default: { styles: { textColor: '#333333', textSize: 14, fontStyle: 'normal' as const, borderColor: '#d1d5db', borderWidth: 1, backgroundColor: '#ffffff', labelAlignment: 'left' as const, iconColor: '#6b7280', iconBackground: '#f3f4f6', borderRadius: 12, shadow: true, fieldBackgroundColor: '#ffffff', labelColor: '#111827', labelFontSize: 14 }, buttonColor: '#000000' },
-                                                        modern_slate: { styles: { textColor: '#1e293b', textSize: 14, fontStyle: 'normal' as const, borderColor: '#f97316', borderWidth: 2, backgroundColor: '#fff7ed', labelAlignment: 'left' as const, iconColor: '#ea580c', iconBackground: '#fed7aa', borderRadius: 16, shadow: true, fieldBackgroundColor: '#fff7ed', labelColor: '#9a3412', labelFontSize: 14 }, buttonColor: '#ea580c' },
-                                                        dark_mode: { styles: { textColor: '#e2e8f0', textSize: 14, fontStyle: 'normal' as const, borderColor: '#334155', borderWidth: 1, backgroundColor: '#1e293b', labelAlignment: 'left' as const, iconColor: '#94a3b8', iconBackground: '#1e293b', borderRadius: 12, shadow: true, fieldBackgroundColor: '#0f172a', labelColor: '#f1f5f9', labelFontSize: 14 }, buttonColor: '#6366f1' },
-                                                        eastern_gold: { styles: { textColor: '#78350f', textSize: 14, fontStyle: 'normal' as const, borderColor: '#d4a574', borderWidth: 1, backgroundColor: '#fffbeb', labelAlignment: 'left' as const, iconColor: '#b45309', iconBackground: '#fef3c7', borderRadius: 10, shadow: true, fieldBackgroundColor: '#fef9c3', labelColor: '#713f12', labelFontSize: 14 }, buttonColor: '#b45309' },
-                                                        arctic_blue: { styles: { textColor: '#164e63', textSize: 14, fontStyle: 'normal' as const, borderColor: '#67e8f9', borderWidth: 1, backgroundColor: '#ecfeff', labelAlignment: 'left' as const, iconColor: '#0891b2', iconBackground: '#cffafe', borderRadius: 12, shadow: true, fieldBackgroundColor: '#ecfeff', labelColor: '#155e75', labelFontSize: 14 }, buttonColor: '#0891b2' },
-                                                        rose_garden: { styles: { textColor: '#9f1239', textSize: 14, fontStyle: 'normal' as const, borderColor: '#fda4af', borderWidth: 1, backgroundColor: '#fff1f2', labelAlignment: 'left' as const, iconColor: '#e11d48', iconBackground: '#ffe4e6', borderRadius: 14, shadow: true, fieldBackgroundColor: '#fff1f2', labelColor: '#881337', labelFontSize: 14 }, buttonColor: '#e11d48' },
-                                                        midnight_purple: { styles: { textColor: '#c4b5fd', textSize: 14, fontStyle: 'normal' as const, borderColor: '#4c1d95', borderWidth: 1, backgroundColor: '#1e1b4b', labelAlignment: 'left' as const, iconColor: '#a78bfa', iconBackground: '#312e81', borderRadius: 12, shadow: true, fieldBackgroundColor: '#312e81', labelColor: '#ddd6fe', labelFontSize: 14 }, buttonColor: '#7c3aed' },
-                                                        forest_green: { styles: { textColor: '#14532d', textSize: 14, fontStyle: 'normal' as const, borderColor: '#86efac', borderWidth: 1, backgroundColor: '#f0fdf4', labelAlignment: 'left' as const, iconColor: '#16a34a', iconBackground: '#dcfce7', borderRadius: 10, shadow: true, fieldBackgroundColor: '#f0fdf4', labelColor: '#15803d', labelFontSize: 14 }, buttonColor: '#16a34a' },
-                                                        professional: { styles: { textColor: '#1f2937', textSize: 14, fontStyle: 'normal' as const, borderColor: '#9ca3af', borderWidth: 1, backgroundColor: '#f9fafb', labelAlignment: 'left' as const, iconColor: '#4b5563', iconBackground: '#e5e7eb', borderRadius: 6, shadow: false, fieldBackgroundColor: '#ffffff', labelColor: '#111827', labelFontSize: 13 }, buttonColor: '#374151' },
-                                                        minimal_white: { styles: { textColor: '#374151', textSize: 14, fontStyle: 'normal' as const, borderColor: '#e5e7eb', borderWidth: 1, backgroundColor: '#ffffff', labelAlignment: 'left' as const, iconColor: '#9ca3af', iconBackground: 'transparent', borderRadius: 8, shadow: false, fieldBackgroundColor: '#ffffff', labelColor: '#6b7280', labelFontSize: 13 }, buttonColor: '#111827' },
-                                                        luxury_gold: { styles: { textColor: '#fbbf24', textSize: 14, fontStyle: 'normal' as const, borderColor: '#d97706', borderWidth: 1, backgroundColor: '#18181b', labelAlignment: 'left' as const, iconColor: '#f59e0b', iconBackground: '#27272a', borderRadius: 10, shadow: true, fieldBackgroundColor: '#27272a', labelColor: '#fcd34d', labelFontSize: 14 }, buttonColor: '#d97706' },
-                                                        ocean_breeze: { styles: { textColor: '#0f766e', textSize: 14, fontStyle: 'normal' as const, borderColor: '#5eead4', borderWidth: 1, backgroundColor: '#f0fdfa', labelAlignment: 'left' as const, iconColor: '#14b8a6', iconBackground: '#ccfbf1', borderRadius: 14, shadow: true, fieldBackgroundColor: '#f0fdfa', labelColor: '#115e59', labelFontSize: 14 }, buttonColor: '#14b8a6' },
+                                                        default: { styles: { themeKey: 'default', textColor: '#333333', textSize: 14, fontStyle: 'normal' as const, borderColor: '#d1d5db', borderWidth: 1, backgroundColor: '#ffffff', labelAlignment: 'left' as const, iconColor: '#6b7280', iconBackground: '#f3f4f6', borderRadius: 12, shadow: true, fieldBackgroundColor: '#ffffff', labelColor: '#111827', labelFontSize: 14 }, buttonColor: '#000000' },
+                                                        modern_slate: { styles: { themeKey: 'modern_slate', textColor: '#1e293b', textSize: 14, fontStyle: 'normal' as const, borderColor: '#f97316', borderWidth: 2, backgroundColor: '#fff7ed', labelAlignment: 'left' as const, iconColor: '#ea580c', iconBackground: '#fed7aa', borderRadius: 16, shadow: true, fieldBackgroundColor: '#fff7ed', labelColor: '#9a3412', labelFontSize: 14 }, buttonColor: '#ea580c' },
+                                                        dark_mode: { styles: { themeKey: 'dark_mode', textColor: '#e2e8f0', textSize: 14, fontStyle: 'normal' as const, borderColor: '#334155', borderWidth: 1, backgroundColor: '#1e293b', labelAlignment: 'left' as const, iconColor: '#94a3b8', iconBackground: '#1e293b', borderRadius: 12, shadow: true, fieldBackgroundColor: '#0f172a', labelColor: '#f1f5f9', labelFontSize: 14 }, buttonColor: '#6366f1' },
+                                                        eastern_gold: { styles: { themeKey: 'eastern_gold', textColor: '#78350f', textSize: 14, fontStyle: 'normal' as const, borderColor: '#d4a574', borderWidth: 1, backgroundColor: '#fffbeb', labelAlignment: 'left' as const, iconColor: '#b45309', iconBackground: '#fef3c7', borderRadius: 10, shadow: true, fieldBackgroundColor: '#fef9c3', labelColor: '#713f12', labelFontSize: 14 }, buttonColor: '#b45309' },
+                                                        arctic_blue: { styles: { themeKey: 'arctic_blue', textColor: '#164e63', textSize: 14, fontStyle: 'normal' as const, borderColor: '#67e8f9', borderWidth: 1, backgroundColor: '#ecfeff', labelAlignment: 'left' as const, iconColor: '#0891b2', iconBackground: '#cffafe', borderRadius: 12, shadow: true, fieldBackgroundColor: '#ecfeff', labelColor: '#155e75', labelFontSize: 14 }, buttonColor: '#0891b2' },
+                                                        rose_garden: { styles: { themeKey: 'rose_garden', textColor: '#9f1239', textSize: 14, fontStyle: 'normal' as const, borderColor: '#fda4af', borderWidth: 1, backgroundColor: '#fff1f2', labelAlignment: 'left' as const, iconColor: '#e11d48', iconBackground: '#ffe4e6', borderRadius: 14, shadow: true, fieldBackgroundColor: '#fff1f2', labelColor: '#881337', labelFontSize: 14 }, buttonColor: '#e11d48' },
+                                                        midnight_purple: { styles: { themeKey: 'midnight_purple', textColor: '#c4b5fd', textSize: 14, fontStyle: 'normal' as const, borderColor: '#4c1d95', borderWidth: 1, backgroundColor: '#1e1b4b', labelAlignment: 'left' as const, iconColor: '#a78bfa', iconBackground: '#312e81', borderRadius: 12, shadow: true, fieldBackgroundColor: '#312e81', labelColor: '#ddd6fe', labelFontSize: 14 }, buttonColor: '#7c3aed' },
+                                                        forest_green: { styles: { themeKey: 'forest_green', textColor: '#14532d', textSize: 14, fontStyle: 'normal' as const, borderColor: '#86efac', borderWidth: 1, backgroundColor: '#f0fdf4', labelAlignment: 'left' as const, iconColor: '#16a34a', iconBackground: '#dcfce7', borderRadius: 10, shadow: true, fieldBackgroundColor: '#f0fdf4', labelColor: '#15803d', labelFontSize: 14 }, buttonColor: '#16a34a' },
+                                                        professional: { styles: { themeKey: 'professional', textColor: '#1f2937', textSize: 14, fontStyle: 'normal' as const, borderColor: '#9ca3af', borderWidth: 1, backgroundColor: '#f9fafb', labelAlignment: 'left' as const, iconColor: '#4b5563', iconBackground: '#e5e7eb', borderRadius: 6, shadow: false, fieldBackgroundColor: '#ffffff', labelColor: '#111827', labelFontSize: 13 }, buttonColor: '#374151' },
+                                                        minimal_white: { styles: { themeKey: 'minimal_white', textColor: '#374151', textSize: 14, fontStyle: 'normal' as const, borderColor: '#e5e7eb', borderWidth: 1, backgroundColor: '#ffffff', labelAlignment: 'left' as const, iconColor: '#9ca3af', iconBackground: 'transparent', borderRadius: 8, shadow: false, fieldBackgroundColor: '#ffffff', labelColor: '#6b7280', labelFontSize: 13 }, buttonColor: '#111827' },
+                                                        luxury_gold: { styles: { themeKey: 'luxury_gold', textColor: '#fbbf24', textSize: 14, fontStyle: 'normal' as const, borderColor: '#d97706', borderWidth: 1, backgroundColor: '#18181b', labelAlignment: 'left' as const, iconColor: '#f59e0b', iconBackground: '#27272a', borderRadius: 10, shadow: true, fieldBackgroundColor: '#27272a', labelColor: '#fcd34d', labelFontSize: 14 }, buttonColor: '#d97706' },
+                                                        ocean_breeze: { styles: { themeKey: 'ocean_breeze', textColor: '#0f766e', textSize: 14, fontStyle: 'normal' as const, borderColor: '#5eead4', borderWidth: 1, backgroundColor: '#f0fdfa', labelAlignment: 'left' as const, iconColor: '#14b8a6', iconBackground: '#ccfbf1', borderRadius: 14, shadow: true, fieldBackgroundColor: '#f0fdfa', labelColor: '#115e59', labelFontSize: 14 }, buttonColor: '#14b8a6' },
                                                     };
                                                     if (key !== 'custom' && presetMap[key]) {
                                                         setFormStyles(presetMap[key].styles);
                                                         setPrimaryColor(presetMap[key].buttonColor);
+                                                    } else if (key === 'custom') {
+                                                        setFormStyles(s => ({ ...s, themeKey: 'custom' }));
                                                     }
                                                 }}
                                             >
@@ -3822,9 +3840,30 @@ export default function SettingsPage() {
                                                 />
                                             </div>
                                         </div>
-                                        <div className="toggle-option" style={{ marginTop: 12 }} onClick={() => setFormStyles(s => ({ ...s, shadow: !s.shadow }))}>
-                                            <span className="toggle-option-label">Shadow</span>
-                                            <div className={`mini-toggle ${formStyles?.shadow ? 'on' : 'off'}`} />
+                                        <div className="input-group" style={{ marginTop: 12 }}>
+                                            <label className="input-label">Shadow Intensity</label>
+                                            <div style={{ padding: '0 8px', width: '100%' }}>
+                                                <RangeSlider
+                                                    labelHidden
+                                                    label="Shadow Intensity"
+                                                    min={0}
+                                                    max={100}
+                                                    value={
+                                                        typeof formStyles?.shadowIntensity === 'number'
+                                                            ? formStyles.shadowIntensity
+                                                            : (formStyles?.shadow ? 35 : 0)
+                                                    }
+                                                    onChange={(val) => {
+                                                        const num = Number(val);
+                                                        setFormStyles(s => ({
+                                                            ...s,
+                                                            shadowIntensity: num,
+                                                            shadow: num > 0
+                                                        }));
+                                                    }}
+                                                    output
+                                                />
+                                            </div>
                                         </div>
                                         <div className="input-group" style={{ marginTop: 12 }}>
                                             <ColorSelector

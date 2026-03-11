@@ -43,6 +43,17 @@ export interface FormStyles {
     iconBackground: string;
     borderRadius: number;
     shadow: boolean;
+    /**
+     * Shadow intensity for inputs / form container.
+     * 0 = no shadow, 100 = strong shadow.
+     * Slider in settings writes this value while also toggling `shadow`.
+     */
+    shadowIntensity?: number;
+    /**
+     * Optional key for the active preset theme.
+     * 'custom' or undefined means seller-defined styling.
+     */
+    themeKey?: string;
     fieldBackgroundColor: string;  // Separate from container background
     labelColor: string;            // Separate from textColor
     labelFontSize: number;         // Separate control for labels
@@ -151,6 +162,8 @@ export const DEFAULT_STYLES: FormStyles = {
     iconBackground: '#f3f4f6',
     borderRadius: 12,
     shadow: true,
+    shadowIntensity: 35,
+    themeKey: 'custom',
     fieldBackgroundColor: '#ffffff',
     labelColor: '#111827',
     labelFontSize: 14,
