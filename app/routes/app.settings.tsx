@@ -1050,14 +1050,35 @@ const PreviewDisplay = memo(({
                                             );
                                         }
 
-                                        // Order Summary section field
+                                        // Order Summary section field (preview)
                                         if (field.id === 'order_summary') {
+                                            const fsAny: any = formStyles || {};
+                                            const themeKey = fsAny.themeKey || 'custom';
+                                            const isPresetTheme = themeKey && themeKey !== 'custom';
+                                            const primaryTheme = primaryColor || '#111827';
+
+                                            const customGreyBg = '#f3f4f6';
+                                            const customBorder = '1px solid #e5e7eb';
+                                            const presetBg = (() => {
+                                                const hex = primaryTheme.replace('#', '');
+                                                if (hex.length !== 6) return 'rgba(17,24,39,0.12)';
+                                                const r = parseInt(hex.substring(0, 2), 16);
+                                                const g = parseInt(hex.substring(2, 4), 16);
+                                                const b = parseInt(hex.substring(4, 6), 16);
+                                                return `rgba(${r},${g},${b},0.16)`;
+                                            })();
+
+                                            const cardStyle: React.CSSProperties = {
+                                                background: isPresetTheme ? presetBg : customGreyBg,
+                                                borderRadius: 10,
+                                                padding: 12,
+                                                marginTop: 4,
+                                                marginBottom: 12,
+                                                border: isPresetTheme ? 'none' : customBorder,
+                                            };
+
                                             return (
-                                                <div key={field.id} style={{
-                                                    background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-                                                    borderRadius: '10px', padding: '12px', marginTop: '4px', marginBottom: '12px',
-                                                    border: '1px solid #e2e8f0'
-                                                }}>
+                                                <div key={field.id} style={cardStyle}>
                                                     <div style={{ fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                         Order Summary
                                                     </div>
