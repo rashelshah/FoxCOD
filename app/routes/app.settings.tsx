@@ -3290,7 +3290,7 @@ export default function SettingsPage() {
                             {activeTab === 'button' && (
                                 <>
                                     {/* Button Basics (Default Open) */}
-                                    <AccordionSection id="button-basics" tab="button" title="Button Basics" expandedSection={expandedSection} toggleSection={toggleSection}>
+                                    <AccordionSection id="button-basics" tab="button" title="Button Basics" helperText="This is the label that will be displayed on the button" expandedSection={expandedSection} toggleSection={toggleSection}>
                                         <div className="input-group">
                                             <label className="input-label">Button Label</label>
                                             <input
@@ -3460,7 +3460,7 @@ export default function SettingsPage() {
                                     </AccordionSection>
 
                                     {/* Button Typography */}
-                                    <AccordionSection id="button-typography" tab="button" title="Button Typography" expandedSection={expandedSection} toggleSection={toggleSection}>
+                                    <AccordionSection id="button-typography" tab="button" title="Button Typography" helperText="Changes the typography of the button" expandedSection={expandedSection} toggleSection={toggleSection}>
                                         <div className="input-group">
                                             <ColorSelector
                                                 label="Text Color"
@@ -3495,7 +3495,7 @@ export default function SettingsPage() {
                                     </AccordionSection>
 
                                     {/* Button Shape & Border */}
-                                    <AccordionSection id="button-shape-border" tab="button" title="Button Shape & Border" expandedSection={expandedSection} toggleSection={toggleSection}>
+                                    <AccordionSection id="button-shape-border" tab="button" title="Button Shape & Border" helperText="Changes the shape and border of the button" expandedSection={expandedSection} toggleSection={toggleSection}>
                                         <div className="input-group">
                                             <ColorSelector
                                                 label="Border Color"
@@ -3538,7 +3538,7 @@ export default function SettingsPage() {
                                     </AccordionSection>
 
                                     {/* Button Animations */}
-                                    <AccordionSection id="button-animations" tab="button" title="Button Animations" expandedSection={expandedSection} toggleSection={toggleSection}>
+                                    <AccordionSection id="button-animations" tab="button" title="Button Animations" helperText="Changes the animation of the button" expandedSection={expandedSection} toggleSection={toggleSection}>
                                         <div className="input-group">
                                             <label className="input-label">Animation Presets</label>
                                             <select
@@ -3622,7 +3622,7 @@ export default function SettingsPage() {
                                     </AccordionSection>
 
                                     {/* Hover & Click Effects */}
-                                    <AccordionSection id="hover-click-effects" tab="button" title="Hover & Click Effects" expandedSection={expandedSection} toggleSection={toggleSection}>
+                                    <AccordionSection id="hover-click-effects" tab="button" title="Hover & Click Effects" helperText="Changes the hover and click effects of the button" expandedSection={expandedSection} toggleSection={toggleSection}>
                                         <div className="toggle-option" onClick={() => setButtonStylesState(s => ({ ...s, hoverLift: !s.hoverLift }))}>
                                             <span className="toggle-option-label">Hover Lift + Shadow</span>
                                             <div className={`mini-toggle ${buttonStylesState?.hoverLift ? 'on' : 'off'}`} />
@@ -3638,7 +3638,7 @@ export default function SettingsPage() {
                                     </AccordionSection>
 
                                     {/* Device Behavior */}
-                                    <AccordionSection id="device-behavior" tab="button" title="Device Behavior" expandedSection={expandedSection} toggleSection={toggleSection}>
+                                    <AccordionSection id="device-behavior" tab="button" title="Device Behavior" helperText="Changes the device behavior of the button" expandedSection={expandedSection} toggleSection={toggleSection}>
                                         <div className="toggle-option" onClick={() => setButtonStylesState(s => ({ ...s, enableDesktop: !s.enableDesktop }))}>
                                             <span className="toggle-option-label">Enable Animations on Desktop</span>
                                             <div className={`mini-toggle ${buttonStylesState?.enableDesktop !== false ? 'on' : 'off'}`} />
@@ -3670,7 +3670,7 @@ export default function SettingsPage() {
                             {activeTab === 'form' && (
                                 <>
                                     {/* Field Management (Default Open) */}
-                                    <AccordionSection id="field-management" tab="form" title="Field Management" expandedSection={expandedSection} toggleSection={toggleSection}>
+                                    <AccordionSection id="field-management" tab="form" title="Field Management" helperText="Changes the field management of the form on Product page" expandedSection={expandedSection} toggleSection={toggleSection}>
                                         <p style={{ color: '#6b7280', fontSize: '13px', marginBottom: '16px' }}>
                                             Drag to reorder • 👁️ visibility • ★ required
                                         </p>
@@ -3708,7 +3708,7 @@ export default function SettingsPage() {
                                     </AccordionSection>
 
                                     {/* Field Styling */}
-                                    <AccordionSection id="field-styling" tab="form" title="Field Styling" expandedSection={expandedSection} toggleSection={toggleSection}>
+                                    <AccordionSection id="field-styling" tab="form" title="Field Styling" helperText="Changes the styling of the form fields" expandedSection={expandedSection} toggleSection={toggleSection}>
                                         {/* ── Style Preset Selector ── */}
                                         <div className="input-group">
                                             <label className="input-label">Style Preset</label>
@@ -3903,7 +3903,7 @@ export default function SettingsPage() {
                                     </AccordionSection>
 
                                     {/* Partial Cash on Delivery */}
-                                    <AccordionSection id="partial-cod" tab="form" title="Partial Cash on Delivery" expandedSection={expandedSection} toggleSection={toggleSection}>
+                                    <AccordionSection id="partial-cod" tab="form" title="Partial Cash on Delivery" helperText="Enables the partial cash on delivery settings" expandedSection={expandedSection} toggleSection={toggleSection}>
                                         <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '16px' }}>
                                             Allow customers to pay a portion of the order online and the rest on delivery.
                                         </p>
@@ -3954,7 +3954,7 @@ export default function SettingsPage() {
                                     </AccordionSection>
 
                                     {/* Form Content */}
-                                    <AccordionSection id="form-content" tab="form" title="Form Content" expandedSection={expandedSection} toggleSection={toggleSection}>
+                                    <AccordionSection id="form-content" tab="form" title="Form Content" helperText="Changes the form content on Product page" expandedSection={expandedSection} toggleSection={toggleSection}>
                                         <div className="input-group">
                                             <label className="input-label">Form Title</label>
                                             <input

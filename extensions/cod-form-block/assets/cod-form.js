@@ -2283,7 +2283,7 @@
 
       card.innerHTML =
         '<div style="font-weight:600; margin-bottom:8px; display:flex; align-items:center;">' +
-        '   🧾 Order Summary' +
+        '   Order Summary' +
         '</div>' +
         lineItemsHtml +
         '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#6b7280;">' +
@@ -3145,7 +3145,7 @@
       }
 
       var html = '<div style="font-weight:600; margin-bottom:8px; display:flex; align-items:center;">' +
-          '   🧾 Order Summary' +
+          '   Order Summary' +
           '</div>';
 
       // Per-variant line items for bundles
