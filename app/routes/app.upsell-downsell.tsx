@@ -268,7 +268,39 @@ ${colorSelectorStyles}
 .tick-pv-text{flex:1;font-size:13px;font-weight:600;line-height:1.4}
 .tick-pv-submit{width:100%;padding:12px;border:none;color:#fff;border-radius:8px;font-weight:600;font-size:13px;margin-top:4px;background:#1f2937;cursor:pointer}
 @keyframes tick-marching-ants{to{stroke-dashoffset:-20}}
+/* ==================== ACCORDION ==================== */
+.accordion-section{border:1px solid #e5e7eb;border-radius:12px;margin-bottom:10px;overflow:hidden;background:#fff}
+.accordion-header{width:100%;display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:#f9fafb;border:none;cursor:pointer;font-size:14px;font-weight:600;color:#111827;text-align:left;transition:background .15s ease}
+.accordion-header:hover{background:#f3f4f6}
+.accordion-section.open .accordion-header{background:#fff;border-bottom:1px solid #e5e7eb}
+.accordion-title{flex:1}
+.accordion-chevron{font-size:11px;color:#9ca3af;transition:transform .2s ease}
+.accordion-chevron.rotated{transform:rotate(90deg)}
+.accordion-helper-collapsed{font-size:12px;color:#9ca3af;padding:6px 18px 10px;margin:0}
+.accordion-body{overflow:hidden;transition:max-height .25s ease}
+.accordion-content{padding:16px 18px}
 `;
+
+const AccordionSection = ({ id, tab, title, helperText, expandedSection, toggleSection, children }: {
+    id: string; tab: string; title: string; helperText?: string;
+    expandedSection: Record<string, string>;
+    toggleSection: (tab: string, id: string) => void;
+    children: React.ReactNode;
+}) => {
+    const isOpen = expandedSection[tab] === id;
+    return (
+        <div className={`accordion-section ${isOpen ? 'open' : ''}`}>
+            <button type="button" className="accordion-header" onClick={() => toggleSection(tab, id)}>
+                <span className="accordion-title">{title}</span>
+                <span className={`accordion-chevron ${isOpen ? 'rotated' : ''}`}>▶</span>
+            </button>
+            {helperText && !isOpen && <p className="accordion-helper-collapsed">{helperText}</p>}
+            <div className={`accordion-body ${isOpen ? 'expanded' : 'collapsed'}`}>
+                {isOpen && <div className="accordion-content">{children}</div>}
+            </div>
+        </div>
+    );
+};
 
 export default function UpsellDownsellPage() {
     const { shopDomain, campaigns: initialCampaigns, formSettings, shopCurrency } = useLoaderData<typeof loader>();
@@ -307,6 +339,19 @@ export default function UpsellDownsellPage() {
     const pendingSaveRef = useRef<string | null>(null);
 
     const [campaignToDelete, setCampaignToDelete] = useState<{ id: string, name: string } | null>(null);
+
+    // Accordion state: track which section is expanded per editor type (only one at a time)
+    const [expandedSection, setExpandedSection] = useState<Record<string, string>>({
+        click: 'click-config',
+        tick: 'tick-config',
+        down: 'down-config',
+    });
+    const toggleSection = useCallback((tab: string, sectionId: string) => {
+        setExpandedSection(prev => ({
+            ...prev,
+            [tab]: prev[tab] === sectionId ? '' : sectionId,
+        }));
+    }, []);
 
     const filtered = useMemo(() => (initialCampaigns || []).filter((c: any) => c.type === activeTab), [initialCampaigns, activeTab]);
 
@@ -571,108 +616,118 @@ export default function UpsellDownsellPage() {
                             /* ==================== TICK UPSELL EDITOR ==================== */
                             <>
                                 <div>
-                                    {/* Name */}
-                                    <LegacyCard sectioned>
-                                        <TextField label="Name" value={editing.campaign_name} placeholder="New 1-Tick Upsell" onChange={val => upd({ campaign_name: val })} autoComplete="off" />
-                                    </LegacyCard>
+                                    {/* Section 1 — Offer Configuration */}
+                                    <AccordionSection id="tick-config" tab="tick" title="Offer Configuration" helperText="Set the name for this tick upsell." expandedSection={expandedSection} toggleSection={toggleSection}>
+                                        <LegacyCard sectioned>
+                                            <TextField label="Name" value={editing.campaign_name} placeholder="New 1-Tick Upsell" onChange={val => upd({ campaign_name: val })} autoComplete="off" />
+                                        </LegacyCard>
+                                    </AccordionSection>
 
-                                    {/* Where to show */}
-                                    <LegacyCard title="Where you want to show this upsell?" sectioned>
-                                        <BlockStack gap="300">
-                                            <Text variant="bodySm" tone="subdued" as="p">This upsell will show up on the products you choose below, you can show it on all products or specific</Text>
-                                            <ButtonGroup variant="segmented">
-                                                <Button pressed={editing.show_condition_type === 'always'} onClick={() => upd({ show_condition_type: 'always' as any })}>All products</Button>
-                                                <Button pressed={editing.show_condition_type === 'specific_products'} onClick={() => upd({ show_condition_type: 'specific_products' as any })}>Specific products</Button>
-                                            </ButtonGroup>
-                                            {editing.show_condition_type === 'specific_products' && (
-                                                <BlockStack gap="200">
-                                                    <Button onClick={pickTrigger}>{`Select products (${editing.trigger_product_ids?.length || 0} selected)`}</Button>
-                                                    {editing._triggerProducts?.map((p: any) => (
-                                                        <div key={p.id} className="prod-row">
-                                                            {p.images?.[0] && <img src={p.images[0].originalSrc || p.images[0].url} alt="" />}
-                                                            <div className="prod-row-info"><div className="name">{p.title}</div><div className="vid">{p.id.replace('gid://shopify/Product/', '')}</div></div>
-                                                            <button className="prod-x" onClick={() => upd({ trigger_product_ids: editing.trigger_product_ids.filter(id => id !== p.id.replace('gid://shopify/Product/', '')), _triggerProducts: editing._triggerProducts?.filter((tp: any) => tp.id !== p.id) })}>×</button>
-                                                        </div>
-                                                    ))}
-                                                </BlockStack>
-                                            )}
-                                        </BlockStack>
-                                    </LegacyCard>
+                                    {/* Section 2 — Display Location */}
+                                    <AccordionSection id="tick-location" tab="tick" title="Display Location" helperText="Choose which products will display this upsell." expandedSection={expandedSection} toggleSection={toggleSection}>
+                                        <LegacyCard sectioned>
+                                            <BlockStack gap="300">
+                                                <Text variant="bodySm" tone="subdued" as="p">This upsell will show up on the products you choose below, you can show it on all products or specific</Text>
+                                                <ButtonGroup variant="segmented">
+                                                    <Button pressed={editing.show_condition_type === 'always'} onClick={() => upd({ show_condition_type: 'always' as any })}>All products</Button>
+                                                    <Button pressed={editing.show_condition_type === 'specific_products'} onClick={() => upd({ show_condition_type: 'specific_products' as any })}>Specific products</Button>
+                                                </ButtonGroup>
+                                                {editing.show_condition_type === 'specific_products' && (
+                                                    <BlockStack gap="200">
+                                                        <Button onClick={pickTrigger}>{`Select products (${editing.trigger_product_ids?.length || 0} selected)`}</Button>
+                                                        {editing._triggerProducts?.map((p: any) => (
+                                                            <div key={p.id} className="prod-row">
+                                                                {p.images?.[0] && <img src={p.images[0].originalSrc || p.images[0].url} alt="" />}
+                                                                <div className="prod-row-info"><div className="name">{p.title}</div><div className="vid">{p.id.replace('gid://shopify/Product/', '')}</div></div>
+                                                                <button className="prod-x" onClick={() => upd({ trigger_product_ids: editing.trigger_product_ids.filter(id => id !== p.id.replace('gid://shopify/Product/', '')), _triggerProducts: editing._triggerProducts?.filter((tp: any) => tp.id !== p.id) })}>×</button>
+                                                            </div>
+                                                        ))}
+                                                    </BlockStack>
+                                                )}
+                                            </BlockStack>
+                                        </LegacyCard>
+                                    </AccordionSection>
 
-                                    {/* Configure 1-Tick Offer */}
-                                    <LegacyCard title="Configure 1-Tick Offer" sectioned>
-                                        {editing.offers[0] && (() => {
-                                            const offer = editing.offers[0];
-                                            return (
-                                                <BlockStack gap="300">
-                                                    <InlineStack gap="300" wrap={false}>
-                                                        <div style={{ flex: 1 }}>
-                                                            <TextField label="Offer title" value={offer.upsell_product_title || ''} placeholder="Shipping protection" onChange={val => updOffer(offer.id, { upsell_product_title: val })} autoComplete="off" />
-                                                        </div>
-                                                        <div style={{ flex: 1 }}>
-                                                            <TextField label="Offer price" value={String(offer.original_price || '')} placeholder="USD 0.99" type="number" min={0 as any} step={0.01 as any} onChange={val => updOffer(offer.id, { original_price: parseFloat(val) || 0 })} autoComplete="off" />
-                                                        </div>
-                                                    </InlineStack>
-                                                    <Text variant="bodySm" fontWeight="semibold" as="span">Select upsell product (optional)</Text>
-                                                    {offer.upsell_product_id ? (
-                                                        <div className="prod-row">
-                                                            {offer.upsell_product_image && <img src={offer.upsell_product_image} alt="" />}
-                                                            <div className="prod-row-info"><div className="name">{offer.upsell_product_title}</div><div className="vid">{offer.upsell_product_id}</div></div>
-                                                            <Button size="slim" onClick={() => pickProduct(offer.id)}>Change</Button>
-                                                            <button className="prod-x" onClick={() => updOffer(offer.id, { upsell_product_id: '', upsell_product_title: '', upsell_product_image: '', upsell_variant_id: '', original_price: 0 })}>×</button>
-                                                        </div>
-                                                    ) : (
-                                                        <Button onClick={() => pickProduct(offer.id)}>Link to a product</Button>
-                                                    )}
-                                                    <TextField
-                                                        label="Offer text"
-                                                        value={editing.design.headerText || ''}
-                                                        placeholder={`Add {{title}} for only {{price}}`}
-                                                        onChange={val => updDesign({ headerText: val })}
-                                                        multiline={2}
-                                                        helpText="You can use {{title}} and {{price}} to dynamically replace the values"
-                                                        autoComplete="off"
-                                                    />
-                                                </BlockStack>
-                                            );
-                                        })()}
-                                    </LegacyCard>
+                                    {/* Section 3 — Tick Offer Settings */}
+                                    <AccordionSection id="tick-offer" tab="tick" title="Tick Offer Settings" helperText="Configure the offer title, price, product, and display text." expandedSection={expandedSection} toggleSection={toggleSection}>
+                                        <LegacyCard sectioned>
+                                            {editing.offers[0] && (() => {
+                                                const offer = editing.offers[0];
+                                                return (
+                                                    <BlockStack gap="300">
+                                                        <InlineStack gap="300" wrap={false}>
+                                                            <div style={{ flex: 1 }}>
+                                                                <TextField label="Offer title" value={offer.upsell_product_title || ''} placeholder="Shipping protection" onChange={val => updOffer(offer.id, { upsell_product_title: val })} autoComplete="off" />
+                                                            </div>
+                                                            <div style={{ flex: 1 }}>
+                                                                <TextField label="Offer price" value={String(offer.original_price || '')} placeholder="USD 0.99" type="number" min={0 as any} step={0.01 as any} onChange={val => updOffer(offer.id, { original_price: parseFloat(val) || 0 })} autoComplete="off" />
+                                                            </div>
+                                                        </InlineStack>
+                                                        <Text variant="bodySm" fontWeight="semibold" as="span">Select upsell product (optional)</Text>
+                                                        {offer.upsell_product_id ? (
+                                                            <div className="prod-row">
+                                                                {offer.upsell_product_image && <img src={offer.upsell_product_image} alt="" />}
+                                                                <div className="prod-row-info"><div className="name">{offer.upsell_product_title}</div><div className="vid">{offer.upsell_product_id}</div></div>
+                                                                <Button size="slim" onClick={() => pickProduct(offer.id)}>Change</Button>
+                                                                <button className="prod-x" onClick={() => updOffer(offer.id, { upsell_product_id: '', upsell_product_title: '', upsell_product_image: '', upsell_variant_id: '', original_price: 0 })}>×</button>
+                                                            </div>
+                                                        ) : (
+                                                            <Button onClick={() => pickProduct(offer.id)}>Link to a product</Button>
+                                                        )}
+                                                        <TextField
+                                                            label="Offer text"
+                                                            value={editing.design.headerText || ''}
+                                                            placeholder={`Add {{title}} for only {{price}}`}
+                                                            onChange={val => updDesign({ headerText: val })}
+                                                            multiline={2}
+                                                            helpText="You can use {{title}} and {{price}} to dynamically replace the values"
+                                                            autoComplete="off"
+                                                        />
+                                                    </BlockStack>
+                                                );
+                                            })()}
+                                        </LegacyCard>
+                                    </AccordionSection>
 
-                                    {/* Settings */}
-                                    <LegacyCard title="Settings" sectioned>
-                                        <div className="up-toggle-row" onClick={() => upd({ checkbox_default_checked: !editing.checkbox_default_checked })}>
-                                            <span>Ticked by default</span>
-                                            <div className={`up-mini-toggle ${editing.checkbox_default_checked ? 'on' : 'off'}`} />
-                                        </div>
-                                    </LegacyCard>
+                                    {/* Section 4 — Behavior Settings */}
+                                    <AccordionSection id="tick-behavior" tab="tick" title="Behavior Settings" helperText="Control whether the upsell is ticked by default." expandedSection={expandedSection} toggleSection={toggleSection}>
+                                        <LegacyCard sectioned>
+                                            <div className="up-toggle-row" onClick={() => upd({ checkbox_default_checked: !editing.checkbox_default_checked })}>
+                                                <span>Ticked by default</span>
+                                                <div className={`up-mini-toggle ${editing.checkbox_default_checked ? 'on' : 'off'}`} />
+                                            </div>
+                                        </LegacyCard>
+                                    </AccordionSection>
 
-                                    {/* Style */}
-                                    <LegacyCard title="Style" sectioned>
-                                        <BlockStack gap="400">
-                                            <InlineStack gap="300" wrap={false}>
-                                                <div style={{ flex: 1 }}><ColorSelector label="Tick Color" value={editing.design.acceptButton.bgColor} onChange={c => updAccept({ bgColor: c })} /></div>
-                                                <div style={{ flex: 1 }}><ColorSelector label="Background color" value={editing.design.bgColor} onChange={c => updDesign({ bgColor: c })} /></div>
-                                            </InlineStack>
-                                            <InlineStack gap="300" wrap={false}>
-                                                <div style={{ flex: 1 }}><ColorSelector label="Text Color" value={editing.design.headerTextColor} onChange={c => updDesign({ headerTextColor: c })} /></div>
-                                                <div style={{ flex: 1 }}><ColorSelector label="Border color" value={editing.design.acceptButton.borderColor} onChange={c => updAccept({ borderColor: c })} /></div>
-                                            </InlineStack>
-                                            <RangeSlider label="Border Width (px)" min={0} max={4} value={editing.design.acceptButton.borderWidth} onChange={val => updAccept({ borderWidth: Number(val) })} output />
-                                            <Select
-                                                label="Border style"
-                                                value={editing.design.acceptButton.borderStyle || 'dashed'}
-                                                onChange={val => updAccept({ borderStyle: val })}
-                                                options={[
-                                                    { label: 'None', value: 'none' },
-                                                    { label: 'Solid', value: 'solid' },
-                                                    { label: 'Dashed', value: 'dashed' },
-                                                    { label: 'Dashed (Animation)', value: 'dashed_animation' },
-                                                ]}
-                                            />
-                                            <RangeSlider label="Rounded Corners (px)" min={0} max={20} value={editing.design.acceptButton.borderRadius} onChange={val => updAccept({ borderRadius: Number(val) })} output />
-                                            <RangeSlider label="Text Size (px)" min={10} max={20} value={editing.design.headerTextSize} onChange={val => updDesign({ headerTextSize: Number(val) })} output />
-                                        </BlockStack>
-                                    </LegacyCard>
+                                    {/* Section 5 — Styling */}
+                                    <AccordionSection id="tick-style" tab="tick" title="Styling" helperText="Customize colors, borders, and text appearance." expandedSection={expandedSection} toggleSection={toggleSection}>
+                                        <LegacyCard sectioned>
+                                            <BlockStack gap="400">
+                                                <InlineStack gap="300" wrap={false}>
+                                                    <div style={{ flex: 1 }}><ColorSelector label="Tick Color" value={editing.design.acceptButton.bgColor} onChange={c => updAccept({ bgColor: c })} /></div>
+                                                    <div style={{ flex: 1 }}><ColorSelector label="Background color" value={editing.design.bgColor} onChange={c => updDesign({ bgColor: c })} /></div>
+                                                </InlineStack>
+                                                <InlineStack gap="300" wrap={false}>
+                                                    <div style={{ flex: 1 }}><ColorSelector label="Text Color" value={editing.design.headerTextColor} onChange={c => updDesign({ headerTextColor: c })} /></div>
+                                                    <div style={{ flex: 1 }}><ColorSelector label="Border color" value={editing.design.acceptButton.borderColor} onChange={c => updAccept({ borderColor: c })} /></div>
+                                                </InlineStack>
+                                                <RangeSlider label="Border Width (px)" min={0} max={4} value={editing.design.acceptButton.borderWidth} onChange={val => updAccept({ borderWidth: Number(val) })} output />
+                                                <Select
+                                                    label="Border style"
+                                                    value={editing.design.acceptButton.borderStyle || 'dashed'}
+                                                    onChange={val => updAccept({ borderStyle: val })}
+                                                    options={[
+                                                        { label: 'None', value: 'none' },
+                                                        { label: 'Solid', value: 'solid' },
+                                                        { label: 'Dashed', value: 'dashed' },
+                                                        { label: 'Dashed (Animation)', value: 'dashed_animation' },
+                                                    ]}
+                                                />
+                                                <RangeSlider label="Rounded Corners (px)" min={0} max={20} value={editing.design.acceptButton.borderRadius} onChange={val => updAccept({ borderRadius: Number(val) })} output />
+                                                <RangeSlider label="Text Size (px)" min={10} max={20} value={editing.design.headerTextSize} onChange={val => updDesign({ headerTextSize: Number(val) })} output />
+                                            </BlockStack>
+                                        </LegacyCard>
+                                    </AccordionSection>
                                 </div>
 
                                 {/* Tick Upsell Live Preview */}
@@ -1101,139 +1156,145 @@ export default function UpsellDownsellPage() {
                             /* ==================== DOWNSELL EDITOR (EasySell-style) ==================== */
                             <>
                                 <div>
-                                    {/* Name + Active */}
-                                    <LegacyCard sectioned>
-                                        <TextField label="Name" value={editing.campaign_name} placeholder="New Downsell" onChange={val => upd({ campaign_name: val })} autoComplete="off" />
-                                    </LegacyCard>
+                                    {/* Section 1 — Downsell Configuration */}
+                                    <AccordionSection id="down-config" tab="down" title="Downsell Configuration" helperText="Set the name for this downsell campaign." expandedSection={expandedSection} toggleSection={toggleSection}>
+                                        <LegacyCard sectioned>
+                                            <TextField label="Name" value={editing.campaign_name} placeholder="New Downsell" onChange={val => upd({ campaign_name: val })} autoComplete="off" />
+                                        </LegacyCard>
+                                    </AccordionSection>
 
-                                    {/* 1 - Display the downsell for */}
-                                    <LegacyCard title="1- Display the downsell for" sectioned>
-                                        <BlockStack gap="300">
-                                            <ButtonGroup variant="segmented">
-                                                <Button pressed={editing.show_condition_type === 'always'} onClick={() => upd({ show_condition_type: 'always' as any })}>All products</Button>
-                                                <Button pressed={editing.show_condition_type === 'specific_products'} onClick={() => upd({ show_condition_type: 'specific_products' as any })}>Specific products</Button>
-                                            </ButtonGroup>
-                                            {editing.show_condition_type === 'specific_products' && (
+                                    {/* Section 2 — Display Conditions */}
+                                    <AccordionSection id="down-display" tab="down" title="Display Conditions" helperText="Choose which products and how many form closes trigger this downsell." expandedSection={expandedSection} toggleSection={toggleSection}>
+                                        <LegacyCard sectioned>
+                                            <BlockStack gap="300">
+                                                <ButtonGroup variant="segmented">
+                                                    <Button pressed={editing.show_condition_type === 'always'} onClick={() => upd({ show_condition_type: 'always' as any })}>All products</Button>
+                                                    <Button pressed={editing.show_condition_type === 'specific_products'} onClick={() => upd({ show_condition_type: 'specific_products' as any })}>Specific products</Button>
+                                                </ButtonGroup>
+                                                {editing.show_condition_type === 'specific_products' && (
+                                                    <BlockStack gap="200">
+                                                        <Button onClick={pickTrigger}>{`Select products (${editing.trigger_product_ids?.length || 0} selected)`}</Button>
+                                                        {editing._triggerProducts?.map((p: any) => (
+                                                            <div key={p.id} className="prod-row">
+                                                                {p.images?.[0] && <img src={p.images[0].originalSrc || p.images[0].url} alt="" />}
+                                                                <div className="prod-row-info"><div className="name">{p.title}</div><div className="vid">{p.id.replace('gid://shopify/Product/', '')}</div></div>
+                                                                <button className="prod-x" onClick={() => upd({ trigger_product_ids: editing.trigger_product_ids.filter(id => id !== p.id.replace('gid://shopify/Product/', '')), _triggerProducts: editing._triggerProducts?.filter((tp: any) => tp.id !== p.id) })}>×</button>
+                                                            </div>
+                                                        ))}
+                                                    </BlockStack>
+                                                )}
                                                 <BlockStack gap="200">
-                                                    <Button onClick={pickTrigger}>{`Select products (${editing.trigger_product_ids?.length || 0} selected)`}</Button>
-                                                    {editing._triggerProducts?.map((p: any) => (
-                                                        <div key={p.id} className="prod-row">
-                                                            {p.images?.[0] && <img src={p.images[0].originalSrc || p.images[0].url} alt="" />}
-                                                            <div className="prod-row-info"><div className="name">{p.title}</div><div className="vid">{p.id.replace('gid://shopify/Product/', '')}</div></div>
-                                                            <button className="prod-x" onClick={() => upd({ trigger_product_ids: editing.trigger_product_ids.filter(id => id !== p.id.replace('gid://shopify/Product/', '')), _triggerProducts: editing._triggerProducts?.filter((tp: any) => tp.id !== p.id) })}>×</button>
-                                                        </div>
-                                                    ))}
+                                                    <Text variant="bodySm" fontWeight="semibold" as="span">How many times should the form be closed before displaying the downsell?</Text>
+                                                    <InlineStack gap="400">
+                                                        {[1, 2, 3, 4].map(n => (
+                                                            <label key={n} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 14, fontWeight: 500, color: '#374151' }}>
+                                                                <input type="radio" name="form-close-count" checked={editing.form_close_count === n} onChange={() => upd({ form_close_count: n })} style={{ accentColor: '#1f2937', width: 18, height: 18 }} />
+                                                                {n}
+                                                            </label>
+                                                        ))}
+                                                    </InlineStack>
                                                 </BlockStack>
-                                            )}
-                                            <BlockStack gap="200">
-                                                <Text variant="bodySm" fontWeight="semibold" as="span">How many times should the form be closed before displaying the downsell?</Text>
-                                                <InlineStack gap="400">
-                                                    {[1, 2, 3, 4].map(n => (
-                                                        <label key={n} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 14, fontWeight: 500, color: '#374151' }}>
-                                                            <input type="radio" name="form-close-count" checked={editing.form_close_count === n} onChange={() => upd({ form_close_count: n })} style={{ accentColor: '#1f2937', width: 18, height: 18 }} />
-                                                            {n}
-                                                        </label>
-                                                    ))}
-                                                </InlineStack>
                                             </BlockStack>
-                                        </BlockStack>
-                                    </LegacyCard>
+                                        </LegacyCard>
+                                    </AccordionSection>
 
-                                    {/* 2 - Discount value */}
-                                    <div className="sec">
-                                        <h3>2- Discount value</h3>
-                                        {editing.offers[0] && (() => {
-                                            const offer = editing.offers[0];
-                                            return (
-                                                <>
-                                                    <div className="mode-toggle">
-                                                        <ButtonGroup variant="segmented">
-                                                            <Button pressed={offer.discount_type === 'fixed'} onClick={() => updOffer(offer.id, { discount_type: 'fixed' as any })}>Fixed amount</Button>
-                                                            <Button pressed={offer.discount_type === 'percentage'} onClick={() => updOffer(offer.id, { discount_type: 'percentage' as any })}>Percentage</Button>
-                                                        </ButtonGroup>
-                                                    </div>
-                                                    <div className="fr" style={{ marginTop: 12 }}>
-                                                        <div className="fg">
-                                                            <input type="number" min="0" value={offer.discount_value} onChange={e => updOffer(offer.id, { discount_value: parseFloat(e.target.value) || 0 })} />
-                                                        </div>
-                                                        <div style={{ alignSelf: 'center', fontWeight: 700, fontSize: 18, color: '#374151' }}>{offer.discount_type === 'percentage' ? '%' : currencySymbol}</div>
-                                                    </div>
-                                                </>
-                                            );
-                                        })()}
-                                    </div>
-
-                                    {/* Product selection */}
-                                    <div className="sec">
-                                        <h3>Downsell product</h3>
-                                        {editing.offers[0] && (() => {
-                                            const offer = editing.offers[0];
-                                            return (
-                                                <>
-                                                    <Button onClick={() => pickProduct(offer.id)}>Select product</Button>
-                                                    {offer.upsell_product_id ? (
-                                                        <div className="prod-row" style={{ marginTop: 8 }}>
-                                                            {offer.upsell_product_image && <img src={offer.upsell_product_image} alt="" />}
-                                                            <div className="prod-row-info"><div className="name">{offer.upsell_product_title}</div><div className="vid">{fmtCurrency(offer.original_price || 0)}</div></div>
-                                                            <button className="prod-x" onClick={() => updOffer(offer.id, { upsell_product_id: '', upsell_variant_id: '', upsell_product_title: '', upsell_product_image: '', original_price: 0, offer_price: 0, _selectedProduct: undefined })}>×</button>
-                                                        </div>
-                                                    ) : (
-                                                        <div style={{ padding: 12, border: '1px dashed #e5e7eb', borderRadius: 10, textAlign: 'center', color: '#9ca3af', fontSize: 13, marginTop: 8 }}>No product selected — select a product to show its price in the downsell</div>
-                                                    )}
-                                                </>
-                                            );
-                                        })()}
-                                    </div>
-
-                                    {/* 3 - Customize the downsell */}
-                                    <div className="sec">
-                                        <h3>3- Customize the downsell</h3>
-
-                                        {/* Background image presets */}
-                                        <div className="fg"><label>Background image</label></div>
-                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 16 }}>
-                                            {Array.from({ length: 9 }, (_, i) => i + 1).map((n) => {
-                                                const imgPath = `/bg-presets/${n}.svg`;
-                                                const isSelected = editing.design.bgImage === imgPath;
+                                    {/* Section 3 — Discount Configuration */}
+                                    <AccordionSection id="down-discount" tab="down" title="Discount Configuration" helperText="Set the discount type and value for this downsell." expandedSection={expandedSection} toggleSection={toggleSection}>
+                                        <div className="sec">
+                                            {editing.offers[0] && (() => {
+                                                const offer = editing.offers[0];
                                                 return (
-                                                    <div key={n} onClick={() => updDesign({ bgImage: imgPath, bgColor: '' })} style={{
-                                                        width: '100%', aspectRatio: '1', borderRadius: 12, cursor: 'pointer',
-                                                        border: isSelected ? '3px solid #1f2937' : '2px solid #e5e7eb',
-                                                        boxShadow: isSelected ? '0 0 0 2px #fff, 0 0 0 4px #1f2937' : 'none',
-                                                        overflow: 'hidden', position: 'relative' as const,
-                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                    }}>
-                                                        <img src={imgPath} alt={`Preset ${n}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                                        {isSelected && <span style={{ position: 'absolute' as const, background: '#1f2937', color: '#fff', borderRadius: 4, width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>✓</span>}
-                                                    </div>
+                                                    <>
+                                                        <div className="mode-toggle">
+                                                            <ButtonGroup variant="segmented">
+                                                                <Button pressed={offer.discount_type === 'fixed'} onClick={() => updOffer(offer.id, { discount_type: 'fixed' as any })}>Fixed amount</Button>
+                                                                <Button pressed={offer.discount_type === 'percentage'} onClick={() => updOffer(offer.id, { discount_type: 'percentage' as any })}>Percentage</Button>
+                                                            </ButtonGroup>
+                                                        </div>
+                                                        <div className="fr" style={{ marginTop: 12 }}>
+                                                            <div className="fg">
+                                                                <input type="number" min="0" value={offer.discount_value} onChange={e => updOffer(offer.id, { discount_value: parseFloat(e.target.value) || 0 })} />
+                                                            </div>
+                                                            <div style={{ alignSelf: 'center', fontWeight: 700, fontSize: 18, color: '#374151' }}>{offer.discount_type === 'percentage' ? '%' : currencySymbol}</div>
+                                                        </div>
+                                                    </>
                                                 );
-                                            })}
-                                            {/* White color swatch as 10th option */}
-                                            <div onClick={() => updDesign({ bgColor: '#ffffff', bgImage: '' })} style={{
-                                                width: '100%', aspectRatio: '1', borderRadius: 12, background: '#ffffff', cursor: 'pointer',
-                                                border: editing.design.bgColor === '#ffffff' && !editing.design.bgImage ? '3px solid #1f2937' : '2px solid #e5e7eb',
-                                                boxShadow: editing.design.bgColor === '#ffffff' && !editing.design.bgImage ? '0 0 0 2px #fff, 0 0 0 4px #1f2937' : 'none',
-                                                display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' as const,
-                                            }}>
-                                                {editing.design.bgColor === '#ffffff' && !editing.design.bgImage && <span style={{ background: '#1f2937', color: '#fff', borderRadius: 4, width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>✓</span>}
+                                            })()}
+                                        </div>
+                                    </AccordionSection>
+
+                                    {/* Section 4 — Downsell Product */}
+                                    <AccordionSection id="down-product" tab="down" title="Downsell Product" helperText="Select the product to offer as a downsell." expandedSection={expandedSection} toggleSection={toggleSection}>
+                                        <div className="sec">
+                                            {editing.offers[0] && (() => {
+                                                const offer = editing.offers[0];
+                                                return (
+                                                    <>
+                                                        <Button onClick={() => pickProduct(offer.id)}>Select product</Button>
+                                                        {offer.upsell_product_id ? (
+                                                            <div className="prod-row" style={{ marginTop: 8 }}>
+                                                                {offer.upsell_product_image && <img src={offer.upsell_product_image} alt="" />}
+                                                                <div className="prod-row-info"><div className="name">{offer.upsell_product_title}</div><div className="vid">{fmtCurrency(offer.original_price || 0)}</div></div>
+                                                                <button className="prod-x" onClick={() => updOffer(offer.id, { upsell_product_id: '', upsell_variant_id: '', upsell_product_title: '', upsell_product_image: '', original_price: 0, offer_price: 0, _selectedProduct: undefined })}>×</button>
+                                                            </div>
+                                                        ) : (
+                                                            <div style={{ padding: 12, border: '1px dashed #e5e7eb', borderRadius: 10, textAlign: 'center', color: '#9ca3af', fontSize: 13, marginTop: 8 }}>No product selected — select a product to show its price in the downsell</div>
+                                                        )}
+                                                    </>
+                                                );
+                                            })()}
+                                        </div>
+                                    </AccordionSection>
+
+                                    {/* Section 5 — Background Customization */}
+                                    <AccordionSection id="down-background" tab="down" title="Background Customization" helperText="Choose a preset or custom background for the downsell popup." expandedSection={expandedSection} toggleSection={toggleSection}>
+                                        <div className="sec">
+                                            {/* Background image presets */}
+                                            <div className="fg"><label>Background image</label></div>
+                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 16 }}>
+                                                {Array.from({ length: 9 }, (_, i) => i + 1).map((n) => {
+                                                    const imgPath = `/bg-presets/${n}.svg`;
+                                                    const isSelected = editing.design.bgImage === imgPath;
+                                                    return (
+                                                        <div key={n} onClick={() => updDesign({ bgImage: imgPath, bgColor: '' })} style={{
+                                                            width: '100%', aspectRatio: '1', borderRadius: 12, cursor: 'pointer',
+                                                            border: isSelected ? '3px solid #1f2937' : '2px solid #e5e7eb',
+                                                            boxShadow: isSelected ? '0 0 0 2px #fff, 0 0 0 4px #1f2937' : 'none',
+                                                            overflow: 'hidden', position: 'relative' as const,
+                                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                        }}>
+                                                            <img src={imgPath} alt={`Preset ${n}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                            {isSelected && <span style={{ position: 'absolute' as const, background: '#1f2937', color: '#fff', borderRadius: 4, width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>✓</span>}
+                                                        </div>
+                                                    );
+                                                })}
+                                                {/* White color swatch as 10th option */}
+                                                <div onClick={() => updDesign({ bgColor: '#ffffff', bgImage: '' })} style={{
+                                                    width: '100%', aspectRatio: '1', borderRadius: 12, background: '#ffffff', cursor: 'pointer',
+                                                    border: editing.design.bgColor === '#ffffff' && !editing.design.bgImage ? '3px solid #1f2937' : '2px solid #e5e7eb',
+                                                    boxShadow: editing.design.bgColor === '#ffffff' && !editing.design.bgImage ? '0 0 0 2px #fff, 0 0 0 4px #1f2937' : 'none',
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' as const,
+                                                }}>
+                                                    {editing.design.bgColor === '#ffffff' && !editing.design.bgImage && <span style={{ background: '#1f2937', color: '#fff', borderRadius: 4, width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>✓</span>}
+                                                </div>
+                                            </div>
+                                            <ColorSelector label="Custom background" value={editing.design.bgColor.startsWith('#') ? editing.design.bgColor : '#ffd700'} onChange={c => updDesign({ bgColor: c, bgImage: '' })} />
+                                            <div className="fg" style={{ marginTop: 8 }}>
+                                                <label>Background image URL</label>
+                                                <input value={editing.design.bgImage || ''} placeholder="https://example.com/image.jpg" onChange={e => updDesign({ bgImage: e.target.value })} />
+                                                {editing.design.bgImage && (
+                                                    <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                        <img src={editing.design.bgImage} alt="" style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 8, border: '1px solid #e5e7eb' }} />
+                                                        <button onClick={() => updDesign({ bgImage: '' })} style={{ padding: '4px 10px', border: '1px solid #e5e7eb', borderRadius: 6, cursor: 'pointer', fontSize: 12, color: '#ef4444', background: '#fff' }}>Remove</button>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
-                                        <ColorSelector label="Custom background" value={editing.design.bgColor.startsWith('#') ? editing.design.bgColor : '#ffd700'} onChange={c => updDesign({ bgColor: c, bgImage: '' })} />
-                                        <div className="fg" style={{ marginTop: 8 }}>
-                                            <label>Background image URL</label>
-                                            <input value={editing.design.bgImage || ''} placeholder="https://example.com/image.jpg" onChange={e => updDesign({ bgImage: e.target.value })} />
-                                            {editing.design.bgImage && (
-                                                <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                    <img src={editing.design.bgImage} alt="" style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 8, border: '1px solid #e5e7eb' }} />
-                                                    <button onClick={() => updDesign({ bgImage: '' })} style={{ padding: '4px 10px', border: '1px solid #e5e7eb', borderRadius: 6, cursor: 'pointer', fontSize: 12, color: '#ef4444', background: '#fff' }}>Remove</button>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
+                                    </AccordionSection>
 
-                                    {/* Discount badge */}
-                                    <div className="sec">
-                                        <h3>Discount badge</h3>
+                                    {/* Section 6 — Discount Badge */}
+                                    <AccordionSection id="down-badge" tab="down" title="Discount Badge" helperText="Customize the discount badge appearance." expandedSection={expandedSection} toggleSection={toggleSection}>
+                                        <div className="sec">
                                         <div className="fr">
                                             <div className="fg"><label>Title</label><input value={editing.design.discountBadgeTitle} placeholder="" onChange={e => updDesign({ discountBadgeTitle: e.target.value })} /></div>
                                             <ColorSelector label="Background color" value={editing.design.discountBadgeBgColor.startsWith('#') ? editing.design.discountBadgeBgColor : '#ff4500'} onChange={c => updDesign({ discountBadgeBgColor: c })} />
@@ -1253,142 +1314,142 @@ export default function UpsellDownsellPage() {
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
+                                        </div>
+                                    </AccordionSection>
 
-                                    {/* Edit text */}
-                                    <div className="sec">
-                                        <h3>Edit text</h3>
-
-                                        {/* Title */}
-                                        <div style={{ marginBottom: 20 }}>
-                                            <div className="fg"><label>Title</label><input value={editing.design.titleText} placeholder="Hold on!" onChange={e => updDesign({ titleText: e.target.value })} /></div>
-                                            <div className="fr3">
-                                                <ColorSelector label="Text color" value={editing.design.titleTextColor} onChange={c => updDesign({ titleTextColor: c })} />
-                                                <div className="fg"><label>Text size</label><input type="number" min="8" max="48" value={editing.design.titleTextSize} onChange={e => updDesign({ titleTextSize: parseInt(e.target.value) || 24 })} /><span style={{ fontSize: 11, color: '#9ca3af' }}>px</span></div>
-                                                <div className="fg"><label>Style</label>
-                                                    <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
-                                                        <button onClick={() => updDesign({ titleBold: !editing.design.titleBold })} style={{ padding: '8px 14px', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontWeight: 700, background: editing.design.titleBold ? '#1f2937' : '#fff', color: editing.design.titleBold ? '#fff' : '#374151' }}>B</button>
-                                                        <button onClick={() => updDesign({ titleItalic: !editing.design.titleItalic })} style={{ padding: '8px 14px', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontStyle: 'italic', background: editing.design.titleItalic ? '#1f2937' : '#fff', color: editing.design.titleItalic ? '#fff' : '#374151' }}>I</button>
+                                    {/* Section 7 — Text Content */}
+                                    <AccordionSection id="down-text" tab="down" title="Text Content" helperText="Edit all text elements — title, subtitle, description, and content." expandedSection={expandedSection} toggleSection={toggleSection}>
+                                        <div className="sec">
+                                            {/* Title */}
+                                            <div style={{ marginBottom: 20 }}>
+                                                <div className="fg"><label>Title</label><input value={editing.design.titleText} placeholder="Hold on!" onChange={e => updDesign({ titleText: e.target.value })} /></div>
+                                                <div className="fr3">
+                                                    <ColorSelector label="Text color" value={editing.design.titleTextColor} onChange={c => updDesign({ titleTextColor: c })} />
+                                                    <div className="fg"><label>Text size</label><input type="number" min="8" max="48" value={editing.design.titleTextSize} onChange={e => updDesign({ titleTextSize: parseInt(e.target.value) || 24 })} /><span style={{ fontSize: 11, color: '#9ca3af' }}>px</span></div>
+                                                    <div className="fg"><label>Style</label>
+                                                        <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+                                                            <button onClick={() => updDesign({ titleBold: !editing.design.titleBold })} style={{ padding: '8px 14px', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontWeight: 700, background: editing.design.titleBold ? '#1f2937' : '#fff', color: editing.design.titleBold ? '#fff' : '#374151' }}>B</button>
+                                                            <button onClick={() => updDesign({ titleItalic: !editing.design.titleItalic })} style={{ padding: '8px 14px', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontStyle: 'italic', background: editing.design.titleItalic ? '#1f2937' : '#fff', color: editing.design.titleItalic ? '#fff' : '#374151' }}>I</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {/* Subtitle */}
+                                            <div style={{ marginBottom: 20 }}>
+                                                <div className="fg"><label>Subtitle</label><input value={editing.design.subtitleText} placeholder="Congratulations! You've just unlocked a special discount!" onChange={e => updDesign({ subtitleText: e.target.value })} /></div>
+                                                <div className="fr3">
+                                                    <ColorSelector label="Text color" value={editing.design.subtitleTextColor} onChange={c => updDesign({ subtitleTextColor: c })} />
+                                                    <div className="fg"><label>Text size</label><input type="number" min="8" max="48" value={editing.design.subtitleTextSize} onChange={e => updDesign({ subtitleTextSize: parseInt(e.target.value) || 16 })} /><span style={{ fontSize: 11, color: '#9ca3af' }}>px</span></div>
+                                                    <div className="fg"><label>Style</label>
+                                                        <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+                                                            <button onClick={() => updDesign({ subtitleBold: !editing.design.subtitleBold })} style={{ padding: '8px 14px', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontWeight: 700, background: editing.design.subtitleBold ? '#1f2937' : '#fff', color: editing.design.subtitleBold ? '#fff' : '#374151' }}>B</button>
+                                                            <button onClick={() => updDesign({ subtitleItalic: !editing.design.subtitleItalic })} style={{ padding: '8px 14px', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontStyle: 'italic', background: editing.design.subtitleItalic ? '#1f2937' : '#fff', color: editing.design.subtitleItalic ? '#fff' : '#374151' }}>I</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {/* Description */}
+                                            <div style={{ marginBottom: 20 }}>
+                                                <div className="fg"><label>Description</label><input value={editing.design.descriptionText} placeholder="Buy now, get a discount!" onChange={e => updDesign({ descriptionText: e.target.value })} /></div>
+                                                <div className="fr3">
+                                                    <ColorSelector label="Text color" value={editing.design.descriptionTextColor} onChange={c => updDesign({ descriptionTextColor: c })} />
+                                                    <div className="fg"><label>Text size</label><input type="number" min="8" max="48" value={editing.design.descriptionTextSize} onChange={e => updDesign({ descriptionTextSize: parseInt(e.target.value) || 20 })} /><span style={{ fontSize: 11, color: '#9ca3af' }}>px</span></div>
+                                                    <div className="fg"><label>Style</label>
+                                                        <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+                                                            <button onClick={() => updDesign({ descriptionBold: !editing.design.descriptionBold })} style={{ padding: '8px 14px', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontWeight: 700, background: editing.design.descriptionBold ? '#1f2937' : '#fff', color: editing.design.descriptionBold ? '#fff' : '#374151' }}>B</button>
+                                                            <button onClick={() => updDesign({ descriptionItalic: !editing.design.descriptionItalic })} style={{ padding: '8px 14px', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontStyle: 'italic', background: editing.design.descriptionItalic ? '#1f2937' : '#fff', color: editing.design.descriptionItalic ? '#fff' : '#374151' }}>I</button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {/* Content */}
+                                            <div>
+                                                <div className="fg"><label>Content</label><textarea value={editing.design.contentText} placeholder="Additional content..." onChange={e => updDesign({ contentText: e.target.value })} /></div>
+                                                <div className="fr3">
+                                                    <ColorSelector label="Text color" value={editing.design.contentTextColor} onChange={c => updDesign({ contentTextColor: c })} />
+                                                    <div className="fg"><label>Text size</label><input type="number" min="8" max="48" value={editing.design.contentTextSize} onChange={e => updDesign({ contentTextSize: parseInt(e.target.value) || 16 })} /><span style={{ fontSize: 11, color: '#9ca3af' }}>px</span></div>
+                                                    <div className="fg"><label>Style</label>
+                                                        <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+                                                            <button onClick={() => updDesign({ contentBold: !editing.design.contentBold })} style={{ padding: '8px 14px', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontWeight: 700, background: editing.design.contentBold ? '#1f2937' : '#fff', color: editing.design.contentBold ? '#fff' : '#374151' }}>B</button>
+                                                            <button onClick={() => updDesign({ contentItalic: !editing.design.contentItalic })} style={{ padding: '8px 14px', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontStyle: 'italic', background: editing.design.contentItalic ? '#1f2937' : '#fff', color: editing.design.contentItalic ? '#fff' : '#374151' }}>I</button>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
+                                    </AccordionSection>
 
-                                        {/* Subtitle */}
-                                        <div style={{ marginBottom: 20 }}>
-                                            <div className="fg"><label>Subtitle</label><input value={editing.design.subtitleText} placeholder="Congratulations! You've just unlocked a special discount!" onChange={e => updDesign({ subtitleText: e.target.value })} /></div>
+                                    {/* Section 8 — Accept Button */}
+                                    <AccordionSection id="down-accept-btn" tab="down" title="Accept Button" helperText="Customize the 'Complete order' button appearance." expandedSection={expandedSection} toggleSection={toggleSection}>
+                                        <div className="sec">
+                                            <div className="fg"><label>Button Text</label><input value={editing.design.acceptButton.text} placeholder="Complete order with {discount} OFF" onChange={e => updAccept({ text: e.target.value })} /></div>
+                                            <div className="fr">
+                                                <ColorSelector label="Background color" value={editing.design.acceptButton.bgColor.startsWith('#') ? editing.design.acceptButton.bgColor : '#ff4500'} onChange={c => updAccept({ bgColor: c })} />
+                                                <div className="fg"><label>Animation</label><select value={editing.design.acceptButton.animation} onChange={e => updAccept({ animation: e.target.value })}><option value="none">None</option><option value="pulse">Pulse</option><option value="bounce">Bounce</option><option value="shake">Shake</option></select></div>
+                                            </div>
+                                            <div className="fg"><label>Change icon</label>
+                                                <select value={editing.design.acceptButton.changeIcon || 'none'} onChange={e => updAccept({ changeIcon: e.target.value })}>
+                                                    <option value="none">None</option>
+                                                    <option value="cart">🛒 Cart</option>
+                                                    <option value="check">✓ Check</option>
+                                                    <option value="star">⭐ Star</option>
+                                                    <option value="gift">🎁 Gift</option>
+                                                    <option value="heart">❤️ Heart</option>
+                                                </select>
+                                            </div>
                                             <div className="fr3">
-                                                <ColorSelector label="Text color" value={editing.design.subtitleTextColor} onChange={c => updDesign({ subtitleTextColor: c })} />
-                                                <div className="fg"><label>Text size</label><input type="number" min="8" max="48" value={editing.design.subtitleTextSize} onChange={e => updDesign({ subtitleTextSize: parseInt(e.target.value) || 16 })} /><span style={{ fontSize: 11, color: '#9ca3af' }}>px</span></div>
+                                                <ColorSelector label="Text color" value={editing.design.acceptButton.textColor} onChange={c => updAccept({ textColor: c })} />
+                                                <div className="fg"><label>Text size</label><input type="number" min="8" max="32" value={editing.design.acceptButton.textSize} onChange={e => updAccept({ textSize: parseInt(e.target.value) || 16 })} /><span style={{ fontSize: 11, color: '#9ca3af' }}>px</span></div>
                                                 <div className="fg"><label>Style</label>
                                                     <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
-                                                        <button onClick={() => updDesign({ subtitleBold: !editing.design.subtitleBold })} style={{ padding: '8px 14px', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontWeight: 700, background: editing.design.subtitleBold ? '#1f2937' : '#fff', color: editing.design.subtitleBold ? '#fff' : '#374151' }}>B</button>
-                                                        <button onClick={() => updDesign({ subtitleItalic: !editing.design.subtitleItalic })} style={{ padding: '8px 14px', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontStyle: 'italic', background: editing.design.subtitleItalic ? '#1f2937' : '#fff', color: editing.design.subtitleItalic ? '#fff' : '#374151' }}>I</button>
+                                                        <button onClick={() => updAccept({ bold: !editing.design.acceptButton.bold })} style={{ padding: '8px 14px', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontWeight: 700, background: editing.design.acceptButton.bold ? '#1f2937' : '#fff', color: editing.design.acceptButton.bold ? '#fff' : '#374151' }}>B</button>
+                                                        <button onClick={() => updAccept({ italic: !editing.design.acceptButton.italic })} style={{ padding: '8px 14px', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontStyle: 'italic', background: editing.design.acceptButton.italic ? '#1f2937' : '#fff', color: editing.design.acceptButton.italic ? '#fff' : '#374151' }}>I</button>
                                                     </div>
                                                 </div>
                                             </div>
+                                            <div className="up-section-label">Border</div>
+                                            <ColorSelector label="Border color" value={editing.design.acceptButton.borderColor} onChange={c => updAccept({ borderColor: c })} />
+                                            <div className="fg"><label>Border width</label><div style={{ padding: '0 8px', width: '100%' }}><RangeSlider labelHidden label="Border width" min={0} max={5} value={editing.design.acceptButton.borderWidth} onChange={val => updAccept({ borderWidth: Number(val) })} output /></div></div>
+                                            <div className="fg"><label>Rounded corners</label><div style={{ padding: '0 8px', width: '100%' }}><RangeSlider labelHidden label="Rounded corners" min={0} max={30} value={editing.design.acceptButton.borderRadius} onChange={val => updAccept({ borderRadius: Number(val) })} output /></div></div>
+                                            <div className="fg"><label>Shadow</label><div style={{ padding: '0 8px', width: '100%' }}><RangeSlider labelHidden label="Shadow" min={0} max={20} value={editing.design.acceptButton.shadow ? 10 : 0} onChange={val => updAccept({ shadow: Number(val) > 0 })} output /></div></div>
                                         </div>
+                                    </AccordionSection>
 
-                                        {/* Description */}
-                                        <div style={{ marginBottom: 20 }}>
-                                            <div className="fg"><label>Description</label><input value={editing.design.descriptionText} placeholder="Buy now, get a discount!" onChange={e => updDesign({ descriptionText: e.target.value })} /></div>
+                                    {/* Section 9 — Reject Button */}
+                                    <AccordionSection id="down-reject-btn" tab="down" title="Reject Button" helperText="Customize the 'No thanks' button appearance." expandedSection={expandedSection} toggleSection={toggleSection}>
+                                        <div className="sec">
+                                            <div className="fg"><label>Button Text</label><input value={editing.design.rejectButton.text} placeholder="No thanks" onChange={e => updReject({ text: e.target.value })} /></div>
+                                            <div className="fr">
+                                                <ColorSelector label="Background color" value={editing.design.rejectButton.bgColor.startsWith('#') ? editing.design.rejectButton.bgColor : '#ffffff'} onChange={c => updReject({ bgColor: c })} />
+                                                <div className="fg"><label>Animation</label><select value={editing.design.rejectButton.animation} onChange={e => updReject({ animation: e.target.value })}><option value="none">None</option><option value="pulse">Pulse</option><option value="bounce">Bounce</option><option value="shake">Shake</option></select></div>
+                                            </div>
+                                            <div className="fg"><label>Change icon</label>
+                                                <select value={editing.design.rejectButton.changeIcon || 'none'} onChange={e => updReject({ changeIcon: e.target.value })}>
+                                                    <option value="none">None</option>
+                                                    <option value="cart">🛒 Cart</option>
+                                                    <option value="check">✓ Check</option>
+                                                    <option value="star">⭐ Star</option>
+                                                    <option value="gift">🎁 Gift</option>
+                                                    <option value="heart">❤️ Heart</option>
+                                                </select>
+                                            </div>
                                             <div className="fr3">
-                                                <ColorSelector label="Text color" value={editing.design.descriptionTextColor} onChange={c => updDesign({ descriptionTextColor: c })} />
-                                                <div className="fg"><label>Text size</label><input type="number" min="8" max="48" value={editing.design.descriptionTextSize} onChange={e => updDesign({ descriptionTextSize: parseInt(e.target.value) || 20 })} /><span style={{ fontSize: 11, color: '#9ca3af' }}>px</span></div>
+                                                <ColorSelector label="Text color" value={editing.design.rejectButton.textColor} onChange={c => updReject({ textColor: c })} />
+                                                <div className="fg"><label>Text size</label><input type="number" min="8" max="32" value={editing.design.rejectButton.textSize} onChange={e => updReject({ textSize: parseInt(e.target.value) || 16 })} /><span style={{ fontSize: 11, color: '#9ca3af' }}>px</span></div>
                                                 <div className="fg"><label>Style</label>
                                                     <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
-                                                        <button onClick={() => updDesign({ descriptionBold: !editing.design.descriptionBold })} style={{ padding: '8px 14px', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontWeight: 700, background: editing.design.descriptionBold ? '#1f2937' : '#fff', color: editing.design.descriptionBold ? '#fff' : '#374151' }}>B</button>
-                                                        <button onClick={() => updDesign({ descriptionItalic: !editing.design.descriptionItalic })} style={{ padding: '8px 14px', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontStyle: 'italic', background: editing.design.descriptionItalic ? '#1f2937' : '#fff', color: editing.design.descriptionItalic ? '#fff' : '#374151' }}>I</button>
+                                                        <button onClick={() => updReject({ bold: !editing.design.rejectButton.bold })} style={{ padding: '8px 14px', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontWeight: 700, background: editing.design.rejectButton.bold ? '#1f2937' : '#fff', color: editing.design.rejectButton.bold ? '#fff' : '#374151' }}>B</button>
+                                                        <button onClick={() => updReject({ italic: !editing.design.rejectButton.italic })} style={{ padding: '8px 14px', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontStyle: 'italic', background: editing.design.rejectButton.italic ? '#1f2937' : '#fff', color: editing.design.rejectButton.italic ? '#fff' : '#374151' }}>I</button>
                                                     </div>
                                                 </div>
                                             </div>
+                                            <div className="up-section-label">Border</div>
+                                            <ColorSelector label="Border color" value={editing.design.rejectButton.borderColor} onChange={c => updReject({ borderColor: c })} />
+                                            <div className="fg"><label>Border width</label><div style={{ padding: '0 8px', width: '100%' }}><RangeSlider labelHidden label="Border width" min={0} max={5} value={editing.design.rejectButton.borderWidth} onChange={val => updReject({ borderWidth: Number(val) })} output /></div></div>
+                                            <div className="fg"><label>Rounded corners</label><div style={{ padding: '0 8px', width: '100%' }}><RangeSlider labelHidden label="Rounded corners" min={0} max={30} value={editing.design.rejectButton.borderRadius} onChange={val => updReject({ borderRadius: Number(val) })} output /></div></div>
+                                            <div className="fg"><label>Shadow</label><div style={{ padding: '0 8px', width: '100%' }}><RangeSlider labelHidden label="Shadow" min={0} max={20} value={editing.design.rejectButton.shadow ? 10 : 0} onChange={val => updReject({ shadow: Number(val) > 0 })} output /></div></div>
                                         </div>
-
-                                        {/* Content */}
-                                        <div>
-                                            <div className="fg"><label>Content</label><textarea value={editing.design.contentText} placeholder="Additional content..." onChange={e => updDesign({ contentText: e.target.value })} /></div>
-                                            <div className="fr3">
-                                                <ColorSelector label="Text color" value={editing.design.contentTextColor} onChange={c => updDesign({ contentTextColor: c })} />
-                                                <div className="fg"><label>Text size</label><input type="number" min="8" max="48" value={editing.design.contentTextSize} onChange={e => updDesign({ contentTextSize: parseInt(e.target.value) || 16 })} /><span style={{ fontSize: 11, color: '#9ca3af' }}>px</span></div>
-                                                <div className="fg"><label>Style</label>
-                                                    <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
-                                                        <button onClick={() => updDesign({ contentBold: !editing.design.contentBold })} style={{ padding: '8px 14px', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontWeight: 700, background: editing.design.contentBold ? '#1f2937' : '#fff', color: editing.design.contentBold ? '#fff' : '#374151' }}>B</button>
-                                                        <button onClick={() => updDesign({ contentItalic: !editing.design.contentItalic })} style={{ padding: '8px 14px', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontStyle: 'italic', background: editing.design.contentItalic ? '#1f2937' : '#fff', color: editing.design.contentItalic ? '#fff' : '#374151' }}>I</button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Complete order button */}
-                                    <div className="sec">
-                                        <h3>Complete order button</h3>
-                                        <div className="fg"><label>Button Text</label><input value={editing.design.acceptButton.text} placeholder="Complete order with {discount} OFF" onChange={e => updAccept({ text: e.target.value })} /></div>
-                                        <div className="fr">
-                                            <ColorSelector label="Background color" value={editing.design.acceptButton.bgColor.startsWith('#') ? editing.design.acceptButton.bgColor : '#ff4500'} onChange={c => updAccept({ bgColor: c })} />
-                                            <div className="fg"><label>Animation</label><select value={editing.design.acceptButton.animation} onChange={e => updAccept({ animation: e.target.value })}><option value="none">None</option><option value="pulse">Pulse</option><option value="bounce">Bounce</option><option value="shake">Shake</option></select></div>
-                                        </div>
-                                        <div className="fg"><label>Change icon</label>
-                                            <select value={editing.design.acceptButton.changeIcon || 'none'} onChange={e => updAccept({ changeIcon: e.target.value })}>
-                                                <option value="none">None</option>
-                                                <option value="cart">🛒 Cart</option>
-                                                <option value="check">✓ Check</option>
-                                                <option value="star">⭐ Star</option>
-                                                <option value="gift">🎁 Gift</option>
-                                                <option value="heart">❤️ Heart</option>
-                                            </select>
-                                        </div>
-                                        <div className="fr3">
-                                            <ColorSelector label="Text color" value={editing.design.acceptButton.textColor} onChange={c => updAccept({ textColor: c })} />
-                                            <div className="fg"><label>Text size</label><input type="number" min="8" max="32" value={editing.design.acceptButton.textSize} onChange={e => updAccept({ textSize: parseInt(e.target.value) || 16 })} /><span style={{ fontSize: 11, color: '#9ca3af' }}>px</span></div>
-                                            <div className="fg"><label>Style</label>
-                                                <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
-                                                    <button onClick={() => updAccept({ bold: !editing.design.acceptButton.bold })} style={{ padding: '8px 14px', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontWeight: 700, background: editing.design.acceptButton.bold ? '#1f2937' : '#fff', color: editing.design.acceptButton.bold ? '#fff' : '#374151' }}>B</button>
-                                                    <button onClick={() => updAccept({ italic: !editing.design.acceptButton.italic })} style={{ padding: '8px 14px', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontStyle: 'italic', background: editing.design.acceptButton.italic ? '#1f2937' : '#fff', color: editing.design.acceptButton.italic ? '#fff' : '#374151' }}>I</button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="up-section-label">Border</div>
-                                        <ColorSelector label="Border color" value={editing.design.acceptButton.borderColor} onChange={c => updAccept({ borderColor: c })} />
-                                        <div className="fg"><label>Border width</label><div style={{ padding: '0 8px', width: '100%' }}><RangeSlider labelHidden label="Border width" min={0} max={5} value={editing.design.acceptButton.borderWidth} onChange={val => updAccept({ borderWidth: Number(val) })} output /></div></div>
-                                        <div className="fg"><label>Rounded corners</label><div style={{ padding: '0 8px', width: '100%' }}><RangeSlider labelHidden label="Rounded corners" min={0} max={30} value={editing.design.acceptButton.borderRadius} onChange={val => updAccept({ borderRadius: Number(val) })} output /></div></div>
-                                        <div className="fg"><label>Shadow</label><div style={{ padding: '0 8px', width: '100%' }}><RangeSlider labelHidden label="Shadow" min={0} max={20} value={editing.design.acceptButton.shadow ? 10 : 0} onChange={val => updAccept({ shadow: Number(val) > 0 })} output /></div></div>
-                                    </div>
-
-                                    {/* No thank you button */}
-                                    <div className="sec">
-                                        <h3>No thank you button</h3>
-                                        <div className="fg"><label>Button Text</label><input value={editing.design.rejectButton.text} placeholder="No thanks" onChange={e => updReject({ text: e.target.value })} /></div>
-                                        <div className="fr">
-                                            <ColorSelector label="Background color" value={editing.design.rejectButton.bgColor.startsWith('#') ? editing.design.rejectButton.bgColor : '#ffffff'} onChange={c => updReject({ bgColor: c })} />
-                                            <div className="fg"><label>Animation</label><select value={editing.design.rejectButton.animation} onChange={e => updReject({ animation: e.target.value })}><option value="none">None</option><option value="pulse">Pulse</option><option value="bounce">Bounce</option><option value="shake">Shake</option></select></div>
-                                        </div>
-                                        <div className="fg"><label>Change icon</label>
-                                            <select value={editing.design.rejectButton.changeIcon || 'none'} onChange={e => updReject({ changeIcon: e.target.value })}>
-                                                <option value="none">None</option>
-                                                <option value="cart">🛒 Cart</option>
-                                                <option value="check">✓ Check</option>
-                                                <option value="star">⭐ Star</option>
-                                                <option value="gift">🎁 Gift</option>
-                                                <option value="heart">❤️ Heart</option>
-                                            </select>
-                                        </div>
-                                        <div className="fr3">
-                                            <ColorSelector label="Text color" value={editing.design.rejectButton.textColor} onChange={c => updReject({ textColor: c })} />
-                                            <div className="fg"><label>Text size</label><input type="number" min="8" max="32" value={editing.design.rejectButton.textSize} onChange={e => updReject({ textSize: parseInt(e.target.value) || 16 })} /><span style={{ fontSize: 11, color: '#9ca3af' }}>px</span></div>
-                                            <div className="fg"><label>Style</label>
-                                                <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
-                                                    <button onClick={() => updReject({ bold: !editing.design.rejectButton.bold })} style={{ padding: '8px 14px', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontWeight: 700, background: editing.design.rejectButton.bold ? '#1f2937' : '#fff', color: editing.design.rejectButton.bold ? '#fff' : '#374151' }}>B</button>
-                                                    <button onClick={() => updReject({ italic: !editing.design.rejectButton.italic })} style={{ padding: '8px 14px', border: '1px solid #e5e7eb', borderRadius: 8, cursor: 'pointer', fontStyle: 'italic', background: editing.design.rejectButton.italic ? '#1f2937' : '#fff', color: editing.design.rejectButton.italic ? '#fff' : '#374151' }}>I</button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="up-section-label">Border</div>
-                                        <ColorSelector label="Border color" value={editing.design.rejectButton.borderColor} onChange={c => updReject({ borderColor: c })} />
-                                        <div className="fg"><label>Border width</label><div style={{ padding: '0 8px', width: '100%' }}><RangeSlider labelHidden label="Border width" min={0} max={5} value={editing.design.rejectButton.borderWidth} onChange={val => updReject({ borderWidth: Number(val) })} output /></div></div>
-                                        <div className="fg"><label>Rounded corners</label><div style={{ padding: '0 8px', width: '100%' }}><RangeSlider labelHidden label="Rounded corners" min={0} max={30} value={editing.design.rejectButton.borderRadius} onChange={val => updReject({ borderRadius: Number(val) })} output /></div></div>
-                                        <div className="fg"><label>Shadow</label><div style={{ padding: '0 8px', width: '100%' }}><RangeSlider labelHidden label="Shadow" min={0} max={20} value={editing.design.rejectButton.shadow ? 10 : 0} onChange={val => updReject({ shadow: Number(val) > 0 })} output /></div></div>
-                                    </div>
+                                    </AccordionSection>
                                 </div>
 
                                 {/* Downsell Live Preview */}
@@ -1553,335 +1614,282 @@ export default function UpsellDownsellPage() {
                             /* ==================== CLICK UPSELL EDITOR ==================== */
                             <>
                                 <div>
-                                    {/* Name */}
-                                    <LegacyCard sectioned>
-                                        <TextField label="Name" value={editing.campaign_name} placeholder="New Upsell" onChange={val => upd({ campaign_name: val })} autoComplete="off" />
-                                    </LegacyCard>
+                                    {/* Section 1 — Upsell Configuration */}
+                                    <AccordionSection id="click-config" tab="click" title="Upsell Configuration" helperText="Set the name for this upsell campaign." expandedSection={expandedSection} toggleSection={toggleSection}>
+                                        <LegacyCard sectioned>
+                                            <TextField label="Name" value={editing.campaign_name} placeholder="New Upsell" onChange={val => upd({ campaign_name: val })} autoComplete="off" />
+                                        </LegacyCard>
+                                    </AccordionSection>
 
-                                    {/* Upsell Mode */}
-                                    <LegacyCard title="Upsell Mode" sectioned>
-                                        <BlockStack gap="300">
-                                            <ButtonGroup variant="segmented">
-                                                <Button pressed={editing.upsell_mode === 'post_purchase'} onClick={() => upd({ upsell_mode: 'post_purchase' })}>Post-Purchase</Button>
-                                                <Button pressed={editing.upsell_mode === 'pre_purchase'} onClick={() => upd({ upsell_mode: 'pre_purchase' })}>Pre-Purchase</Button>
-                                            </ButtonGroup>
-                                            <Banner tone="info">
-                                                {editing.upsell_mode === 'post_purchase' ? 'The upsell appears immediately after customers submit the order form.' : 'The upsell appears before customers submit the order form.'}
-                                            </Banner>
-                                        </BlockStack>
-                                    </LegacyCard>
+                                    {/* Section 2 — Upsell Mode */}
+                                    <AccordionSection id="click-mode" tab="click" title="Upsell Mode" helperText="Choose when the upsell appears — before or after order submission." expandedSection={expandedSection} toggleSection={toggleSection}>
+                                        <LegacyCard sectioned>
+                                            <BlockStack gap="300">
+                                                <ButtonGroup variant="segmented">
+                                                    <Button pressed={editing.upsell_mode === 'post_purchase'} onClick={() => upd({ upsell_mode: 'post_purchase' })}>Post-Purchase</Button>
+                                                    <Button pressed={editing.upsell_mode === 'pre_purchase'} onClick={() => upd({ upsell_mode: 'pre_purchase' })}>Pre-Purchase</Button>
+                                                </ButtonGroup>
+                                                <Banner tone="info">
+                                                    {editing.upsell_mode === 'post_purchase' ? 'The upsell appears immediately after customers submit the order form.' : 'The upsell appears before customers submit the order form.'}
+                                                </Banner>
+                                            </BlockStack>
+                                        </LegacyCard>
+                                    </AccordionSection>
 
-                                    {/* Trigger Rules */}
-                                    <div className="sec">
-                                        <h3><span className="icon"></span> 1. If a customer bought one of these products</h3>
-                                        <div className="fg">
-                                            <select value={editing.show_condition_type} onChange={e => upd({ show_condition_type: e.target.value as any })}>
-                                                <option value="always">Show for all products</option>
-                                                <option value="specific_products">Specific products</option>
-                                                <option value="order_value">Order value range</option>
-                                            </select>
-                                        </div>
-                                        {editing.show_condition_type === 'specific_products' && (
-                                            <>
-                                                <Button onClick={pickTrigger}>Select products ({editing.trigger_product_ids?.length || 0} selected)</Button>
-                                                {editing._triggerProducts?.map((p: any) => (
-                                                    <div key={p.id} className="prod-row">
-                                                        {p.images?.[0] && <img src={p.images[0].originalSrc || p.images[0].url} alt="" />}
-                                                        <div className="prod-row-info"><div className="name">{p.title}</div><div className="vid">{p.id.replace('gid://shopify/Product/', '')}</div></div>
-                                                        <button className="prod-x" onClick={() => upd({ trigger_product_ids: editing.trigger_product_ids.filter(id => id !== p.id.replace('gid://shopify/Product/', '')), _triggerProducts: editing._triggerProducts?.filter((tp: any) => tp.id !== p.id) })}>×</button>
-                                                    </div>
-                                                ))}
-                                            </>
-                                        )}
-                                        {editing.show_condition_type === 'order_value' && (
-                                            <div className="fr">
-                                                <div className="fg"><label>Min ({currencySymbol})</label><input type="number" min="0" value={editing.min_order_value} onChange={e => upd({ min_order_value: parseFloat(e.target.value) || 0 })} /></div>
-                                                <div className="fg"><label>Max ({currencySymbol})</label><input type="number" min="0" value={editing.max_order_value} onChange={e => upd({ max_order_value: parseFloat(e.target.value) || 0 })} /></div>
+                                    {/* Section 3 — Trigger Rules */}
+                                    <AccordionSection id="click-triggers" tab="click" title="Trigger Rules" helperText="Define which products or order values trigger this upsell." expandedSection={expandedSection} toggleSection={toggleSection}>
+                                        <div className="sec">
+                                            <div className="fg">
+                                                <select value={editing.show_condition_type} onChange={e => upd({ show_condition_type: e.target.value as any })}>
+                                                    <option value="always">Show for all products</option>
+                                                    <option value="specific_products">Specific products</option>
+                                                    <option value="order_value">Order value range</option>
+                                                </select>
                                             </div>
-                                        )}
-                                    </div>
-
-                                    {/* Offers */}
-                                    <div className="sec">
-                                        <h3 style={{ justifyContent: 'space-between' }}>
-                                            <span><span className="icon"></span> 2. Create offer to include in this upsell</span>
-                                            {editing.offers.length < 5 && <Button onClick={addOffer}>Add offer</Button>}
-                                        </h3>
-                                        {editing.offers.map((offer, idx) => (
-                                            <div key={offer.id} className="offer-card">
-                                                <div className="offer-header" onClick={() => updOffer(offer.id, { expanded: !offer.expanded })}>
-                                                    <span className="drag">⋮⋮</span>
-                                                    <span className="title">Offer #{idx + 1} {offer.discount_value > 0 ? ` -${offer.discount_type === 'percentage' ? offer.discount_value + '%' : currencySymbol + offer.discount_value}` : ''}</span>
-                                                    <span className={`chevron ${offer.expanded ? 'open' : ''}`}>▼</span>
-                                                    {editing.offers.length > 1 && <span onClick={e => { e.stopPropagation(); delOffer(offer.id); }} style={{ cursor: 'pointer', display: 'inline-flex' }}><Button icon={DeleteIcon} variant="plain" tone="critical" accessibilityLabel="Delete offer" onClick={() => delOffer(offer.id)} /></span>}
-                                                </div>
-                                                <div className={`offer-body ${offer.expanded ? '' : 'collapsed'}`}>
-                                                    <div className="fg"><label>Select the product you want to offer</label></div>
-                                                    {offer.upsell_product_id ? (
-                                                        <div className="prod-row">
-                                                            {offer.upsell_product_image && <img src={offer.upsell_product_image} alt="" />}
-                                                            <div className="prod-row-info"><div className="name">{offer.upsell_product_title}</div><div className="vid">{offer.upsell_product_id}</div></div>
-                                                            <Button onClick={() => pickProduct(offer.id)}>Change product</Button>
-                                                            <button className="prod-x" onClick={() => updOffer(offer.id, { upsell_product_id: '', upsell_product_title: '', upsell_product_image: '', upsell_variant_id: '', original_price: 0 })}>×</button>
+                                            {editing.show_condition_type === 'specific_products' && (
+                                                <>
+                                                    <Button onClick={pickTrigger}>Select products ({editing.trigger_product_ids?.length || 0} selected)</Button>
+                                                    {editing._triggerProducts?.map((p: any) => (
+                                                        <div key={p.id} className="prod-row">
+                                                            {p.images?.[0] && <img src={p.images[0].originalSrc || p.images[0].url} alt="" />}
+                                                            <div className="prod-row-info"><div className="name">{p.title}</div><div className="vid">{p.id.replace('gid://shopify/Product/', '')}</div></div>
+                                                            <button className="prod-x" onClick={() => upd({ trigger_product_ids: editing.trigger_product_ids.filter(id => id !== p.id.replace('gid://shopify/Product/', '')), _triggerProducts: editing._triggerProducts?.filter((tp: any) => tp.id !== p.id) })}>×</button>
                                                         </div>
-                                                    ) : (
-                                                        <Button onClick={() => pickProduct(offer.id)}>Select Product</Button>
-                                                    )}
-                                                    <div style={{ marginTop: 14 }}>
-                                                        <div className="fr">
-                                                            <div className="fg"><label>Discount</label>
-                                                                <div style={{ display: 'flex', gap: 8 }}>
-                                                                    <select value={offer.discount_type} onChange={e => updOffer(offer.id, { discount_type: e.target.value as any })} style={{ width: 120 }}>
-                                                                        <option value="percentage">Percentage</option><option value="fixed">Fixed</option>
-                                                                    </select>
-                                                                    <input type="number" min="0" value={offer.discount_value} onChange={e => updOffer(offer.id, { discount_value: parseFloat(e.target.value) || 0 })} style={{ width: 80 }} />
-                                                                    <span style={{ alignSelf: 'center', fontWeight: 600 }}>{offer.discount_type === 'percentage' ? '%' : currencySymbol}</span>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                        {editing.offers.length >= 2 && (
-                                            <div className="info-banner">Create up to 5 upsell offers. When the customer accepts or rejects an offer, the next one will be shown.</div>
-                                        )}
-                                    </div>
-
-                                    {/* Background */}
-                                    <div className="sec">
-                                        <h3><span className="icon"></span> 3- Customize the background</h3>
-                                        {/* Background image presets */}
-                                        <div className="fg"><label>Background image</label></div>
-                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 16 }}>
-                                            {Array.from({ length: 9 }, (_, i) => i + 1).map((n) => {
-                                                const imgPath = `/bg-presets/${n}.svg`;
-                                                const isSelected = editing.design.bgImage === imgPath;
-                                                return (
-                                                    <div key={n} onClick={() => updDesign({ bgImage: imgPath, bgColor: '' })} style={{
-                                                        width: '100%', aspectRatio: '1', borderRadius: 12, cursor: 'pointer',
-                                                        border: isSelected ? '3px solid #1f2937' : '2px solid #e5e7eb',
-                                                        boxShadow: isSelected ? '0 0 0 2px #fff, 0 0 0 4px #1f2937' : 'none',
-                                                        overflow: 'hidden', position: 'relative' as const,
-                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                    }}>
-                                                        <img src={imgPath} alt={`Preset ${n}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                                        {isSelected && <span style={{ position: 'absolute' as const, background: '#1f2937', color: '#fff', borderRadius: 4, width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>✓</span>}
-                                                    </div>
-                                                );
-                                            })}
-                                            {/* White color swatch as 10th option */}
-                                            <div onClick={() => updDesign({ bgColor: '#ffffff', bgImage: '' })} style={{
-                                                width: '100%', aspectRatio: '1', borderRadius: 12, background: '#ffffff', cursor: 'pointer',
-                                                border: editing.design.bgColor === '#ffffff' && !editing.design.bgImage ? '3px solid #1f2937' : '2px solid #e5e7eb',
-                                                boxShadow: editing.design.bgColor === '#ffffff' && !editing.design.bgImage ? '0 0 0 2px #fff, 0 0 0 4px #1f2937' : 'none',
-                                                display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' as const,
-                                            }}>
-                                                {editing.design.bgColor === '#ffffff' && !editing.design.bgImage && <span style={{ background: '#1f2937', color: '#fff', borderRadius: 4, width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>✓</span>}
-                                            </div>
-                                        </div>
-                                        <ColorSelector label="Custom background" value={editing.design.bgColor.startsWith('#') ? editing.design.bgColor : '#ffffff'} onChange={c => updDesign({ bgColor: c, bgImage: '' })} />
-                                        <div className="fg" style={{ marginTop: 8 }}>
-                                            <label>Background image URL</label>
-                                            <input value={editing.design.bgImage || ''} placeholder="https://example.com/image.jpg" onChange={e => updDesign({ bgImage: e.target.value })} />
-                                            {editing.design.bgImage && (
-                                                <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                    <img src={editing.design.bgImage} alt="" style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 8, border: '1px solid #e5e7eb' }} />
-                                                    <button onClick={() => updDesign({ bgImage: '' })} style={{ padding: '4px 10px', border: '1px solid #e5e7eb', borderRadius: 6, cursor: 'pointer', fontSize: 12, color: '#ef4444', background: '#fff' }}>Remove</button>
+                                                    ))}
+                                                </>
+                                            )}
+                                            {editing.show_condition_type === 'order_value' && (
+                                                <div className="fr">
+                                                    <div className="fg"><label>Min ({currencySymbol})</label><input type="number" min="0" value={editing.min_order_value} onChange={e => upd({ min_order_value: parseFloat(e.target.value) || 0 })} /></div>
+                                                    <div className="fg"><label>Max ({currencySymbol})</label><input type="number" min="0" value={editing.max_order_value} onChange={e => upd({ max_order_value: parseFloat(e.target.value) || 0 })} /></div>
                                                 </div>
                                             )}
                                         </div>
-                                    </div>
+                                    </AccordionSection>
 
-                                    {/* Header Design */}
-                                    <div className="sec">
-                                        <h3><span className="icon"></span> Header</h3>
-                                        <div className="fg"><label>Header Text</label><input value={editing.design.headerText} onChange={e => updDesign({ headerText: e.target.value })} /></div>
-                                        <div className="fg"><label>Subheader</label><input value={editing.design.subheaderText} onChange={e => updDesign({ subheaderText: e.target.value })} /></div>
-                                        <div className="fg">
-                                            <label>Text Size (px)</label>
-                                            <div style={{ padding: '0 8px', width: '100%' }}>
-                                                <RangeSlider
-                                                    labelHidden
-                                                    label="Text Size"
-                                                    min={10}
-                                                    max={36}
-                                                    value={editing.design.headerTextSize}
-                                                    onChange={val => updDesign({ headerTextSize: Number(val) || 20 })}
-                                                    output
-                                                />
-                                            </div>
-                                        </div>
-                                        <ColorSelector label="Text Color" value={editing.design.headerTextColor} onChange={c => updDesign({ headerTextColor: c })} />
-                                    </div>
-
-                                    {/* Timer */}
-                                    <div className="sec">
-                                        <h3><span className="icon"></span> Timer</h3>
-                                        <div className="up-toggle-row" onClick={() => updDesign({ timer: { ...editing.design.timer, enabled: !editing.design.timer.enabled } })}>
-                                            <span>Enable timer</span>
-                                            <div className={`up-mini-toggle ${editing.design.timer.enabled ? 'on' : 'off'}`} />
-                                        </div>
-                                        {editing.design.timer.enabled && (
-                                            <>
-                                                <div className="fg" style={{ marginTop: 12 }}><label>Timer Text</label><textarea value={editing.design.timer.text} onChange={e => updDesign({ timer: { ...editing.design.timer, text: e.target.value } })} /></div>
-                                                <p style={{ fontSize: 12, color: '#9ca3af', marginTop: -8, marginBottom: 12 }}>Use {'{time}'} to insert the timer value</p>
-                                                <div className="fg"><label>Time (minutes)</label><input type="number" min="1" value={editing.design.timer.minutes} onChange={e => updDesign({ timer: { ...editing.design.timer, minutes: parseInt(e.target.value) || 10 } })} /></div>
-                                                <ColorSelector label="Background Color" value={editing.design.timer.bgColor} onChange={c => updDesign({ timer: { ...editing.design.timer, bgColor: c } })} />
-                                            </>
-                                        )}
-                                    </div>
-
-                                    {/* Discount Tag */}
-                                    <div className="sec">
-                                        <h3><span className="icon"></span> Discount Tag</h3>
-                                        <div className="fg"><label>Text</label><input value={editing.design.discountTag.text} onChange={e => updDesign({ discountTag: { ...editing.design.discountTag, text: e.target.value } })} /></div>
-                                        <ColorSelector label="Background" value={editing.design.discountTag.bgColor.startsWith('#') ? editing.design.discountTag.bgColor : '#ec4899'} onChange={c => updDesign({ discountTag: { ...editing.design.discountTag, bgColor: c } })} />
-                                        <ColorSelector label="Text Color" value={editing.design.discountTag.textColor} onChange={c => updDesign({ discountTag: { ...editing.design.discountTag, textColor: c } })} />
-                                        <div className="fg">
-                                            <label>Text Size (px)</label>
-                                            <div style={{ padding: '0 8px', width: '100%' }}>
-                                                <RangeSlider
-                                                    labelHidden
-                                                    label="Text Size"
-                                                    min={8}
-                                                    max={24}
-                                                    value={editing.design.discountTag.textSize}
-                                                    onChange={val => updDesign({ discountTag: { ...editing.design.discountTag, textSize: Number(val) || 14 } })}
-                                                    output
-                                                />
-                                            </div>
-                                        </div>
-                                        <div className="fg">
-                                            <label>Rounded Corners (px)</label>
-                                            <div style={{ padding: '0 8px', width: '100%' }}>
-                                                <RangeSlider
-                                                    labelHidden
-                                                    label="Rounded Corners"
-                                                    min={0}
-                                                    max={30}
-                                                    value={editing.design.discountTag.borderRadius}
-                                                    onChange={val => updDesign({ discountTag: { ...editing.design.discountTag, borderRadius: Number(val) } })}
-                                                    output
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Accept Button */}
-                                    <div className="sec">
-                                        <h3><span className="icon"></span> Accept Button</h3>
-                                        <div className="fg"><label>Button Text</label><input value={editing.design.acceptButton.text} onChange={e => updAccept({ text: e.target.value })} /></div>
-                                        <div className="fg"><label>Animation</label><select value={editing.design.acceptButton.animation} onChange={e => updAccept({ animation: e.target.value })}><option value="none">None</option><option value="pulse">Pulse</option><option value="bounce">Bounce</option><option value="shake">Shake</option></select></div>
-                                        <div className="up-section-label">Colors</div>
-                                        <ColorSelector label="Background" value={editing.design.acceptButton.bgColor} onChange={c => updAccept({ bgColor: c })} />
-                                        <ColorSelector label="Text Color" value={editing.design.acceptButton.textColor} onChange={c => updAccept({ textColor: c })} />
-                                        <div className="fg">
-                                            <label>Text Size (px)</label>
-                                            <div style={{ padding: '0 8px', width: '100%' }}>
-                                                <RangeSlider
-                                                    labelHidden
-                                                    label="Text Size"
-                                                    min={10}
-                                                    max={24}
-                                                    value={editing.design.acceptButton.textSize}
-                                                    onChange={val => updAccept({ textSize: Number(val) || 16 })}
-                                                    output
-                                                />
-                                            </div>
-                                        </div>
-                                        <div className="up-section-label">Border</div>
-                                        <ColorSelector label="Border Color" value={editing.design.acceptButton.borderColor} onChange={c => updAccept({ borderColor: c })} />
-                                        <div className="fg">
-                                            <label>Border Width (px)</label>
-                                            <div style={{ padding: '0 8px', width: '100%' }}>
-                                                <RangeSlider
-                                                    labelHidden
-                                                    label="Border Width"
-                                                    min={0}
-                                                    max={5}
-                                                    value={editing.design.acceptButton.borderWidth}
-                                                    onChange={val => updAccept({ borderWidth: Number(val) })}
-                                                    output
-                                                />
-                                            </div>
-                                        </div>
-                                        <div className="fg">
-                                            <label>Rounded Corners (px)</label>
-                                            <div style={{ padding: '0 8px', width: '100%' }}>
-                                                <RangeSlider
-                                                    labelHidden
-                                                    label="Rounded Corners"
-                                                    min={0}
-                                                    max={30}
-                                                    value={editing.design.acceptButton.borderRadius}
-                                                    onChange={val => updAccept({ borderRadius: Number(val) })}
-                                                    output
-                                                />
-                                            </div>
-                                        </div>
-                                        <div className="up-toggle-row" onClick={() => updAccept({ shadow: !editing.design.acceptButton.shadow })}>
-                                            <span>Shadow</span>
-                                            <div className={`up-mini-toggle ${editing.design.acceptButton.shadow ? 'on' : 'off'}`} />
-                                        </div>
-                                    </div>
-
-                                    {/* Reject Button */}
-                                    <div className="sec">
-                                        <h3><span className="icon"></span> Reject Button</h3>
-                                        <div className="fg"><label>Button Text</label><input value={editing.design.rejectButton.text} onChange={e => updReject({ text: e.target.value })} /></div>
-                                        <div className="up-section-label">Colors</div>
-                                        <ColorSelector label="Background" value={editing.design.rejectButton.bgColor} onChange={c => updReject({ bgColor: c })} />
-                                        <ColorSelector label="Text Color" value={editing.design.rejectButton.textColor} onChange={c => updReject({ textColor: c })} />
-                                        <div className="up-section-label">Border</div>
-                                        <ColorSelector label="Border Color" value={editing.design.rejectButton.borderColor} onChange={c => updReject({ borderColor: c })} />
-                                        <div className="fg">
-                                            <label>Border Width (px)</label>
-                                            <div style={{ padding: '0 8px', width: '100%' }}>
-                                                <RangeSlider
-                                                    labelHidden
-                                                    label="Border Width"
-                                                    min={0}
-                                                    max={5}
-                                                    value={editing.design.rejectButton.borderWidth}
-                                                    onChange={val => updReject({ borderWidth: Number(val) })}
-                                                    output
-                                                />
-                                            </div>
-                                        </div>
-                                        <div className="fg">
-                                            <label>Rounded Corners (px)</label>
-                                            <div style={{ padding: '0 8px', width: '100%' }}>
-                                                <RangeSlider
-                                                    labelHidden
-                                                    label="Rounded Corners"
-                                                    min={0}
-                                                    max={30}
-                                                    value={editing.design.rejectButton.borderRadius}
-                                                    onChange={val => updReject({ borderRadius: Number(val) })}
-                                                    output
-                                                />
-                                            </div>
-                                        </div>
-                                        <div className="up-toggle-row" onClick={() => updReject({ shadow: !editing.design.rejectButton.shadow })}>
-                                            <span>Shadow</span>
-                                            <div className={`up-mini-toggle ${editing.design.rejectButton.shadow ? 'on' : 'off'}`} />
-                                        </div>
-                                    </div>
-
-                                    {/* Linked Downsell (for click_upsell) */}
-                                    {editing.type === 'click_upsell' && (
+                                    {/* Section 4 — Upsell Offers */}
+                                    <AccordionSection id="click-offers" tab="click" title="Upsell Offers" helperText="Create and manage the products to offer as upsells." expandedSection={expandedSection} toggleSection={toggleSection}>
                                         <div className="sec">
-                                            <h3>Linked Downsell</h3>
-                                            <div className="fg">
-                                                <label>Show this downsell if customer declines</label>
-                                                <select value={editing.linked_downsell_id || ''} onChange={e => upd({ linked_downsell_id: e.target.value || undefined })}>
-                                                    <option value="">None</option>
-                                                    {availableDownsells.map((ds: any) => <option key={ds.id} value={ds.id}>{ds.campaign_name}</option>)}
-                                                </select>
+                                            <h3 style={{ justifyContent: 'space-between' }}>
+                                                <span><span className="icon"></span> Offers</span>
+                                                {editing.offers.length < 5 && <Button onClick={addOffer}>Add offer</Button>}
+                                            </h3>
+                                            {editing.offers.map((offer, idx) => (
+                                                <div key={offer.id} className="offer-card">
+                                                    <div className="offer-header" onClick={() => updOffer(offer.id, { expanded: !offer.expanded })}>
+                                                        <span className="drag">⋮⋮</span>
+                                                        <span className="title">Offer #{idx + 1} {offer.discount_value > 0 ? ` -${offer.discount_type === 'percentage' ? offer.discount_value + '%' : currencySymbol + offer.discount_value}` : ''}</span>
+                                                        <span className={`chevron ${offer.expanded ? 'open' : ''}`}>▼</span>
+                                                        {editing.offers.length > 1 && <span onClick={e => { e.stopPropagation(); delOffer(offer.id); }} style={{ cursor: 'pointer', display: 'inline-flex' }}><Button icon={DeleteIcon} variant="plain" tone="critical" accessibilityLabel="Delete offer" onClick={() => delOffer(offer.id)} /></span>}
+                                                    </div>
+                                                    <div className={`offer-body ${offer.expanded ? '' : 'collapsed'}`}>
+                                                        <div className="fg"><label>Select the product you want to offer</label></div>
+                                                        {offer.upsell_product_id ? (
+                                                            <div className="prod-row">
+                                                                {offer.upsell_product_image && <img src={offer.upsell_product_image} alt="" />}
+                                                                <div className="prod-row-info"><div className="name">{offer.upsell_product_title}</div><div className="vid">{offer.upsell_product_id}</div></div>
+                                                                <Button onClick={() => pickProduct(offer.id)}>Change product</Button>
+                                                                <button className="prod-x" onClick={() => updOffer(offer.id, { upsell_product_id: '', upsell_product_title: '', upsell_product_image: '', upsell_variant_id: '', original_price: 0 })}>×</button>
+                                                            </div>
+                                                        ) : (
+                                                            <Button onClick={() => pickProduct(offer.id)}>Select Product</Button>
+                                                        )}
+                                                        <div style={{ marginTop: 14 }}>
+                                                            <div className="fr">
+                                                                <div className="fg"><label>Discount</label>
+                                                                    <div style={{ display: 'flex', gap: 8 }}>
+                                                                        <select value={offer.discount_type} onChange={e => updOffer(offer.id, { discount_type: e.target.value as any })} style={{ width: 120 }}>
+                                                                            <option value="percentage">Percentage</option><option value="fixed">Fixed</option>
+                                                                        </select>
+                                                                        <input type="number" min="0" value={offer.discount_value} onChange={e => updOffer(offer.id, { discount_value: parseFloat(e.target.value) || 0 })} style={{ width: 80 }} />
+                                                                        <span style={{ alignSelf: 'center', fontWeight: 600 }}>{offer.discount_type === 'percentage' ? '%' : currencySymbol}</span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {editing.offers.length >= 2 && (
+                                                <div className="info-banner">Create up to 5 upsell offers. When the customer accepts or rejects an offer, the next one will be shown.</div>
+                                            )}
+                                        </div>
+                                    </AccordionSection>
+
+                                    {/* Section 5 — Background */}
+                                    <AccordionSection id="click-background" tab="click" title="Background" helperText="Choose a preset or custom background for the upsell popup." expandedSection={expandedSection} toggleSection={toggleSection}>
+                                        <div className="sec">
+                                            <div className="fg"><label>Background image</label></div>
+                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 16 }}>
+                                                {Array.from({ length: 9 }, (_, i) => i + 1).map((n) => {
+                                                    const imgPath = `/bg-presets/${n}.svg`;
+                                                    const isSelected = editing.design.bgImage === imgPath;
+                                                    return (
+                                                        <div key={n} onClick={() => updDesign({ bgImage: imgPath, bgColor: '' })} style={{
+                                                            width: '100%', aspectRatio: '1', borderRadius: 12, cursor: 'pointer',
+                                                            border: isSelected ? '3px solid #1f2937' : '2px solid #e5e7eb',
+                                                            boxShadow: isSelected ? '0 0 0 2px #fff, 0 0 0 4px #1f2937' : 'none',
+                                                            overflow: 'hidden', position: 'relative' as const,
+                                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                        }}>
+                                                            <img src={imgPath} alt={`Preset ${n}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                            {isSelected && <span style={{ position: 'absolute' as const, background: '#1f2937', color: '#fff', borderRadius: 4, width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>✓</span>}
+                                                        </div>
+                                                    );
+                                                })}
+                                                <div onClick={() => updDesign({ bgColor: '#ffffff', bgImage: '' })} style={{
+                                                    width: '100%', aspectRatio: '1', borderRadius: 12, background: '#ffffff', cursor: 'pointer',
+                                                    border: editing.design.bgColor === '#ffffff' && !editing.design.bgImage ? '3px solid #1f2937' : '2px solid #e5e7eb',
+                                                    boxShadow: editing.design.bgColor === '#ffffff' && !editing.design.bgImage ? '0 0 0 2px #fff, 0 0 0 4px #1f2937' : 'none',
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' as const,
+                                                }}>
+                                                    {editing.design.bgColor === '#ffffff' && !editing.design.bgImage && <span style={{ background: '#1f2937', color: '#fff', borderRadius: 4, width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>✓</span>}
+                                                </div>
+                                            </div>
+                                            <ColorSelector label="Custom background" value={editing.design.bgColor.startsWith('#') ? editing.design.bgColor : '#ffffff'} onChange={c => updDesign({ bgColor: c, bgImage: '' })} />
+                                            <div className="fg" style={{ marginTop: 8 }}>
+                                                <label>Background image URL</label>
+                                                <input value={editing.design.bgImage || ''} placeholder="https://example.com/image.jpg" onChange={e => updDesign({ bgImage: e.target.value })} />
+                                                {editing.design.bgImage && (
+                                                    <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                        <img src={editing.design.bgImage} alt="" style={{ width: 60, height: 60, objectFit: 'cover', borderRadius: 8, border: '1px solid #e5e7eb' }} />
+                                                        <button onClick={() => updDesign({ bgImage: '' })} style={{ padding: '4px 10px', border: '1px solid #e5e7eb', borderRadius: 6, cursor: 'pointer', fontSize: 12, color: '#ef4444', background: '#fff' }}>Remove</button>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
+                                    </AccordionSection>
+
+                                    {/* Section 6 — Header */}
+                                    <AccordionSection id="click-header" tab="click" title="Header" helperText="Edit header text, subheader, size, and color." expandedSection={expandedSection} toggleSection={toggleSection}>
+                                        <div className="sec">
+                                            <div className="fg"><label>Header Text</label><input value={editing.design.headerText} onChange={e => updDesign({ headerText: e.target.value })} /></div>
+                                            <div className="fg"><label>Subheader</label><input value={editing.design.subheaderText} onChange={e => updDesign({ subheaderText: e.target.value })} /></div>
+                                            <div className="fg">
+                                                <label>Text Size (px)</label>
+                                                <div style={{ padding: '0 8px', width: '100%' }}>
+                                                    <RangeSlider labelHidden label="Text Size" min={10} max={36} value={editing.design.headerTextSize} onChange={val => updDesign({ headerTextSize: Number(val) || 20 })} output />
+                                                </div>
+                                            </div>
+                                            <ColorSelector label="Text Color" value={editing.design.headerTextColor} onChange={c => updDesign({ headerTextColor: c })} />
+                                        </div>
+                                    </AccordionSection>
+
+                                    {/* Section 7 — Timer */}
+                                    <AccordionSection id="click-timer" tab="click" title="Timer" helperText="Add urgency with a countdown timer." expandedSection={expandedSection} toggleSection={toggleSection}>
+                                        <div className="sec">
+                                            <div className="up-toggle-row" onClick={() => updDesign({ timer: { ...editing.design.timer, enabled: !editing.design.timer.enabled } })}>
+                                                <span>Enable timer</span>
+                                                <div className={`up-mini-toggle ${editing.design.timer.enabled ? 'on' : 'off'}`} />
+                                            </div>
+                                            {editing.design.timer.enabled && (
+                                                <>
+                                                    <div className="fg" style={{ marginTop: 12 }}><label>Timer Text</label><textarea value={editing.design.timer.text} onChange={e => updDesign({ timer: { ...editing.design.timer, text: e.target.value } })} /></div>
+                                                    <p style={{ fontSize: 12, color: '#9ca3af', marginTop: -8, marginBottom: 12 }}>Use {'{time}'} to insert the timer value</p>
+                                                    <div className="fg"><label>Time (minutes)</label><input type="number" min="1" value={editing.design.timer.minutes} onChange={e => updDesign({ timer: { ...editing.design.timer, minutes: parseInt(e.target.value) || 10 } })} /></div>
+                                                    <ColorSelector label="Background Color" value={editing.design.timer.bgColor} onChange={c => updDesign({ timer: { ...editing.design.timer, bgColor: c } })} />
+                                                </>
+                                            )}
+                                        </div>
+                                    </AccordionSection>
+
+                                    {/* Section 8 — Discount Tag */}
+                                    <AccordionSection id="click-discount-tag" tab="click" title="Discount Tag" helperText="Customize the discount tag badge." expandedSection={expandedSection} toggleSection={toggleSection}>
+                                        <div className="sec">
+                                            <div className="fg"><label>Text</label><input value={editing.design.discountTag.text} onChange={e => updDesign({ discountTag: { ...editing.design.discountTag, text: e.target.value } })} /></div>
+                                            <ColorSelector label="Background" value={editing.design.discountTag.bgColor.startsWith('#') ? editing.design.discountTag.bgColor : '#ec4899'} onChange={c => updDesign({ discountTag: { ...editing.design.discountTag, bgColor: c } })} />
+                                            <ColorSelector label="Text Color" value={editing.design.discountTag.textColor} onChange={c => updDesign({ discountTag: { ...editing.design.discountTag, textColor: c } })} />
+                                            <div className="fg">
+                                                <label>Text Size (px)</label>
+                                                <div style={{ padding: '0 8px', width: '100%' }}>
+                                                    <RangeSlider labelHidden label="Text Size" min={8} max={24} value={editing.design.discountTag.textSize} onChange={val => updDesign({ discountTag: { ...editing.design.discountTag, textSize: Number(val) || 14 } })} output />
+                                                </div>
+                                            </div>
+                                            <div className="fg">
+                                                <label>Rounded Corners (px)</label>
+                                                <div style={{ padding: '0 8px', width: '100%' }}>
+                                                    <RangeSlider labelHidden label="Rounded Corners" min={0} max={30} value={editing.design.discountTag.borderRadius} onChange={val => updDesign({ discountTag: { ...editing.design.discountTag, borderRadius: Number(val) } })} output />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </AccordionSection>
+
+                                    {/* Section 9 — Accept Button */}
+                                    <AccordionSection id="click-accept-btn" tab="click" title="Accept Button" helperText="Customize the accept/buy button appearance." expandedSection={expandedSection} toggleSection={toggleSection}>
+                                        <div className="sec">
+                                            <div className="fg"><label>Button Text</label><input value={editing.design.acceptButton.text} onChange={e => updAccept({ text: e.target.value })} /></div>
+                                            <div className="fg"><label>Animation</label><select value={editing.design.acceptButton.animation} onChange={e => updAccept({ animation: e.target.value })}><option value="none">None</option><option value="pulse">Pulse</option><option value="bounce">Bounce</option><option value="shake">Shake</option></select></div>
+                                            <div className="up-section-label">Colors</div>
+                                            <ColorSelector label="Background" value={editing.design.acceptButton.bgColor} onChange={c => updAccept({ bgColor: c })} />
+                                            <ColorSelector label="Text Color" value={editing.design.acceptButton.textColor} onChange={c => updAccept({ textColor: c })} />
+                                            <div className="fg">
+                                                <label>Text Size (px)</label>
+                                                <div style={{ padding: '0 8px', width: '100%' }}>
+                                                    <RangeSlider labelHidden label="Text Size" min={10} max={24} value={editing.design.acceptButton.textSize} onChange={val => updAccept({ textSize: Number(val) || 16 })} output />
+                                                </div>
+                                            </div>
+                                            <div className="up-section-label">Border</div>
+                                            <ColorSelector label="Border Color" value={editing.design.acceptButton.borderColor} onChange={c => updAccept({ borderColor: c })} />
+                                            <div className="fg">
+                                                <label>Border Width (px)</label>
+                                                <div style={{ padding: '0 8px', width: '100%' }}>
+                                                    <RangeSlider labelHidden label="Border Width" min={0} max={5} value={editing.design.acceptButton.borderWidth} onChange={val => updAccept({ borderWidth: Number(val) })} output />
+                                                </div>
+                                            </div>
+                                            <div className="fg">
+                                                <label>Rounded Corners (px)</label>
+                                                <div style={{ padding: '0 8px', width: '100%' }}>
+                                                    <RangeSlider labelHidden label="Rounded Corners" min={0} max={30} value={editing.design.acceptButton.borderRadius} onChange={val => updAccept({ borderRadius: Number(val) })} output />
+                                                </div>
+                                            </div>
+                                            <div className="up-toggle-row" onClick={() => updAccept({ shadow: !editing.design.acceptButton.shadow })}>
+                                                <span>Shadow</span>
+                                                <div className={`up-mini-toggle ${editing.design.acceptButton.shadow ? 'on' : 'off'}`} />
+                                            </div>
+                                        </div>
+                                    </AccordionSection>
+
+                                    {/* Section 10 — Reject Button */}
+                                    <AccordionSection id="click-reject-btn" tab="click" title="Reject Button" helperText="Customize the decline button appearance." expandedSection={expandedSection} toggleSection={toggleSection}>
+                                        <div className="sec">
+                                            <div className="fg"><label>Button Text</label><input value={editing.design.rejectButton.text} onChange={e => updReject({ text: e.target.value })} /></div>
+                                            <div className="up-section-label">Colors</div>
+                                            <ColorSelector label="Background" value={editing.design.rejectButton.bgColor} onChange={c => updReject({ bgColor: c })} />
+                                            <ColorSelector label="Text Color" value={editing.design.rejectButton.textColor} onChange={c => updReject({ textColor: c })} />
+                                            <div className="up-section-label">Border</div>
+                                            <ColorSelector label="Border Color" value={editing.design.rejectButton.borderColor} onChange={c => updReject({ borderColor: c })} />
+                                            <div className="fg">
+                                                <label>Border Width (px)</label>
+                                                <div style={{ padding: '0 8px', width: '100%' }}>
+                                                    <RangeSlider labelHidden label="Border Width" min={0} max={5} value={editing.design.rejectButton.borderWidth} onChange={val => updReject({ borderWidth: Number(val) })} output />
+                                                </div>
+                                            </div>
+                                            <div className="fg">
+                                                <label>Rounded Corners (px)</label>
+                                                <div style={{ padding: '0 8px', width: '100%' }}>
+                                                    <RangeSlider labelHidden label="Rounded Corners" min={0} max={30} value={editing.design.rejectButton.borderRadius} onChange={val => updReject({ borderRadius: Number(val) })} output />
+                                                </div>
+                                            </div>
+                                            <div className="up-toggle-row" onClick={() => updReject({ shadow: !editing.design.rejectButton.shadow })}>
+                                                <span>Shadow</span>
+                                                <div className={`up-mini-toggle ${editing.design.rejectButton.shadow ? 'on' : 'off'}`} />
+                                            </div>
+                                        </div>
+                                    </AccordionSection>
+
+                                    {/* Section 11 — Linked Downsell */}
+                                    {editing.type === 'click_upsell' && (
+                                        <AccordionSection id="click-linked-downsell" tab="click" title="Linked Downsell" helperText="Optionally show a downsell if customer declines the upsell." expandedSection={expandedSection} toggleSection={toggleSection}>
+                                            <div className="sec">
+                                                <div className="fg">
+                                                    <label>Show this downsell if customer declines</label>
+                                                    <select value={editing.linked_downsell_id || ''} onChange={e => upd({ linked_downsell_id: e.target.value || undefined })}>
+                                                        <option value="">None</option>
+                                                        {availableDownsells.map((ds: any) => <option key={ds.id} value={ds.id}>{ds.campaign_name}</option>)}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </AccordionSection>
                                     )}
                                 </div>
 
