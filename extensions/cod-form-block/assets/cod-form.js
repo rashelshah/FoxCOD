@@ -1611,7 +1611,20 @@
     var backgroundColor = styles.backgroundColor || '#ffffff';
     var iconColor = styles.iconColor || '#6b7280';
     var iconBackground = styles.iconBackground || 'transparent';
-    var hasShadow = styles.shadow !== false;
+
+    // Shadow intensity (0–100) comes from settings; fall back to boolean `shadow`.
+    var rawShadowIntensity = typeof styles.shadowIntensity === 'number' ? styles.shadowIntensity : (styles.shadow ? 35 : 0);
+    var shadowSlider = Math.max(0, Math.min(100, rawShadowIntensity));
+    var shadowOpacity = shadowSlider === 0 ? 0 : 0.05 + (shadowSlider / 100) * 0.25; // 0.05 – 0.30
+    var hasShadow = shadowSlider > 0;
+
+    // Theme awareness for focus styles
+    var themeKey = styles.themeKey || 'custom';
+    var isPresetTheme = themeKey && themeKey !== 'custom';
+    var primaryThemeColor = config.primaryColor || (config.buttonStyles && config.buttonStyles.backgroundColor) || '#111827';
+    var focusRingColor = isPresetTheme
+        ? (hexToRgba(primaryThemeColor, 0.45) || 'rgba(15,23,42,0.35)')
+        : 'rgba(148,163,184,0.8)'; // greyish for custom styling
     
     container.innerHTML = '';
     
@@ -1817,7 +1830,7 @@
         } else {
             input.style.backgroundColor = '#ffffff';
         }
-        input.style.boxShadow = hasShadow ? '0 1px 2px rgba(0,0,0,0.05)' : 'none';
+        input.style.boxShadow = hasShadow ? ('0 1px 2px rgba(0,0,0,' + shadowOpacity.toFixed(2) + ')') : 'none';
         input.style.boxSizing = 'border-box';
         input.style.marginBottom = '0';
 
@@ -1827,6 +1840,20 @@
         inputContainer.appendChild(input);
         wrapper.appendChild(inputContainer);
         container.appendChild(wrapper);
+
+        // Focus / blur styling — lift + colored shadow per theme
+        input.addEventListener('focus', function() {
+          this.style.outline = 'none';
+          this.style.borderColor = primaryThemeColor || borderColor;
+          this.style.boxShadow = '0 0 0 1px ' + focusRingColor + ', 0 10px 24px rgba(15,23,42,0.16)';
+          this.style.transform = 'translateY(-1px)';
+        });
+
+        input.addEventListener('blur', function() {
+          this.style.border = borderWidth + 'px solid ' + borderColor;
+          this.style.boxShadow = hasShadow ? ('0 1px 2px rgba(0,0,0,' + shadowOpacity.toFixed(2) + ')') : 'none';
+          this.style.transform = 'translateY(0)';
+        });
 
         // Clear validation error on input
         input.addEventListener('input', function() {
@@ -2198,6 +2225,25 @@
   }
 
   /**
+   * Helper: convert hex color to rgba string with alpha.
+   * Falls back to null on invalid input.
+   */
+  function hexToRgba(hex, alpha) {
+      if (!hex || typeof hex !== 'string') return null;
+      var h = hex.replace('#', '');
+      if (h.length === 3) {
+          h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+      }
+      if (h.length !== 6) return null;
+      var r = parseInt(h.substring(0, 2), 16);
+      var g = parseInt(h.substring(2, 4), 16);
+      var b = parseInt(h.substring(4, 6), 16);
+      if (isNaN(r) || isNaN(g) || isNaN(b)) return null;
+      var a = typeof alpha === 'number' ? Math.max(0, Math.min(1, alpha)) : 1;
+      return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
+  }
+
+  /**
    * Render Rate Card / Order Summary
    */
   function renderRateCard(form, config) {
@@ -2210,11 +2256,31 @@
 
       var card = document.createElement('div');
       card.className = 'cod-order-summary';
-      card.style.background = '#f9fafb';
+
+      // Use preset / button primary color to theme the order summary,
+      // but keep it clearly distinct and easy to identify.
+      var styles = config.styles || {};
+      var primaryTheme = config.primaryColor || (config.buttonStyles && config.buttonStyles.backgroundColor) || '#111827';
+      var themeKey = styles.themeKey || 'custom';
+      var isPresetTheme = themeKey && themeKey !== 'custom';
+
+      // Greyish styling baseline
+      var customGreyBg = '#f3f4f6';
+      var customBorder = '1px solid #e5e7eb';
+
+      // For presets, use a stronger tinted background and no border
+      var presetBg = hexToRgba(primaryTheme, 0.16) || '#e5f5ff';
+
+      if (isPresetTheme) {
+          card.style.background = presetBg;
+          card.style.border = 'none';
+      } else {
+          card.style.background = customGreyBg;
+          card.style.border = customBorder;
+      }
       card.style.padding = '12px';
       card.style.borderRadius = '8px';
       card.style.marginBottom = '16px';
-      card.style.border = '1px solid #e5e7eb';
 
       // Check for selected quantity offer
       var quantityOffersEl = form.closest('.cod-modal') ? form.closest('.cod-modal').querySelector('.cod-quantity-offers') : null;
@@ -2523,6 +2589,10 @@
       var existingShipping = form.querySelectorAll('.cod-shipping-section');
       existingShipping.forEach(function(el) { el.remove(); });
 
+      var styles = config.styles || {};
+      // Field background color chosen in the form builder (falls back to a soft grey)
+      var fieldBg = styles.fieldBackgroundColor || '#f3f4f6';
+
       var container = document.createElement('div');
       container.className = 'cod-shipping-section';
       container.style.marginBottom = '16px';
@@ -2563,7 +2633,7 @@
           radio.name = 'shipping_method';
           radio.value = rate.id;
           radio.setAttribute('data-price', rate.price);
-          radio.style.cssText = 'accent-color:' + (config.primaryColor || '#6366f1') + ';width:18px;height:18px;flex-shrink:0;cursor:pointer;margin:0;';
+          radio.style.cssText = 'accent-color:' + (config.primaryColor || '#111827') + ';width:18px;height:18px;flex-shrink:0;cursor:pointer;margin:0;';
           
           // Add change listener to update total and card styles
           radio.addEventListener('change', function() {
@@ -2573,8 +2643,8 @@
               allCards.forEach(function(c) {
                   var r = c.querySelector('input[type="radio"]');
                   if (r && r.checked) {
-                      c.style.borderColor = config.primaryColor || '#6366f1';
-                      c.style.background = 'rgba(99,102,241,0.04)';
+                      c.style.borderColor = config.primaryColor || '#111827';
+                      c.style.background = fieldBg;
                   } else {
                       c.style.borderColor = '#e5e7eb';
                       c.style.background = '#fff';
@@ -2613,9 +2683,9 @@
           card.appendChild(priceEl);
           container.appendChild(card);
           
-          // Hover effects
+          // Neutral hover effects (no blue tint) – lightly hint the field background
           card.addEventListener('mouseenter', function() {
-              if (!radio.checked) { card.style.borderColor = '#c7d2fe'; card.style.background = '#fafaff'; }
+              if (!radio.checked) { card.style.borderColor = '#d1d5db'; card.style.background = fieldBg; }
           });
           card.addEventListener('mouseleave', function() {
               if (!radio.checked) { card.style.borderColor = '#e5e7eb'; card.style.background = '#fff'; }
@@ -2700,9 +2770,19 @@
       container.className = 'cod-payment-method-options';
       container.style.marginBottom = '20px';
       container.style.padding = '16px';
-      container.style.background = 'linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%)';
+
+      // Neutral / theme-aware background – no fixed blue gradient
+      var styles = config.styles || {};
+      var primaryTheme = config.primaryColor || (config.buttonStyles && config.buttonStyles.backgroundColor) || '#111827';
+      var isPlainWhiteBg = !styles.backgroundColor || styles.backgroundColor === '#ffffff' || styles.backgroundColor === '#fff';
+      var baseBg = isPlainWhiteBg ? '#f9fafb' : (hexToRgba(primaryTheme, 0.03) || '#f9fafb');
+      var borderColor = hexToRgba(primaryTheme, 0.35) || '#e5e7eb';
+      // Field background from form styling (used when a payment option is selected)
+      var fieldBg = styles.fieldBackgroundColor || '#f3f4f6';
+
+      container.style.background = baseBg;
       container.style.borderRadius = '12px';
-      container.style.border = '1px solid rgba(99, 102, 241, 0.2)';
+      container.style.border = '1px solid ' + borderColor;
 
       var title = document.createElement('div');
       title.textContent = 'Payment Method';
@@ -2796,8 +2876,8 @@
           // Mouse events for hover
           row.addEventListener('mouseenter', function() {
               if (!radio.checked) {
-                  row.style.borderColor = '#c7d2fe';
-                  row.style.background = 'rgba(99, 102, 241, 0.05)';
+                  row.style.borderColor = borderColor;
+                  row.style.background = '#f3f4f6';
               }
           });
           row.addEventListener('mouseleave', function() {
@@ -2814,7 +2894,8 @@
               allRows.forEach(function(r, idx) {
                   var isSelected = r.querySelector('input[type="radio"]').checked;
                   r.style.borderColor = isSelected ? config.primaryColor : '#e5e7eb';
-                  r.style.background = isSelected ? 'rgba(99, 102, 241, 0.1)' : '#fff';
+                  // Selected option uses the same background color as form fields
+                  r.style.background = isSelected ? fieldBg : '#fff';
               });
 
               // Update submit button text

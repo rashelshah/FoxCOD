@@ -83,7 +83,9 @@ export function ColorSelector({ label, value, onChange }: ColorSelectorProps) {
     const [hexInput, setHexInput] = useState(safeValue.toUpperCase());
     const [hexError, setHexError] = useState('');
     const [pickerOpen, setPickerOpen] = useState(false);
+    const [popoverPos, setPopoverPos] = useState<{ top: number; left: number; width: number } | null>(null);
     const wrapperRef = useRef<HTMLDivElement>(null);
+    const popoverRef = useRef<HTMLDivElement>(null);
 
     // Sync internal state when parent value changes externally
     useEffect(() => {
@@ -95,10 +97,17 @@ export function ColorSelector({ label, value, onChange }: ColorSelectorProps) {
         }
     }, [value]);
 
-    // Close picker when clicking outside
+    // Close picker when clicking outside (supports fixed-position popover)
     useEffect(() => {
         function handleClickOutside(e: MouseEvent) {
-            if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+            const target = e.target as Node;
+            const wrapper = wrapperRef.current;
+            const popover = popoverRef.current;
+            if (
+                wrapper &&
+                !wrapper.contains(target) &&
+                (!popover || !popover.contains(target))
+            ) {
                 setPickerOpen(false);
             }
         }
@@ -141,7 +150,30 @@ export function ColorSelector({ label, value, onChange }: ColorSelectorProps) {
                 <div
                     className="polaris-color-swatch"
                     style={{ backgroundColor: safeValue }}
-                    onClick={() => setPickerOpen(!pickerOpen)}
+                    onClick={() => {
+                        if (!pickerOpen && wrapperRef.current) {
+                            const rect = wrapperRef.current.getBoundingClientRect();
+                            const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+                            const estimatedHeight = 280; // Approx height of Polaris ColorPicker
+                            const spaceBelow = viewportHeight - rect.bottom;
+                            const openAbove = spaceBelow < estimatedHeight;
+
+                            let top: number;
+                            if (openAbove) {
+                                top = rect.top - estimatedHeight - 8;
+                                if (top < 8) top = 8; // clamp to top padding
+                            } else {
+                                top = rect.bottom + 8;
+                            }
+
+                            setPopoverPos({
+                                top,
+                                left: rect.left,
+                                width: rect.width,
+                            });
+                        }
+                        setPickerOpen((open) => !open);
+                    }}
                     title="Click to pick a color"
                 />
                 <input
@@ -154,8 +186,17 @@ export function ColorSelector({ label, value, onChange }: ColorSelectorProps) {
                 />
             </div>
             {hexError && <span className="polaris-hex-error">{hexError}</span>}
-            {pickerOpen && (
-                <div className="polaris-picker-popover">
+            {pickerOpen && popoverPos && (
+                <div
+                    ref={popoverRef}
+                    className="polaris-picker-popover"
+                    style={{
+                        position: 'fixed',
+                        top: popoverPos.top,
+                        left: popoverPos.left,
+                        width: popoverPos.width,
+                    }}
+                >
                     <ColorPicker
                         onChange={handlePickerChange}
                         color={hsbColor}
@@ -229,10 +270,6 @@ export const colorSelectorStyles = `
         border-radius: 12px;
         box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
         z-index: 9999;
-        position: absolute;
-        left: 0;
-        right: 0;
-        top: 100%;
     }
     /* Ensure Polaris ColorPicker fills the popover width */
     .polaris-picker-popover .Polaris-ColorPicker {
