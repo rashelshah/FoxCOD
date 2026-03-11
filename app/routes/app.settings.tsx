@@ -1060,6 +1060,7 @@ const PreviewDisplay = memo(({
                                             const customGreyBg = '#f3f4f6';
                                             const customBorder = '1px solid #e5e7eb';
                                             const presetBg = (() => {
+                                                if (themeKey === 'default' || themeKey === 'professional') return 'rgb(243, 244, 246)';
                                                 const hex = primaryTheme.replace('#', '');
                                                 if (hex.length !== 6) return 'rgba(17,24,39,0.12)';
                                                 const r = parseInt(hex.substring(0, 2), 16);
@@ -1074,7 +1075,7 @@ const PreviewDisplay = memo(({
                                                 padding: 12,
                                                 marginTop: 4,
                                                 marginBottom: 12,
-                                                border: isPresetTheme ? 'none' : customBorder,
+                                                border: isPresetTheme ? (themeKey === 'default' ? customBorder : 'none') : customBorder,
                                             };
 
                                             return (
