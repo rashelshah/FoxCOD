@@ -2269,11 +2269,11 @@
       var customBorder = '1px solid #e5e7eb';
 
       // For presets, use a stronger tinted background and no border
-      var presetBg = hexToRgba(primaryTheme, 0.16) || '#e5f5ff';
+      var presetBg = themeKey === 'default' || themeKey === 'professional' ? 'rgb(243, 244, 246)' : (hexToRgba(primaryTheme, 0.16) || '#e5f5ff');
 
       if (isPresetTheme) {
           card.style.background = presetBg;
-          card.style.border = 'none';
+          card.style.border = themeKey === 'default' ? customBorder : 'none';
       } else {
           card.style.background = customGreyBg;
           card.style.border = customBorder;
