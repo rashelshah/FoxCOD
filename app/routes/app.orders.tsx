@@ -734,8 +734,36 @@ export default function OrdersPage() {
                                         <div className="product-cell">
                                             <span className="product-title">{order.product_title || 'Product'}</span>
                                             <span className="product-qty">Qty: {order.quantity}</span>
+                                            {/* Bundle Variants */}
+                                            {order.customer_notes && order.customer_notes.includes('BUNDLE VARIANTS:') && (() => {
+                                                const variantLines = order.customer_notes.split('\n').filter((l: string) => l.trim().startsWith('- Item'));
+                                                return variantLines.length > 0 ? (
+                                                    <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                                        {variantLines.map((line: string, idx: number) => {
+                                                            const m = line.match(/-\s*Item\s*\d+:\s*(.+?)\s*\(([^)]+)\)/);
+                                                            return m ? (
+                                                                <span key={'bv-' + idx} style={{ fontSize: '11px', padding: '2px 6px', borderRadius: '4px', background: '#eff6ff', color: '#1d4ed8', fontWeight: 600, display: 'inline-block', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                                    {m[1]}
+                                                                </span>
+                                                            ) : null;
+                                                        })}
+                                                    </div>
+                                                ) : null;
+                                            })()}
+                                            {/* Downsell */}
+                                            {order.customer_notes && order.customer_notes.includes('DOWNSELL APPLIED') && (() => {
+                                                const dsMatch = order.customer_notes.match(/DOWNSELL APPLIED:\s*(.+?)\s*\(([^)]+)\)/);
+                                                return dsMatch ? (
+                                                    <div style={{ marginTop: '4px' }}>
+                                                        <span style={{ fontSize: '11px', padding: '2px 6px', borderRadius: '4px', background: '#fffbeb', color: '#92400e', fontWeight: 600, display: 'inline-block', maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                            ↓ {dsMatch[1]} ({dsMatch[2]})
+                                                        </span>
+                                                    </div>
+                                                ) : null;
+                                            })()}
+                                            {/* Upsell Items */}
                                             {order.customer_notes && order.customer_notes.includes('UPSELL ITEMS') && (() => {
-                                                const lines = order.customer_notes.split('\n').filter((l: string) => l.trim().startsWith('-'));
+                                                const lines = order.customer_notes.split('\n').filter((l: string) => l.trim().startsWith('-') && !l.trim().startsWith('- Item'));
                                                 return lines.length > 0 ? (
                                                     <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
                                                         {lines.map((line: string, idx: number) => {
