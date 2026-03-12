@@ -81,6 +81,44 @@
 {% assign cod_blocks = shop.metafields.fox_cod.blocks | default: '{}' %}
 {% assign cod_custom_fields = shop.metafields.fox_cod.custom_fields | default: '[]' %}
 {% assign cod_styles = shop.metafields.fox_cod.styles | default: '{}' %}
+{% assign theme_key = shop.metafields.fox_cod.styles.value.themeKey %}
+{% if theme_key == blank %}
+  {% assign cod_styles_parsed = cod_styles | parse_json %}
+  {% assign theme_key = cod_styles_parsed.themeKey | default: 'custom' %}
+{% endif %}
+
+{% assign form_theme_color = cod_primary_color %}
+{% if theme_key == 'modern_slate' %}{% assign form_theme_color = '#ea580c' %}
+{% elsif theme_key == 'dark_mode' %}{% assign form_theme_color = '#6366f1' %}
+{% elsif theme_key == 'eastern_gold' %}{% assign form_theme_color = '#b45309' %}
+{% elsif theme_key == 'arctic_blue' %}{% assign form_theme_color = '#0891b2' %}
+{% elsif theme_key == 'rose_garden' %}{% assign form_theme_color = '#e11d48' %}
+{% elsif theme_key == 'midnight_purple' %}{% assign form_theme_color = '#7c3aed' %}
+{% elsif theme_key == 'forest_green' %}{% assign form_theme_color = '#16a34a' %}
+{% elsif theme_key == 'professional' %}{% assign form_theme_color = '#374151' %}
+{% elsif theme_key == 'minimal_white' %}{% assign form_theme_color = '#111827' %}
+{% elsif theme_key == 'luxury_gold' %}{% assign form_theme_color = '#d97706' %}
+{% elsif theme_key == 'ocean_breeze' %}{% assign form_theme_color = '#14b8a6' %}
+{% elsif theme_key == 'default' %}{% assign form_theme_color = '#000000' %}
+{% endif %}
+
+{% comment %} Accent color — decoupled from product button color (cod_primary_color). {% endcomment %}
+{% comment %} Priority: edited preset border → preset theme color → custom border → #111827 fallback {% endcomment %}
+{% unless cod_styles_parsed %}{% assign cod_styles_parsed = cod_styles | parse_json %}{% endunless %}
+{% assign edited_border = cod_styles_parsed.borderColor %}
+{% assign edited_bg = cod_styles_parsed.backgroundColor %}
+
+{% if theme_key == 'custom' %}
+  {% assign accent_color = edited_border %}
+  {% assign form_background = edited_bg %}
+{% else %}
+  {% assign accent_color = edited_border | default: form_theme_color %}
+  {% assign form_background = edited_bg %}
+{% endif %}
+
+{% assign accent_color = accent_color | default: '#111827' %}
+{% assign form_background = form_background | default: '#ffffff' %}
+
 {% assign btn_styles_raw = shop.metafields.fox_cod.button_styles_json.value %}
 {% assign btn_styles = btn_styles_raw | parse_json %}
 {% assign cod_shipping_options = shop.metafields.fox_cod.shipping_options | default: '{}' %}
@@ -138,6 +176,9 @@
      data-max-quantity="{{ cod_max_quantity }}"
      data-button-text="{{ cod_button_text }}"
      data-primary-color="{{ cod_primary_color }}"
+     data-form-theme-color="{{ form_theme_color }}"
+     data-accent-color="{{ accent_color }}"
+     data-form-bg="{{ form_background }}"
      data-form-type="{{ cod_form_type }}"
      data-fields="{{ cod_fields | escape }}"
      data-blocks="{{ cod_blocks | escape }}"
@@ -283,7 +324,7 @@
     <div class="cod-product-details">
       <h3 class="cod-product-title">{{ product.title }}</h3>
       {% if cod_show_price == 'true' %}
-          <p class="cod-product-price" style="color: {{ cod_primary_color }};">{{ product_price_display }}</p>
+          <p class="cod-product-price" style="color: {{ form_theme_color }};">{{ product_price_display }}</p>
       {% endif %}
       {% if current_variant.title != 'Default Title' %}
         <p class="cod-variant-title">{{ current_variant.title }}</p>
@@ -312,7 +353,7 @@
     {% comment %} Total Price {% endcomment %}
     <div class="cod-total">
       <span>Total:</span>
-      <span class="cod-total-price" data-unit-price="{{ current_variant.price | divided_by: 100.0 }}" style="color: {{ cod_primary_color }};">
+      <span class="cod-total-price" data-unit-price="{{ current_variant.price | divided_by: 100.0 }}" style="color: {{ accent_color }};">
         {{ product_price }}
       </span>
     </div>
@@ -598,7 +639,7 @@
   .cod-form-field input:focus,
   .cod-form-field textarea:focus {
     outline: none;
-    border-color: {{ cod_primary_color }};
+    border-color: {{ form_theme_color }};
   }
 
   .cod-quantity-selector {
@@ -814,19 +855,19 @@
   }
 
   .cod-offer-card:hover {
-    border-color: {{ cod_primary_color }};
+    border-color: {{ form_theme_color }};
   }
 
   .cod-offer-card.selected {
     background: rgba(99, 102, 241, 0.08);
-    border-color: {{ cod_primary_color }};
+    border-color: {{ form_theme_color }};
   }
 
   .cod-offer-badge {
     display: inline-block;
     font-size: 10px;
     font-weight: 600;
-    background: {{ cod_primary_color }};
+    background: {{ form_theme_color }};
     color: #fff;
     padding: 2px 8px;
     border-radius: 4px;
@@ -925,6 +966,9 @@
   /* Dynamic Styles from Metafields - button_styles sync text color, border, etc. */
   :root {
       --cod-primary: {{ cod_primary_color }};
+      --cod-brand: {{ cod_primary_color }};
+      --cod-accent: {{ accent_color }};
+      --cod-form-bg: {{ form_background }};
       --cod-radius: {{ cod_border_radius }}px;
       --cod-btn-size: {% if cod_button_size == 'small' %}10px 20px{% elsif cod_button_size == 'large' %}16px 32px{% else %}14px 28px{% endif %};
       --cod-btn-font: {% if cod_button_size == 'small' %}14px{% elsif cod_button_size == 'large' %}18px{% else %}16px{% endif %};
@@ -1018,8 +1062,8 @@
   }
 
   .cod-input:focus, .cod-form-field textarea:focus {
-      border-color: var(--cod-primary) !important;
-      box-shadow: 0 0 0 2px {{ cod_primary_color }}20 !important;
+      border-color: {{ form_theme_color }} !important;
+      box-shadow: 0 0 0 2px {{ form_theme_color }}20 !important;
   }
 
   /* Animation Overrides */
