@@ -94,6 +94,8 @@
 {% assign cod_shipping_rates_json = shop.metafields.fox_cod.shipping_rates_json | default: '[]' %}
 {% assign cod_quantity_offers = shop.metafields.fox_cod.quantity_offers_json.value | default: '[]' %}
 {% assign cod_upsell_offers = shop.metafields.fox_cod.upsells_downsells_json | default: '{}' %}
+{% comment %} For Shopify `json` type metafields, `.value` already returns parsed object — use directly {% endcomment %}
+{% assign cod_form_submit_btn = shop.metafields.fox_cod.form_submit_button_json.value %}
 
 {% comment %} Build product collection IDs for shipping rate collection matching {% endcomment %}
 {% assign product_collection_ids = '' %}
@@ -168,7 +170,8 @@
      data-sticky-mobile="{{ btn_styles.stickyOnMobile | default: false }}"
      data-quantity-offers="{{ cod_quantity_offers | escape }}"
      data-product-collection-ids="{{ product_collection_ids }}"
-     data-upsell-offers="{{ cod_upsell_offers | escape }}">
+     data-upsell-offers="{{ cod_upsell_offers | escape }}"
+     data-form-submit-button="{{ cod_form_submit_btn | json | escape }}">
 </div>
 
 {% comment %} Inject settings into global scope for reliable JavaScript access {% endcomment %}
@@ -211,6 +214,16 @@
     var upsellData = {{ shop.metafields.fox_cod.upsells_downsells_json.value | json }};
     window.FoxCod.upsellOffers = upsellData || { tick_upsells: [], click_upsells: [], downsells: [] };
     console.log('[FoxCod] Upsell offers injected:', window.FoxCod.upsellOffers);
+    
+    // Form submit button style overrides
+    var fsbRaw = {{ shop.metafields.fox_cod.form_submit_button_json.value | json | default: 'null' }};
+    window.FoxCod.formSubmitButton = (fsbRaw && typeof fsbRaw === 'object') ? fsbRaw : {};
+    console.log('[FoxCod] formSubmitButton injected:', window.FoxCod.formSubmitButton);
+    
+    // Product button styles (used as base for submit button when useProductButtonStyle is true)
+    var btnStylesRaw = {{ shop.metafields.fox_cod.button_styles_json.value | json | default: 'null' }};
+    window.FoxCod.buttonStyles = (btnStylesRaw && typeof btnStylesRaw === 'object') ? btnStylesRaw : {};
+    console.log('[FoxCod] buttonStyles injected:', window.FoxCod.buttonStyles);
   } catch (e) {
     console.error('[FoxCod] Failed to parse settings:', e);
     window.FoxCod.quantityOffers = [];
@@ -304,10 +317,11 @@
       </span>
     </div>
 
-    {% comment %} Submit Button {% endcomment %}
-    <button type="submit" 
+    {% comment %} Submit Button — styles applied via JS from window.FoxCod.formSubmitButton / button_styles {% endcomment %}
+    <button type="submit"
             class="cod-submit-btn"
-            style="background-color: {{ cod_primary_color }};">
+            data-primary-color="{{ cod_primary_color }}"
+            style="width:100%; padding:13px; border-radius:12px; border:none; cursor:pointer; font-size:15px; font-weight:700; color:#fff; background-color:{{ cod_primary_color }}; transition:all 0.2s ease;">
       {{ shop.metafields.fox_cod.submit_button_text | default: 'Place Order (COD)' }}
     </button>
 
@@ -921,8 +935,8 @@
       --cod-btn-bg: {{ btn_styles.backgroundColor | default: cod_primary_color }};
   }
 
-  /* Base Button Styles - use button_styles for text, border, radius */
-  .cod-buy-btn, .cod-submit-btn {
+  /* Base Button Styles - use button_styles for text, border, radius (product page button ONLY) */
+  .cod-buy-btn {
       background-color: var(--cod-btn-bg) !important;
       border-radius: var(--cod-btn-radius) !important;
       padding: var(--cod-btn-size) !important;
@@ -938,12 +952,12 @@
 
   /* Outline Style */
   {% if cod_button_style == 'outline' %}
-  .cod-buy-btn, .cod-submit-btn {
+  .cod-buy-btn {
       background-color: transparent !important;
       border: 2px solid var(--cod-btn-bg) !important;
       color: var(--cod-btn-bg) !important;
   }
-  .cod-buy-btn:hover, .cod-submit-btn:hover {
+  .cod-buy-btn:hover {
       background-color: var(--cod-btn-bg) !important;
       color: #ffffff !important;
   }
@@ -951,7 +965,7 @@
 
   /* Gradient Style */
   {% if cod_button_style == 'gradient' %}
-  .cod-buy-btn, .cod-submit-btn {
+  .cod-buy-btn {
       background-color: var(--cod-primary) !important;
       background-image: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(0,0,0,0.25) 100%) !important;
       box-shadow: {% if btn_styles.shadow %}0 6px 12px -2px rgba(0, 0, 0, 0.2), 0 3px 6px -3px rgba(0, 0, 0, 0.15){% else %}none{% endif %} !important;

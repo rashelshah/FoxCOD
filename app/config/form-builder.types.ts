@@ -223,3 +223,43 @@ export const DEFAULT_SHIPPING_OPTIONS: ShippingOptions = {
         { id: 'express', label: 'Express Shipping', price: 100 },
     ],
 };
+
+/**
+ * Form submit button style overrides
+ * When useProductButtonStyle is true, the submit button inherits
+ * the product page button styles. When false, custom values are used.
+ */
+export interface FormSubmitButtonStyles {
+    useProductButtonStyle: boolean;
+    buttonStyle?: string;
+    buttonSize?: string;
+    backgroundColor?: string;
+    textColor?: string;
+    textSize?: number;
+    fontStyle?: string;
+    fontWeight?: string;
+    borderColor?: string;
+    borderWidth?: number;
+    borderRadius?: number;
+    shadow?: boolean;
+    shadowIntensity?: number;
+}
+
+/**
+ * Default form submit button styles
+ */
+export const DEFAULT_FORM_SUBMIT_BUTTON: FormSubmitButtonStyles = {
+    useProductButtonStyle: true,
+    buttonStyle: 'solid',
+    buttonSize: 'medium',
+    backgroundColor: '#6366f1',
+    textColor: '#ffffff',
+    textSize: 15,
+    fontStyle: 'bold',
+    fontWeight: 'bold',
+    borderColor: '#6366f1',
+    borderWidth: 0,
+    borderRadius: 12,
+    shadow: true,
+    shadowIntensity: 35,
+};

@@ -1090,15 +1090,22 @@ export default function UpsellDownsellPage() {
                                                                 );
                                                             })()}
 
-                                                            {/* Submit Button - Styled exactly like Form Builder */}
+                                                            {/* Submit Button - Reads form_submit_button overrides first, falls back to product button styles */}
                                                             {(() => {
+                                                                // Check for custom submit button overrides
+                                                                const fsb = (formSettings as any)?.form_submit_button || {};
+                                                                const useCustom = fsb.useProductButtonStyle === false;
                                                                 const primaryColor = formSettings?.primary_color || '#ef4444';
-                                                                const btn = (formSettings?.button_styles || {}) as any;
-                                                                const buttonColor = primaryColor;
+
+                                                                // Resolve which settings to use
+                                                                const btn = useCustom ? fsb : (formSettings?.button_styles || {}) as any;
+                                                                const buttonColor = useCustom
+                                                                    ? (fsb.backgroundColor || primaryColor)
+                                                                    : primaryColor;
                                                                 const borderCol = btn.borderColor || buttonColor;
                                                                 const borderW = btn.borderWidth ?? 0;
                                                                 const buttonSize = btn.buttonSize || 'medium';
-                                                                const bRadius = btn.borderRadius || 12;
+                                                                const bRadius = btn.borderRadius ?? 12;
                                                                 const buttonStyle = btn.buttonStyle || 'solid';
 
                                                                 const base: any = {
@@ -1121,7 +1128,7 @@ export default function UpsellDownsellPage() {
                                                                 if (buttonStyle === 'outline') {
                                                                     base.background = 'transparent';
                                                                     base.backgroundColor = 'transparent';
-                                                                    base.border = borderW > 0 ? `${borderW}px solid ${buttonColor}` : 'none';
+                                                                    base.border = borderW > 0 ? `${borderW}px solid ${buttonColor}` : `1px solid ${buttonColor}`;
                                                                     const isWhite = (btn.textColor || '#ffffff').toLowerCase() === '#ffffff';
                                                                     base.color = isWhite ? buttonColor : btn.textColor;
                                                                     base.boxShadow = 'none';
@@ -1140,7 +1147,7 @@ export default function UpsellDownsellPage() {
 
                                                                 return (
                                                                     <button style={base}>
-                                                                        {formSettings?.submit_button_text || 'Place Order'}
+                                                                        {useCustom ? (fsb.buttonText || formSettings?.submit_button_text || 'Place COD Order') : (formSettings?.submit_button_text || 'Place Order')}
                                                                     </button>
                                                                 );
                                                             })()}

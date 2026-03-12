@@ -1747,15 +1747,21 @@ export default function QuantityOffersPage() {
 
 
 
-                                                    {/* Submit Button - Styled exactly like Form Builder */}
+                                                    {/* Submit Button - Reads form_submit_button overrides first, falls back to product button styles */}
                                                     {(() => {
-                                                        // Calculate button styles - matching Form Builder's getButtonStyle() exactly
-                                                        const btn = buttonStyles || {};
-                                                        const buttonColor = primaryColor;
+                                                        // Check for custom submit button overrides (from Form Builder → Submit Button Style)
+                                                        const fsb = (formSettings as any)?.form_submit_button || {};
+                                                        const useCustom = fsb.useProductButtonStyle === false;
+
+                                                        // Resolve which settings to use
+                                                        const btn = useCustom ? fsb : (buttonStyles || {}) as any;
+                                                        const buttonColor = useCustom
+                                                            ? (fsb.backgroundColor || primaryColor)
+                                                            : primaryColor;
                                                         const borderCol = btn.borderColor || buttonColor;
                                                         const borderW = btn.borderWidth ?? 0;
                                                         const buttonSize = btn.buttonSize || 'medium';
-                                                        const borderRadius = btn.borderRadius || 12;
+                                                        const borderRadius = btn.borderRadius ?? 12;
                                                         const buttonStyle = btn.buttonStyle || 'solid';
 
                                                         const base: any = {
@@ -1778,12 +1784,11 @@ export default function QuantityOffersPage() {
                                                         if (buttonStyle === 'outline') {
                                                             base.background = 'transparent';
                                                             base.backgroundColor = 'transparent';
-                                                            base.border = borderW > 0 ? `${borderW}px solid ${buttonColor}` : 'none';
+                                                            base.border = borderW > 0 ? `${borderW}px solid ${buttonColor}` : `1px solid ${buttonColor}`;
                                                             const isWhite = (btn.textColor || '#ffffff').toLowerCase() === '#ffffff';
                                                             base.color = isWhite ? buttonColor : btn.textColor;
                                                             base.boxShadow = 'none';
                                                         } else if (buttonStyle === 'gradient') {
-                                                            // Darken color helper
                                                             const darkenColor = (hex: string, percent: number) => {
                                                                 const num = parseInt(hex.replace('#', ''), 16);
                                                                 const r = Math.max(0, (num >> 16) - Math.round(255 * percent / 100));
@@ -1798,7 +1803,7 @@ export default function QuantityOffersPage() {
 
                                                         return (
                                                             <button style={base}>
-                                                                {formSettings?.submit_button_text || 'Place Order'}
+                                                                {useCustom ? (fsb.buttonText || formSettings?.submit_button_text || 'Place COD Order') : (formSettings?.submit_button_text || 'Place Order')}
                                                             </button>
                                                         );
                                                     })()}
