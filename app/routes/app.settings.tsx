@@ -1040,6 +1040,22 @@ const PreviewDisplay = memo(({
 
                                     {/* Dynamic Fields based on visibility and drag-drop order */}
                                     {visibleFields.map((field: FormField) => {
+                                        const fsAny: any = formStyles || {};
+                                        const themeKey = fsAny.themeKey || 'custom';
+                                        let formThemeColor = primaryColor;
+                                        if (themeKey === 'modern_slate') formThemeColor = '#ea580c';
+                                        else if (themeKey === 'dark_mode') formThemeColor = '#6366f1';
+                                        else if (themeKey === 'eastern_gold') formThemeColor = '#b45309';
+                                        else if (themeKey === 'arctic_blue') formThemeColor = '#0891b2';
+                                        else if (themeKey === 'rose_garden') formThemeColor = '#e11d48';
+                                        else if (themeKey === 'midnight_purple') formThemeColor = '#7c3aed';
+                                        else if (themeKey === 'forest_green') formThemeColor = '#16a34a';
+                                        else if (themeKey === 'professional') formThemeColor = '#374151';
+                                        else if (themeKey === 'minimal_white') formThemeColor = '#111827';
+                                        else if (themeKey === 'luxury_gold') formThemeColor = '#d97706';
+                                        else if (themeKey === 'ocean_breeze') formThemeColor = '#14b8a6';
+                                        else if (themeKey === 'default') formThemeColor = '#000000';
+
                                         // Shipping section field
                                         if (field.id === 'shipping') {
                                             const hasNewRates = shippingRatesEnabled && shippingRates?.length > 0;
@@ -1055,11 +1071,11 @@ const PreviewDisplay = memo(({
                                                         shippingRates.filter((r: any) => r.is_active).slice(0, 3).map((rate: any, idx: number) => (
                                                             <div key={rate.id} style={{
                                                                 display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px',
-                                                                border: idx === 0 ? `2px solid ${primaryColor}` : '2px solid #e5e7eb',
+                                                                border: idx === 0 ? `2px solid ${formThemeColor}` : '2px solid #e5e7eb',
                                                                 borderRadius: '10px', background: idx === 0 ? 'rgba(99,102,241,0.04)' : '#fff',
                                                                 marginBottom: '6px', cursor: 'default'
                                                             }}>
-                                                                <input type="radio" name="shipping-preview" disabled checked={idx === 0} style={{ width: '14px', height: '14px', accentColor: primaryColor, flexShrink: 0 }} />
+                                                                <input type="radio" name="shipping-preview" disabled checked={idx === 0} style={{ width: '14px', height: '14px', accentColor: formThemeColor, flexShrink: 0 }} />
                                                                 <div style={{ flex: 1, minWidth: 0 }}>
                                                                     <div style={{ fontWeight: 600, fontSize: '12px', color: '#1f2937', marginBottom: '1px' }}>{rate.name}</div>
                                                                     {rate.description && (
@@ -1082,11 +1098,11 @@ const PreviewDisplay = memo(({
                                                         shippingOpts.options?.slice(0, 2).map((opt: any) => (
                                                             <div key={opt.id} style={{
                                                                 display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px',
-                                                                border: opt.id === shippingOpts.defaultOption ? `2px solid ${primaryColor}` : '2px solid #e5e7eb',
+                                                                border: opt.id === shippingOpts.defaultOption ? `2px solid ${formThemeColor}` : '2px solid #e5e7eb',
                                                                 borderRadius: '10px', background: opt.id === shippingOpts.defaultOption ? 'rgba(99,102,241,0.04)' : '#fff',
                                                                 marginBottom: '6px', cursor: 'default'
                                                             }}>
-                                                                <input type="radio" name="shipping-preview" disabled checked={opt.id === shippingOpts.defaultOption} style={{ width: '14px', height: '14px', accentColor: primaryColor, flexShrink: 0 }} />
+                                                                <input type="radio" name="shipping-preview" disabled checked={opt.id === shippingOpts.defaultOption} style={{ width: '14px', height: '14px', accentColor: formThemeColor, flexShrink: 0 }} />
                                                                 <div style={{ flex: 1, minWidth: 0 }}>
                                                                     <div style={{ fontWeight: 600, fontSize: '12px', color: '#1f2937' }}>{opt.label}</div>
                                                                 </div>
@@ -1150,7 +1166,7 @@ const PreviewDisplay = memo(({
                                                         display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 700,
                                                         color: '#111827', paddingTop: '8px', borderTop: '1px dashed #d1d5db'
                                                     }}>
-                                                        <span>Total</span><span style={{ color: primaryColor }}>{fmtCurrency(total)}</span>
+                                                        <span>Total</span><span style={{ color: formThemeColor }}>{fmtCurrency(total)}</span>
                                                     </div>
                                                 </div>
                                             );
@@ -1175,7 +1191,7 @@ const PreviewDisplay = memo(({
                                                         background: '#fff', borderRadius: '8px', border: '2px solid #e5e7eb',
                                                         marginBottom: '6px', cursor: 'default', fontSize: '11px',
                                                     }}>
-                                                        <input type="radio" name="preview-payment" disabled style={{ width: '12px', height: '12px', marginTop: '1px', accentColor: primaryColor }} />
+                                                        <input type="radio" name="preview-payment" disabled style={{ width: '12px', height: '12px', marginTop: '1px', accentColor: formThemeColor }} />
                                                         <div style={{ flex: 1 }}>
                                                             <div style={{ fontWeight: 600, color: '#1f2937' }}>Full COD</div>
                                                             <div style={{ color: '#6b7280', fontSize: '10px', marginTop: '1px' }}>Pay on delivery</div>
@@ -1187,7 +1203,7 @@ const PreviewDisplay = memo(({
                                                         background: '#fff', borderRadius: '8px', border: '2px solid #e5e7eb',
                                                         cursor: 'default', fontSize: '11px',
                                                     }}>
-                                                        <input type="radio" name="preview-payment" disabled style={{ width: '12px', height: '12px', marginTop: '1px', accentColor: primaryColor }} />
+                                                        <input type="radio" name="preview-payment" disabled style={{ width: '12px', height: '12px', marginTop: '1px', accentColor: formThemeColor }} />
                                                         <div style={{ flex: 1 }}>
                                                             <div style={{ fontWeight: 600, color: '#1f2937' }}>Partial COD</div>
                                                             <div style={{ color: '#6b7280', fontSize: '10px', marginTop: '1px' }}>Pay advance, rest on delivery</div>
