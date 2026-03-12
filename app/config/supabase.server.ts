@@ -107,16 +107,18 @@ import {
     ButtonStyles,
     ShippingOption,
     ShippingOptions,
+    FormSubmitButtonStyles,
     DEFAULT_FIELDS,
     DEFAULT_BLOCKS,
     DEFAULT_STYLES,
     DEFAULT_BUTTON_STYLES,
     DEFAULT_SHIPPING_OPTIONS,
+    DEFAULT_FORM_SUBMIT_BUTTON,
 } from './form-builder.types';
 
 // Re-export for other modules
-export type { FormField, ContentBlocks, FormStyles, ButtonStyles, ShippingOption, ShippingOptions };
-export { DEFAULT_FIELDS, DEFAULT_BLOCKS, DEFAULT_STYLES, DEFAULT_BUTTON_STYLES, DEFAULT_SHIPPING_OPTIONS };
+export type { FormField, ContentBlocks, FormStyles, ButtonStyles, ShippingOption, ShippingOptions, FormSubmitButtonStyles };
+export { DEFAULT_FIELDS, DEFAULT_BLOCKS, DEFAULT_STYLES, DEFAULT_BUTTON_STYLES, DEFAULT_SHIPPING_OPTIONS, DEFAULT_FORM_SUBMIT_BUTTON };
 
 export interface FormSettings {
     shop_domain: string;
@@ -162,6 +164,8 @@ export interface FormSettings {
     partial_cod_commission?: number;
     // Shipping rates settings
     shipping_rates_enabled?: boolean;
+    // Form submit button style overrides
+    form_submit_button?: FormSubmitButtonStyles;
 }
 
 /**
@@ -233,6 +237,8 @@ export async function saveFormSettings(settings: FormSettings) {
                 partial_cod_commission: settings.partial_cod_commission ?? 0,
                 // Shipping rates settings
                 shipping_rates_enabled: settings.shipping_rates_enabled ?? false,
+                // Form submit button style overrides
+                form_submit_button: settings.form_submit_button || DEFAULT_FORM_SUBMIT_BUTTON,
             },
             { onConflict: 'shop_domain' }
         )

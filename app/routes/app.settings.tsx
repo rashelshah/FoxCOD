@@ -43,12 +43,14 @@ import {
     type FormStyles,
     type ButtonStyles,
     type ShippingOptions,
+    type FormSubmitButtonStyles,
     DEFAULT_FIELDS,
 
     DEFAULT_BLOCKS,
     DEFAULT_STYLES,
     DEFAULT_BUTTON_STYLES,
     DEFAULT_SHIPPING_OPTIONS,
+    DEFAULT_FORM_SUBMIT_BUTTON,
 } from "../config/form-builder.types";
 import { ColorSelector, colorSelectorStyles } from "./ColorSelector";
 
@@ -94,6 +96,8 @@ const defaultSettings: Omit<FormSettings, "shop_domain"> = {
     partial_cod_commission: 0,
     // New Shipping Rates settings
     shipping_rates_enabled: false,
+    // Form submit button
+    form_submit_button: DEFAULT_FORM_SUBMIT_BUTTON,
 };
 
 /**
@@ -143,6 +147,8 @@ async function ensureMetafieldDefinitions(admin: any) {
         { key: "upsells_downsells_json", type: "json" },
         // Pixel Tracking
         { key: "pixel_tracking_settings_json", type: "json" },
+        // Form submit button style overrides
+        { key: "form_submit_button_json", type: "json" },
     ];
 
     console.log('[Settings] Ensuring metafield definitions (parallel)...');
@@ -483,6 +489,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         partial_cod_commission: parseFloat(formData.get("partial_cod_commission") as string) || defaultSettings.partial_cod_commission,
         // Shipping rates enabled setting
         shipping_rates_enabled: formData.get("shipping_rates_enabled") === "true",
+        // Form submit button style overrides
+        form_submit_button: JSON.parse(formData.get("form_submit_button") as string || JSON.stringify(defaultSettings.form_submit_button)),
     };
 
     // Save to Supabase
@@ -602,6 +610,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     // Shipping rates - sync to metafields for storefront
                     { ownerId: shopGid, namespace: "fox_cod", key: "shipping_rates_enabled", value: String(settings.shipping_rates_enabled ?? false), type: "single_line_text_field" },
                     { ownerId: shopGid, namespace: "fox_cod", key: "shipping_rates_json", value: JSON.stringify(shippingRatesForMetafield || []), type: "json" },
+                    // Form submit button style overrides
+                    { ownerId: shopGid, namespace: "fox_cod", key: "form_submit_button_json", value: JSON.stringify(settings.form_submit_button || DEFAULT_FORM_SUBMIT_BUTTON), type: "json" },
                 ]
             }
         });
@@ -648,7 +658,7 @@ const PreviewDisplay = memo(({
     notesPlaceholder, submitButtonText,
     primaryColor, buttonStyle, buttonSize, borderRadius, modalStyle, animationStyle,
     fields, formStyles, buttonStylesState, blocks, shippingOpts, shippingRates, shippingRatesEnabled, activeTab,
-    fmtCurrency, currencySymbol
+    fmtCurrency, currencySymbol, formSubmitButtonState
 }: any) => {
 
     // Calculate button styles - sync with storefront
@@ -689,6 +699,50 @@ const PreviewDisplay = memo(({
             const darkColor = darkenColor(buttonColor, 25);
             base.background = `linear-gradient(135deg, ${buttonColor} 0%, ${darkColor} 100%)`;
             base.boxShadow = btn.shadow ? '0 6px 12px rgba(0,0,0,0.2)' : 'none';
+        }
+        return base;
+    };
+
+    // Calculate form submit button styles — mirrors product button when toggle ON, uses custom when OFF
+    const getSubmitButtonStyle = (): any => {
+        const fsb = formSubmitButtonState || {};
+        if (fsb.useProductButtonStyle !== false) {
+            // Mirror the product page button style exactly
+            return getButtonStyle();
+        }
+        // Custom submit button styles
+        const btnColor = fsb.backgroundColor || '#6366f1';
+        const borderCol = fsb.borderColor || btnColor;
+        const borderW = fsb.borderWidth ?? 0;
+        const btnSize = fsb.buttonSize || 'medium';
+        const btnStyle = fsb.buttonStyle || 'solid';
+
+        const base: any = {
+            width: '100%',
+            padding: btnSize === 'small' ? '10px' : btnSize === 'large' ? '16px' : '13px',
+            borderRadius: (fsb.borderRadius ?? 12) + 'px',
+            fontWeight: fsb.fontStyle === 'bold' ? 700 : 400,
+            fontStyle: fsb.fontStyle === 'italic' ? 'italic' : 'normal',
+            fontSize: (fsb.textSize ?? 15) + 'px',
+            border: borderW ? `${borderW}px solid ${borderCol}` : 'none',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            color: fsb.textColor || '#ffffff',
+            background: btnColor,
+            boxShadow: fsb.shadow ? '0 4px 6px rgba(0,0,0,0.1)' : 'none',
+        };
+
+        if (btnStyle === 'outline') {
+            base.background = 'transparent';
+            base.backgroundColor = 'transparent';
+            base.border = `${borderW > 0 ? borderW : 2}px solid ${btnColor}`;
+            const isWhite = (fsb.textColor || '#ffffff').toLowerCase() === '#ffffff';
+            base.color = isWhite ? btnColor : fsb.textColor;
+            base.boxShadow = 'none';
+        } else if (btnStyle === 'gradient') {
+            const darkColor = darkenColor(btnColor, 25);
+            base.background = `linear-gradient(135deg, ${btnColor} 0%, ${darkColor} 100%)`;
+            base.boxShadow = fsb.shadow ? '0 6px 12px rgba(0,0,0,0.2)' : 'none';
         }
         return base;
     };
@@ -1206,7 +1260,7 @@ const PreviewDisplay = memo(({
                                         );
                                     })}
 
-                                    <button className="preview-submit" style={getButtonStyle()}>
+                                    <button className="preview-submit" style={getSubmitButtonStyle()}>
                                         {submitButtonText || 'Place Order'}
                                     </button>
                                 </div>
@@ -1805,6 +1859,7 @@ export default function SettingsPage() {
     const [selectedPreset, setSelectedPreset] = useState('custom');
     const [buttonStylesState, setButtonStylesState] = useState<ButtonStyles>(settings.button_styles || DEFAULT_BUTTON_STYLES);
     const [shippingOpts, setShippingOpts] = useState<ShippingOptions>(settings.shipping_options || DEFAULT_SHIPPING_OPTIONS);
+    const [formSubmitButtonState, setFormSubmitButtonState] = useState<FormSubmitButtonStyles>(settings.form_submit_button || DEFAULT_FORM_SUBMIT_BUTTON);
     const [showAddFieldModal, setShowAddFieldModal] = useState(false);
     const [newFieldType, setNewFieldType] = useState<'text' | 'number' | 'dropdown' | 'checkbox'>('text');
     const [newFieldLabel, setNewFieldLabel] = useState('');
@@ -2089,6 +2144,8 @@ export default function SettingsPage() {
         formData.append("partial_cod_commission", partialCodCommission.toString());
         // Shipping rates enabled setting
         formData.append("shipping_rates_enabled", shippingRatesEnabled.toString());
+        // Form submit button style overrides
+        formData.append("form_submit_button", JSON.stringify(formSubmitButtonState));
 
         submit(formData, { method: "post" });
 
@@ -2121,7 +2178,8 @@ export default function SettingsPage() {
         modalStyle, animationStyle, borderRadius, formType, fields, blocks,
         formStyles, buttonStylesState, shippingOpts,
         partialCodEnabled, partialCodAdvanceAmount, partialCodCommission,
-        shippingRatesEnabled, submit, shopify, pendingShippingOps
+        shippingRatesEnabled, submit, shopify, pendingShippingOps,
+        formSubmitButtonState
     ]);
 
     // Show/hide native Shopify save bar based on unsaved changes
@@ -4045,6 +4103,164 @@ export default function SettingsPage() {
                                                 placeholder="Your order has been placed! We'll contact you shortly."
                                             />
                                         </div>
+
+                                        {/* Submit Button Style */}
+                                        <div style={{ borderTop: '1px solid #e5e7eb', marginTop: '16px', paddingTop: '16px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                                                <div>
+                                                    <label className="input-label" style={{ margin: 0, fontWeight: 600 }}>Submit Button Style</label>
+                                                    <p style={{ fontSize: '12px', color: '#6b7280', margin: '2px 0 0' }}>Customize the form submit button appearance</p>
+                                                </div>
+                                            </div>
+
+                                            <div className="toggle-option" onClick={() => setFormSubmitButtonState(prev => ({ ...prev, useProductButtonStyle: !prev.useProductButtonStyle }))}>
+                                                <span className="toggle-option-label">Use product page button style</span>
+                                                <div className={`mini-toggle ${formSubmitButtonState.useProductButtonStyle ? 'on' : 'off'}`} />
+                                            </div>
+
+                                            {!formSubmitButtonState.useProductButtonStyle && (
+                                                <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                                    {/* Button Style */}
+                                                    <div className="input-group">
+                                                        <label className="input-label">Button Style</label>
+                                                        <div className="style-options">
+                                                            {['solid', 'outline', 'gradient'].map((style) => (
+                                                                <button
+                                                                    key={style}
+                                                                    type="button"
+                                                                    className={`style-option ${(formSubmitButtonState.buttonStyle || 'solid') === style ? 'active' : ''}`}
+                                                                    onClick={() => {
+                                                                        setFormSubmitButtonState(prev => ({
+                                                                            ...prev,
+                                                                            buttonStyle: style,
+                                                                            borderWidth: style === 'outline' ? 2 : 0,
+                                                                        }));
+                                                                    }}
+                                                                >
+                                                                    {style.charAt(0).toUpperCase() + style.slice(1)}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Button Size */}
+                                                    <div className="input-group">
+                                                        <label className="input-label">Button Size</label>
+                                                        <div className="style-options">
+                                                            {['small', 'medium', 'large'].map((size) => (
+                                                                <button
+                                                                    key={size}
+                                                                    type="button"
+                                                                    className={`style-option ${(formSubmitButtonState.buttonSize || 'medium') === size ? 'active' : ''}`}
+                                                                    onClick={() => setFormSubmitButtonState(prev => ({ ...prev, buttonSize: size }))}
+                                                                >
+                                                                    {size.charAt(0).toUpperCase() + size.slice(1)}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Background Color */}
+                                                    <div className="input-group">
+                                                        <ColorSelector
+                                                            label="Background Color"
+                                                            value={formSubmitButtonState.backgroundColor || '#6366f1'}
+                                                            onChange={(c: string) => setFormSubmitButtonState(prev => ({ ...prev, backgroundColor: c }))}
+                                                        />
+                                                    </div>
+
+                                                    {/* Text Color */}
+                                                    <div className="input-group">
+                                                        <ColorSelector
+                                                            label="Text Color"
+                                                            value={formSubmitButtonState.textColor || '#ffffff'}
+                                                            onChange={(c: string) => setFormSubmitButtonState(prev => ({ ...prev, textColor: c }))}
+                                                        />
+                                                    </div>
+
+                                                    {/* Text Size */}
+                                                    <div className="input-group" style={{ marginTop: 12 }}>
+                                                        <label className="input-label">Text Size (px)</label>
+                                                        <div style={{ padding: '0 8px', width: '100%' }}>
+                                                            <RangeSlider
+                                                                labelHidden
+                                                                label="Text Size"
+                                                                min={12}
+                                                                max={24}
+                                                                value={formSubmitButtonState.textSize ?? 15}
+                                                                onChange={(val) => setFormSubmitButtonState(prev => ({ ...prev, textSize: Number(val) }))}
+                                                                output
+                                                            />
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Font Style */}
+                                                    <div className="input-group" style={{ marginTop: 12 }}>
+                                                        <label className="input-label">Font Style</label>
+                                                        <div className="style-options">
+                                                            {(['normal', 'bold', 'italic'] as const).map((fs) => (
+                                                                <button
+                                                                    key={fs}
+                                                                    type="button"
+                                                                    className={`style-option ${(formSubmitButtonState.fontStyle || 'bold') === fs ? 'active' : ''}`}
+                                                                    onClick={() => setFormSubmitButtonState(prev => ({ ...prev, fontStyle: fs }))}
+                                                                    style={{ fontStyle: fs === 'italic' ? 'italic' : undefined, fontWeight: fs === 'bold' ? 700 : undefined }}
+                                                                >
+                                                                    {fs.charAt(0).toUpperCase() + fs.slice(1)}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Border Color */}
+                                                    <div className="input-group">
+                                                        <ColorSelector
+                                                            label="Border Color"
+                                                            value={formSubmitButtonState.borderColor || '#6366f1'}
+                                                            onChange={(c: string) => setFormSubmitButtonState(prev => ({ ...prev, borderColor: c }))}
+                                                        />
+                                                    </div>
+
+                                                    {/* Border Width */}
+                                                    <div className="input-group" style={{ marginTop: 12 }}>
+                                                        <label className="input-label">Border Width (px)</label>
+                                                        <div style={{ padding: '0 8px', width: '100%' }}>
+                                                            <RangeSlider
+                                                                labelHidden
+                                                                label="Border Width"
+                                                                min={0}
+                                                                max={4}
+                                                                value={formSubmitButtonState.borderWidth ?? 0}
+                                                                onChange={(val) => setFormSubmitButtonState(prev => ({ ...prev, borderWidth: Number(val) }))}
+                                                                output
+                                                            />
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Border Radius */}
+                                                    <div className="input-group" style={{ marginTop: 12 }}>
+                                                        <label className="input-label">Rounded Corners (px)</label>
+                                                        <div style={{ padding: '0 8px', width: '100%' }}>
+                                                            <RangeSlider
+                                                                labelHidden
+                                                                label="Rounded Corners"
+                                                                min={0}
+                                                                max={24}
+                                                                value={formSubmitButtonState.borderRadius ?? 12}
+                                                                onChange={(val) => setFormSubmitButtonState(prev => ({ ...prev, borderRadius: Number(val) }))}
+                                                                output
+                                                            />
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Shadow */}
+                                                    <div className="toggle-option" style={{ marginTop: 12 }} onClick={() => setFormSubmitButtonState(prev => ({ ...prev, shadow: !prev.shadow }))}>
+                                                        <span className="toggle-option-label">Shadow</span>
+                                                        <div className={`mini-toggle ${formSubmitButtonState.shadow ? 'on' : 'off'}`} />
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
                                     </AccordionSection>
 
                                     {/* Add Field Modal — Polaris UI */}
@@ -4361,6 +4577,7 @@ export default function SettingsPage() {
                                 activeTab={activeTab}
                                 fmtCurrency={fmtCurrency}
                                 currencySymbol={currencySymbol}
+                                formSubmitButtonState={formSubmitButtonState}
                             />
                         </div>
 

@@ -370,7 +370,11 @@
         
         // Upsell Offers Configuration
         upsellOffers: (window.FoxCod && window.FoxCod.upsellOffers) || safeJSONParse(dataContainer.dataset.upsellOffers, { tick_upsells: [], click_upsells: [], downsells: [] }),
-        appUrl: dataContainer.dataset.appUrl || ''
+        appUrl: dataContainer.dataset.appUrl || '',
+        // Form submit button style overrides
+        formSubmitButton: (window.FoxCod && window.FoxCod.formSubmitButton) || safeJSONParse(dataContainer.dataset.formSubmitButton, {}),
+        // Product button styles — used as baseline for submit button styling
+        buttonStyles: (window.FoxCod && window.FoxCod.buttonStyles) || {}
       };
 
       // Debug: Log quantity offers data
@@ -715,6 +719,76 @@
     var g = Math.max(0, ((num >> 8) & 0x00FF) - Math.round(255 * percent / 100));
     var b = Math.max(0, (num & 0x0000FF) - Math.round(255 * percent / 100));
     return '#' + (r << 16 | g << 8 | b).toString(16).padStart(6, '0');
+  }
+
+  /**
+   * Apply submit button styles — always called after form init/open.
+   * When useProductButtonStyle === false → uses formSubmitButton overrides.
+   * Otherwise → applies product button styles (size, radius, font, border, color).
+   */
+  function applySubmitButtonStyles(btn, config) {
+    if (!btn) return;
+    var fsb = config.formSubmitButton || {};
+    var useCustom = fsb.useProductButtonStyle === false;
+    var src = useCustom ? fsb : (config.buttonStyles || {});
+    var btnColor = useCustom ? (fsb.backgroundColor || config.primaryColor) : config.primaryColor;
+    var borderCol = src.borderColor || btnColor;
+    var borderW = src.borderWidth != null ? Number(src.borderWidth) : 0;
+    var btnSize = src.buttonSize || 'medium';
+    var btnStyle = src.buttonStyle || 'solid';
+    var textColor = src.textColor || '#ffffff';
+    var textSize = src.textSize || 15;
+    var fontStyle = src.fontStyle || 'normal';
+    var radius = src.borderRadius != null ? Number(src.borderRadius) : 12;
+
+    // Reset all styles first for clean slate
+    btn.style.cssText = '';
+
+    // Base styles always applied
+    btn.style.width = '100%';
+    btn.style.cursor = 'pointer';
+    btn.style.transition = 'all 0.2s ease';
+    btn.style.fontFamily = 'inherit';
+    btn.style.display = 'block';
+
+    // Size
+    btn.style.padding = btnSize === 'small' ? '10px 16px' : btnSize === 'large' ? '16px' : '13px 16px';
+
+    // Typography
+    btn.style.color = textColor;
+    btn.style.fontSize = textSize + 'px';
+    btn.style.fontWeight = fontStyle === 'bold' ? '700' : '600';
+    btn.style.fontStyle = fontStyle === 'italic' ? 'italic' : 'normal';
+
+    // Border radius
+    btn.style.borderRadius = radius + 'px';
+
+    // Style: solid / outline / gradient
+    if (btnStyle === 'outline') {
+      btn.style.backgroundColor = 'transparent';
+      btn.style.background = 'transparent';
+      btn.style.border = (borderW > 0 ? borderW : 2) + 'px solid ' + btnColor;
+      var isWhite = textColor.toLowerCase() === '#ffffff' || textColor.toLowerCase() === 'white';
+      btn.style.color = isWhite ? btnColor : textColor;
+      btn.style.boxShadow = 'none';
+    } else if (btnStyle === 'gradient') {
+      var darkColor = darkenColor(btnColor, 25);
+      btn.style.background = 'linear-gradient(135deg, ' + btnColor + ' 0%, ' + darkColor + ' 100%)';
+      btn.style.border = borderW > 0 ? borderW + 'px solid ' + borderCol : 'none';
+      btn.style.boxShadow = src.shadow ? '0 6px 12px rgba(0,0,0,0.2)' : 'none';
+    } else {
+      // Solid
+      btn.style.backgroundColor = btnColor;
+      btn.style.background = btnColor;
+      btn.style.border = borderW > 0 ? borderW + 'px solid ' + borderCol : 'none';
+      if (src.shadow) {
+        var intensity = src.shadowIntensity || 35;
+        var opacity = 0.05 + (intensity / 100) * 0.25;
+        btn.style.boxShadow = '0 4px 12px rgba(0,0,0,' + opacity + ')';
+      } else {
+        btn.style.boxShadow = 'none';
+      }
+    }
   }
 
   /**
@@ -1571,6 +1645,10 @@
     form.addEventListener('change', function() {
         saveFoxCodCheckoutState(form);
     });
+
+    // Always apply submit button styles (product button styles or custom override)
+    var submitBtnEl = form.querySelector('.cod-submit-btn');
+    applySubmitButtonStyles(submitBtnEl, config);
 
     // Setup Form Submission
     form.addEventListener('submit', function(e) {
@@ -3516,6 +3594,10 @@
                 cb.dispatchEvent(new Event('change', { bubbles: true }));
             }
         });
+
+        // Always re-apply submit button styles on modal open
+        var submitBtn = form.querySelector('.cod-submit-btn');
+        applySubmitButtonStyles(submitBtn, config);
     }
 
     // ── Pre-purchase click upsells: show BEFORE customer fills the form ──
