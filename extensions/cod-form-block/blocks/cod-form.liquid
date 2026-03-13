@@ -632,14 +632,20 @@
     border: 1px solid #ddd;
     border-radius: 6px;
     font-size: 14px;
-    transition: border-color 0.2s;
+    transition:
+      border-color 0.15s ease,
+      box-shadow 0.15s ease,
+      background-color 0.15s ease;
     color: inherit;
   }
 
   .cod-form-field input:focus,
   .cod-form-field textarea:focus {
+    border-color: var(--cod-accent);
+    box-shadow:
+      0 0 0 1px var(--cod-accent),
+      0 0 0 4px color-mix(in srgb, var(--cod-accent) 20%, transparent);
     outline: none;
-    border-color: {{ form_theme_color }};
   }
 
   .cod-quantity-selector {
@@ -1058,12 +1064,19 @@
   {% endif %}
   
   .cod-input, .cod-form-field textarea {
-      border-radius: 8px !important; 
+      border-radius: 8px !important;
+      transition:
+        border-color 0.15s ease,
+        box-shadow 0.15s ease,
+        background-color 0.15s ease !important;
   }
 
   .cod-input:focus, .cod-form-field textarea:focus {
-      border-color: {{ form_theme_color }} !important;
-      box-shadow: 0 0 0 2px {{ form_theme_color }}20 !important;
+      border-color: var(--cod-accent) !important;
+      box-shadow:
+        0 0 0 1px var(--cod-accent),
+        0 0 0 4px color-mix(in srgb, var(--cod-accent) 20%, transparent) !important;
+      outline: none !important;
   }
 
   /* Animation Overrides */
@@ -1411,12 +1424,17 @@
       -moz-appearance: none;
       appearance: none;
       cursor: pointer;
-      transition: border-color 0.15s ease;
+      transition:
+        border-color 0.15s ease,
+        box-shadow 0.15s ease,
+        background-color 0.15s ease;
   }
   .foxcod-variant-select:focus {
-      border-color: #6366f1;
+      border-color: var(--cod-accent);
       outline: none;
-      box-shadow: 0 0 0 2px rgba(99,102,241,0.1);
+      box-shadow:
+        0 0 0 1px var(--cod-accent),
+        0 0 0 4px color-mix(in srgb, var(--cod-accent) 20%, transparent);
   }
   .foxcod-variant-select option:disabled {
       color: #d1d5db;
