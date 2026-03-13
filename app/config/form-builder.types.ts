@@ -57,6 +57,7 @@ export interface FormStyles {
     fieldBackgroundColor: string;  // Separate from container background
     labelColor: string;            // Separate from textColor
     labelFontSize: number;         // Separate control for labels
+    priceColor: string;            // Price display color (product price, total price, offer prices)
 }
 
 /**
@@ -167,6 +168,7 @@ export const DEFAULT_STYLES: FormStyles = {
     fieldBackgroundColor: '#ffffff',
     labelColor: '#111827',
     labelFontSize: 14,
+    priceColor: '#111827',
 };
 
 /**
