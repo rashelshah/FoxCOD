@@ -1699,13 +1699,9 @@
     var shadowOpacity = shadowSlider === 0 ? 0 : 0.05 + (shadowSlider / 100) * 0.25; // 0.05 – 0.30
     var hasShadow = shadowSlider > 0;
 
-    // Theme awareness for focus styles
-    var themeKey = styles.themeKey || 'custom';
-    var isPresetTheme = themeKey && themeKey !== 'custom';
-    var primaryThemeColor = config.accentColor;
-    var focusRingColor = isPresetTheme
-        ? (hexToRgba(primaryThemeColor, 0.45) || 'rgba(15,23,42,0.35)')
-        : 'rgba(148,163,184,0.8)'; // greyish for custom styling
+    // Focus ring colors — always use accent color for consistency
+    var primaryThemeColor = config.accentColor || '#111827';
+    var focusGlowColor = hexToRgba(primaryThemeColor, 0.2) || 'rgba(17,24,39,0.2)';
     
     container.innerHTML = '';
     
@@ -1922,18 +1918,18 @@
         wrapper.appendChild(inputContainer);
         container.appendChild(wrapper);
 
-        // Focus / blur styling — lift + colored shadow per theme
+        // Focus / blur styling — dual ring via accent color
+        input.style.transition = 'border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease';
+
         input.addEventListener('focus', function() {
           this.style.outline = 'none';
-          this.style.borderColor = primaryThemeColor || borderColor;
-          this.style.boxShadow = '0 0 0 1px ' + focusRingColor + ', 0 10px 24px rgba(15,23,42,0.16)';
-          this.style.transform = 'translateY(-1px)';
+          this.style.borderColor = primaryThemeColor;
+          this.style.boxShadow = '0 0 0 1px ' + primaryThemeColor + ', 0 0 0 4px ' + focusGlowColor;
         });
 
         input.addEventListener('blur', function() {
           this.style.border = borderWidth + 'px solid ' + borderColor;
           this.style.boxShadow = hasShadow ? ('0 1px 2px rgba(0,0,0,' + shadowOpacity.toFixed(2) + ')') : 'none';
-          this.style.transform = 'translateY(0)';
         });
 
         // Clear validation error on input
