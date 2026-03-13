@@ -653,7 +653,7 @@ const darkenColor = (hex: string, percent: number) => {
 
 // Memoized Preview Component
 const PreviewDisplay = memo(({
-    showProductImage, showPrice, buttonText, formTitle,
+    showProductImage, showPrice, buttonText, formTitle, formSubtitle,
     namePlaceholder, phonePlaceholder, addressPlaceholder,
     notesPlaceholder, submitButtonText,
     primaryColor, buttonStyle, buttonSize, borderRadius, modalStyle, animationStyle,
@@ -1050,12 +1050,24 @@ const PreviewDisplay = memo(({
                             {activeTab !== 'button' && (
                                 <div className="preview-modal" style={{ ...getModalStyle(), marginTop: '0', background: 'transparent', boxShadow: 'none', border: 'none', backdropFilter: 'none', padding: '0 0 16px 0' }}>
                                     <div className="preview-modal-title" style={{
-                                        fontWeight: 600,
-                                        marginBottom: '12px',
+                                        fontWeight: 700,
+                                        fontSize: '16px',
+                                        marginBottom: '6px',
                                         color: formStyles?.textColor || '#111',
-                                        textAlign: formStyles?.labelAlignment || 'left'
+                                        textAlign: 'center',
+                                        fontFamily: formStyles?.fontFamily || 'Inter'
                                     }}>
                                         {formTitle || 'Cash on Delivery'}
+                                    </div>
+                                    <div className="preview-modal-subtitle" style={{
+                                        fontSize: '12px',
+                                        color: '#36383dff',
+                                        marginBottom: '16px',
+                                        textAlign: 'center',
+                                        lineHeight: '1.4',
+                                        fontFamily: formStyles?.fontFamily || 'Inter'
+                                    }}>
+                                        {formSubtitle || 'Fill in your details to place a COD order'}
                                     </div>
 
                                     {/* Dynamic Fields based on visibility and drag-drop order */}
@@ -1220,9 +1232,9 @@ const PreviewDisplay = memo(({
                                             return (
                                                 <div key={field.id} style={{
                                                     marginBottom: '12px', padding: '14px',
-                                                    background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%)',
+                                                    background: formStyles?.fieldBackgroundColor || '#f9fafb',
                                                     borderRadius: '10px',
-                                                    border: '1px solid rgba(99, 102, 241, 0.2)',
+                                                    border: '1px solid #e5e7eb',
                                                 }}>
                                                     <div style={{ fontSize: '12px', fontWeight: 600, color: '#1f2937', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>
@@ -1869,7 +1881,7 @@ export default function SettingsPage() {
     const [buttonSize, setButtonSize] = useState(settings.button_size || 'large');
     const [buttonPosition, setButtonPosition] = useState(settings.button_position || 'below_atc');
     const [formTitle, setFormTitle] = useState(settings.form_title || '');
-    const [formSubtitle, setFormSubtitle] = useState(settings.form_subtitle || '');
+    const [formSubtitle, setFormSubtitle] = useState(settings.form_subtitle || 'Fill in your details to place a COD order');
     const [successMessage, setSuccessMessage] = useState(settings.success_message || '');
     const [submitButtonText, setSubmitButtonText] = useState(settings.submit_button_text || 'Place COD Order');
     const [showProductImage, setShowProductImage] = useState(settings.show_product_image ?? true);
@@ -4139,7 +4151,7 @@ export default function SettingsPage() {
                                     </AccordionSection>
 
                                     {/* Form Content */}
-                                    <AccordionSection id="form-content" tab="form" title="Form Content" helperText="Changes the form content on Product page" expandedSection={expandedSection} toggleSection={toggleSection}>
+                                    <AccordionSection id="form-content" tab="form" title="Form Header and Submit button" helperText="Customize the form title, description, and the submit button text and style shown in the COD form." expandedSection={expandedSection} toggleSection={toggleSection}>
                                         <div className="input-group">
                                             <label className="input-label">Form Title</label>
                                             <input
@@ -4150,6 +4162,35 @@ export default function SettingsPage() {
                                                 placeholder="Cash on Delivery Order"
                                             />
                                         </div>
+                                        <div className="input-group" style={{ marginBottom: '16px' }}>
+                                            <label className="input-label" style={{ marginBottom: '6px' }}>Form Description</label>
+                                            <textarea
+                                                className="input-field"
+                                                value={formSubtitle}
+                                                onChange={(e) => setFormSubtitle(e.target.value)}
+                                                placeholder="Fill in your details to place a COD order"
+                                                rows={2}
+                                            />
+                                        </div>
+                                        <div className="input-group" style={{ marginBottom: '16px' }}>
+                                            <label className="input-label" style={{ marginBottom: '6px' }}>Form Header & Description Font</label>
+                                            <select
+                                                className="input-field"
+                                                value={formStyles?.fontFamily || 'Inter'}
+                                                onChange={(e) => setFormStyles(prev => ({ ...prev, fontFamily: e.target.value as any }))}
+                                                style={{ cursor: 'pointer' }}
+                                            >
+                                                <option value="Inter">Inter (Default)</option>
+                                                <option value="Poppins">Poppins</option>
+                                                <option value="DM Sans">DM Sans</option>
+                                                <option value="Outfit">Outfit</option>
+                                                <option value="Playfair Display">Playfair Display</option>
+                                                <option value="Cormorant Garamond">Cormorant Garamond</option>
+                                                <option value="Abril Fatface">Abril Fatface</option>
+                                                <option value="Syne">Syne</option>
+                                                <option value="Space Grotesk">Space Grotesk</option>
+                                            </select>
+                                        </div>
                                         <div className="input-group">
                                             <label className="input-label">Submit Button Text</label>
                                             <input
@@ -4158,15 +4199,6 @@ export default function SettingsPage() {
                                                 value={submitButtonText}
                                                 onChange={(e) => setSubmitButtonText(e.target.value)}
                                                 placeholder="Place COD Order"
-                                            />
-                                        </div>
-                                        <div className="input-group">
-                                            <label className="input-label">Success Message</label>
-                                            <textarea
-                                                className="input-field"
-                                                value={successMessage}
-                                                onChange={(e) => setSuccessMessage(e.target.value)}
-                                                placeholder="Your order has been placed! We'll contact you shortly."
                                             />
                                         </div>
 
@@ -4622,6 +4654,7 @@ export default function SettingsPage() {
                                 showPrice={showPrice}
                                 buttonText={buttonText}
                                 formTitle={formTitle}
+                                formSubtitle={formSubtitle}
                                 namePlaceholder={namePlaceholder}
                                 phonePlaceholder={phonePlaceholder}
                                 addressPlaceholder={addressPlaceholder}

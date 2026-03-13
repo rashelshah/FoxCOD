@@ -58,6 +58,7 @@ export interface FormStyles {
     labelColor: string;            // Separate from textColor
     labelFontSize: number;         // Separate control for labels
     priceColor: string;            // Price display color (product price, total price, offer prices)
+    fontFamily: 'Inter' | 'Poppins' | 'DM Sans' | 'Outfit' | 'Playfair Display' | 'Cormorant Garamond' | 'Abril Fatface' | 'Syne' | 'Space Grotesk';  // Font family for form title and description
 }
 
 /**
@@ -169,6 +170,7 @@ export const DEFAULT_STYLES: FormStyles = {
     labelColor: '#111827',
     labelFontSize: 14,
     priceColor: '#111827',
+    fontFamily: 'Inter',
 };
 
 /**

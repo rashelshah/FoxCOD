@@ -772,10 +772,10 @@ export default function UpsellDownsellPage() {
                                                                 <div style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937', lineHeight: 1.3, marginBottom: '2px' }}>Sample Product</div>
                                                                 <div style={{ fontSize: '14px', fontWeight: 600, color: formSettings?.styles?.priceColor || '#111827' }}>{fmtCurrency(1999)}</div>
                                                             </div>
-                                                            {/* Quantity selector - smaller mobile size */}
-                                                            <div style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid #d1d5db', borderRadius: '6px', overflow: 'hidden', background: '#fff', flexShrink: 0 }}>
-                                                                <div style={{ width: '28px', height: '28px', background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 500, color: '#6b7280', cursor: 'default' }}>−</div>
-                                                                <div style={{ width: '32px', height: '28px', borderLeft: '1px solid #e5e7eb', borderRight: '1px solid #e5e7eb', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 600, color: '#1f2937', fontFamily: "'Inter', sans-serif" }}>1</div>
+                                                            {/* Quantity selector - pill shape like form builder */}
+                                                            <div style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid #d1d5db', borderRadius: '999px', overflow: 'hidden', background: '#fff', flexShrink: 0 }}>
+                                                                <div style={{ width: '34px', height: '32px', background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 500, color: '#6b7280', cursor: 'default' }}>−</div>
+                                                                <div style={{ width: '36px', height: '32px', borderLeft: '1px solid #e5e7eb', borderRight: '1px solid #e5e7eb', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 600, color: '#1f2937', fontFamily: "'Inter', sans-serif" }}>1</div>
                                                                 <div style={{ width: '28px', height: '28px', background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 500, color: '#6b7280', cursor: 'default' }}>+</div>
                                                             </div>
                                                         </div>
@@ -815,11 +815,12 @@ export default function UpsellDownsellPage() {
                                                         })()}>
                                                             {/* Form Title */}
                                                             <div style={{
-                                                                fontWeight: 600,
-                                                                fontSize: (formSettings?.styles?.textSize || 16) + 'px',
+                                                                fontWeight: 700,
+                                                                fontSize: '16px',
                                                                 marginBottom: '4px',
                                                                 color: (formSettings?.styles as any)?.textColor || '#111',
-                                                                textAlign: (formSettings?.styles?.labelAlignment || 'left') as any,
+                                                                textAlign: 'center',
+                                                                fontFamily: formSettings?.styles?.fontFamily || 'Inter',
                                                             }}>
                                                                 {formSettings?.form_title || 'Cash on Delivery Order'}
                                                             </div>
@@ -827,10 +828,11 @@ export default function UpsellDownsellPage() {
                                                             {/* Form Subtitle */}
                                                             {formSettings?.form_subtitle && (
                                                                 <div style={{
-                                                                    fontSize: (formSettings?.styles?.textSize || 14) - 2 + 'px',
+                                                                    fontSize: '13px',
                                                                     color: '#6b7280',
                                                                     marginBottom: '16px',
-                                                                    textAlign: (formSettings?.styles?.labelAlignment || 'left') as any,
+                                                                    textAlign: 'center',
+                                                                    fontFamily: formSettings?.styles?.fontFamily || 'Inter',
                                                                 }}>
                                                                     {formSettings.form_subtitle}
                                                                 </div>
@@ -970,9 +972,9 @@ export default function UpsellDownsellPage() {
                                                                         return (
                                                                             <div key={field.id} style={{
                                                                                 marginBottom: '12px', padding: '14px',
-                                                                                background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%)',
+                                                                                background: formSettings?.styles?.fieldBackgroundColor || '#f9fafb',
                                                                                 borderRadius: '10px',
-                                                                                border: '1px solid rgba(99, 102, 241, 0.2)',
+                                                                                border: '1px solid #e5e7eb',
                                                                             }}>
                                                                                 <div style={{ fontSize: '12px', fontWeight: 600, color: '#1f2937', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>

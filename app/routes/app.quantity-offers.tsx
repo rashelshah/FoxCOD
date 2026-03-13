@@ -1220,10 +1220,7 @@ export default function QuantityOffersPage() {
                                             </div>
                                         ) : (
                                             <>
-                                                <div className="preview-header-row">
-                                                    <span>Please fill in the form to order</span>
-                                                    <span className="preview-close">×</span>
-                                                </div>
+                                               
 
                                                 {/* Form Modal Container - Matching Form Builder exactly */}
                                                 <div style={{
@@ -1234,22 +1231,22 @@ export default function QuantityOffersPage() {
                                                 }}>
                                                     {/* Form Title */}
                                                     <div style={{
-                                                        fontWeight: 600,
-                                                        fontSize: (formSettings?.styles?.textSize || 16) + 'px',
+                                                        fontWeight: 700,
+                                                        fontSize: '16px',
                                                         marginBottom: '4px',
                                                         color: formSettings?.styles?.textColor || '#111827',
-                                                        textAlign: (formSettings?.styles?.labelAlignment || 'left') as any,
+                                                        textAlign: 'center',
+                                                        fontFamily: formSettings?.styles?.fontFamily || 'Inter',
                                                     }}>
                                                         {formSettings?.form_title || 'Cash on Delivery Order'}
                                                     </div>
-
-                                                    {/* Form Subtitle */}
                                                     {formSettings?.form_subtitle && (
                                                         <div style={{
-                                                            fontSize: (formSettings?.styles?.textSize || 14) - 2 + 'px',
+                                                            fontSize: '13px',
                                                             color: '#6b7280',
                                                             marginBottom: '16px',
-                                                            textAlign: (formSettings?.styles?.labelAlignment || 'left') as any,
+                                                            textAlign: 'center',
+                                                            fontFamily: formSettings?.styles?.fontFamily || 'Inter',
                                                         }}>
                                                             {formSettings.form_subtitle}
                                                         </div>
@@ -1526,9 +1523,9 @@ export default function QuantityOffersPage() {
                                                                 return (
                                                                     <div key={field.id} style={{
                                                                         marginBottom: '12px', padding: '14px',
-                                                                        background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%)',
+                                                                        background: formSettings?.styles?.fieldBackgroundColor || '#f9fafb',
                                                                         borderRadius: '10px',
-                                                                        border: '1px solid rgba(99, 102, 241, 0.2)',
+                                                                        border: '1px solid #e5e7eb',
                                                                     }}>
                                                                         <div style={{ fontSize: '12px', fontWeight: 600, color: '#1f2937', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>
