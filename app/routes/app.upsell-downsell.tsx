@@ -741,17 +741,42 @@ export default function UpsellDownsellPage() {
                                                 <div className="pv-phone-screen" ref={tickPreviewRef}>
 
                                                     {/* Product Section + Form Modal - same structure as Form Builder */}
-                                                    {/* Product Section - horizontal layout matching storefront */}
+                                                    {/* Product Section - horizontal layout matching storefront mobile */}
                                                     <div className="tick-pv-product" style={{ background: formSettings?.styles?.backgroundColor || '#ffffff' }}>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', paddingBottom: '10px', borderBottom: '1px solid #e5e5e5', marginBottom: '6px' }}>
-                                                            <img
-                                                                src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRfEiGMrC1y0OMGHknT1nakNKz7HWAgTAl3LQ&s?w=200&h=200&fit=crop&crop=center"
-                                                                alt="Sample Product"
-                                                                style={{ width: '65px', height: '65px', objectFit: 'cover', borderRadius: '6px', flexShrink: 0 }}
-                                                            />
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingBottom: '10px', borderBottom: '1px solid #e5e5e5', marginBottom: '6px', position: 'relative' }}>
+                                                            <div style={{ position: 'relative', flexShrink: 0 }}>
+                                                                <img
+                                                                    src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRfEiGMrC1y0OMGHknT1nakNKz7HWAgTAl3LQ&s?w=200&h=200&fit=crop&crop=center"
+                                                                    alt="Sample Product"
+                                                                    style={{ width: '55px', height: '55px', objectFit: 'cover', borderRadius: '8px' }}
+                                                                />
+                                                                {/* Quantity badge - black circle with "1" */}
+                                                                <div style={{
+                                                                    position: 'absolute',
+                                                                    top: '-6px',
+                                                                    right: '-6px',
+                                                                    width: '20px',
+                                                                    height: '20px',
+                                                                    background: '#000000',
+                                                                    borderRadius: '50%',
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'center',
+                                                                    fontSize: '11px',
+                                                                    fontWeight: 600,
+                                                                    color: '#ffffff',
+                                                                    border: '2px solid #ffffff'
+                                                                }}>1</div>
+                                                            </div>
                                                             <div style={{ flex: 1, minWidth: 0 }}>
-                                                                <div className="tick-pv-product-title">Sample Product</div>
-                                                                <div className="tick-pv-product-price">{fmtCurrency(1999)}</div>
+                                                                <div style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937', lineHeight: 1.3, marginBottom: '2px' }}>Sample Product</div>
+                                                                <div style={{ fontSize: '14px', fontWeight: 600, color: formSettings?.styles?.priceColor || '#111827' }}>{fmtCurrency(1999)}</div>
+                                                            </div>
+                                                            {/* Quantity selector - smaller mobile size */}
+                                                            <div style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid #d1d5db', borderRadius: '6px', overflow: 'hidden', background: '#fff', flexShrink: 0 }}>
+                                                                <div style={{ width: '28px', height: '28px', background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 500, color: '#6b7280', cursor: 'default' }}>−</div>
+                                                                <div style={{ width: '32px', height: '28px', borderLeft: '1px solid #e5e7eb', borderRight: '1px solid #e5e7eb', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 600, color: '#1f2937', fontFamily: "'Inter', sans-serif" }}>1</div>
+                                                                <div style={{ width: '28px', height: '28px', background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 500, color: '#6b7280', cursor: 'default' }}>+</div>
                                                             </div>
                                                         </div>
 
@@ -870,26 +895,16 @@ export default function UpsellDownsellPage() {
                                                                         const fsAny: any = formSettings?.styles || {};
                                                                         const themeKey = fsAny.themeKey || 'custom';
                                                                         const isPresetTheme = themeKey && themeKey !== 'custom';
-                                                                        const primaryTheme = formSettings?.primary_color || '#111827';
-                                                                        
-                                                                        let formThemeColor = formSettings?.primary_color || '#10b981';
-                                                                        if (themeKey === 'modern_slate') formThemeColor = '#ea580c';
-                                                                        else if (themeKey === 'dark_mode') formThemeColor = '#6366f1';
-                                                                        else if (themeKey === 'eastern_gold') formThemeColor = '#b45309';
-                                                                        else if (themeKey === 'arctic_blue') formThemeColor = '#0891b2';
-                                                                        else if (themeKey === 'rose_garden') formThemeColor = '#e11d48';
-                                                                        else if (themeKey === 'midnight_purple') formThemeColor = '#7c3aed';
-                                                                        else if (themeKey === 'forest_green') formThemeColor = '#16a34a';
-                                                                        else if (themeKey === 'professional') formThemeColor = '#374151';
-                                                                        else if (themeKey === 'minimal_white') formThemeColor = '#111827';
-                                                                        else if (themeKey === 'luxury_gold') formThemeColor = '#d97706';
-                                                                        else if (themeKey === 'ocean_breeze') formThemeColor = '#14b8a6';
-                                                                        else if (themeKey === 'default') formThemeColor = '#000000';
+                                                                        const formBackgroundColor = fsAny.backgroundColor || '#ffffff';
+                                                                        // Use priceColor from styles, fallback to primaryColor
+                                                                        const priceColor = fsAny.priceColor || primaryTheme || '#111827';
 
                                                                         const customGreyBg = '#f3f4f6';
                                                                         const customBorder = '1px solid #e5e7eb';
                                                                         const presetBg = (() => {
-                                                                            const hex = primaryTheme.replace('#', '');
+                                                                            if (themeKey === 'default' || themeKey === 'professional') return 'rgb(243, 244, 246)';
+                                                                            // Use form background color to create tinted background
+                                                                            const hex = formBackgroundColor.replace('#', '');
                                                                             if (hex.length !== 6) return 'rgba(17,24,39,0.12)';
                                                                             const r = parseInt(hex.substring(0, 2), 16);
                                                                             const g = parseInt(hex.substring(2, 4), 16);
@@ -903,7 +918,7 @@ export default function UpsellDownsellPage() {
                                                                             padding: 12,
                                                                             marginTop: 4,
                                                                             marginBottom: 12,
-                                                                            border: isPresetTheme ? 'none' : customBorder,
+                                                                            border: isPresetTheme ? (themeKey === 'default' ? customBorder : 'none') : customBorder,
                                                                         };
 
                                                                         return (
@@ -926,7 +941,7 @@ export default function UpsellDownsellPage() {
                                                                                             {tickUpsellPrice > 0 && (
                                                                                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#059669', marginBottom: '6px' }}><span>{tickOffer?.upsell_product_title || 'Upsell'}</span><span>{fmtCurrency(tickUpsellPrice)}</span></div>
                                                                                             )}
-                                                                                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 700, color: '#111827', paddingTop: '8px', borderTop: '1px dashed #d1d5db' }}><span>Total</span><span style={{ color: formThemeColor }}>{fmtCurrency(total)}</span></div>
+                                                                                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 700, color: '#111827', paddingTop: '8px', borderTop: '1px dashed #d1d5db' }}><span>Total</span><span style={{ color: priceColor }}>{fmtCurrency(total)}</span></div>
                                                                                         </>
                                                                                     );
                                                                                 })()}

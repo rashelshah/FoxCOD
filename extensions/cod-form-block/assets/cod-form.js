@@ -321,6 +321,7 @@
         buttonText: dataContainer.dataset.buttonText || 'Buy with COD',
         primaryColor: dataContainer.dataset.primaryColor || '#667eea',
         accentColor: dataContainer.dataset.accentColor || '#111827',
+        priceColor: dataContainer.dataset.priceColor || dataContainer.dataset.accentColor || '#111827',
         formBackground: dataContainer.dataset.formBg || '#ffffff',
         formThemeColor: dataContainer.dataset.formThemeColor || dataContainer.dataset.primaryColor || '#667eea',
         submitText: dataContainer.dataset.submitText || 'Place Order (COD)',
@@ -721,7 +722,8 @@
     var r = Math.max(0, (num >> 16) - Math.round(255 * percent / 100));
     var g = Math.max(0, ((num >> 8) & 0x00FF) - Math.round(255 * percent / 100));
     var b = Math.max(0, (num & 0x0000FF) - Math.round(255 * percent / 100));
-    return '#' + (r << 16 | g << 8 | b).toString(16).padStart(6, '0');
+    // Pad each component to 2 digits to ensure correct hex color
+    return '#' + r.toString(16).padStart(2, '0') + g.toString(16).padStart(2, '0') + b.toString(16).padStart(2, '0');
   }
 
   /**
@@ -2337,26 +2339,58 @@
       // Use preset / button primary color to theme the order summary,
       // but keep it clearly distinct and easy to identify.
       var styles = config.styles || {};
-      var primaryTheme = config.accentColor;
+      var backgroundColor = styles.backgroundColor || '#ffffff';
       var themeKey = styles.themeKey || 'custom';
       var isPresetTheme = themeKey && themeKey !== 'custom';
 
-      // Greyish styling baseline
+      // Greyish styling baseline - based on form background color
       var customGreyBg = '#f3f4f6';
       var customBorder = '1px solid #e5e7eb';
 
-      // For presets, use a stronger tinted background and no border
-      var presetBg = themeKey === 'default' || themeKey === 'professional' ? 'rgb(243, 244, 246)' : (hexToRgba(primaryTheme, 0.16) || '#e5f5ff');
+      // Create a darker premium surface color from form background
+function darkenColor(hex, percent) {
+    if (!hex) return null;
+
+    hex = hex.replace('#','');
+
+    if (hex.length === 3) {
+        hex = hex.split('').map(c => c + c).join('');
+    }
+
+    var r = parseInt(hex.substring(0,2),16);
+    var g = parseInt(hex.substring(2,4),16);
+    var b = parseInt(hex.substring(4,6),16);
+
+    r = Math.max(0, Math.floor(r * (1 - percent)));
+    g = Math.max(0, Math.floor(g * (1 - percent)));
+    b = Math.max(0, Math.floor(b * (1 - percent)));
+
+    return `rgb(${r}, ${g}, ${b})`;
+}
+
+
+
+      // For presets, use a tinted version of the form's background color
+      var presetBg;
+      if (themeKey === 'default' || themeKey === 'professional') {
+          presetBg = 'rgb(243, 244, 246)';
+      } else {
+          // Use form background color to create tinted background
+          presetBg = darkenColor(backgroundColor, 0.06) || '#f3f4f6';
+      }
 
       if (isPresetTheme) {
           card.style.background = presetBg;
           card.style.border = themeKey === 'default' ? customBorder : 'none';
       } else {
-          card.style.background = customGreyBg;
+          // For custom themes, use a slightly tinted version of form background or fallback
+          var formBgTinted = darkenColor(backgroundColor, 0.08) || customGreyBg;
+          card.style.background = formBgTinted;
           card.style.border = customBorder;
       }
+      card.style.boxShadow = "0 6px 18px rgba(0,0,0,0.06)";
       card.style.padding = '12px';
-      card.style.borderRadius = '8px';
+      card.style.borderRadius = '14px';
       card.style.marginBottom = '16px';
 
       // Check for selected quantity offer
@@ -2444,7 +2478,7 @@
         '</div>' +
         '<div style="display:flex; justify-content:space-between; margin-top:8px; padding-top:8px; border-top:1px dashed #d1d5db; font-weight:700; color:#111827;">' +
         '   <span>Total</span>' +
-        '   <span id="cod-summary-total" style="color:' + config.accentColor + '">' + formatMoney(state.total) + '</span>' +
+        '   <span id="cod-summary-total" style="color:' + (config.priceColor || config.accentColor) + '">' + formatMoney(state.total) + '</span>' +
         '</div>';
 
       form.insertBefore(card, form.querySelector('button[type="submit"]'));
@@ -2722,9 +2756,11 @@
                   if (r && r.checked) {
                       c.style.borderColor = config.accentColor;
                       c.style.background = fieldBg;
+                      c.style.boxShadow = '0 0 0 1px ' + config.accentColor + ', 0 0 0 4px ' + (hexToRgba(config.accentColor, 0.2) || 'transparent');
                   } else {
                       c.style.borderColor = '#e5e7eb';
                       c.style.background = '#fff';
+                      c.style.boxShadow = 'none';
                   }
               });
           });
@@ -2912,9 +2948,10 @@
           row.style.alignItems = 'flex-start';
           row.style.gap = '12px';
           row.style.padding = '14px';
-          row.style.background = '#fff';
+          row.style.background = opt.checked ? fieldBg : '#fff';
           row.style.borderRadius = '10px';
-          row.style.border = '2px solid #e5e7eb';
+          row.style.border = '2px solid ' + (opt.checked ? config.accentColor : '#e5e7eb');
+          row.style.boxShadow = opt.checked ? ('0 0 0 1px ' + config.accentColor + ', 0 0 0 4px ' + (hexToRgba(config.accentColor, 0.2) || 'transparent')) : 'none';
           row.style.cursor = 'pointer';
           row.style.transition = 'all 0.2s ease';
 
@@ -2968,11 +3005,14 @@
           radio.addEventListener('change', function() {
               // Update all row styles
               var allRows = optionsWrapper.querySelectorAll('label');
-              allRows.forEach(function(r, idx) {
-                  var isSelected = r.querySelector('input[type="radio"]').checked;
+              allRows.forEach(function(r) {
+                  var rInput = r.querySelector('input[type="radio"]');
+                  if (!rInput) return;
+                  var isSelected = rInput.checked;
                   r.style.borderColor = isSelected ? config.accentColor : '#e5e7eb';
                   // Selected option uses the same background color as form fields
                   r.style.background = isSelected ? fieldBg : '#fff';
+                  r.style.boxShadow = isSelected ? ('0 0 0 1px ' + config.accentColor + ', 0 0 0 4px ' + (hexToRgba(config.accentColor, 0.2) || 'transparent')) : 'none';
               });
 
               // Update submit button text and styling
@@ -3364,7 +3404,7 @@
       // Total
       html += '<div style="display:flex; justify-content:space-between; margin-top:8px; padding-top:8px; border-top:1px dashed #d1d5db; font-weight:700; color:#111827;">' +
           '   <span>Total</span>' +
-          '   <span id="cod-summary-total" style="color:' + config.accentColor + '">' + formatMoney(state.total) + '</span>' +
+          '   <span id="cod-summary-total" style="color:' + (config.priceColor || config.accentColor) + '">' + formatMoney(state.total) + '</span>' +
           '</div>';
 
       summaryEl.innerHTML = html;
@@ -3880,11 +3920,12 @@
 
                                         // Create new price wrapper with strikeout + discounted price
                                         var priceWrapper = document.createElement('div');
+                                        var dsPriceColor = config.priceColor || config.accentColor;
                                         priceWrapper.className = 'cod-ds-price-wrapper';
                                         priceWrapper.innerHTML =
                                             '<div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">' +
                                             '  <span style="text-decoration: line-through; color: #9ca3af; font-size: 14px;">' + formatMoney(originalPrice) + '</span>' +
-                                            '  <span style="font-size: 18px; font-weight: 700; color: ' + config.accentColor + ';">' + formatMoney(dsItem.price) + '</span>' +
+                                            '  <span style="font-size: 18px; font-weight: 700; color: ' + dsPriceColor + ';">' + formatMoney(dsItem.price) + '</span>' +
                                             '</div>' +
                                             '<div style="display: flex; align-items: center; gap: 6px; margin-top: 4px;">' +
                                             '  <span style="font-size: 11px; color: #10b981; font-weight: 600;">✓ Downsell offer applied</span>' +

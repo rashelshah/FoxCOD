@@ -178,6 +178,7 @@
      data-primary-color="{{ cod_primary_color }}"
      data-form-theme-color="{{ form_theme_color }}"
      data-accent-color="{{ accent_color }}"
+     data-price-color="{{ cod_styles_parsed.priceColor | default: accent_color }}"
      data-form-bg="{{ form_background }}"
      data-form-type="{{ cod_form_type }}"
      data-fields="{{ cod_fields | escape }}"
@@ -324,7 +325,7 @@
     <div class="cod-product-details">
       <h3 class="cod-product-title">{{ product.title }}</h3>
       {% if cod_show_price == 'true' %}
-          <p class="cod-product-price" style="color: {{ accent_color }};">{{ product_price_display }}</p>
+          <p class="cod-product-price" style="color: {{ cod_styles_parsed.priceColor | default: accent_color }};">{{ product_price_display }}</p>
       {% endif %}
       {% if current_variant.title != 'Default Title' %}
         <p class="cod-variant-title">{{ current_variant.title }}</p>
@@ -353,7 +354,7 @@
     {% comment %} Total Price {% endcomment %}
     <div class="cod-total">
       <span>Total:</span>
-      <span class="cod-total-price" data-unit-price="{{ current_variant.price | divided_by: 100.0 }}" style="color: {{ accent_color }};">
+      <span class="cod-total-price" data-unit-price="{{ current_variant.price | divided_by: 100.0 }}" style="color: {{ cod_styles_parsed.priceColor | default: accent_color }};">
         {{ product_price }}
       </span>
     </div>

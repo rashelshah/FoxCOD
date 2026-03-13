@@ -986,23 +986,43 @@ const PreviewDisplay = memo(({
                             borderRadius: (formStyles?.borderRadius || borderRadius) + 'px',
                             ...(modalStyle === 'glassmorphism' ? { backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.3)', boxShadow: formStyles?.shadow ? '0 8px 32px rgba(0,0,0,0.1)' : 'none' } : modalStyle === 'minimal' ? { border: '1px solid #e5e7eb', boxShadow: 'none' } : { boxShadow: formStyles?.shadow ? '0 10px 25px rgba(0,0,0,0.1)' : 'none' }),
                         }}>
-                            {/* Product Info - horizontal layout matching storefront */}
+                            {/* Product Info - horizontal layout matching storefront mobile */}
                             {activeTab !== 'button' && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingBottom: '12px', borderBottom: '1px solid rgba(0,0,0,0.08)', marginBottom: '8px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingBottom: '12px', borderBottom: '1px solid rgba(0,0,0,0.08)', marginBottom: '8px', position: 'relative' }}>
                                     {showProductImage && (
-                                        <img
-                                            src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRfEiGMrC1y0OMGHknT1nakNKz7HWAgTAl3LQ&s?w=200&h=200&fit=crop&crop=center"
-                                            alt="Sample Product"
-                                            style={{ width: '65px', height: '65px', objectFit: 'cover', borderRadius: '6px', flexShrink: 0 }}
-                                        />
+                                        <div style={{ position: 'relative', flexShrink: 0 }}>
+                                            <img
+                                                src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRfEiGMrC1y0OMGHknT1nakNKz7HWAgTAl3LQ&s?w=200&h=200&fit=crop&crop=center"
+                                                alt="Sample Product"
+                                                style={{ width: '55px', height: '55px', objectFit: 'cover', borderRadius: '8px' }}
+                                            />
+                                            {/* Quantity badge - black circle with "1" */}
+                                            <div style={{
+                                                position: 'absolute',
+                                                top: '-6px',
+                                                right: '-6px',
+                                                width: '20px',
+                                                height: '20px',
+                                                background: '#000000',
+                                                borderRadius: '50%',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                fontSize: '11px',
+                                                fontWeight: 600,
+                                                color: '#ffffff',
+                                                border: '2px solid #ffffff'
+                                            }}>1</div>
+                                        </div>
                                     )}
                                     <div style={{ flex: 1, minWidth: 0 }}>
-                                        <div className="preview-product-title">Sample Product</div>
+                                        <div style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937', lineHeight: 1.3, marginBottom: '2px' }}>Sample Product</div>
                                         {showPrice && (
-                                            <div className="preview-product-price">{fmtCurrency(1999)}</div>
+                                            <div style={{ fontSize: '14px', fontWeight: 600, color: formStyles?.priceColor || '#111827' }}>{fmtCurrency(1999)}</div>
                                         )}
                                     </div>
-                                    <div style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid #d1d5db', borderRadius: '999px', overflow: 'hidden', background: '#fff', flexShrink: 0, marginLeft: 'auto' }}>
+                                    {/* Quantity selector - pill shape like storefront */}
+                                    <div style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid #d1d5db', borderRadius: '999px', overflow: 'hidden', background: '#fff', flexShrink: 0 }}>
                                         <div style={{ width: '34px', height: '32px', background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 500, color: '#6b7280', cursor: 'default' }}>−</div>
                                         <div style={{ width: '36px', height: '32px', borderLeft: '1px solid #e5e7eb', borderRight: '1px solid #e5e7eb', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 600, color: '#1f2937', fontFamily: "'Inter', sans-serif" }}>1</div>
                                         <div style={{ width: '34px', height: '32px', background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 500, color: '#6b7280', cursor: 'default' }}>+</div>
@@ -1125,28 +1145,51 @@ const PreviewDisplay = memo(({
                                             const fsAny: any = formStyles || {};
                                             const themeKey = fsAny.themeKey || 'custom';
                                             const isPresetTheme = themeKey && themeKey !== 'custom';
-                                            const primaryTheme = primaryColor || '#111827';
+                                            const formBackgroundColor = fsAny.backgroundColor || '#ffffff';
 
                                             const customGreyBg = '#f3f4f6';
                                             const customBorder = '1px solid #e5e7eb';
-                                            const presetBg = (() => {
-                                                if (themeKey === 'default' || themeKey === 'professional') return 'rgb(243, 244, 246)';
-                                                const hex = primaryTheme.replace('#', '');
-                                                if (hex.length !== 6) return 'rgba(17,24,39,0.12)';
-                                                const r = parseInt(hex.substring(0, 2), 16);
-                                                const g = parseInt(hex.substring(2, 4), 16);
-                                                const b = parseInt(hex.substring(4, 6), 16);
-                                                return `rgba(${r},${g},${b},0.16)`;
-                                            })();
+                                            
+                                            // Replicate darkenColor logic from cod-form.js
+                                            const darkenColor = (hex: string, percent: number) => {
+                                                if (!hex) return null;
+                                                hex = hex.replace('#', '');
+                                                if (hex.length === 3) {
+                                                    hex = hex.split('').map(c => c + c).join('');
+                                                }
+                                                // Default to #ffffff if invalid
+                                                if (hex.length !== 6) hex = 'ffffff';
+                                                
+                                                let r = parseInt(hex.substring(0, 2), 16);
+                                                let g = parseInt(hex.substring(2, 4), 16);
+                                                let b = parseInt(hex.substring(4, 6), 16);
+                                                
+                                                if (isNaN(r) || isNaN(g) || isNaN(b)) return null;
+
+                                                r = Math.max(0, Math.floor(r * (1 - percent)));
+                                                g = Math.max(0, Math.floor(g * (1 - percent)));
+                                                b = Math.max(0, Math.floor(b * (1 - percent)));
+
+                                                return `rgb(${r}, ${g}, ${b})`;
+                                            };
+
+                                            let presetBg;
+                                            if (themeKey === 'default' || themeKey === 'professional') {
+                                                presetBg = 'rgb(243, 244, 246)';
+                                            } else {
+                                                presetBg = darkenColor(formBackgroundColor, 0.06) || '#f3f4f6';
+                                            }
 
                                             const cardStyle: React.CSSProperties = {
-                                                background: isPresetTheme ? presetBg : customGreyBg,
-                                                borderRadius: 10,
+                                                background: isPresetTheme ? presetBg : (darkenColor(formBackgroundColor, 0.08) || customGreyBg),
+                                                borderRadius: 14,
                                                 padding: 12,
-                                                marginTop: 4,
-                                                marginBottom: 12,
+                                                marginTop: 16,
                                                 border: isPresetTheme ? (themeKey === 'default' ? customBorder : 'none') : customBorder,
+                                                boxShadow: "0 6px 18px rgba(0,0,0,0.06)"
                                             };
+
+                                            const priceColor = fsAny.priceColor || primaryColor || '#111827';
 
                                             return (
                                                 <div key={field.id} style={cardStyle}>
@@ -1166,7 +1209,7 @@ const PreviewDisplay = memo(({
                                                         display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 700,
                                                         color: '#111827', paddingTop: '8px', borderTop: '1px dashed #d1d5db'
                                                     }}>
-                                                        <span>Total</span><span style={{ color: formThemeColor }}>{fmtCurrency(total)}</span>
+                                                        <span>Total</span><span style={{ color: priceColor }}>{fmtCurrency(total)}</span>
                                                     </div>
                                                 </div>
                                             );
@@ -2510,7 +2553,7 @@ export default function SettingsPage() {
                     border: 1px solid #e5e7eb;
                     border-radius: 16px;
                     margin-bottom: 16px;
-                    overflow: hidden;
+                    overflow: visible;
                     transition: box-shadow 0.2s ease;
                 }
                 .accordion-section.open {
@@ -3831,18 +3874,18 @@ export default function SettingsPage() {
                                                     const key = e.target.value;
                                                     setSelectedPreset(key);
                                                     const presetMap: Record<string, any> = {
-                                                        default: { styles: { themeKey: 'default', textColor: '#333333', textSize: 14, fontStyle: 'normal' as const, borderColor: '#d1d5db', borderWidth: 1, backgroundColor: '#ffffff', labelAlignment: 'left' as const, iconColor: '#6b7280', iconBackground: '#f3f4f6', borderRadius: 12, shadow: true, fieldBackgroundColor: '#ffffff', labelColor: '#111827', labelFontSize: 14 }, buttonColor: '#000000' },
-                                                        modern_slate: { styles: { themeKey: 'modern_slate', textColor: '#1e293b', textSize: 14, fontStyle: 'normal' as const, borderColor: '#f97316', borderWidth: 2, backgroundColor: '#fff7ed', labelAlignment: 'left' as const, iconColor: '#ea580c', iconBackground: '#fed7aa', borderRadius: 16, shadow: true, fieldBackgroundColor: '#fff7ed', labelColor: '#9a3412', labelFontSize: 14 }, buttonColor: '#ea580c' },
-                                                        dark_mode: { styles: { themeKey: 'dark_mode', textColor: '#e2e8f0', textSize: 14, fontStyle: 'normal' as const, borderColor: '#334155', borderWidth: 1, backgroundColor: '#1e293b', labelAlignment: 'left' as const, iconColor: '#94a3b8', iconBackground: '#1e293b', borderRadius: 12, shadow: true, fieldBackgroundColor: '#0f172a', labelColor: '#f1f5f9', labelFontSize: 14 }, buttonColor: '#6366f1' },
-                                                        eastern_gold: { styles: { themeKey: 'eastern_gold', textColor: '#78350f', textSize: 14, fontStyle: 'normal' as const, borderColor: '#d4a574', borderWidth: 1, backgroundColor: '#fffbeb', labelAlignment: 'left' as const, iconColor: '#b45309', iconBackground: '#fef3c7', borderRadius: 10, shadow: true, fieldBackgroundColor: '#fef9c3', labelColor: '#713f12', labelFontSize: 14 }, buttonColor: '#b45309' },
-                                                        arctic_blue: { styles: { themeKey: 'arctic_blue', textColor: '#164e63', textSize: 14, fontStyle: 'normal' as const, borderColor: '#67e8f9', borderWidth: 1, backgroundColor: '#ecfeff', labelAlignment: 'left' as const, iconColor: '#0891b2', iconBackground: '#cffafe', borderRadius: 12, shadow: true, fieldBackgroundColor: '#ecfeff', labelColor: '#155e75', labelFontSize: 14 }, buttonColor: '#0891b2' },
-                                                        rose_garden: { styles: { themeKey: 'rose_garden', textColor: '#9f1239', textSize: 14, fontStyle: 'normal' as const, borderColor: '#fda4af', borderWidth: 1, backgroundColor: '#fff1f2', labelAlignment: 'left' as const, iconColor: '#e11d48', iconBackground: '#ffe4e6', borderRadius: 14, shadow: true, fieldBackgroundColor: '#fff1f2', labelColor: '#881337', labelFontSize: 14 }, buttonColor: '#e11d48' },
-                                                        midnight_purple: { styles: { themeKey: 'midnight_purple', textColor: '#c4b5fd', textSize: 14, fontStyle: 'normal' as const, borderColor: '#4c1d95', borderWidth: 1, backgroundColor: '#1e1b4b', labelAlignment: 'left' as const, iconColor: '#a78bfa', iconBackground: '#312e81', borderRadius: 12, shadow: true, fieldBackgroundColor: '#312e81', labelColor: '#ddd6fe', labelFontSize: 14 }, buttonColor: '#7c3aed' },
-                                                        forest_green: { styles: { themeKey: 'forest_green', textColor: '#14532d', textSize: 14, fontStyle: 'normal' as const, borderColor: '#86efac', borderWidth: 1, backgroundColor: '#f0fdf4', labelAlignment: 'left' as const, iconColor: '#16a34a', iconBackground: '#dcfce7', borderRadius: 10, shadow: true, fieldBackgroundColor: '#f0fdf4', labelColor: '#15803d', labelFontSize: 14 }, buttonColor: '#16a34a' },
-                                                        professional: { styles: { themeKey: 'professional', textColor: '#1f2937', textSize: 14, fontStyle: 'normal' as const, borderColor: '#9ca3af', borderWidth: 1, backgroundColor: '#f9fafb', labelAlignment: 'left' as const, iconColor: '#4b5563', iconBackground: '#e5e7eb', borderRadius: 6, shadow: false, fieldBackgroundColor: '#ffffff', labelColor: '#111827', labelFontSize: 13 }, buttonColor: '#374151' },
-                                                        minimal_white: { styles: { themeKey: 'minimal_white', textColor: '#374151', textSize: 14, fontStyle: 'normal' as const, borderColor: '#e5e7eb', borderWidth: 1, backgroundColor: '#ffffff', labelAlignment: 'left' as const, iconColor: '#9ca3af', iconBackground: 'transparent', borderRadius: 8, shadow: false, fieldBackgroundColor: '#ffffff', labelColor: '#6b7280', labelFontSize: 13 }, buttonColor: '#111827' },
-                                                        luxury_gold: { styles: { themeKey: 'luxury_gold', textColor: '#fbbf24', textSize: 14, fontStyle: 'normal' as const, borderColor: '#d97706', borderWidth: 1, backgroundColor: '#18181b', labelAlignment: 'left' as const, iconColor: '#f59e0b', iconBackground: '#27272a', borderRadius: 10, shadow: true, fieldBackgroundColor: '#27272a', labelColor: '#fcd34d', labelFontSize: 14 }, buttonColor: '#d97706' },
-                                                        ocean_breeze: { styles: { themeKey: 'ocean_breeze', textColor: '#0f766e', textSize: 14, fontStyle: 'normal' as const, borderColor: '#5eead4', borderWidth: 1, backgroundColor: '#f0fdfa', labelAlignment: 'left' as const, iconColor: '#14b8a6', iconBackground: '#ccfbf1', borderRadius: 14, shadow: true, fieldBackgroundColor: '#f0fdfa', labelColor: '#115e59', labelFontSize: 14 }, buttonColor: '#14b8a6' },
+                                                        default: { styles: { themeKey: 'default', textColor: '#333333', textSize: 14, fontStyle: 'normal' as const, borderColor: '#d1d5db', borderWidth: 1, backgroundColor: '#ffffff', labelAlignment: 'left' as const, iconColor: '#6b7280', iconBackground: '#f3f4f6', borderRadius: 12, shadow: true, fieldBackgroundColor: '#ffffff', labelColor: '#111827', labelFontSize: 14, priceColor: '#000000' }, buttonColor: '#000000' },
+                                                        modern_slate: { styles: { themeKey: 'modern_slate', textColor: '#1e293b', textSize: 14, fontStyle: 'normal' as const, borderColor: '#f97316', borderWidth: 2, backgroundColor: '#fff7ed', labelAlignment: 'left' as const, iconColor: '#ea580c', iconBackground: '#fed7aa', borderRadius: 16, shadow: true, fieldBackgroundColor: '#fff7ed', labelColor: '#9a3412', labelFontSize: 14, priceColor: '#ea580c' }, buttonColor: '#ea580c' },
+                                                        dark_mode: { styles: { themeKey: 'dark_mode', textColor: '#e2e8f0', textSize: 14, fontStyle: 'normal' as const, borderColor: '#334155', borderWidth: 1, backgroundColor: '#1e293b', labelAlignment: 'left' as const, iconColor: '#94a3b8', iconBackground: '#1e293b', borderRadius: 12, shadow: true, fieldBackgroundColor: '#0f172a', labelColor: '#f1f5f9', labelFontSize: 14, priceColor: '#6366f1' }, buttonColor: '#6366f1' },
+                                                        eastern_gold: { styles: { themeKey: 'eastern_gold', textColor: '#78350f', textSize: 14, fontStyle: 'normal' as const, borderColor: '#d4a574', borderWidth: 1, backgroundColor: '#fffbeb', labelAlignment: 'left' as const, iconColor: '#b45309', iconBackground: '#fef3c7', borderRadius: 10, shadow: true, fieldBackgroundColor: '#fef9c3', labelColor: '#713f12', labelFontSize: 14, priceColor: '#b45309' }, buttonColor: '#b45309' },
+                                                        arctic_blue: { styles: { themeKey: 'arctic_blue', textColor: '#164e63', textSize: 14, fontStyle: 'normal' as const, borderColor: '#67e8f9', borderWidth: 1, backgroundColor: '#ecfeff', labelAlignment: 'left' as const, iconColor: '#0891b2', iconBackground: '#cffafe', borderRadius: 12, shadow: true, fieldBackgroundColor: '#ecfeff', labelColor: '#155e75', labelFontSize: 14, priceColor: '#0891b2' }, buttonColor: '#0891b2' },
+                                                        rose_garden: { styles: { themeKey: 'rose_garden', textColor: '#9f1239', textSize: 14, fontStyle: 'normal' as const, borderColor: '#fda4af', borderWidth: 1, backgroundColor: '#fff1f2', labelAlignment: 'left' as const, iconColor: '#e11d48', iconBackground: '#ffe4e6', borderRadius: 14, shadow: true, fieldBackgroundColor: '#fff1f2', labelColor: '#881337', labelFontSize: 14, priceColor: '#e11d48' }, buttonColor: '#e11d48' },
+                                                        midnight_purple: { styles: { themeKey: 'midnight_purple', textColor: '#c4b5fd', textSize: 14, fontStyle: 'normal' as const, borderColor: '#4c1d95', borderWidth: 1, backgroundColor: '#1e1b4b', labelAlignment: 'left' as const, iconColor: '#a78bfa', iconBackground: '#312e81', borderRadius: 12, shadow: true, fieldBackgroundColor: '#312e81', labelColor: '#ddd6fe', labelFontSize: 14, priceColor: '#a78bfa' }, buttonColor: '#7c3aed' },
+                                                        forest_green: { styles: { themeKey: 'forest_green', textColor: '#14532d', textSize: 14, fontStyle: 'normal' as const, borderColor: '#86efac', borderWidth: 1, backgroundColor: '#f0fdf4', labelAlignment: 'left' as const, iconColor: '#16a34a', iconBackground: '#dcfce7', borderRadius: 10, shadow: true, fieldBackgroundColor: '#f0fdf4', labelColor: '#15803d', labelFontSize: 14, priceColor: '#16a34a' }, buttonColor: '#16a34a' },
+                                                        professional: { styles: { themeKey: 'professional', textColor: '#1f2937', textSize: 14, fontStyle: 'normal' as const, borderColor: '#9ca3af', borderWidth: 1, backgroundColor: '#f9fafb', labelAlignment: 'left' as const, iconColor: '#4b5563', iconBackground: '#e5e7eb', borderRadius: 6, shadow: false, fieldBackgroundColor: '#ffffff', labelColor: '#111827', labelFontSize: 13, priceColor: '#374151' }, buttonColor: '#374151' },
+                                                        minimal_white: { styles: { themeKey: 'minimal_white', textColor: '#374151', textSize: 14, fontStyle: 'normal' as const, borderColor: '#e5e7eb', borderWidth: 1, backgroundColor: '#ffffff', labelAlignment: 'left' as const, iconColor: '#9ca3af', iconBackground: 'transparent', borderRadius: 8, shadow: false, fieldBackgroundColor: '#ffffff', labelColor: '#6b7280', labelFontSize: 13, priceColor: '#111827' }, buttonColor: '#111827' },
+                                                        luxury_gold: { styles: { themeKey: 'luxury_gold', textColor: '#fbbf24', textSize: 14, fontStyle: 'normal' as const, borderColor: '#d97706', borderWidth: 1, backgroundColor: '#18181b', labelAlignment: 'left' as const, iconColor: '#f59e0b', iconBackground: '#27272a', borderRadius: 10, shadow: true, fieldBackgroundColor: '#27272a', labelColor: '#fcd34d', labelFontSize: 14, priceColor: '#fbbf24' }, buttonColor: '#d97706' },
+                                                        ocean_breeze: { styles: { themeKey: 'ocean_breeze', textColor: '#0f766e', textSize: 14, fontStyle: 'normal' as const, borderColor: '#5eead4', borderWidth: 1, backgroundColor: '#f0fdfa', labelAlignment: 'left' as const, iconColor: '#14b8a6', iconBackground: '#ccfbf1', borderRadius: 14, shadow: true, fieldBackgroundColor: '#f0fdfa', labelColor: '#115e59', labelFontSize: 14, priceColor: '#14b8a6' }, buttonColor: '#14b8a6' },
                                                     };
                                                     if (key !== 'custom' && presetMap[key]) {
                                                         setFormStyles(presetMap[key].styles);
@@ -3890,6 +3933,13 @@ export default function SettingsPage() {
                                                     output
                                                 />
                                             </div>
+                                        </div>
+                                        <div className="input-group" style={{ marginTop: 12 }}>
+                                            <ColorSelector
+                                                label="Price Color"
+                                                value={formStyles?.priceColor || '#111827'}
+                                                onChange={(c) => setFormStyles(s => ({ ...s, priceColor: c }))}
+                                            />
                                         </div>
                                         <div className="input-group" style={{ marginTop: 12 }}>
                                             <label className="input-label">Font Style</label>

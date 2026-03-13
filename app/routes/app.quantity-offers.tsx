@@ -1429,26 +1429,16 @@ export default function QuantityOffersPage() {
                                                                 const fsAny: any = formSettings?.styles || {};
                                                                 const themeKey = fsAny.themeKey || 'custom';
                                                                 const isPresetTheme = themeKey && themeKey !== 'custom';
-                                                                const primaryTheme = primaryColor || '#111827';
-                                                                
-                                                                let formThemeColor = primaryColor;
-                                                                if (themeKey === 'modern_slate') formThemeColor = '#ea580c';
-                                                                else if (themeKey === 'dark_mode') formThemeColor = '#6366f1';
-                                                                else if (themeKey === 'eastern_gold') formThemeColor = '#b45309';
-                                                                else if (themeKey === 'arctic_blue') formThemeColor = '#0891b2';
-                                                                else if (themeKey === 'rose_garden') formThemeColor = '#e11d48';
-                                                                else if (themeKey === 'midnight_purple') formThemeColor = '#7c3aed';
-                                                                else if (themeKey === 'forest_green') formThemeColor = '#16a34a';
-                                                                else if (themeKey === 'professional') formThemeColor = '#374151';
-                                                                else if (themeKey === 'minimal_white') formThemeColor = '#111827';
-                                                                else if (themeKey === 'luxury_gold') formThemeColor = '#d97706';
-                                                                else if (themeKey === 'ocean_breeze') formThemeColor = '#14b8a6';
-                                                                else if (themeKey === 'default') formThemeColor = '#000000';
+                                                                const formBackgroundColor = fsAny.backgroundColor || '#ffffff';
+                                                                // Use priceColor from styles, fallback to primaryColor
+                                                                const priceColor = fsAny.priceColor || primaryColor || '#111827';
 
                                                                 const customGreyBg = '#f3f4f6';
                                                                 const customBorder = '1px solid #e5e7eb';
                                                                 const presetBg = (() => {
-                                                                    const hex = primaryTheme.replace('#', '');
+                                                                    if (themeKey === 'default' || themeKey === 'professional') return 'rgb(243, 244, 246)';
+                                                                    // Use form background color to create tinted background
+                                                                    const hex = formBackgroundColor.replace('#', '');
                                                                     if (hex.length !== 6) return 'rgba(17,24,39,0.12)';
                                                                     const r = parseInt(hex.substring(0, 2), 16);
                                                                     const g = parseInt(hex.substring(2, 4), 16);
@@ -1462,7 +1452,7 @@ export default function QuantityOffersPage() {
                                                                     padding: 12,
                                                                     marginTop: 16,
                                                                     marginBottom: 16,
-                                                                    border: isPresetTheme ? 'none' : customBorder,
+                                                                    border: isPresetTheme ? (themeKey === 'default' ? customBorder : 'none') : customBorder,
                                                                 };
 
                                                                 return (
@@ -1506,7 +1496,7 @@ export default function QuantityOffersPage() {
                                                                                         color: '#111827', paddingTop: '8px', borderTop: '1px dashed #d1d5db',
                                                                                     }}>
                                                                                         <span>Total</span>
-                                                                                        <span style={{ color: formThemeColor }}>{fmtCurrency(total)}</span>
+                                                                                        <span style={{ color: priceColor }}>{fmtCurrency(total)}</span>
                                                                                     </div>
                                                                                 </>
                                                                             );
