@@ -80,12 +80,9 @@
 {% assign cod_fields = shop.metafields.fox_cod.fields | default: '[]' %}
 {% assign cod_blocks = shop.metafields.fox_cod.blocks | default: '{}' %}
 {% assign cod_custom_fields = shop.metafields.fox_cod.custom_fields | default: '[]' %}
-{% assign cod_styles = shop.metafields.fox_cod.styles | default: '{}' %}
-{% assign theme_key = shop.metafields.fox_cod.styles.value.themeKey %}
-{% if theme_key == blank %}
-  {% assign cod_styles_parsed = cod_styles | parse_json %}
-  {% assign theme_key = cod_styles_parsed.themeKey | default: 'custom' %}
-{% endif %}
+{% assign cod_styles_raw = shop.metafields.fox_cod.styles %}
+{% assign cod_styles_parsed = cod_styles_raw.value %}
+{% assign theme_key = cod_styles_parsed.themeKey | default: 'custom' %}
 
 {% assign form_theme_color = cod_primary_color %}
 {% if theme_key == 'modern_slate' %}{% assign form_theme_color = '#ea580c' %}
@@ -103,21 +100,24 @@
 {% endif %}
 
 {% comment %} Accent color — decoupled from product button color (cod_primary_color). {% endcomment %}
-{% comment %} Priority: edited preset border → preset theme color → custom border → #111827 fallback {% endcomment %}
+{% comment %} Priority: 1) edited preset/custom border → 2) preset theme color → 3) fallback #111827 {% endcomment %}
 {% unless cod_styles_parsed %}{% assign cod_styles_parsed = cod_styles | parse_json %}{% endunless %}
 {% assign edited_border = cod_styles_parsed.borderColor %}
 {% assign edited_bg = cod_styles_parsed.backgroundColor %}
 
-{% if theme_key == 'custom' %}
-  {% assign accent_color = edited_border %}
-  {% assign form_background = edited_bg %}
-{% else %}
-  {% assign accent_color = edited_border | default: form_theme_color %}
-  {% assign form_background = edited_bg %}
+{% comment %} Accent color resolution: edited border takes priority over preset theme color {% endcomment %}
+{% assign accent_color = edited_border %}
+
+{% if accent_color == blank %}
+  {% assign accent_color = form_theme_color %}
 {% endif %}
 
-{% assign accent_color = accent_color | default: '#111827' %}
-{% assign form_background = form_background | default: '#ffffff' %}
+{% if accent_color == blank %}
+  {% assign accent_color = '#111827' %}
+{% endif %}
+
+{% comment %} Form background: use edited background if available, otherwise white {% endcomment %}
+{% assign form_background = edited_bg | default: '#ffffff' %}
 
 {% assign btn_styles_raw = shop.metafields.fox_cod.button_styles_json.value %}
 {% assign btn_styles = btn_styles_raw | parse_json %}
@@ -183,7 +183,7 @@
      data-fields="{{ cod_fields | escape }}"
      data-blocks="{{ cod_blocks | escape }}"
      data-custom-fields="{{ cod_custom_fields | escape }}"
-     data-styles="{{ cod_styles | escape }}"
+     data-styles="{{ cod_styles_parsed | json | escape }}"
      data-button-styles="{{ cod_button_styles | escape }}"
      data-button-text-color="{{ btn_styles.textColor | default: '#ffffff' }}"
      data-button-border-color="{{ btn_styles.borderColor | default: cod_primary_color }}"
@@ -324,7 +324,7 @@
     <div class="cod-product-details">
       <h3 class="cod-product-title">{{ product.title }}</h3>
       {% if cod_show_price == 'true' %}
-          <p class="cod-product-price" style="color: {{ form_theme_color }};">{{ product_price_display }}</p>
+          <p class="cod-product-price" style="color: {{ accent_color }};">{{ product_price_display }}</p>
       {% endif %}
       {% if current_variant.title != 'Default Title' %}
         <p class="cod-variant-title">{{ current_variant.title }}</p>
