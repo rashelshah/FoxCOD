@@ -155,10 +155,10 @@
 {% comment %} Only render COD functionality if enabled in the app {% endcomment %}
 {% if cod_enabled == 'true' %}
 
-{% comment %} Load Inter font from Google Fonts {% endcomment %}
+{% comment %} Load Google Fonts for form typography {% endcomment %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700&family=Cormorant+Garamond:wght@400;500;600;700&family=Abril+Fatface:wght@400;500;600;700&family=Syne:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 
 
 {% comment %} Container for COD form data - hidden, used by JavaScript {% endcomment %}
@@ -340,9 +340,9 @@
   </div>
   {% endif %}
   
-  <div class="cod-form-headers" style="text-align: center; margin-bottom: 16px;">
-      {% if cod_form_title != blank %}<h2 style="margin: 0; font-size: 20px;">{{ cod_form_title }}</h2>{% endif %}
-      {% if cod_form_subtitle != blank %}<p style="margin: 4px 0 0; color: #666; font-size: 14px;">{{ cod_form_subtitle }}</p>{% endif %}
+  <div class="cod-form-headers" style="text-align: center; margin-bottom: 16px; font-family: '{{ cod_styles_parsed.fontFamily | default: 'Inter' }}', sans-serif;">
+      {% if cod_form_title != blank %}<h2 style="margin: 0; font-size: 20px; font-weight: 600; color: {{ cod_styles_parsed.textColor | default: '#111' }}; font-family: inherit;">{{ cod_form_title }}</h2>{% endif %}
+      {% if cod_form_subtitle != blank %}<p style="margin: 6px 0 0; color: #6b7280; font-size: 14px; line-height: 1.4; font-family: inherit;">{{ cod_form_subtitle }}</p>{% endif %}
   </div>
 
   {% comment %} COD Form - Dynamic Content Rendered by JS {% endcomment %}
