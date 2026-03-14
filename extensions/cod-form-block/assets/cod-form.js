@@ -569,10 +569,12 @@
         
         if (!hasCustomHover && !hasAnimation && !hasBorderEffect) {
           codBtn.addEventListener('mouseenter', function() {
+            if (this.disabled) return;
             this.style.opacity = '0.9';
             this.style.transform = 'translateY(-1px)';
           });
           codBtn.addEventListener('mouseleave', function() {
+            if (this.disabled) return;
             this.style.opacity = '1';
             this.style.transform = 'translateY(0)';
           });
@@ -589,6 +591,9 @@
         btn.parentNode.insertBefore(codBtn, btn);
         btn.style.display = 'none';
         btn.dataset.codReplaced = 'true';
+        
+        // Track variant changes to disable/enable the COD button based on stock
+        setupVariantObserver(btn, codBtn, config);
         
         // In Product Page placement: render offers above the COD button on the product page
         if (!document.querySelector('.cod-product-page-offers[data-product-id="' + productId + '"]')) {
@@ -715,8 +720,96 @@
   }
 
   /**
+   * Track variant changes to disable/enable the COD button based on stock
+   */
+  function setupVariantObserver(origBtn, codBtn, config) {
+      if (!window.FoxCod || !window.FoxCod.productVariants || window.FoxCod.productVariants.length === 0) return;
+      var variants = window.FoxCod.productVariants;
+      
+      function updateButtonState(variantId) {
+          if (!variantId) return;
+          var v = variants.find(function(vr) { return String(vr.id) === String(variantId); });
+          if (v) {
+              if (v.available) {
+                  codBtn.disabled = false;
+                  codBtn.textContent = config.buttonText;
+                  codBtn.style.opacity = '1';
+                  codBtn.style.cursor = 'pointer';
+              } else {
+                  codBtn.disabled = true;
+                  codBtn.textContent = 'Out of stock';
+                  codBtn.style.opacity = '0.5';
+                  codBtn.style.cursor = 'not-allowed';
+              }
+              config.variantId = v.id;
+              config.productPrice = v.price;
+              if (v.title && v.title !== 'Default Title') {
+                  config.productTitle = window.FoxCod.productTitle ? (window.FoxCod.productTitle + ' - ' + v.title) : v.title;
+              }
+          }
+      }
+
+      var form = origBtn.closest('form');
+      var idInput = form ? form.querySelector('input[name="id"]') : null;
+
+      if (idInput && idInput.value) {
+          updateButtonState(idInput.value);
+      } else {
+          var urlParams = new URLSearchParams(window.location.search);
+          var vid = urlParams.get('variant');
+          if (vid) updateButtonState(vid);
+          else updateButtonState(config.variantId);
+      }
+
+      if (idInput) {
+          idInput.addEventListener('change', function() {
+              updateButtonState(this.value);
+          });
+      }
+      
+      if (form) {
+          form.addEventListener('change', function() {
+              setTimeout(function() {
+                  if (idInput) updateButtonState(idInput.value);
+                  else {
+                      var urlParams = new URLSearchParams(window.location.search);
+                      updateButtonState(urlParams.get('variant'));
+                  }
+              }, 50);
+          });
+      }
+
+      var handleUrlChange = function() {
+          setTimeout(function() {
+              var urlParams = new URLSearchParams(window.location.search);
+              var vid = urlParams.get('variant');
+              if (vid) updateButtonState(vid);
+              else if (idInput) updateButtonState(idInput.value);
+          }, 50);
+      };
+
+      if (!window._foxcodHistoryPatched) {
+          window._foxcodHistoryPatched = true;
+          var originalPushState = history.pushState;
+          var originalReplaceState = history.replaceState;
+          
+          history.pushState = function() {
+              originalPushState.apply(this, arguments);
+              window.dispatchEvent(new Event('foxcod-url-change'));
+          };
+          history.replaceState = function() {
+              originalReplaceState.apply(this, arguments);
+              window.dispatchEvent(new Event('foxcod-url-change'));
+          };
+          window.addEventListener('popstate', function() { window.dispatchEvent(new Event('foxcod-url-change')); });
+      }
+      window.addEventListener('foxcod-url-change', handleUrlChange);
+  }
+
+  /**
    * Helper to darken color
    */
+
   function darkenColor(hex, percent) {
     var num = parseInt(hex.replace('#', ''), 16);
     var r = Math.max(0, (num >> 16) - Math.round(255 * percent / 100));

@@ -329,7 +329,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                         phone: formattedPhone || undefined,
                         financial_status: 'pending',
                         fulfillment_status: null,
-                        tags: 'FoxCOD, Cash on Delivery, foxcod-app',
+                        tags: 'FoxCOD, COD',
                         note: orderNotes || `Order placed via FoxCOD COD Form - ${orderName}`,
                         inventory_behaviour: 'decrement_obeying_policy',
                         source_name: 'FoxCOD',

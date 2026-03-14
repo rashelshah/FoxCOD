@@ -399,14 +399,14 @@
   }
 
   /* Only apply hover transform when NO animation class is present */
-  .cod-buy-btn:not(.btn-anim-shake):not(.btn-anim-pulse):not(.btn-anim-bounce):not(.btn-anim-glow):not(.btn-anim-gradient-flow):not(.btn-anim-shimmer):hover {
+  .cod-buy-btn:not(.btn-anim-shake):not(.btn-anim-pulse):not(.btn-anim-bounce):not(.btn-anim-glow):not(.btn-anim-gradient-flow):not(.btn-anim-shimmer):not(:disabled):hover {
     opacity: 0.9;
     transform: translateY(-1px);
   }
-  .cod-buy-btn.btn-anim-shake:hover,
-  .cod-buy-btn.btn-anim-pulse:hover,
-  .cod-buy-btn.btn-anim-bounce:hover,
-  .cod-buy-btn.btn-anim-glow:hover {
+  .cod-buy-btn.btn-anim-shake:not(:disabled):hover,
+  .cod-buy-btn.btn-anim-pulse:not(:disabled):hover,
+  .cod-buy-btn.btn-anim-bounce:not(:disabled):hover,
+  .cod-buy-btn.btn-anim-glow:not(:disabled):hover {
     opacity: 0.9;
   }
 
@@ -1008,7 +1008,7 @@
       border: 2px solid var(--cod-btn-bg) !important;
       color: var(--cod-btn-bg) !important;
   }
-  .cod-buy-btn:hover {
+  .cod-buy-btn:not(:disabled):hover {
       background-color: var(--cod-btn-bg) !important;
       color: #ffffff !important;
   }
@@ -1162,11 +1162,11 @@
   }
   
   /* Hover & Click Effects */
-  .btn-hover-lift:hover {
+  .btn-hover-lift:not(:disabled):hover {
       transform: translateY(-3px) !important;
       box-shadow: 0 8px 20px rgba(0,0,0,0.15) !important;
   }
-  .btn-click-press:active {
+  .btn-click-press:not(:disabled):active {
       transform: scale(0.96) !important;
   }
   
