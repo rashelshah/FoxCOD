@@ -399,31 +399,52 @@ async function handleRegularOrder(request: Request, data: any) {
 
     console.log('[Proxy] Order created:', result);
 
-    // Try to create Shopify draft order
+    // Try to create Shopify Order (REST Orders API)
     let shopifyOrderName = result.shopify_order_name; // fallback: COD-XXX
     try {
         const shop = await getShop(data.shop);
         console.log('[Proxy] Shop lookup result for', data.shop, ':', shop ? 'found (has token: ' + !!shop.access_token + ')' : 'NOT FOUND');
         const accessToken = shop?.access_token;
         if (accessToken) {
-            const mainVariantGid = data.variantId.startsWith('gid://')
-                ? data.variantId
-                : `gid://shopify/ProductVariant/${data.variantId}`;
+            // Helper: extract numeric variant ID from GID or plain ID
+            const toNumericVariantId = (vid: string): number => {
+                if (String(vid).startsWith('gid://')) {
+                    return Number(String(vid).split('/').pop());
+                }
+                return Number(vid);
+            };
 
-            const lineItems: Array<{ variantId: string; quantity: number }> = [];
+            // Helper: format phone to E.164 (Shopify requires +countrycode format)
+            const formatPhoneE164 = (phone: string): string => {
+                const digits = phone.replace(/[^\d]/g, '');
+                if (!digits) return '';
+                if (phone.startsWith('+')) return phone;
+                // If 10 digits, assume Indian number
+                if (digits.length === 10) return `+91${digits}`;
+                return `+${digits}`;
+            };
+
+            // Helper: safe name split with fallback for empty last name
+            const firstName = (data.customerName || '').split(' ')[0] || 'Customer';
+            const lastName = (data.customerName || '').split(' ').slice(1).join(' ') || '.';
+            const formattedPhone = formatPhoneE164(data.customerPhone || '');
+
+            const lineItems: Array<{ variant_id: number; quantity: number; price: string }> = [];
+
+            // Main product unit price
+            const mainUnitPrice = parseFloat(data.price) || 0;
 
             // Bundle variants: when customer selected different variants per item
             if (data.bundleVariants && Array.isArray(data.bundleVariants) && data.bundleVariants.length > 1) {
-                // Group by variantId and sum quantities
-                const variantMap: Record<string, number> = {};
+                // Bundle variants include their own prices
                 data.bundleVariants.forEach((bv: any) => {
-                    const vid = String(bv.variantId).startsWith('gid://')
-                        ? bv.variantId
-                        : `gid://shopify/ProductVariant/${bv.variantId}`;
-                    variantMap[vid] = (variantMap[vid] || 0) + (parseInt(bv.quantity) || 1);
-                });
-                Object.keys(variantMap).forEach(vid => {
-                    lineItems.push({ variantId: vid, quantity: variantMap[vid] });
+                    const vid = toNumericVariantId(String(bv.variantId));
+                    const bvPrice = parseFloat(bv.price) || mainUnitPrice;
+                    lineItems.push({
+                        variant_id: vid,
+                        quantity: parseInt(bv.quantity) || 1,
+                        price: bvPrice.toFixed(2),
+                    });
                 });
                 console.log('[Proxy] Bundle variants line items:', lineItems.length);
 
@@ -433,69 +454,123 @@ async function handleRegularOrder(request: Request, data: any) {
                 ).join('\n');
                 orderNotes = orderNotes ? orderNotes + '\n' + variantNotes : variantNotes;
             } else {
-                lineItems.push({ variantId: mainVariantGid, quantity: parseInt(data.quantity) || 1 });
+                lineItems.push({
+                    variant_id: toNumericVariantId(data.variantId),
+                    quantity: parseInt(data.quantity) || 1,
+                    price: mainUnitPrice.toFixed(2),
+                });
             }
 
+            // Upsell / Downsell items — each with its own price
             if (upsellItems.length > 0) {
                 upsellItems.forEach((item: any) => {
                     if (!item.variant_id) {
                         console.warn('[Proxy] Skipping upsell item with no variant_id:', item.title);
                         return;
                     }
-                    const vid = String(item.variant_id).startsWith('gid://')
-                        ? item.variant_id
-                        : `gid://shopify/ProductVariant/${item.variant_id}`;
-                    lineItems.push({ variantId: vid, quantity: parseInt(item.quantity) || 1 });
+                    lineItems.push({
+                        variant_id: toNumericVariantId(String(item.variant_id)),
+                        quantity: parseInt(item.quantity) || 1,
+                        price: parseFloat(String(item.price)).toFixed(2),
+                    });
                 });
             }
 
-            const draftOrderInput: Record<string, any> = {
-                note: orderNotes || `COD Order via FoxCOD`,
-                tags: ['FoxCOD', 'COD'],
-                lineItems: lineItems.map(li => ({ variantId: li.variantId, quantity: li.quantity })),
+            // Determine country with fallback
+            const orderCountry = data.customerCountry || 'IN';
+
+            // Build REST Orders API payload
+            const orderPayload: Record<string, any> = {
+                order: {
+                    line_items: lineItems,
+                    customer: {
+                        first_name: firstName,
+                        last_name: lastName,
+                        email: data.customerEmail || undefined,
+                    },
+                    phone: formattedPhone || undefined,
+                    financial_status: 'pending',
+                    fulfillment_status: null,
+                    tags: 'FoxCOD, Cash on Delivery, foxcod-app',
+                    note: orderNotes || 'Order placed via FoxCOD COD Form',
+                    inventory_behaviour: 'decrement_obeying_policy',
+                    source_name: 'FoxCOD',
+                    transactions: [
+                        {
+                            kind: 'authorization',
+                            status: 'success',
+                            gateway: 'Cash on Delivery',
+                            amount: totalPrice.toFixed(2),
+                        },
+                    ],
+                },
             };
 
+            // Always add shipping line so delivery method name appears in Shopify
+            // Smart default: if no label provided, show "Free Shipping" for $0, "Shipping" otherwise
+            const shippingTitle = (data.shippingLabel && data.shippingLabel.trim())
+                ? data.shippingLabel.trim()
+                : (shippingPrice > 0 ? 'Shipping' : 'Free Shipping');
+            orderPayload.order.shipping_lines = [
+                {
+                    title: shippingTitle,
+                    price: shippingPrice.toFixed(2),
+                    code: 'COD_SHIPPING',
+                },
+            ];
+
+            // Add bundle discount if applicable
+            if (discountPercent > 0) {
+                // Calculate discount based on sum of all line item prices (correct for both bundle and regular)
+                const itemsSubtotal = lineItems.reduce((sum, li) => sum + (parseFloat(li.price) * li.quantity), 0);
+                const discountAmount = itemsSubtotal * (discountPercent / 100);
+                orderPayload.order.discount_codes = [
+                    {
+                        code: `BUNDLE-${discountPercent}OFF`,
+                        amount: discountAmount.toFixed(2),
+                        type: 'fixed_amount',
+                    },
+                ];
+            }
+
+            // Add shipping address if available
             if (data.customerName || data.customerAddress) {
-                draftOrderInput.shippingAddress = {
-                    firstName: (data.customerName || '').split(' ')[0] || '',
-                    lastName: (data.customerName || '').split(' ').slice(1).join(' ') || '',
+                orderPayload.order.shipping_address = {
+                    first_name: firstName,
+                    last_name: lastName,
                     address1: data.customerAddress || '',
                     city: data.customerCity || '',
                     province: data.customerState || '',
                     zip: data.customerZipcode || '',
-                    country: 'IN',
-                    phone: data.customerPhone || '',
+                    country: orderCountry,
+                    phone: formattedPhone || '',
                 };
             }
 
-            console.log('[Proxy] Creating draft order with input:', JSON.stringify(draftOrderInput).substring(0, 500));
+            console.log('[Proxy] Creating Shopify order with payload:', JSON.stringify(orderPayload).substring(0, 500));
 
-            const shopifyRes = await fetch(`https://${data.shop}/admin/api/2024-01/graphql.json`, {
+            const shopifyRes = await fetch(`https://${data.shop}/admin/api/2024-04/orders.json`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': accessToken },
-                body: JSON.stringify({
-                    query: `mutation draftOrderCreate($input: DraftOrderInput!) { draftOrderCreate(input: $input) { draftOrder { id name } userErrors { field message } } }`,
-                    variables: { input: draftOrderInput },
-                }),
+                body: JSON.stringify(orderPayload),
             });
 
             const shopifyData = await shopifyRes.json();
-            console.log('[Proxy] Full Shopify response:', JSON.stringify(shopifyData).substring(0, 800));
-            if (shopifyData.data?.draftOrderCreate?.draftOrder) {
-                const draftOrder = shopifyData.data.draftOrderCreate.draftOrder;
-                console.log('[Proxy] ✅ Shopify draft order created:', draftOrder.name);
-                shopifyOrderName = draftOrder.name; // Use real Shopify name (e.g. #D39)
+            console.log('[Proxy] Shopify order response:', JSON.stringify(shopifyData).substring(0, 800));
+            if (shopifyData.order) {
+                console.log('[Proxy] ✅ Shopify order created:', shopifyData.order.name);
+                shopifyOrderName = shopifyData.order.name;
                 // Update Supabase record
                 const { updateOrderStatus } = await import("../config/supabase.server");
-                await updateOrderStatus(result.id, draftOrder.id, draftOrder.name, 'pending');
+                await updateOrderStatus(result.id, String(shopifyData.order.id), shopifyData.order.name, 'pending');
             } else {
-                console.warn('[Proxy] ❌ Shopify draft order failed. Errors:', JSON.stringify(shopifyData.data?.draftOrderCreate?.userErrors || shopifyData.errors));
+                console.warn('[Proxy] ❌ Shopify order creation failed. Errors:', JSON.stringify(shopifyData.errors || shopifyData));
             }
         } else {
-            console.warn('[Proxy] ⚠️ No access token found for shop:', data.shop, '— skipping Shopify draft order');
+            console.warn('[Proxy] ⚠️ No access token found for shop:', data.shop, '— skipping Shopify order creation');
         }
     } catch (shopifyErr: any) {
-        console.error('[Proxy] Shopify draft order error (non-fatal):', shopifyErr.message, shopifyErr.stack);
+        console.error('[Proxy] Shopify order creation error (non-fatal):', shopifyErr.message, shopifyErr.stack);
     }
 
     // Non-blocking Google Sheets sync
