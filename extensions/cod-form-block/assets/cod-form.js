@@ -1245,10 +1245,12 @@
           c.classList.remove('selected');
           c.style.background = design.unselectedBgColor || '#ffffff';
           c.style.borderColor = design.unselectedBorderColor || '#e5e7eb';
+          c.style.color = '#6b7280';
         });
         card.classList.add('selected');
         card.style.background = design.selectedBgColor || 'rgba(99,102,241,0.08)';
         card.style.borderColor = design.selectedBorderColor || config.accentColor;
+        card.style.color = design.selectedTextColor || '#1f2937';
         
         // Update quantity selector
         var form = container.closest('.cod-modal') || container.closest('form');
@@ -4262,7 +4264,7 @@ function darkenColor(hex, percent) {
           (campaign.offers || []).forEach(function(offer) {
               var cb = form.querySelector('input[name="tick_upsell_' + campaign.id + '_' + offer.id + '"]');
               if (cb && cb.checked) {
-                  items.push({ product_id: offer.upsell_product_id, variant_id: offer.upsell_variant_id, title: offer.upsell_product_title, price: offer.original_price || 0, quantity: 1, type: 'tick_upsell' });
+                  items.push({ product_id: offer.upsell_product_id, variant_id: offer.upsell_variant_id, title: offer.upsell_product_title, price: parseFloat(String(offer.price ?? offer.original_price ?? 0)), quantity: 1, type: 'tick_upsell' });
               }
           });
       });
@@ -4963,6 +4965,8 @@ function darkenColor(hex, percent) {
       // Recalculate finalTotal to include any upsell items accepted after the DOM snapshot
       if (payload.upsell_items && payload.upsell_items.length > 0) {
           var upsellTotal = payload.upsell_items.reduce(function(sum, item) {
+              // Tick upsells are already included in finalTotal from calculateCheckoutState
+              if (item.type === 'tick_upsell') return sum;
               return sum + (parseFloat(item.price) || 0) * (parseInt(item.quantity) || 1);
           }, 0);
 

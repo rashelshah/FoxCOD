@@ -267,12 +267,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         try {
             const accessToken = shop.access_token;
             if (accessToken) {
-                // Helper: extract numeric variant ID from GID or plain ID
-                const toNumericVariantId = (vid: string): number => {
-                    if (vid.startsWith('gid://')) {
-                        return Number(vid.split('/').pop());
+                // Helper: extract numeric variant ID from GID or plain ID (null-safe)
+                const toNumericVariantId = (vid: string | null | undefined): number | null => {
+                    if (!vid) return null;
+                    const s = String(vid);
+                    if (s.startsWith('gid://')) {
+                        const num = Number(s.split('/').pop());
+                        return isNaN(num) || num === 0 ? null : num;
                     }
-                    return Number(vid);
+                    const num = Number(s);
+                    return isNaN(num) || num === 0 ? null : num;
                 };
 
                 // Helper: format phone to E.164 (Shopify requires +countrycode format)
@@ -289,25 +293,48 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 const firstName = body.customerName?.split(' ')[0] || 'Customer';
                 const lastName = body.customerName?.split(' ').slice(1).join(' ') || '.';
 
-                // Build line items (REST API uses numeric variant_id + explicit price)
-                const lineItems: Array<{ variant_id: number; quantity: number; price: string }> = [];
+                // Build line items — supports both variant-based and custom (title+price) line items
+                const lineItems: Array<Record<string, any>> = [];
 
                 // Main product — use per-unit price
                 const mainUnitPrice = parseFloat(String(body.price));
+                const mainVariantId = toNumericVariantId(body.variantId);
                 lineItems.push({
-                    variant_id: toNumericVariantId(body.variantId),
+                    variant_id: mainVariantId!,
                     quantity: body.quantity,
                     price: mainUnitPrice.toFixed(2),
                 });
 
-                // Upsell / Downsell items — each with its own price
+                // Upsell / Downsell items — each with its own price (includes tick upsells)
+                // Each item is wrapped in its own try/catch so one bad item doesn't kill the rest
                 if (body.upsell_items && body.upsell_items.length > 0) {
                     body.upsell_items.forEach(item => {
-                        lineItems.push({
-                            variant_id: toNumericVariantId(item.variant_id),
-                            quantity: item.quantity,
-                            price: parseFloat(String(item.price)).toFixed(2),
-                        });
+                        try {
+                            const upsellVariantId = toNumericVariantId(item.variant_id);
+                            const upsellPrice = parseFloat(String(item.price || 0)).toFixed(2);
+                            const upsellQty = item.quantity || 1;
+                            const upsellTitle = item.title || 'Upsell Item';
+
+                            if (upsellVariantId) {
+                                // Valid variant ID — use variant-based line item
+                                console.log(`[COD Order] Adding upsell line_item (variant): variant=${upsellVariantId}, price=${upsellPrice}, qty=${upsellQty}, type=${item.type}`);
+                                lineItems.push({
+                                    variant_id: upsellVariantId,
+                                    quantity: upsellQty,
+                                    price: upsellPrice,
+                                });
+                            } else {
+                                // No valid variant ID — use custom line item (title + price only)
+                                console.log(`[COD Order] Adding upsell line_item (custom): title="${upsellTitle}", price=${upsellPrice}, qty=${upsellQty}, type=${item.type}`);
+                                lineItems.push({
+                                    title: upsellTitle,
+                                    quantity: upsellQty,
+                                    price: upsellPrice,
+                                });
+                            }
+                        } catch (upsellErr: any) {
+                            console.error(`[COD Order] Failed to add upsell line_item:`, item, upsellErr.message);
+                        }
                     });
                 }
 
@@ -385,6 +412,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     };
                 }
 
+                console.log("[COD Order] Sending line_items to Shopify:", JSON.stringify(lineItems));
                 const shopifyApiUrl = `https://${body.shop}/admin/api/2024-04/orders.json`;
 
                 const shopifyRes = await fetch(shopifyApiUrl, {
