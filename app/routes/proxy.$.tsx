@@ -429,7 +429,7 @@ async function handleRegularOrder(request: Request, data: any) {
             const lastName = (data.customerName || '').split(' ').slice(1).join(' ') || '.';
             const formattedPhone = formatPhoneE164(data.customerPhone || '');
 
-            const lineItems: Array<{ variant_id: number; quantity: number; price: string }> = [];
+            const lineItems: Array<Record<string, any>> = [];
 
             // Main product unit price
             const mainUnitPrice = parseFloat(data.price) || 0;
@@ -462,17 +462,37 @@ async function handleRegularOrder(request: Request, data: any) {
             }
 
             // Upsell / Downsell items — each with its own price
+            // If variant_id is valid → variant-based line item
+            // If variant_id is missing → custom line item using title + price (Shopify supports this)
             if (upsellItems.length > 0) {
                 upsellItems.forEach((item: any) => {
-                    if (!item.variant_id) {
-                        console.warn('[Proxy] Skipping upsell item with no variant_id:', item.title);
-                        return;
+                    try {
+                        const upsellPrice = parseFloat(String(item.price || 0)).toFixed(2);
+                        const upsellQty = parseInt(item.quantity) || 1;
+                        const upsellTitle = item.title || 'Upsell Item';
+
+                        if (item.variant_id) {
+                            const numericVid = toNumericVariantId(String(item.variant_id));
+                            if (numericVid && !isNaN(numericVid) && numericVid > 0) {
+                                console.log(`[Proxy] Adding upsell line_item (variant): variant=${numericVid}, price=${upsellPrice}, qty=${upsellQty}, type=${item.type}`);
+                                lineItems.push({
+                                    variant_id: numericVid,
+                                    quantity: upsellQty,
+                                    price: upsellPrice,
+                                });
+                                return;
+                            }
+                        }
+                        // No valid variant ID — use custom line item (title + price only)
+                        console.log(`[Proxy] Adding upsell line_item (custom): title="${upsellTitle}", price=${upsellPrice}, qty=${upsellQty}, type=${item.type}`);
+                        lineItems.push({
+                            title: upsellTitle,
+                            quantity: upsellQty,
+                            price: upsellPrice,
+                        });
+                    } catch (upsellErr: any) {
+                        console.error(`[Proxy] Failed to process upsell item:`, item, upsellErr.message);
                     }
-                    lineItems.push({
-                        variant_id: toNumericVariantId(String(item.variant_id)),
-                        quantity: parseInt(item.quantity) || 1,
-                        price: parseFloat(String(item.price)).toFixed(2),
-                    });
                 });
             }
 
