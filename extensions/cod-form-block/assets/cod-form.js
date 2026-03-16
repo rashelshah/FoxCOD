@@ -1636,15 +1636,18 @@
 
     // Hide quantity selector when bundle offers are active (bundles control quantity)
     var qtySelector = container.querySelector('.cod-product-qty');
+    var qtyBadge = container.querySelector('.cod-qty-badge');
     if (qtySelector) {
         // Check for bundle offers in the modal OR on the product page
         var hasProductPageOffers = document.querySelector('.cod-product-page-offers[data-product-id="' + config.productId + '"]');
         if (quantityOffersEl || hasProductPageOffers) {
             // Use setProperty with 'important' to override the CSS `display: flex !important` rule
             qtySelector.style.setProperty('display', 'none', 'important');
+            if (qtyBadge) qtyBadge.style.setProperty('display', 'none', 'important');
             console.log('[COD Form] Hiding quantity selector — bundle offers active');
         } else {
             qtySelector.style.setProperty('display', 'flex', 'important');
+            if (qtyBadge) qtyBadge.style.display = '';
         }
     }
 
@@ -2274,6 +2277,11 @@
           // Restore bundle variant selections (after bundle card click which triggers render)
           if (state.selections && state.selections.bundleVariants) {
               setTimeout(function() {
+                  var currentQty = getEffectiveQuantity(form, config);
+                  if (currentQty <= 1) {
+                      window.FoxCod._selectedBundleVariants = null;
+                      return;
+                  }
                   window.FoxCod._selectedBundleVariants = state.selections.bundleVariants;
                   // Restore dropdowns if variant section exists
                   var varSection = form.querySelector('.foxcod-variant-section') ||
@@ -2507,7 +2515,7 @@ function darkenColor(hex, percent) {
       
       // For in_product_page placement, also check the product page offers container
       if (!selectedOffer) {
-          var productPageOffers = document.querySelector('.cod-product-page-offers');
+          var productPageOffers = getProductPageOffersForConfig(config);
           if (productPageOffers) {
               try {
                   var ppOfferData = productPageOffers.getAttribute('data-selected-offer');
@@ -2654,7 +2662,19 @@ function darkenColor(hex, percent) {
    * Get the effective quantity considering bundle offers
    * Priority: bundle offer selection > quantity input > default 1
    */
-  function getEffectiveQuantity(form) {
+  function getProductPageOffersForConfig(config) {
+      var all = document.querySelectorAll('.cod-product-page-offers');
+      if (!all || !all.length) return null;
+      if (!config || !config.productId) return all[0];
+      var target = String(config.productId).replace('gid://shopify/Product/', '');
+      for (var i = 0; i < all.length; i++) {
+          var pid = String(all[i].getAttribute('data-product-id') || '').replace('gid://shopify/Product/', '');
+          if (pid === target) return all[i];
+      }
+      return all[0];
+  }
+
+  function getEffectiveQuantity(form, config) {
       // Check for bundle offer selection first
       var modal = form ? form.closest('.cod-modal') : null;
       if (modal) {
@@ -2674,7 +2694,7 @@ function darkenColor(hex, percent) {
           }
       }
       // Also check product page offers (for in_product_page placement)
-      var productPageOffers = document.querySelector('.cod-product-page-offers');
+      var productPageOffers = getProductPageOffersForConfig(config);
       if (productPageOffers) {
           try {
               var ppOfferData = productPageOffers.getAttribute('data-selected-offer');
@@ -2701,7 +2721,8 @@ function darkenColor(hex, percent) {
    * Check if a shipping rate's conditions are met
    */
   function isRateApplicable(rate, config, quantity) {
-      var orderPrice = getVariantSubtotal(config) * quantity / Math.max(1, getEffectiveQuantity(null));
+      var effectiveQty = Math.max(1, quantity || getEffectiveQuantity(null, config));
+      var orderPrice = getVariantSubtotal(config, effectiveQty) * quantity / effectiveQty;
       
       // Check if rate is active
       if (!rate.is_active) return false;
@@ -2809,7 +2830,7 @@ function darkenColor(hex, percent) {
       container.appendChild(title);
 
       // Get current quantity for condition evaluation (uses bundle offer if available)
-      var quantity = getEffectiveQuantity(form);
+      var quantity = getEffectiveQuantity(form, config);
 
       // Filter active and applicable rates based on conditions
       var applicableRates = config.shippingRates.filter(function(rate) {
@@ -3246,9 +3267,10 @@ function darkenColor(hex, percent) {
   /**
    * Helper: get the subtotal from bundle variants or single product price
    */
-  function getVariantSubtotal(config) {
+  function getVariantSubtotal(config, quantity) {
       var bundleVariants = window.FoxCod && window.FoxCod._selectedBundleVariants;
-      if (bundleVariants && bundleVariants.length > 1) {
+      var qty = parseInt(quantity || 1, 10) || 1;
+      if (bundleVariants && bundleVariants.length > 1 && qty > 1) {
           return bundleVariants.reduce(function(s, v) { return s + (v.price || 0); }, 0);
       }
       return parseFloat(config.productPrice) || 0;
@@ -3275,6 +3297,7 @@ function darkenColor(hex, percent) {
           downsellSavings: 0,
           total: 0
       };
+      var hasBundleOfferSelection = false;
 
       // ── 1. Read offer quantity & discount ──
       var modal = form ? (form.closest('.cod-modal') || form) : null;
@@ -3286,12 +3309,13 @@ function darkenColor(hex, percent) {
                   var selectedOffer = JSON.parse(offerData);
                   state.quantity = selectedOffer.quantity || 1;
                   state.discountPercent = selectedOffer.discountPercent || 0;
+                  hasBundleOfferSelection = true;
               }
           } catch (e) {}
       }
       // Also check product page offers (for in_product_page placement)
       if (state.quantity === 1 && state.discountPercent === 0) {
-          var productPageOffers = document.querySelector('.cod-product-page-offers');
+          var productPageOffers = getProductPageOffersForConfig(config);
           if (productPageOffers) {
               try {
                   var ppOfferData = productPageOffers.getAttribute('data-selected-offer');
@@ -3299,12 +3323,14 @@ function darkenColor(hex, percent) {
                       var ppOffer = JSON.parse(ppOfferData);
                       state.quantity = ppOffer.quantity || 1;
                       state.discountPercent = ppOffer.discountPercent || 0;
+                      hasBundleOfferSelection = true;
                   }
               } catch (e) {}
           }
       }
       // Fallback: quantity input (outside form in .cod-product-qty)
-      if (state.quantity === 1 && !quantityOffersEl) {
+      // Important: do NOT override if a bundle offer is selected and it happens to be 1 unit.
+      if (!hasBundleOfferSelection && state.quantity === 1 && !quantityOffersEl) {
           var container = form ? (form.closest('.cod-form-container') || form.closest('.cod-modal') || form.parentElement) : null;
           var qtyInput = form ? form.querySelector('[name="quantity"]') : null;
           if (!qtyInput && container) {
@@ -3315,7 +3341,7 @@ function darkenColor(hex, percent) {
 
       // ── 2. Calculate subtotal from variant prices (never config.productPrice for bundles) ──
       var bundleVariants = window.FoxCod && window.FoxCod._selectedBundleVariants;
-      if (bundleVariants && bundleVariants.length > 1) {
+      if (bundleVariants && bundleVariants.length > 1 && state.quantity > 1) {
           bundleVariants.forEach(function(v) {
               state.items.push({
                   title: (config.productTitle || '') + ' — ' + (v.title || ''),
@@ -3326,6 +3352,9 @@ function darkenColor(hex, percent) {
               state.subtotal += (v.price || 0);
           });
       } else {
+          if (state.quantity <= 1 && window.FoxCod) {
+              window.FoxCod._selectedBundleVariants = null;
+          }
           var unitPrice = parseFloat(config.productPrice) || 0;
           state.subtotal = unitPrice * state.quantity;
           state.items.push({
@@ -3443,7 +3472,7 @@ function darkenColor(hex, percent) {
 
       // Per-variant line items for bundles
       var bundleVariants = window.FoxCod && window.FoxCod._selectedBundleVariants;
-      if (bundleVariants && bundleVariants.length > 1) {
+      if (bundleVariants && bundleVariants.length > 1 && state.quantity > 1) {
           bundleVariants.forEach(function(bv) {
               html += '<div style="display:flex; justify-content:space-between; margin-bottom:3px; font-size:12px; color:#4b5563;">' +
                   '   <span>1 × ' + (config.productTitle || '') + ' — ' + (bv.title || '') + '</span>' +
@@ -3672,6 +3701,7 @@ function darkenColor(hex, percent) {
     var modal = document.getElementById('cod-form-' + productId);
     var overlay = document.getElementById('cod-modal-overlay-' + productId);
     var form = document.getElementById('cod-order-form-' + productId);
+    var hasBundleOffersActive = !!getProductPageOffersForConfig(config);
     
     if (modal) {
         modal.style.display = 'block';
@@ -3732,6 +3762,17 @@ function darkenColor(hex, percent) {
         // Always re-apply submit button styles on modal open
         var submitBtn = form.querySelector('.cod-submit-btn');
         applySubmitButtonStyles(submitBtn, config);
+
+        // Keep quantity controls/badge hidden when bundle offers are active.
+        var container = form.closest('.cod-form-container') || form.closest('.cod-modal') || form.parentElement;
+        if (container) {
+            var qtySelector = container.querySelector('.cod-product-qty');
+            var qtyBadge = container.querySelector('.cod-qty-badge');
+            if (hasBundleOffersActive) {
+                if (qtySelector) qtySelector.style.setProperty('display', 'none', 'important');
+                if (qtyBadge) qtyBadge.style.setProperty('display', 'none', 'important');
+            }
+        }
     }
 
     // ── Pre-purchase click upsells: show BEFORE customer fills the form ──
@@ -3844,7 +3885,7 @@ function darkenColor(hex, percent) {
     // Sync pre-selected offer from product page to the modal
     if (config && form) {
         setTimeout(function() {
-            var productPageOffers = document.querySelector('.cod-product-page-offers[data-product-id="' + productId + '"]');
+            var productPageOffers = getProductPageOffersForConfig(config);
             var selectedOfferData = productPageOffers ? productPageOffers.getAttribute('data-selected-offer') : null;
             
             if (selectedOfferData) {
@@ -3858,9 +3899,6 @@ function darkenColor(hex, percent) {
                         qtyInput.value = offer.quantity;
                     }
                     
-                    // Update the price in the product header
-                    updateOfferPrice(form, config, offer);
-                    
                     // Also set data-selected-offer on modal offers container (for getEffectiveQuantity)
                     var modalOffers = modal.querySelector('.cod-quantity-offers');
                     if (modalOffers) {
@@ -3872,6 +3910,13 @@ function darkenColor(hex, percent) {
                         var matchCard = modalOffers.querySelector('[data-quantity="' + offer.quantity + '"]');
                         if (matchCard) matchCard.classList.add('selected');
                     }
+
+                    // Always sync variant selectors to the latest offer quantity.
+                    // This clears stale multi-item bundle variant state when quantity goes back to 1.
+                    renderBundleVariantSelectors(form, config, parseInt(offer.quantity, 10) || 1, modalOffers);
+
+                    // Update the price in the product header
+                    updateOfferPrice(form, config, offer);
                     
                     // Update order summary with the selected offer
                     updateOrderSummaryWithOffer(form, config, offer);
