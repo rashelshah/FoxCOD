@@ -59,12 +59,12 @@ export async function createCODOrder(
                     ],
                     customer: {
                         first_name: firstName,
-                        last_name: lastName || firstName,
+                        last_name: lastName,
                         phone: input.customerPhone,
                     },
                     shipping_address: {
                         first_name: firstName,
-                        last_name: lastName || firstName,
+                        last_name: lastName,
                         address1: addressParts.address1,
                         city: addressParts.city,
                         province: addressParts.province,
@@ -74,7 +74,7 @@ export async function createCODOrder(
                     },
                     billing_address: {
                         first_name: firstName,
-                        last_name: lastName || firstName,
+                        last_name: lastName,
                         address1: addressParts.address1,
                         city: addressParts.city,
                         province: addressParts.province,

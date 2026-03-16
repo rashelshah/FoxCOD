@@ -290,8 +290,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 };
 
                 // Helper: safe name split with fallback for empty last name
-                const firstName = body.customerName?.split(' ')[0] || 'Customer';
-                const lastName = body.customerName?.split(' ').slice(1).join(' ') || '.';
+                const nameString = (body.customerName || '').trim();
+                const nameParts = nameString.split(/\s+/);
+                const firstName = nameParts[0] || 'Customer';
+                const lastName = nameParts.slice(1).join(' ') || '';
 
                 // Build line items — supports both variant-based and custom (title+price) line items
                 const lineItems: Array<Record<string, any>> = [];
