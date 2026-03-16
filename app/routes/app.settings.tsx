@@ -9,7 +9,7 @@ import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
 import { useLoaderData, useSubmit, useNavigation, Link, useActionData } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
-import { RangeSlider, Button, InlineStack, Modal, Text, Icon, Select, TextField, ColorPicker } from "@shopify/polaris";
+import { RangeSlider, Button, InlineStack, Modal, Text, Icon, Select, TextField, ColorPicker, Banner } from "@shopify/polaris";
 import { EditIcon, DeleteIcon, ViewIcon, HideIcon, StarFilledIcon } from "@shopify/polaris-icons";
 import {
     DndContext,
@@ -1016,16 +1016,16 @@ const PreviewDisplay = memo(({
                                         </div>
                                     )}
                                     <div style={{ flex: 1, minWidth: 0 }}>
-                                        <div style={{ fontSize: '14px', fontWeight: 600, color: '#1f2937', lineHeight: 1.3, marginBottom: '2px' }}>Sample Product</div>
+                                        <div style={{ fontSize: '14px', fontWeight: 650, color: '#1f2937', lineHeight: 1.3, marginBottom: '2px' }}>Sample Product</div>
                                         {showPrice && (
-                                            <div style={{ fontSize: '14px', fontWeight: 600, color: formStyles?.priceColor || '#111827' }}>{fmtCurrency(1999)}</div>
+                                            <div style={{ fontSize: '14px', fontWeight: 650, color: formStyles?.priceColor || '#111827' }}>{fmtCurrency(299.99)}</div>
                                         )}
                                     </div>
                                     {/* Quantity selector - pill shape like storefront */}
                                     <div style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid #d1d5db', borderRadius: '999px', overflow: 'hidden', background: '#fff', flexShrink: 0 }}>
-                                        <div style={{ width: '34px', height: '32px', background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 500, color: '#6b7280', cursor: 'default' }}>−</div>
-                                        <div style={{ width: '36px', height: '32px', borderLeft: '1px solid #e5e7eb', borderRight: '1px solid #e5e7eb', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 600, color: '#1f2937', fontFamily: "'Inter', sans-serif" }}>1</div>
-                                        <div style={{ width: '34px', height: '32px', background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 500, color: '#6b7280', cursor: 'default' }}>+</div>
+                                        <div style={{ width: '28px', height: '28px', background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 500, color: '#6b7280', cursor: 'default' }}>−</div>
+                                        <div style={{ width: '28px', height: '28px', borderLeft: '1px solid #e5e7eb', borderRight: '1px solid #e5e7eb', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 600, color: '#1f2937', fontFamily: "'Inter', sans-serif" }}>1</div>
+                                        <div style={{ width: '28px', height: '28px', background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 500, color: '#6b7280', cursor: 'default' }}>+</div>
                                     </div>
                                 </div>
                             )}
@@ -1161,7 +1161,7 @@ const PreviewDisplay = memo(({
 
                                             const customGreyBg = '#f3f4f6';
                                             const customBorder = '1px solid #e5e7eb';
-                                            
+
                                             // Replicate darkenColor logic from cod-form.js
                                             const darkenColor = (hex: string, percent: number) => {
                                                 if (!hex) return null;
@@ -1171,11 +1171,11 @@ const PreviewDisplay = memo(({
                                                 }
                                                 // Default to #ffffff if invalid
                                                 if (hex.length !== 6) hex = 'ffffff';
-                                                
+
                                                 let r = parseInt(hex.substring(0, 2), 16);
                                                 let g = parseInt(hex.substring(2, 4), 16);
                                                 let b = parseInt(hex.substring(4, 6), 16);
-                                                
+
                                                 if (isNaN(r) || isNaN(g) || isNaN(b)) return null;
 
                                                 r = Math.max(0, Math.floor(r * (1 - percent)));
@@ -1833,6 +1833,34 @@ const AccordionSection = ({ id, tab, title, helperText, expandedSection, toggleS
     );
 };
 
+/** Helper for deep equality comparison */
+function deepEqual(obj1: any, obj2: any): boolean {
+    if (obj1 === obj2) return true;
+    if (obj1 == null || obj2 == null) return obj1 === obj2;
+    if (typeof obj1 !== 'object' || typeof obj2 !== 'object') return false;
+
+    if (Array.isArray(obj1) && Array.isArray(obj2)) {
+        if (obj1.length !== obj2.length) return false;
+        for (let i = 0; i < obj1.length; i++) {
+            if (!deepEqual(obj1[i], obj2[i])) return false;
+        }
+        return true;
+    }
+
+    if (!Array.isArray(obj1) && !Array.isArray(obj2)) {
+        const getDefinedKeys = (obj: any) => Object.keys(obj).filter(k => obj[k] !== undefined);
+        const keys1 = getDefinedKeys(obj1);
+        const keys2 = getDefinedKeys(obj2);
+        if (keys1.length !== keys2.length) return false;
+        for (const key of keys1) {
+            if (!deepEqual(obj1[key], obj2[key])) return false;
+        }
+        return true;
+    }
+
+    return false;
+}
+
 /**
  * Settings Page Component - Premium Form Builder
  */
@@ -1986,9 +2014,25 @@ export default function SettingsPage() {
             notes_placeholder: notesPlaceholder, modal_style: modalStyle, animation_style: animationStyle, border_radius: borderRadius,
             form_type: formType, fields, blocks, custom_fields: [], styles: formStyles, button_styles: { ...buttonStylesState, backgroundColor: primaryColor },
             shipping_options: shippingOpts, partial_cod_enabled: partialCodEnabled, partial_cod_advance_amount: partialCodAdvanceAmount,
-            partial_cod_commission: partialCodCommission, shipping_rates_enabled: shippingRatesEnabled
+            partial_cod_commission: partialCodCommission, shipping_rates_enabled: shippingRatesEnabled,
+            form_submit_button: formSubmitButtonState
         };
-        const settingsChanged = JSON.stringify(current) !== savedSettingsString;
+
+        // Robust deep equality check instead of JSON.stringify which is vulnerable to key ordering
+        let settingsChanged = false;
+        try {
+            const orig = JSON.parse(savedSettingsString);
+            for (const key of Object.keys(current)) {
+                // For objects, don't use stringify, use the deep equal helper
+                if (!deepEqual((current as any)[key], orig[key])) {
+                    settingsChanged = true;
+                    break;
+                }
+            }
+        } catch (e) {
+            settingsChanged = true;
+        }
+
         return settingsChanged || pendingShippingOps.length > 0;
     }, [
         enabled, buttonText, primaryColor, requiredFields, maxQuantity, buttonStyle, buttonSize, buttonPosition,
@@ -1996,7 +2040,7 @@ export default function SettingsPage() {
         showEmailField, showNotesField, emailRequired, namePlaceholder, phonePlaceholder, addressPlaceholder,
         notesPlaceholder, modalStyle, animationStyle, borderRadius, formType, fields, blocks,
         formStyles, buttonStylesState, shippingOpts, partialCodEnabled, partialCodAdvanceAmount, partialCodCommission,
-        shippingRatesEnabled, savedSettingsString, pendingShippingOps
+        shippingRatesEnabled, savedSettingsString, pendingShippingOps, formSubmitButtonState
     ]);
 
     // Discard handler - reset all fields to saved values
@@ -2037,6 +2081,7 @@ export default function SettingsPage() {
         setPartialCodAdvanceAmount(orig.partial_cod_advance_amount ?? 100);
         setPartialCodCommission(orig.partial_cod_commission ?? 0);
         setShippingRatesEnabled(orig.shipping_rates_enabled ?? false);
+        setFormSubmitButtonState(orig.form_submit_button || DEFAULT_FORM_SUBMIT_BUTTON);
         // Reset pending shipping operations and restore original rates
         setPendingShippingOps([]);
         setShippingRates(initialShippingRates || []);
@@ -2060,7 +2105,8 @@ export default function SettingsPage() {
                     notes_placeholder: notesPlaceholder, modal_style: modalStyle, animation_style: animationStyle, border_radius: borderRadius,
                     form_type: formType, fields, blocks, custom_fields: [], styles: formStyles, button_styles: { ...buttonStylesState, backgroundColor: primaryColor },
                     shipping_options: shippingOpts, partial_cod_enabled: partialCodEnabled, partial_cod_advance_amount: partialCodAdvanceAmount,
-                    partial_cod_commission: partialCodCommission, shipping_rates_enabled: shippingRatesEnabled
+                    partial_cod_commission: partialCodCommission, shipping_rates_enabled: shippingRatesEnabled,
+                    form_submit_button: formSubmitButtonState
                 };
                 setSavedSettingsString(JSON.stringify(currentSettings));
                 setSaveError(null); // Clear any previous errors
@@ -2078,7 +2124,7 @@ export default function SettingsPage() {
         formTitle, formSubtitle, successMessage, submitButtonText, showProductImage, showPrice, showQuantitySelector,
         showEmailField, showNotesField, emailRequired, namePlaceholder, phonePlaceholder, addressPlaceholder,
         notesPlaceholder, modalStyle, animationStyle, borderRadius, formType, fields, blocks,
-        formStyles, buttonStylesState, shippingOpts, partialCodEnabled, partialCodAdvanceAmount, partialCodCommission, shippingRatesEnabled, shopify]);
+        formStyles, buttonStylesState, shippingOpts, partialCodEnabled, partialCodAdvanceAmount, partialCodCommission, shippingRatesEnabled, formSubmitButtonState, shopify]);
 
     // Hex validation helpers
     const isValidHex = (hex: string): boolean => {
@@ -3838,6 +3884,11 @@ export default function SettingsPage() {
                                 <>
                                     {/* Field Management (Default Open) */}
                                     <AccordionSection id="field-management" tab="form" title="Field Management" helperText="Changes the field management of the form on Product page" expandedSection={expandedSection} toggleSection={toggleSection}>
+                                        <div style={{ marginBottom: '16px' }}>
+                                            <Banner tone="info">
+                                                Tip: Place the Phone Number field near the top for faster browser autofill and improved conversion.
+                                            </Banner>
+                                        </div>
                                         <p style={{ color: '#6b7280', fontSize: '13px', marginBottom: '16px' }}>
                                             Drag to reorder • 👁️ visibility • ★ required
                                         </p>
@@ -3888,7 +3939,7 @@ export default function SettingsPage() {
                                                     const presetMap: Record<string, any> = {
                                                         default: { styles: { themeKey: 'default', textColor: '#333333', textSize: 14, fontStyle: 'normal' as const, borderColor: '#808080', borderWidth: 1, backgroundColor: '#ffffff', labelAlignment: 'left' as const, iconColor: '#6b7280', iconBackground: '#f3f4f6', borderRadius: 12, shadow: true, fieldBackgroundColor: '#ffffff', labelColor: '#111827', labelFontSize: 14, priceColor: '#000000' }, buttonColor: '#000000' },
                                                         modern_slate: { styles: { themeKey: 'modern_slate', textColor: '#1e293b', textSize: 14, fontStyle: 'normal' as const, borderColor: '#f97316', borderWidth: 2, backgroundColor: '#fff7ed', labelAlignment: 'left' as const, iconColor: '#ea580c', iconBackground: '#fed7aa', borderRadius: 16, shadow: true, fieldBackgroundColor: '#fff7ed', labelColor: '#9a3412', labelFontSize: 14, priceColor: '#ea580c' }, buttonColor: '#ea580c' },
-                                                        dark_mode:{styles:{themeKey:'dark_mode',textColor:'#f8fafc',textSize:14,fontStyle:'normal' as const,borderColor:'#475569',borderWidth:1,backgroundColor:'#1f2a3a',labelAlignment:'left' as const,iconColor:'#cbd5f5',iconBackground:'#1f2a3a',borderRadius:12,shadow:true,fieldBackgroundColor:'#0f172a',labelColor:'#f8fafc',labelFontSize:14,priceColor:'#f8fafc'},buttonColor:'#6366f1'},
+                                                        dark_mode: { styles: { themeKey: 'dark_mode', textColor: '#f8fafc', textSize: 14, fontStyle: 'normal' as const, borderColor: '#475569', borderWidth: 1, backgroundColor: '#1f2a3a', labelAlignment: 'left' as const, iconColor: '#cbd5f5', iconBackground: '#1f2a3a', borderRadius: 12, shadow: true, fieldBackgroundColor: '#0f172a', labelColor: '#f8fafc', labelFontSize: 14, priceColor: '#f8fafc' }, buttonColor: '#6366f1' },
                                                         eastern_gold: { styles: { themeKey: 'eastern_gold', textColor: '#78350f', textSize: 14, fontStyle: 'normal' as const, borderColor: '#d4a574', borderWidth: 1, backgroundColor: '#fffbeb', labelAlignment: 'left' as const, iconColor: '#b45309', iconBackground: '#fef3c7', borderRadius: 10, shadow: true, fieldBackgroundColor: '#fef9c3', labelColor: '#713f12', labelFontSize: 14, priceColor: '#b45309' }, buttonColor: '#b45309' },
                                                         arctic_blue: { styles: { themeKey: 'arctic_blue', textColor: '#164e63', textSize: 14, fontStyle: 'normal' as const, borderColor: '#67e8f9', borderWidth: 1, backgroundColor: '#ecfeff', labelAlignment: 'left' as const, iconColor: '#0891b2', iconBackground: '#cffafe', borderRadius: 12, shadow: true, fieldBackgroundColor: '#ecfeff', labelColor: '#155e75', labelFontSize: 14, priceColor: '#0891b2' }, buttonColor: '#0891b2' },
                                                         rose_garden: { styles: { themeKey: 'rose_garden', textColor: '#9f1239', textSize: 14, fontStyle: 'normal' as const, borderColor: '#fda4af', borderWidth: 1, backgroundColor: '#fff1f2', labelAlignment: 'left' as const, iconColor: '#e11d48', iconBackground: '#ffe4e6', borderRadius: 14, shadow: true, fieldBackgroundColor: '#fff1f2', labelColor: '#881337', labelFontSize: 14, priceColor: '#e11d48' }, buttonColor: '#e11d48' },
@@ -3897,8 +3948,8 @@ export default function SettingsPage() {
                                                         minimal_white: { styles: { themeKey: 'minimal_white', textColor: '#374151', textSize: 14, fontStyle: 'normal' as const, borderColor: '#e5e7eb', borderWidth: 1, backgroundColor: '#ffffff', labelAlignment: 'left' as const, iconColor: '#9ca3af', iconBackground: 'transparent', borderRadius: 8, shadow: false, fieldBackgroundColor: '#ffffff', labelColor: '#6b7280', labelFontSize: 13, priceColor: '#111827' }, buttonColor: '#111827' },
                                                         luxury_gold: { styles: { themeKey: 'luxury_gold', textColor: '#fbbf24', textSize: 14, fontStyle: 'normal' as const, borderColor: '#d97706', borderWidth: 1, backgroundColor: '#18181b', labelAlignment: 'left' as const, iconColor: '#f59e0b', iconBackground: '#27272a', borderRadius: 10, shadow: true, fieldBackgroundColor: '#27272a', labelColor: '#fcd34d', labelFontSize: 14, priceColor: '#fbbf24' }, buttonColor: '#d97706' },
                                                         ocean_breeze: { styles: { themeKey: 'ocean_breeze', textColor: '#0f766e', textSize: 14, fontStyle: 'normal' as const, borderColor: '#5eead4', borderWidth: 1, backgroundColor: '#f0fdfa', labelAlignment: 'left' as const, iconColor: '#14b8a6', iconBackground: '#ccfbf1', borderRadius: 14, shadow: true, fieldBackgroundColor: '#f0fdfa', labelColor: '#115e59', labelFontSize: 14, priceColor: '#14b8a6' }, buttonColor: '#14b8a6' },
-                                                        royal_indigo:{styles:{themeKey:'royal_indigo',textColor:'#e0e7ff',textSize:14,fontStyle:'normal' as const,borderColor:'#6366f1',borderWidth:1,backgroundColor:'#1e1b4b',labelAlignment:'left' as const,iconColor:'#a5b4fc',iconBackground:'#312e81',borderRadius:12,shadow:true,fieldBackgroundColor:'#1e1b4b',labelColor:'#f8fafc',labelFontSize:14,priceColor:'#a5b4fc'},buttonColor:'#6366f1'},
-                                                        emerald_night:{styles:{themeKey:'emerald_night',textColor:'#ecfdf5',textSize:14,fontStyle:'normal' as const,borderColor:'#10b981',borderWidth:1,backgroundColor:'#022c22',labelAlignment:'left' as const,iconColor:'#6ee7b7',iconBackground:'#064e3b',borderRadius:12,shadow:true,fieldBackgroundColor:'#022c22',labelColor:'#f0fdf4',labelFontSize:14,priceColor:'#34d399'},buttonColor:'#10b981'},
+                                                        royal_indigo: { styles: { themeKey: 'royal_indigo', textColor: '#e0e7ff', textSize: 14, fontStyle: 'normal' as const, borderColor: '#6366f1', borderWidth: 1, backgroundColor: '#1e1b4b', labelAlignment: 'left' as const, iconColor: '#a5b4fc', iconBackground: '#312e81', borderRadius: 12, shadow: true, fieldBackgroundColor: '#1e1b4b', labelColor: '#f8fafc', labelFontSize: 14, priceColor: '#a5b4fc' }, buttonColor: '#6366f1' },
+                                                        emerald_night: { styles: { themeKey: 'emerald_night', textColor: '#ecfdf5', textSize: 14, fontStyle: 'normal' as const, borderColor: '#10b981', borderWidth: 1, backgroundColor: '#022c22', labelAlignment: 'left' as const, iconColor: '#6ee7b7', iconBackground: '#064e3b', borderRadius: 12, shadow: true, fieldBackgroundColor: '#022c22', labelColor: '#f0fdf4', labelFontSize: 14, priceColor: '#34d399' }, buttonColor: '#10b981' },
                                                     };
                                                     if (key !== 'custom' && presetMap[key]) {
                                                         setFormStyles(presetMap[key].styles);
