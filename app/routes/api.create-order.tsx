@@ -26,9 +26,9 @@ const corsHeaders = {
 // Input validation types
 interface OrderRequestBody {
     shop: string;
-    customerName: string;
-    customerPhone: string;
-    customerAddress: string;
+    customerName?: string;
+    customerPhone?: string;
+    customerAddress?: string;
     customerEmail?: string;
     customerState?: string;
     customerCity?: string;
@@ -53,36 +53,156 @@ interface OrderRequestBody {
         quantity: number;
         type: string;
     }>;
+    customFieldData?: Array<{
+        label?: string;
+        value?: string | number | null;
+    }>;
+    [key: string]: any;
+}
+
+interface NormalizedCustomerFields {
+    name: string;
+    firstName: string;
+    lastName: string;
+    phone: string;
+    email: string;
+    address: string;
+    city: string;
+    state: string;
+    zipcode: string;
+}
+
+function normalizeFieldKey(raw: string): string {
+    return String(raw || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function normalizeCustomerFields(body: any): NormalizedCustomerFields {
+    const result: NormalizedCustomerFields = {
+        name: "",
+        firstName: "",
+        lastName: "",
+        phone: "",
+        email: "",
+        address: "",
+        city: "",
+        state: "",
+        zipcode: "",
+    };
+
+    const assignByKey = (rawKey: string, rawValue: unknown) => {
+        if (rawValue === null || rawValue === undefined) return;
+        const value = String(rawValue).trim();
+        if (!value) return;
+
+        const key = normalizeFieldKey(rawKey);
+        if (!key) return;
+
+        if (["name", "fullname", "customername", "buyername"].includes(key)) {
+            if (!result.name) result.name = value;
+            return;
+        }
+        if (["firstname", "givenname", "first"].includes(key)) {
+            if (!result.firstName) result.firstName = value;
+            return;
+        }
+        if (["lastname", "familyname", "last", "surname"].includes(key)) {
+            if (!result.lastName) result.lastName = value;
+            return;
+        }
+        if (["phone", "mobile", "phonenumber", "customerphone", "tel", "telephone", "whatsappnumber"].includes(key)) {
+            if (!result.phone) result.phone = value;
+            return;
+        }
+        if (["email", "customeremail", "mail"].includes(key)) {
+            if (!result.email) result.email = value;
+            return;
+        }
+        if (["address", "customeraddress", "deliveryaddress", "streetaddress", "address1"].includes(key)) {
+            if (!result.address) result.address = value;
+            return;
+        }
+        if (["city", "town"].includes(key)) {
+            if (!result.city) result.city = value;
+            return;
+        }
+        if (["state", "province", "region"].includes(key)) {
+            if (!result.state) result.state = value;
+            return;
+        }
+        if (["zipcode", "zip", "postalcode", "pincode", "postcode"].includes(key)) {
+            if (!result.zipcode) result.zipcode = value;
+        }
+    };
+
+    // Top-level body keys
+    Object.entries(body || {}).forEach(([key, value]) => assignByKey(key, value));
+
+    // Dynamic custom fields (from storefront payload)
+    if (Array.isArray(body?.customFieldData)) {
+        body.customFieldData.forEach((field: any) => {
+            assignByKey(field?.label || "", field?.value);
+        });
+    }
+
+    // Backward-compatible hardcoded fallbacks
+    if (!result.name && body?.customerName) result.name = String(body.customerName).trim();
+    if (!result.phone && body?.customerPhone) result.phone = String(body.customerPhone).trim();
+    if (!result.address && body?.customerAddress) result.address = String(body.customerAddress).trim();
+    if (!result.email && body?.customerEmail) result.email = String(body.customerEmail).trim();
+    if (!result.state && body?.customerState) result.state = String(body.customerState).trim();
+    if (!result.city && body?.customerCity) result.city = String(body.customerCity).trim();
+    if (!result.zipcode && body?.customerZipcode) result.zipcode = String(body.customerZipcode).trim();
+
+    // Build name from first + last if needed
+    if (!result.name) {
+        if (result.firstName && result.lastName) {
+            result.name = `${result.firstName} ${result.lastName}`.trim();
+        } else if (result.firstName) {
+            result.name = result.firstName;
+        }
+    }
+
+    // If only full name exists, split into first/last for Shopify
+    if ((!result.firstName || !result.lastName) && result.name) {
+        const parts = result.name.trim().split(/\s+/);
+        if (!result.firstName) result.firstName = parts[0] || "";
+        if (!result.lastName) result.lastName = parts.slice(1).join(" ");
+    }
+
+    if (!result.name) result.name = "Customer";
+
+    return result;
 }
 
 /**
  * Validate order input
  */
-function validateOrderInput(body: OrderRequestBody, formSettings: any): string | null {
+function validateOrderInput(body: OrderRequestBody, formSettings: any, customer: NormalizedCustomerFields): string | null {
     const requiredFields = formSettings?.required_fields || ["name", "phone", "address"];
+    const quantity = Number(body.quantity || 0);
 
     // Check required fields
-    if (requiredFields.includes("name") && !body.customerName?.trim()) {
+    if (requiredFields.includes("name") && !customer.name?.trim()) {
         return "Customer name is required";
     }
-    if (requiredFields.includes("phone") && !body.customerPhone?.trim()) {
+    if (requiredFields.includes("phone") && !customer.phone?.trim()) {
         return "Phone number is required";
     }
-    if (requiredFields.includes("address") && !body.customerAddress?.trim()) {
+    if (requiredFields.includes("address") && !customer.address?.trim()) {
         return "Delivery address is required";
     }
 
     // Validate phone format (basic validation)
-    if (body.customerPhone && !/^[\d\s\+\-\(\)]{8,15}$/.test(body.customerPhone)) {
+    if (customer.phone && !/^[\d\s\+\-\(\)]{8,15}$/.test(customer.phone)) {
         return "Invalid phone number format";
     }
 
     // Validate quantity
     const maxQuantity = formSettings?.max_quantity || 10;
-    if (!body.quantity || body.quantity < 1) {
+    if (!quantity || quantity < 1) {
         return "Quantity must be at least 1";
     }
-    if (body.quantity > maxQuantity) {
+    if (quantity > maxQuantity) {
         return `Maximum quantity is ${maxQuantity}`;
     }
 
@@ -132,6 +252,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     try {
         // Parse request body
         const body: OrderRequestBody = await request.json();
+        const customer = normalizeCustomerFields(body);
 
         console.log("[COD Order] Received order request:", body.shop, body.productTitle, "qty:", body.quantity, "discount:", body.discountPercent, "finalTotal:", body.finalTotal);
 
@@ -162,7 +283,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
 
         // Validate input
-        const validationError = validateOrderInput(body, formSettings);
+        const validationError = validateOrderInput(body, formSettings, customer);
         if (validationError) {
             return Response.json(
                 { success: false, error: validationError },
@@ -178,11 +299,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             || '';
         console.log('[COD Order] Fraud check — detected IP:', clientIp);
         const fraudResult = await validateOrderAgainstFraudRules({
-            phone: body.customerPhone,
-            email: body.customerEmail,
+            phone: customer.phone,
+            email: customer.email,
             ip: clientIp,
-            zipcode: body.customerZipcode,
-            quantity: body.quantity,
+            zipcode: customer.zipcode,
+            quantity: Number(body.quantity || 0),
             shopDomain: body.shop,
         });
         if (!fraudResult.allowed) {
@@ -241,19 +362,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         // Log order in Supabase - this is the primary order storage
         const orderLog = await logOrder({
             shop_domain: body.shop,
-            customer_name: body.customerName,
-            customer_phone: body.customerPhone,
-            customer_address: body.customerAddress,
-            customer_email: body.customerEmail || undefined,
+            customer_name: customer.name,
+            customer_phone: customer.phone,
+            customer_address: customer.address,
+            customer_email: customer.email || undefined,
             product_id: body.productId,
             product_title: body.productTitle,
             variant_id: body.variantId,
             quantity: body.quantity,
             price: totalPrice.toString(),
             notes: orderNotes || undefined,
-            city: body.customerCity || undefined,
-            state: body.customerState || undefined,
-            pincode: body.customerZipcode || undefined,
+            city: customer.city || undefined,
+            state: customer.state || undefined,
+            pincode: customer.zipcode || undefined,
             shipping_label: body.shippingLabel || undefined,
             shipping_price: shippingPrice || undefined,
             currency: currencyCode,
@@ -290,10 +411,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 };
 
                 // Helper: safe name split with fallback for empty last name
-                const nameString = (body.customerName || '').trim();
-                const nameParts = nameString.split(/\s+/);
-                const firstName = nameParts[0] || 'Customer';
-                const lastName = nameParts.slice(1).join(' ') || '';
+                const nameString = customer.name;
+                const firstName = customer.firstName || nameString.split(" ")[0] || "Customer";
+                const lastName = customer.lastName || nameString.split(" ").slice(1).join(" ") || "";
 
                 // Build line items — supports both variant-based and custom (title+price) line items
                 const lineItems: Array<Record<string, any>> = [];
@@ -344,7 +464,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 const orderCountry = body.customerCountry || 'IN';
 
                 // Format phone for Shopify E.164 requirement
-                const formattedPhone = formatPhoneE164(body.customerPhone || '');
+                const formattedPhone = formatPhoneE164(customer.phone || '');
 
                 // Build REST Orders API payload
                 const orderPayload: Record<string, any> = {
@@ -353,7 +473,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                         customer: {
                             first_name: firstName,
                             last_name: lastName,
-                            email: body.customerEmail || undefined,
+                            email: customer.email || undefined,
                         },
                         phone: formattedPhone || undefined,
                         financial_status: 'pending',
@@ -401,14 +521,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 }
 
                 // Add shipping address if available
-                if (body.customerName || body.customerAddress) {
+                if (customer.name || customer.address) {
                     orderPayload.order.shipping_address = {
                         first_name: firstName,
                         last_name: lastName,
-                        address1: body.customerAddress || '',
-                        city: body.customerCity || '',
-                        province: body.customerState || '',
-                        zip: body.customerZipcode || '',
+                        address1: customer.address || '',
+                        city: customer.city || '',
+                        province: customer.state || '',
+                        zip: customer.zipcode || '',
                         country: orderCountry,
                         phone: formattedPhone || '',
                     };

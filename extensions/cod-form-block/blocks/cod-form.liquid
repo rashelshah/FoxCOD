@@ -313,7 +313,7 @@
   <div class="cod-product-info">
     {% if cod_show_product_image == 'true' and product.featured_image %}
       <div class="cod-product-image-wrapper" style="position:relative; display:inline-block;">
-        <span class="cod-qty-badge" style="position:absolute; top:-6px; right:-6px; background:#000000; color:#fff; font-size:11px; font-weight:700; width:20px; height:20px; border-radius:50%; display:flex; align-items:center; justify-content:center; z-index:2; line-height:1;">1</span>
+        <span class="cod-qty-badge" style="position:absolute; top:-6px; right:-6px; background:#000000; color:#fff; font-size:11px; font-weight:700; width:20px; height:20px; border-radius:50%; display:grid; place-items:center; z-index:2; line-height:20px; text-align:center; padding:0; box-sizing:border-box; font-variant-numeric:tabular-nums;">1</span>
         <img src="{{ product.featured_image | image_url: width: 100 }}" 
              alt="{{ product.title }}" 
              class="cod-product-image"

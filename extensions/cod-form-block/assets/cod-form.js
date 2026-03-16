@@ -1772,6 +1772,105 @@
     quantity: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="9" x2="15" y2="15"></line><line x1="15" y1="9" x2="9" y2="15"></line></svg>'
   };
 
+  function normalizeCustomerFieldToken(raw) {
+      return String(raw || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  }
+
+  function resolveCanonicalCustomerField(raw) {
+      var token = normalizeCustomerFieldToken(raw);
+      if (!token) return '';
+
+      if (['name', 'fullname', 'customername', 'buyername'].indexOf(token) !== -1) return 'name';
+      if (['firstname', 'givenname', 'first'].indexOf(token) !== -1) return 'firstName';
+      if (['lastname', 'familyname', 'surname', 'last'].indexOf(token) !== -1) return 'lastName';
+      if (['phone', 'mobile', 'phonenumber', 'customerphone', 'tel', 'telephone', 'whatsappnumber'].indexOf(token) !== -1) return 'phone';
+      if (['email', 'customeremail', 'mail'].indexOf(token) !== -1) return 'email';
+      if (['address', 'customeraddress', 'deliveryaddress', 'streetaddress', 'address1'].indexOf(token) !== -1) return 'address';
+      if (['city', 'town'].indexOf(token) !== -1) return 'city';
+      if (['state', 'province', 'region'].indexOf(token) !== -1) return 'state';
+      if (['zip', 'zipcode', 'postalcode', 'pincode', 'postcode'].indexOf(token) !== -1) return 'zipcode';
+      return '';
+  }
+
+  function getAutocompleteAttr(field) {
+      var canonical = resolveCanonicalCustomerField(field && field.label);
+      if (!canonical) canonical = resolveCanonicalCustomerField(field && field.id);
+
+      if (canonical === 'name') return 'name';
+      if (canonical === 'firstName') return 'given-name';
+      if (canonical === 'lastName') return 'family-name';
+      if (canonical === 'phone') return 'tel';
+      if (canonical === 'email') return 'email';
+      if (canonical === 'address') return 'street-address';
+      if (canonical === 'city') return 'address-level2';
+      if (canonical === 'state') return 'address-level1';
+      if (canonical === 'zipcode') return 'postal-code';
+      return 'off';
+  }
+
+  function getCanonicalCustomerKeyForInput(input) {
+      if (!input) return '';
+      var candidates = [];
+      if (input.name) candidates.push(input.name);
+      if (input.id) candidates.push(String(input.id).replace(/^cod-/, ''));
+      var dataLabel = input.getAttribute('data-field-label');
+      if (dataLabel) candidates.push(dataLabel);
+      var wrapper = input.closest('.cod-form-field');
+      if (wrapper) {
+          var labelEl = wrapper.querySelector('label');
+          if (labelEl) candidates.push(labelEl.textContent || '');
+      }
+      for (var i = 0; i < candidates.length; i++) {
+          var canonical = resolveCanonicalCustomerField(candidates[i]);
+          if (canonical) return canonical;
+      }
+      return '';
+  }
+
+  function findInputByCanonicalKey(form, key) {
+      if (!form || !key) return null;
+      var all = form.querySelectorAll('input, textarea, select');
+      for (var i = 0; i < all.length; i++) {
+          var el = all[i];
+          if (el.type === 'hidden' || el.type === 'checkbox' || el.type === 'radio') continue;
+          if (getCanonicalCustomerKeyForInput(el) === key) return el;
+      }
+      return null;
+  }
+
+  function collectNormalizedCustomerFromForm(form) {
+      var result = {
+          name: '',
+          firstName: '',
+          lastName: '',
+          phone: '',
+          email: '',
+          address: '',
+          city: '',
+          state: '',
+          zipcode: ''
+      };
+      if (!form) return result;
+
+      var all = form.querySelectorAll('input, textarea, select');
+      all.forEach(function(el) {
+          if (el.type === 'hidden' || el.type === 'checkbox' || el.type === 'radio' || el.type === 'submit' || el.type === 'button') return;
+          var canonical = getCanonicalCustomerKeyForInput(el);
+          if (!canonical) return;
+          var val = String(el.value || '').trim();
+          if (!val) return;
+          if (!result[canonical]) result[canonical] = val;
+      });
+
+      if (!result.name) {
+          if (result.firstName && result.lastName) result.name = (result.firstName + ' ' + result.lastName).trim();
+          else if (result.firstName) result.name = result.firstName;
+      }
+      if (!result.firstName && result.name) result.firstName = result.name.split(/\s+/)[0] || '';
+      if (!result.lastName && result.name) result.lastName = result.name.split(/\s+/).slice(1).join(' ');
+      return result;
+  }
+
   /**
    * Render dynamic fields
    */
@@ -1964,6 +2063,7 @@
         // Common Input Attributes
         input.name = field.id; // e.g. 'name', 'phone', 'address'
         input.id = 'cod-' + field.id;
+        input.setAttribute('data-field-label', field.label || '');
         input.placeholder = field.placeholder || 'Enter ' + field.label.toLowerCase();
         if (field.required) {
           input.required = true;
@@ -1971,19 +2071,7 @@
         }
         
         // Add browser autocomplete attributes for native autofill
-        var autocompleteMap = {
-            'name': 'name',
-            'phone': 'tel',
-            'address': 'street-address',
-            'city': 'address-level2',
-            'state': 'address-level1',
-            'zip': 'postal-code',
-            'zipcode': 'postal-code',
-            'email': 'email'
-        };
-        if (autocompleteMap[field.id]) {
-            input.setAttribute('autocomplete', autocompleteMap[field.id]);
-        }
+        input.setAttribute('autocomplete', getAutocompleteAttr(field));
         
         // Set default value of 1 for quantity field
         if (field.id === 'quantity' && field.type === 'number') {
@@ -2067,22 +2155,18 @@
    */
   function saveCustomerToLocalStorage(form) {
     try {
-        var phone = form.querySelector('[name="phone"]');
-        var name = form.querySelector('[name="name"]');
-        var address = form.querySelector('[name="address"]');
-        var email = form.querySelector('[name="email"]');
-        var state = form.querySelector('[name="state"]');
-        var city = form.querySelector('[name="city"]');
-        var zip = form.querySelector('[name="zip"], [name="zipcode"]');
+        var customer = collectNormalizedCustomerFromForm(form);
         
         localStorage.setItem('cod_customer', JSON.stringify({
-            phone: phone ? phone.value : '',
-            name: name ? name.value : '',
-            address: address ? address.value : '',
-            email: email ? email.value : '',
-            state: state ? state.value : '',
-            city: city ? city.value : '',
-            zipcode: zip ? zip.value : ''
+            phone: customer.phone || '',
+            name: customer.name || '',
+            firstName: customer.firstName || '',
+            lastName: customer.lastName || '',
+            address: customer.address || '',
+            email: customer.email || '',
+            state: customer.state || '',
+            city: customer.city || '',
+            zipcode: customer.zipcode || ''
         }));
         console.log('[COD Form] Customer data saved to LocalStorage');
     } catch (e) {
@@ -2106,7 +2190,7 @@
 
                   // If phone is present in LS, also set the phone field explicitly if not set
                   if (data.phone) {
-                      var phoneInput = form.querySelector('input[name="phone"]');
+                      var phoneInput = findInputByCanonicalKey(form, 'phone') || form.querySelector('input[name="phone"]');
                       if (phoneInput && !phoneInput.value) {
                           phoneInput.value = data.phone;
                       }
@@ -2320,7 +2404,7 @@
    * Database is the source of truth
    */
   function setupAutoFill(form, config) {
-    var phoneInput = form.querySelector('input[name="phone"]');
+    var phoneInput = findInputByCanonicalKey(form, 'phone') || form.querySelector('input[name="phone"]');
     if (!phoneInput) return;
 
     function triggerAutoFill() {
@@ -2380,30 +2464,61 @@
    * Auto-fill form fields with customer data
    */
   function autoFillFields(form, data) {
-    if (data.name) {
+    var normalized = {
+        name: data.name || '',
+        firstName: data.firstName || data.firstname || '',
+        lastName: data.lastName || data.lastname || '',
+        phone: data.phone || '',
+        email: data.email || '',
+        address: data.address || '',
+        city: data.city || '',
+        state: data.state || '',
+        zipcode: data.zipcode || data.zip || ''
+    };
+    if (!normalized.name && normalized.firstName) {
+        normalized.name = normalized.lastName ? (normalized.firstName + ' ' + normalized.lastName).trim() : normalized.firstName;
+    }
+
+    // Backward-compatible direct field IDs
+    if (normalized.name) {
         var nameInput = form.querySelector('input[name="name"]');
-        if (nameInput && !nameInput.value) nameInput.value = data.name;
+        if (nameInput && !nameInput.value) nameInput.value = normalized.name;
     }
-    if (data.address) {
+    if (normalized.phone) {
+        var phoneInput = form.querySelector('input[name="phone"]');
+        if (phoneInput && !phoneInput.value) phoneInput.value = normalized.phone;
+    }
+    if (normalized.address) {
         var addrInput = form.querySelector('[name="address"]');
-        if (addrInput && !addrInput.value) addrInput.value = data.address;
+        if (addrInput && !addrInput.value) addrInput.value = normalized.address;
     }
-    if (data.email) {
+    if (normalized.email) {
         var emailInput = form.querySelector('input[name="email"]');
-        if (emailInput && !emailInput.value) emailInput.value = data.email;
+        if (emailInput && !emailInput.value) emailInput.value = normalized.email;
     }
-    if (data.state) {
+    if (normalized.state) {
         var stateInput = form.querySelector('input[name="state"], select[name="state"]');
-        if (stateInput && !stateInput.value) stateInput.value = data.state;
+        if (stateInput && !stateInput.value) stateInput.value = normalized.state;
     }
-    if (data.city) {
+    if (normalized.city) {
         var cityInput = form.querySelector('input[name="city"]');
-        if (cityInput && !cityInput.value) cityInput.value = data.city;
+        if (cityInput && !cityInput.value) cityInput.value = normalized.city;
     }
-    if (data.zipcode) {
+    if (normalized.zipcode) {
         var zipInput = form.querySelector('input[name="zip"], input[name="zipcode"]');
-        if (zipInput && !zipInput.value) zipInput.value = data.zipcode;
+        if (zipInput && !zipInput.value) zipInput.value = normalized.zipcode;
     }
+
+    // Generic canonical fill for custom-labeled fields
+    var all = form.querySelectorAll('input, textarea, select');
+    all.forEach(function(el) {
+        if (el.type === 'hidden' || el.type === 'checkbox' || el.type === 'radio' || el.type === 'submit' || el.type === 'button') return;
+        if (el.value) return;
+        var canonical = getCanonicalCustomerKeyForInput(el);
+        if (!canonical) return;
+        var val = normalized[canonical];
+        if (val) el.value = val;
+    });
   }
 
   /**
@@ -4808,17 +4923,18 @@ function darkenColor(hex, percent) {
       
       // Collect form data
       var formData = new FormData(form);
+      var normalizedCustomer = collectNormalizedCustomerFromForm(form);
       
       // Build payload with proper field mapping
       var payload = {
           shop: config.shop,
-          customerName: formData.get('name') || '',
-          customerPhone: formData.get('phone') || '',
-          customerAddress: formData.get('address') || '',
-          customerEmail: formData.get('email') || '',
-          customerState: formData.get('state') || '',
-          customerCity: formData.get('city') || '',
-          customerZipcode: formData.get('zip') || formData.get('zipcode') || '',
+          customerName: normalizedCustomer.name || formData.get('name') || '',
+          customerPhone: normalizedCustomer.phone || formData.get('phone') || '',
+          customerAddress: normalizedCustomer.address || formData.get('address') || '',
+          customerEmail: normalizedCustomer.email || formData.get('email') || '',
+          customerState: normalizedCustomer.state || formData.get('state') || '',
+          customerCity: normalizedCustomer.city || formData.get('city') || '',
+          customerZipcode: normalizedCustomer.zipcode || formData.get('zip') || formData.get('zipcode') || '',
           notes: formData.get('notes') || '',
           productId: config.productId,
           variantId: config.variantId,
