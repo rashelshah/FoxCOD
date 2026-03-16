@@ -2743,6 +2743,7 @@ function darkenColor(hex, percent) {
           radio.value = opt.id;
           radio.checked = opt.id === config.shippingOptions.defaultOption;
           radio.setAttribute('data-price', opt.price);
+          radio.setAttribute('data-label', opt.label || '');
           radio.style.marginRight = '8px';
           
           // Add change listener to update total
@@ -2975,6 +2976,7 @@ function darkenColor(hex, percent) {
           radio.name = 'shipping_method';
           radio.value = rate.id;
           radio.setAttribute('data-price', rate.price);
+          radio.setAttribute('data-label', rate.name || '');
           radio.style.cssText = 'accent-color:' + config.accentColor + ';width:18px;height:18px;flex-shrink:0;cursor:pointer;margin:0;';
           
           // Add change listener to update total and card styles
@@ -5024,12 +5026,32 @@ function darkenColor(hex, percent) {
 
       // Get selected shipping option
       var shippingRadio = form.querySelector('input[name="shipping_method"]:checked');
-      if (shippingRadio && config.shippingOptions && config.shippingOptions.options) {
-          var selectedOpt = config.shippingOptions.options.find(function(o) { return o.id === shippingRadio.value; });
-          if (selectedOpt) {
-              payload.shippingLabel = selectedOpt.label;
-              payload.shippingPrice = selectedOpt.price;
+      if (shippingRadio) {
+          var selectedShippingLabel = shippingRadio.getAttribute('data-label') || '';
+          var selectedShippingPrice = parseFloat(shippingRadio.getAttribute('data-price')) || payload.shippingPrice || 0;
+
+          // Legacy fallback for older DOM where data-label may be missing
+          if (!selectedShippingLabel && config.shippingOptions && config.shippingOptions.options) {
+              var selectedOpt = config.shippingOptions.options.find(function(o) { return o.id === shippingRadio.value; });
+              if (selectedOpt) {
+                  selectedShippingLabel = selectedOpt.label || '';
+                  selectedShippingPrice = selectedOpt.price;
+              }
           }
+
+          // Final fallback from visible row text
+          if (!selectedShippingLabel) {
+              var shippingRow = shippingRadio.closest('label') || shippingRadio.parentElement;
+              if (shippingRow) {
+                  var textNode = shippingRow.querySelector('div');
+                  if (textNode && textNode.textContent) {
+                      selectedShippingLabel = textNode.textContent.trim();
+                  }
+              }
+          }
+
+          payload.shippingLabel = selectedShippingLabel;
+          payload.shippingPrice = selectedShippingPrice;
       }
 
       // Detect selected payment method
