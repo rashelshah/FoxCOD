@@ -3,7 +3,7 @@
 A comprehensive, performance-focused Shopify Embedded App built to supercharge Cash on Delivery (COD) functionality. It allows merchants to customize a powerful COD form, increase Average Order Value (AOV) with Upsells & Downsells, prevent fraudulent orders, and integrate with third-party tools seamlessly.
 
 ## ✨ Key Features
-
+ 
 - **Customizable COD Form**: Embed a smooth, native-feeling order form directly onto your product pages using Theme App Extensions. No liquid code changes required.
 - **Upsells & Downsells Engine**: Increase store revenue with 1-tick upsells, customizable bundle offers, and post-purchase post-conversion downsells.
 - **Partial COD Payments**: Reduce RTO (Return to Origin) by requiring a partial advance payment. Draft orders are automatically managed.
