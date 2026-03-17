@@ -2837,8 +2837,11 @@ function darkenColor(hex, percent) {
    * Check if a shipping rate's conditions are met
    */
   function isRateApplicable(rate, config, quantity) {
-      var effectiveQty = Math.max(1, quantity || getEffectiveQuantity(null, config));
-      var orderPrice = getVariantSubtotal(config, effectiveQty) * quantity / effectiveQty;
+      if (quantity === undefined || quantity === null) {
+          quantity = getEffectiveQuantity(null, config);
+      }
+      var effectiveQty = Math.max(1, quantity);
+      var orderPrice = getVariantSubtotal(config, effectiveQty);
       
       // Check if rate is active
       if (!rate.is_active) return false;
@@ -3055,7 +3058,8 @@ function darkenColor(hex, percent) {
       console.log('[COD Form] Rendered new shipping rates:', applicableRates.length, 'of', config.shippingRates.length);
       
       // Re-render shipping options when quantity changes
-      var qtyInput = form.querySelector('[name="quantity"]');
+      var containerEl = form.closest('.cod-form-container') || form.parentElement;
+      var qtyInput = containerEl ? containerEl.querySelector('.cod-product-qty .cod-qty-input') : form.querySelector('[name="quantity"]');
       if (qtyInput) {
           qtyInput.addEventListener('change', function() {
               // Remember the marker (parent of existing section)
@@ -3785,6 +3789,7 @@ function darkenColor(hex, percent) {
         var val = parseInt(input.value) || 1;
         if (val > 1) {
             input.value = val - 1;
+            input.dispatchEvent(new Event('change', { bubbles: true }));
             triggerUpdate();
         }
     });
@@ -3794,6 +3799,7 @@ function darkenColor(hex, percent) {
         var max = parseInt(input.max) || config.maxQuantity || 10;
         if (val < max) {
             input.value = val + 1;
+            input.dispatchEvent(new Event('change', { bubbles: true }));
             triggerUpdate();
         }
     });
@@ -4913,6 +4919,49 @@ function darkenColor(hex, percent) {
         firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
         setTimeout(function() { firstInvalid.focus(); }, 400);
         return; // stop submission
+      }
+
+      // ── Custom Options Validation ──
+      var hasErrors = false;
+
+      // 1. Shipping Options Check
+      var shippingContainer = form.querySelector('.cod-shipping-section');
+      if (shippingContainer) {
+          var shippingRadios = shippingContainer.querySelectorAll('input[name="shipping_method"]');
+          if (shippingRadios.length > 0) {
+              var checkedShipping = shippingContainer.querySelector('input[name="shipping_method"]:checked');
+              if (!checkedShipping) {
+                  hasErrors = true;
+                  shippingContainer.style.setProperty('outline', '2px solid #d82c0d', 'important');
+                  shippingContainer.style.setProperty('border-radius', '8px', 'important');
+                  setTimeout(function(el) { el.style.removeProperty('outline'); el.style.removeProperty('border-radius'); }.bind(null, shippingContainer), 4000);
+                  if (!firstInvalid) firstInvalid = shippingContainer;
+              }
+          }
+      }
+
+      // 2. Payment Options Check
+      var paymentContainer = form.querySelector('.cod-payment-method-options');
+      if (paymentContainer) {
+          var paymentRadios = paymentContainer.querySelectorAll('input[name="payment_method"]');
+          if (paymentRadios.length > 0) {
+              var checkedPayment = paymentContainer.querySelector('input[name="payment_method"]:checked');
+              if (!checkedPayment) {
+                  hasErrors = true;
+                  paymentContainer.style.setProperty('outline', '2px solid #d82c0d', 'important');
+                  paymentContainer.style.setProperty('border-radius', '8px', 'important');
+                  setTimeout(function(el) { el.style.removeProperty('outline'); el.style.removeProperty('border-radius'); }.bind(null, paymentContainer), 4000);
+                  if (!firstInvalid) firstInvalid = paymentContainer;
+              }
+          }
+      }
+
+      if (hasErrors) {
+          console.log('[COD Form] Custom options validation failed — scrolling to block');
+          if (firstInvalid && firstInvalid.scrollIntoView) {
+              firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+          return; // stop submission
       }
 
       console.log('[COD Form] Validation passed');
