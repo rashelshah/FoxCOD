@@ -8,8 +8,65 @@ import type { LoaderFunctionArgs } from "react-router";
 import { useLoaderData, Link, useNavigate } from "react-router";
 import { Button, InlineStack } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
-import { getOrderStats, getFormSettings, saveShop } from "../config/supabase.server";
+import { getFormSettings, saveShop } from "../config/supabase.server";
 import { ORDER_STATUSES } from "../config/constants";
+
+// ─── Shopify Orders fetch with Link-header pagination ────────────
+async function fetchShopifyOrderStats(shop: string, accessToken: string) {
+  const fields = "id,created_at,total_price,financial_status,cancelled_at";
+  let nextUrl: string | null =
+    `https://${shop}/admin/api/2024-10/orders.json?status=any&limit=250&fields=${fields}`;
+
+  type ShopifyOrder = { created_at: string; total_price: string; financial_status: string; cancelled_at: string | null };
+  const allOrders: ShopifyOrder[] = [];
+
+  while (nextUrl) {
+    const res: Response = await fetch(nextUrl, {
+      headers: { "X-Shopify-Access-Token": accessToken },
+    });
+    if (!res.ok) break;
+    const data = await res.json();
+    if (data.orders) allOrders.push(...data.orders);
+
+    const linkHeader: string | null = res.headers.get("link");
+    if (linkHeader && linkHeader.includes('rel="next"')) {
+      nextUrl = linkHeader.split(",").find((l: string) => l.includes('rel="next"'))?.match(/<([^>]+)>/)?.[1] || null;
+    } else {
+      nextUrl = null;
+    }
+  }
+
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+  let totalRevenue = 0;
+  let todayOrders = 0;
+  let weekOrders = 0;
+  let pendingOrders = 0;
+
+  for (const order of allOrders) {
+    const createdAt = new Date(order.created_at);
+    const price = parseFloat(order.total_price) || 0;
+    const isCancelled = order.cancelled_at !== null;
+
+    if (!isCancelled && order.financial_status !== "refunded") totalRevenue += price;
+    if (createdAt >= todayStart) todayOrders++;
+    if (createdAt >= weekStart) weekOrders++;
+    if (!isCancelled && order.financial_status === "pending") pendingOrders++;
+  }
+
+  return {
+    totalOrders: allOrders.length,
+    totalRevenue,
+    todayOrders,
+    weekOrders,
+    pendingOrders,
+    todayRevenue: 0,
+    recentOrders: [] as any[],
+    ordersByStatus: {} as Record<string, number>,
+  };
+}
 
 /**
  * Loader: Fetch dashboard data from Supabase
@@ -17,6 +74,7 @@ import { ORDER_STATUSES } from "../config/constants";
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
   const shopDomain = session.shop;
+  const accessToken = session.accessToken || "";
 
   // Query shop currency from Shopify Admin API
   let shopCurrency = 'USD';
@@ -38,7 +96,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   // Get current settings
   const settings = await getFormSettings(shopDomain);
 
-  // Get order statistics
+  // Get order statistics from Shopify Orders API
   let stats = {
     totalOrders: 0,
     pendingOrders: 0,
@@ -51,14 +109,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   };
 
   try {
-    stats = await getOrderStats(shopDomain);
-
-    // Ensure recent orders is an array
-    if (!Array.isArray(stats.recentOrders)) {
-      stats.recentOrders = [];
-    }
+    const shopifyStats = await fetchShopifyOrderStats(shopDomain, accessToken);
+    stats = { ...stats, ...shopifyStats };
   } catch (error) {
-    console.log("Error fetching order stats:", error);
+    console.log("Error fetching Shopify order stats:", error);
   }
 
   return {

@@ -1,502 +1,557 @@
 /**
- * Analytics Page - Order insights and statistics
+ * Analytics Page - Shopify Orders data + Polaris UI
  * Route: /app/analytics
+ *
+ * Data source: Shopify Orders REST API (NOT Supabase)
+ * UI: 100% Shopify Polaris components
  */
 
+import { useState, useCallback } from "react";
 import type { LoaderFunctionArgs } from "react-router";
-import { useLoaderData, Link } from "react-router";
+import { useLoaderData, useNavigate, useSearchParams } from "react-router";
 import { authenticate } from "../shopify.server";
-import { getOrderStats } from "../config/supabase.server";
-import { ORDER_STATUSES } from "../config/constants";
+import {
+    Page,
+    Layout,
+    Card,
+    Text,
+    BlockStack,
+    InlineStack,
+    InlineGrid,
+    Box,
+    ProgressBar,
+    Select,
+    EmptyState,
+    Divider,
+    Badge,
+    SkeletonBodyText,
+} from "@shopify/polaris";
 
-/**
- * Loader: Fetch analytics data
- */
+// ─── Types ──────────────────────────────────────────
+interface ShopifyOrder {
+    id: number;
+    created_at: string;
+    total_price: string;
+    financial_status: string;
+    fulfillment_status: string | null;
+    cancelled_at: string | null;
+}
+
+interface AnalyticsData {
+    totalOrders: number;
+    totalRevenue: number;
+    avgOrderValue: number;
+    todayOrders: number;
+    weekOrders: number;
+    pendingOrders: number;
+    fulfilledOrders: number;
+    cancelledOrders: number;
+    refundedOrders: number;
+    partiallyRefundedOrders: number;
+    paidOrders: number;
+    todayRevenue: number;
+    pendingRevenue: number;
+}
+
+// ─── Fetch ALL orders from Shopify with Link header pagination ──
+async function fetchAllShopifyOrders(
+    shop: string,
+    accessToken: string,
+    createdAtMin?: string,
+): Promise<ShopifyOrder[]> {
+    const fields = "id,created_at,total_price,financial_status,fulfillment_status,cancelled_at";
+    let url: string | null =
+        `https://${shop}/admin/api/2024-10/orders.json?status=any&limit=250&fields=${fields}`;
+
+    if (createdAtMin) {
+        url += `&created_at_min=${createdAtMin}`;
+    }
+
+    const allOrders: ShopifyOrder[] = [];
+
+    while (url) {
+        const res: Response = await fetch(url, {
+            headers: { "X-Shopify-Access-Token": accessToken },
+        });
+
+        if (!res.ok) {
+            console.error(`[Analytics] Shopify API error: ${res.status} ${res.statusText}`);
+            break;
+        }
+
+        const data = await res.json();
+        if (data.orders) {
+            allOrders.push(...data.orders);
+        }
+
+        // Parse Link header for pagination
+        const linkHeader: string | null = res.headers.get("link");
+        if (linkHeader && linkHeader.includes('rel="next"')) {
+            url =
+                linkHeader
+                    .split(",")
+                    .find((l: string) => l.includes('rel="next"'))
+                    ?.match(/<([^>]+)>/)?.[1] || null;
+        } else {
+            url = null;
+        }
+    }
+
+    return allOrders;
+}
+
+// ─── Compute analytics metrics from orders ──────────
+function computeMetrics(orders: ShopifyOrder[]): AnalyticsData {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    let totalRevenue = 0;
+    let todayOrders = 0;
+    let todayRevenue = 0;
+    let weekOrders = 0;
+    let pendingOrders = 0;
+    let fulfilledOrders = 0;
+    let cancelledOrders = 0;
+    let refundedOrders = 0;
+    let partiallyRefundedOrders = 0;
+    let paidOrders = 0;
+    let pendingRevenue = 0;
+
+    for (const order of orders) {
+        const createdAt = new Date(order.created_at);
+        const price = parseFloat(order.total_price) || 0;
+        const isCancelled = order.cancelled_at !== null;
+
+        // Revenue: exclude cancelled and fully refunded
+        if (!isCancelled && order.financial_status !== "refunded") {
+            totalRevenue += price;
+        }
+
+        // Time-based counts
+        if (createdAt >= todayStart) {
+            todayOrders++;
+            if (!isCancelled && order.financial_status !== "refunded") {
+                todayRevenue += price;
+            }
+        }
+        if (createdAt >= weekStart) {
+            weekOrders++;
+        }
+
+        // Status breakdowns
+        if (isCancelled) {
+            cancelledOrders++;
+        } else if (order.financial_status === "refunded") {
+            refundedOrders++;
+        } else if (order.financial_status === "partially_refunded") {
+            partiallyRefundedOrders++;
+        } else if (order.financial_status === "pending") {
+            pendingOrders++;
+            pendingRevenue += price;
+        } else if (order.financial_status === "paid" || order.financial_status === "authorized") {
+            paidOrders++;
+        }
+
+        // Fulfillment
+        if (!isCancelled && order.fulfillment_status === "fulfilled") {
+            fulfilledOrders++;
+        }
+    }
+
+    const totalOrders = orders.length;
+    const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+
+    return {
+        totalOrders,
+        totalRevenue,
+        avgOrderValue,
+        todayOrders,
+        weekOrders,
+        pendingOrders,
+        fulfilledOrders,
+        cancelledOrders,
+        refundedOrders,
+        partiallyRefundedOrders,
+        paidOrders,
+        todayRevenue,
+        pendingRevenue,
+    };
+}
+
+// ─── Loader ─────────────────────────────────────────
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+    // Single authenticate call — get both admin and session
     const { admin, session } = await authenticate.admin(request);
-    const shopDomain = session.shop;
+    const shop = session.shop;
+    const accessToken = session.accessToken || "";
 
-    // Query shop currency from Shopify Admin API
-    let shopCurrency = 'USD';
+    // Get shop currency
+    let shopCurrency = "USD";
     try {
         const currencyRes = await admin.graphql(`{ shop { currencyCode } }`);
         const currencyData = await currencyRes.json();
-        shopCurrency = currencyData?.data?.shop?.currencyCode || 'USD';
-    } catch (e) { console.log('Error fetching shop currency:', e); }
+        shopCurrency = currencyData?.data?.shop?.currencyCode || "USD";
+    } catch (e) {
+        console.log("[Analytics] Error fetching shop currency:", e);
+    }
 
-    const stats = await getOrderStats(shopDomain);
+    // Date filter from URL params
+    const url = new URL(request.url);
+    const selectedDays = url.searchParams.get("days") || "all";
 
-    return {
-        shop: shopDomain,
-        stats,
-        shopCurrency,
-    };
+    // Build created_at_min for Shopify query
+    let createdAtMin: string | undefined;
+    if (selectedDays !== "all") {
+        const days = parseInt(selectedDays, 10);
+        if (!isNaN(days) && days > 0) {
+            const date = new Date();
+            date.setDate(date.getDate() - days);
+            createdAtMin = date.toISOString();
+        }
+    }
+
+    // Fetch fresh data from Shopify on every request (no caching)
+    let metrics: AnalyticsData;
+    try {
+        const orders = await fetchAllShopifyOrders(shop, accessToken, createdAtMin);
+        metrics = computeMetrics(orders);
+    } catch (error) {
+        console.error("[Analytics] Error fetching Shopify orders:", error);
+        metrics = {
+            totalOrders: 0,
+            totalRevenue: 0,
+            avgOrderValue: 0,
+            todayOrders: 0,
+            weekOrders: 0,
+            pendingOrders: 0,
+            fulfilledOrders: 0,
+            cancelledOrders: 0,
+            refundedOrders: 0,
+            partiallyRefundedOrders: 0,
+            paidOrders: 0,
+            todayRevenue: 0,
+            pendingRevenue: 0,
+        };
+    }
+
+    return { ...metrics, shopCurrency, selectedDays };
 };
 
-/**
- * Analytics Page Component
- */
+// ─── Component ──────────────────────────────────────
 export default function AnalyticsPage() {
-    const { stats, shopCurrency } = useLoaderData<typeof loader>();
+    const data = useLoaderData<typeof loader>();
+    const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
 
-    // Format currency
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat(undefined, {
-            style: "currency",
-            currency: shopCurrency || "USD",
-            minimumFractionDigits: 0,
-        }).format(amount);
-    };
+    const {
+        totalOrders,
+        totalRevenue,
+        avgOrderValue,
+        todayOrders,
+        weekOrders,
+        pendingOrders,
+        fulfilledOrders,
+        cancelledOrders,
+        refundedOrders,
+        partiallyRefundedOrders,
+        paidOrders,
+        todayRevenue,
+        pendingRevenue,
+        shopCurrency,
+        selectedDays,
+    } = data;
 
-    // Calculate conversion rate (delivered / total)
-    const deliveredCount = stats.ordersByStatus?.delivered || 0;
-    const conversionRate = stats.totalOrders > 0
-        ? ((deliveredCount / stats.totalOrders) * 100).toFixed(1)
-        : 0;
+    // Currency formatter
+    const formatCurrency = useCallback(
+        (amount: number) =>
+            new Intl.NumberFormat(undefined, {
+                style: "currency",
+                currency: shopCurrency || "USD",
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0,
+            }).format(amount),
+        [shopCurrency],
+    );
 
-    // Calculate average order value
-    const avgOrderValue = stats.totalOrders > 0
-        ? stats.totalRevenue / stats.totalOrders
-        : 0;
+    // Handle date filter change — navigate to trigger loader re-run
+    const handleDateChange = useCallback(
+        (value: string) => {
+            navigate(`/app/analytics?days=${value}`);
+        },
+        [navigate],
+    );
+
+    // ─── Status breakdown for the grid ───
+    const statusItems = [
+        { label: "Pending Payment", count: pendingOrders, tone: "warning" as const },
+        { label: "Paid", count: paidOrders, tone: "success" as const },
+        { label: "Fulfilled", count: fulfilledOrders, tone: "info" as const },
+        { label: "Cancelled", count: cancelledOrders, tone: "critical" as const },
+        { label: "Refunded", count: refundedOrders, tone: "critical" as const },
+    ];
+
+    // ─── Distribution bars ───
+    const maxStatusCount = Math.max(...statusItems.map((s) => s.count), 1);
+
+    // Date filter label
+    const dateFilterOptions = [
+        { label: "Last 7 days", value: "7" },
+        { label: "Last 30 days", value: "30" },
+        { label: "Last 90 days", value: "90" },
+        { label: "All time", value: "all" },
+    ];
+
+    // ─── Empty state ───
+    if (totalOrders === 0) {
+        return (
+            <Page
+                title="Analytics"
+                subtitle="Track your COD order performance"
+                backAction={{ content: "Dashboard", onAction: () => navigate("/app") }}
+            >
+                <Layout>
+                    <Layout.Section>
+                        <Card>
+                            <EmptyState
+                                heading="No orders yet"
+                                action={{
+                                    content: "Go to Orders",
+                                    onAction: () => navigate("/app/orders"),
+                                }}
+                                image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+                            >
+                                <p>
+                                    Once you start receiving orders, your analytics will appear here.
+                                </p>
+                            </EmptyState>
+                        </Card>
+                    </Layout.Section>
+                </Layout>
+                <Box paddingBlockEnd="800" />
+            </Page>
+        );
+    }
 
     return (
-        <>
-            <style>{`
-                .analytics-page {
-                    max-width: 1200px;
-                    margin: 0 auto;
-                    padding: 24px;
-                }
+        <Page
+            title="Analytics"
+            subtitle="Track your COD order performance"
+            backAction={{ content: "Dashboard", onAction: () => navigate("/app") }}
+        >
+            <BlockStack gap="500">
+                {/* ─── Date Filter ─── */}
+                <InlineStack align="end">
+                    <Box minWidth="200px">
+                        <Select
+                            label="Time range"
+                            labelInline
+                            options={dateFilterOptions}
+                            value={selectedDays}
+                            onChange={handleDateChange}
+                        />
+                    </Box>
+                </InlineStack>
 
-                .page-header {
-                    display: flex;
-                    align-items: center;
-                    gap: 16px;
-                    margin-bottom: 32px;
-                }
+                {/* ─── KPI Summary Cards ─── */}
+                <Layout>
+                    <Layout.Section variant="oneThird">
+                        <Card>
+                            <BlockStack gap="200">
+                                <Text as="p" variant="bodySm" tone="subdued">
+                                    Total Orders
+                                </Text>
+                                <Text as="p" variant="headingXl" fontWeight="bold">
+                                    {totalOrders.toLocaleString()}
+                                </Text>
+                                <Text as="p" variant="bodySm" tone="subdued">
+                                    {selectedDays === "all"
+                                        ? "All time"
+                                        : `Last ${selectedDays} days`}
+                                </Text>
+                            </BlockStack>
+                        </Card>
+                    </Layout.Section>
 
-                .back-btn {
-                    width: 40px;
-                    height: 40px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    border: 1px solid #e5e7eb;
-                    border-radius: 10px;
-                    background: white;
-                    text-decoration: none;
-                    color: #374151;
-                }
+                    <Layout.Section variant="oneThird">
+                        <Card>
+                            <BlockStack gap="200">
+                                <Text as="p" variant="bodySm" tone="subdued">
+                                    Total Revenue
+                                </Text>
+                                <Text as="p" variant="headingXl" fontWeight="bold">
+                                    {formatCurrency(totalRevenue)}
+                                </Text>
+                                <Text as="p" variant="bodySm" tone="subdued">
+                                    Excludes cancelled &amp; refunded
+                                </Text>
+                            </BlockStack>
+                        </Card>
+                    </Layout.Section>
 
-                .back-btn:hover {
-                    background: #f9fafb;
-                }
+                    <Layout.Section variant="oneThird">
+                        <Card>
+                            <BlockStack gap="200">
+                                <Text as="p" variant="bodySm" tone="subdued">
+                                    Avg Order Value
+                                </Text>
+                                <Text as="p" variant="headingXl" fontWeight="bold">
+                                    {formatCurrency(avgOrderValue)}
+                                </Text>
+                                <Text as="p" variant="bodySm" tone="subdued">
+                                    Per order
+                                </Text>
+                            </BlockStack>
+                        </Card>
+                    </Layout.Section>
+                </Layout>
 
-                .page-title h1 {
-                    font-size: 24px;
-                    font-weight: 700;
-                    color: #111827;
-                    margin: 0 0 4px 0;
-                }
+                <Layout>
+                    <Layout.Section variant="oneHalf">
+                        <Card>
+                            <BlockStack gap="200">
+                                <Text as="p" variant="bodySm" tone="subdued">
+                                    Orders Last 7 Days
+                                </Text>
+                                <Text as="p" variant="headingXl" fontWeight="bold">
+                                    {weekOrders.toLocaleString()}
+                                </Text>
+                            </BlockStack>
+                        </Card>
+                    </Layout.Section>
 
-                .page-title p {
-                    font-size: 14px;
-                    color: #6b7280;
-                    margin: 0;
-                }
+                    <Layout.Section variant="oneHalf">
+                        <Card>
+                            <BlockStack gap="200">
+                                <Text as="p" variant="bodySm" tone="subdued">
+                                    Revenue Today
+                                </Text>
+                                <Text as="p" variant="headingXl" fontWeight="bold">
+                                    {formatCurrency(todayRevenue)}
+                                </Text>
+                            </BlockStack>
+                        </Card>
+                    </Layout.Section>
+                </Layout>
 
-                /* Stats Grid */
-                .stats-grid {
-                    display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-                    gap: 20px;
-                    margin-bottom: 32px;
-                }
+                {/* ─── Orders by Status ─── */}
+                <Card>
+                    <BlockStack gap="400">
+                        <Text as="h2" variant="headingMd">
+                            Orders by Status
+                        </Text>
+                        <InlineGrid columns={5} gap="400">
+                            {statusItems.map((item) => (
+                                <Box key={item.label}>
+                                    <BlockStack gap="200" inlineAlign="center">
+                                        <Text
+                                            as="p"
+                                            variant="headingLg"
+                                            fontWeight="bold"
+                                            alignment="center"
+                                        >
+                                            {item.count}
+                                        </Text>
+                                        <Badge tone={item.tone}>{item.label}</Badge>
+                                    </BlockStack>
+                                </Box>
+                            ))}
+                        </InlineGrid>
+                    </BlockStack>
+                </Card>
 
-                .stat-card {
-                    background: white;
-                    border-radius: 16px;
-                    padding: 24px;
-                    border: 1px solid #e5e7eb;
-                }
+                {/* ─── Order Distribution ─── */}
+                <Card>
+                    <BlockStack gap="400">
+                        <Text as="h2" variant="headingMd">
+                            Order Distribution
+                        </Text>
+                        <BlockStack gap="300">
+                            {statusItems.map((item) => {
+                                const progress =
+                                    maxStatusCount > 0
+                                        ? Math.round((item.count / maxStatusCount) * 100)
+                                        : 0;
+                                return (
+                                    <BlockStack key={item.label} gap="100">
+                                        <InlineStack align="space-between">
+                                            <Text as="span" variant="bodySm">
+                                                {item.label}
+                                            </Text>
+                                            <Text as="span" variant="bodySm" fontWeight="semibold">
+                                                {item.count}
+                                            </Text>
+                                        </InlineStack>
+                                        <ProgressBar
+                                            progress={progress}
+                                            size="small"
+                                            tone={
+                                                item.tone === "critical"
+                                                    ? "critical"
+                                                    : item.tone === "warning"
+                                                      ? "highlight"
+                                                      : "primary"
+                                            }
+                                        />
+                                    </BlockStack>
+                                );
+                            })}
+                        </BlockStack>
+                    </BlockStack>
+                </Card>
 
-                .stat-card-header {
-                    display: flex;
-                    align-items: center;
-                    gap: 12px;
-                    margin-bottom: 16px;
-                }
+                {/* ─── Quick Insights ─── */}
+                <Layout>
+                    <Layout.Section variant="oneThird">
+                        <Card background="bg-surface-secondary">
+                            <BlockStack gap="200">
+                                <Text as="p" variant="bodySm" tone="subdued">
+                                    Today's Orders
+                                </Text>
+                                <Text as="p" variant="heading2xl" fontWeight="bold">
+                                    {todayOrders}
+                                </Text>
+                                <Text as="p" variant="bodySm" tone="subdued">
+                                    {formatCurrency(todayRevenue)} revenue today
+                                </Text>
+                            </BlockStack>
+                        </Card>
+                    </Layout.Section>
 
-                .stat-icon {
-                    width: 48px;
-                    height: 48px;
-                    border-radius: 12px;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    font-size: 24px;
-                }
+                    <Layout.Section variant="oneThird">
+                        <Card background="bg-surface-secondary">
+                            <BlockStack gap="200">
+                                <Text as="p" variant="bodySm" tone="subdued">
+                                    Pending Orders
+                                </Text>
+                                <Text as="p" variant="heading2xl" fontWeight="bold">
+                                    {pendingOrders}
+                                </Text>
+                                <Text as="p" variant="bodySm" tone="subdued">
+                                    {formatCurrency(pendingRevenue)} pending
+                                </Text>
+                            </BlockStack>
+                        </Card>
+                    </Layout.Section>
 
-                .stat-icon-blue { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
-                .stat-icon-green { background: linear-gradient(135deg, #10b981, #059669); }
-                .stat-icon-purple { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
-                .stat-icon-orange { background: linear-gradient(135deg, #f59e0b, #d97706); }
-
-                .stat-label {
-                    font-size: 14px;
-                    color: #6b7280;
-                    font-weight: 500;
-                }
-
-                .stat-value {
-                    font-size: 32px;
-                    font-weight: 700;
-                    color: #111827;
-                    margin: 0;
-                }
-
-                .stat-subtext {
-                    font-size: 13px;
-                    color: #9ca3af;
-                    margin-top: 4px;
-                }
-
-                /* Section */
-                .section {
-                    margin-bottom: 32px;
-                }
-
-                .section-title {
-                    font-size: 18px;
-                    font-weight: 600;
-                    color: #111827;
-                    margin: 0 0 16px 0;
-                }
-
-                /* Status Breakdown */
-                .status-grid {
-                    display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-                    gap: 12px;
-                }
-
-                .status-card {
-                    background: white;
-                    border: 1px solid #e5e7eb;
-                    border-radius: 12px;
-                    padding: 16px;
-                    text-align: center;
-                }
-
-                .status-count {
-                    font-size: 28px;
-                    font-weight: 700;
-                    color: #111827;
-                }
-
-                .status-label {
-                    font-size: 13px;
-                    font-weight: 600;
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 6px;
-                    margin-top: 4px;
-                }
-
-                .status-dot {
-                    width: 8px;
-                    height: 8px;
-                    border-radius: 50%;
-                }
-
-                /* Insights */
-                .insights-grid {
-                    display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-                    gap: 20px;
-                }
-
-                .insight-card {
-                    background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
-                    border-radius: 16px;
-                    padding: 24px;
-                    color: white;
-                }
-
-                .insight-card h3 {
-                    font-size: 14px;
-                    font-weight: 500;
-                    opacity: 0.8;
-                    margin: 0 0 8px 0;
-                }
-
-                .insight-card .value {
-                    font-size: 28px;
-                    font-weight: 700;
-                }
-
-                .insight-card .description {
-                    font-size: 13px;
-                    opacity: 0.7;
-                    margin-top: 8px;
-                }
-
-                /* Progress Bar */
-                .progress-container {
-                    background: white;
-                    border: 1px solid #e5e7eb;
-                    border-radius: 16px;
-                    padding: 24px;
-                    margin-bottom: 32px;
-                }
-
-                .progress-header {
-                    display: flex;
-                    justify-content: space-between;
-                    margin-bottom: 12px;
-                }
-
-                .progress-header h3 {
-                    font-size: 16px;
-                    font-weight: 600;
-                    margin: 0;
-                }
-
-                .progress-header span {
-                    font-size: 14px;
-                    color: #10b981;
-                    font-weight: 600;
-                }
-
-                .progress-bar {
-                    height: 12px;
-                    background: #f3f4f6;
-                    border-radius: 6px;
-                    overflow: hidden;
-                }
-
-                .progress-fill {
-                    height: 100%;
-                    background: linear-gradient(90deg, #10b981, #059669);
-                    border-radius: 6px;
-                    transition: width 0.5s ease;
-                }
-
-                /* Empty State */
-                .empty-state {
-                    text-align: center;
-                    padding: 64px;
-                    background: white;
-                    border: 1px solid #e5e7eb;
-                    border-radius: 16px;
-                }
-
-                .empty-icon {
-                    font-size: 48px;
-                    margin-bottom: 16px;
-                }
-
-                .empty-state h3 {
-                    font-size: 18px;
-                    font-weight: 600;
-                    margin: 0 0 8px 0;
-                }
-
-                .empty-state p {
-                    color: #6b7280;
-                    margin: 0;
-                }
-            `}</style>
-
-            <s-page heading="">
-                <div className="analytics-page">
-                    <div className="page-header">
-                        <Link to="/app" className="back-btn">←</Link>
-                        <div className="page-title">
-                            <h1>Analytics</h1>
-                            <p>Track your COD order performance</p>
-                        </div>
-                    </div>
-
-                    {stats.totalOrders > 0 ? (
-                        <>
-                            {/* Key Stats */}
-                            <div className="stats-grid">
-                                <div className="stat-card">
-                                    <div className="stat-card-header">
-                                        <div className="stat-icon stat-icon-blue"><svg width="22" height="22" viewBox="0 0 20 20" fill="none"><rect x="3" y="5" width="14" height="12" rx="2" stroke="white" strokeWidth="1.5" fill="none" /><path d="M3 9h14" stroke="white" strokeWidth="1.5" /></svg></div>
-                                        <span className="stat-label">Total Orders</span>
-                                    </div>
-                                    <p className="stat-value">{stats.totalOrders}</p>
-                                    <div className="stat-subtext">All time COD orders</div>
-                                </div>
-
-                                <div className="stat-card">
-                                    <div className="stat-card-header">
-                                        <div className="stat-icon stat-icon-green"><svg width="22" height="22" viewBox="0 0 20 20" fill="none"><path d="M10 2a8 8 0 100 16 8 8 0 000-16z" stroke="white" strokeWidth="1.5" fill="none" /><path d="M6 10l3 3 5-5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" /></svg></div>
-                                        <span className="stat-label">Total Revenue</span>
-                                    </div>
-                                    <p className="stat-value">{formatCurrency(stats.totalRevenue)}</p>
-                                    <div className="stat-subtext">From active orders</div>
-                                </div>
-
-                                <div className="stat-card">
-                                    <div className="stat-card-header">
-                                        <div className="stat-icon stat-icon-purple"><svg width="22" height="22" viewBox="0 0 20 20" fill="none"><path d="M3 17V5h2v12H3zm4 0V8h2v9H7zm4 0V3h2v14h-2zm4 0V10h2v7h-2z" fill="white" /></svg></div>
-                                        <span className="stat-label">Avg Order Value</span>
-                                    </div>
-                                    <p className="stat-value">{formatCurrency(avgOrderValue)}</p>
-                                    <div className="stat-subtext">Per order</div>
-                                </div>
-
-                                <div className="stat-card">
-                                    <div className="stat-card-header">
-                                        <div className="stat-icon stat-icon-orange"><svg width="22" height="22" viewBox="0 0 20 20" fill="none"><rect x="3" y="3" width="14" height="14" rx="2" stroke="white" strokeWidth="1.5" fill="none" /><path d="M3 8h14M8 3v14" stroke="white" strokeWidth="1.5" /></svg></div>
-                                        <span className="stat-label">This Week</span>
-                                    </div>
-                                    <p className="stat-value">{stats.weekOrders}</p>
-                                    <div className="stat-subtext">Orders in last 7 days</div>
-                                </div>
-                            </div>
-
-                            {/* Conversion Rate */}
-                            <div className="progress-container">
-                                <div className="progress-header">
-                                    <h3>Delivery Rate</h3>
-                                    <span>{conversionRate}%</span>
-                                </div>
-                                <div className="progress-bar">
-                                    <div
-                                        className="progress-fill"
-                                        style={{ width: `${conversionRate}%` }}
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Status Breakdown */}
-                            <div className="section">
-                                <h2 className="section-title">Orders by Status</h2>
-                                <div className="status-grid">
-                                    {ORDER_STATUSES.map((status) => (
-                                        <div className="status-card" key={status.value}>
-                                            <div className="status-count">
-                                                {stats.ordersByStatus?.[status.value] || 0}
-                                            </div>
-                                            <div className="status-label">
-                                                <span
-                                                    className="status-dot"
-                                                    style={{ background: status.color }}
-                                                />
-                                                {status.label}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Visual Chart Section */}
-                            <div className="section">
-                                <h2 className="section-title">Order Distribution</h2>
-                                <div style={{
-                                    background: 'white',
-                                    border: '1px solid #e5e7eb',
-                                    borderRadius: '16px',
-                                    padding: '24px'
-                                }}>
-                                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '12px', height: '200px', paddingBottom: '40px', position: 'relative' }}>
-                                        {ORDER_STATUSES.map((status) => {
-                                            const count = stats.ordersByStatus?.[status.value] || 0;
-                                            const maxCount = Math.max(...ORDER_STATUSES.map(s => stats.ordersByStatus?.[s.value] || 0), 1);
-                                            const heightPercent = (count / maxCount) * 100;
-                                            return (
-                                                <div
-                                                    key={status.value}
-                                                    style={{
-                                                        flex: 1,
-                                                        display: 'flex',
-                                                        flexDirection: 'column',
-                                                        alignItems: 'center',
-                                                        height: '100%',
-                                                        justifyContent: 'flex-end'
-                                                    }}
-                                                >
-                                                    <span style={{
-                                                        fontSize: '14px',
-                                                        fontWeight: 700,
-                                                        color: status.color,
-                                                        marginBottom: '8px'
-                                                    }}>
-                                                        {count}
-                                                    </span>
-                                                    <div style={{
-                                                        width: '100%',
-                                                        maxWidth: '60px',
-                                                        height: `${Math.max(heightPercent, 5)}%`,
-                                                        background: `linear-gradient(180deg, ${status.color} 0%, ${status.color}80 100%)`,
-                                                        borderRadius: '8px 8px 0 0',
-                                                        transition: 'height 0.5s ease',
-                                                        boxShadow: `0 4px 12px ${status.color}30`
-                                                    }} />
-                                                    <span style={{
-                                                        position: 'absolute',
-                                                        bottom: '0',
-                                                        fontSize: '11px',
-                                                        color: '#6b7280',
-                                                        fontWeight: 500,
-                                                        textAlign: 'center',
-                                                        width: '70px',
-                                                        whiteSpace: 'nowrap',
-                                                        overflow: 'hidden',
-                                                        textOverflow: 'ellipsis'
-                                                    }}>
-                                                        {status.label}
-                                                    </span>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Insights */}
-                            <div className="section">
-                                <h2 className="section-title">Quick Insights</h2>
-                                <div className="insights-grid">
-                                    <div className="insight-card">
-                                        <h3>Today's Orders</h3>
-                                        <div className="value">{stats.todayOrders}</div>
-                                        <div className="description">
-                                            {formatCurrency(stats.todayRevenue)} revenue today
-                                        </div>
-                                    </div>
-                                    <div className="insight-card">
-                                        <h3>Pending Orders</h3>
-                                        <div className="value">{stats.pendingOrders}</div>
-                                        <div className="description">
-                                            Awaiting confirmation or shipping
-                                        </div>
-                                    </div>
-                                    <div className="insight-card">
-                                        <h3>Returns & Cancellations</h3>
-                                        <div className="value">
-                                            {(stats.ordersByStatus?.returned || 0) + (stats.ordersByStatus?.cancelled || 0)}
-                                        </div>
-                                        <div className="description">
-                                            Total unsuccessful orders
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </>
-                    ) : (
-                        <div className="empty-state">
-                            <div className="empty-icon"><svg width="48" height="48" viewBox="0 0 20 20" fill="none"><path d="M3 17V5h2v12H3zm4 0V8h2v9H7zm4 0V3h2v14h-2zm4 0V10h2v7h-2z" fill="#d1d5db" /></svg></div>
-                            <h3>No analytics data yet</h3>
-                            <p>Start receiving COD orders to see your analytics here</p>
-                        </div>
-                    )}
-                </div>
-            </s-page>
-        </>
+                    <Layout.Section variant="oneThird">
+                        <Card background="bg-surface-secondary">
+                            <BlockStack gap="200">
+                                <Text as="p" variant="bodySm" tone="subdued">
+                                    Returns &amp; Cancellations
+                                </Text>
+                                <Text as="p" variant="heading2xl" fontWeight="bold">
+                                    {cancelledOrders + refundedOrders + partiallyRefundedOrders}
+                                </Text>
+                                <Text as="p" variant="bodySm" tone="subdued">
+                                    Total unsuccessful orders
+                                </Text>
+                            </BlockStack>
+                        </Card>
+                    </Layout.Section>
+                </Layout>
+                <Box paddingBlockEnd="800" />
+            </BlockStack>
+        </Page>
     );
 }
