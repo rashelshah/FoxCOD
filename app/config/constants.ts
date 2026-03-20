@@ -14,3 +14,16 @@ export const ORDER_STATUSES: { value: OrderStatus; label: string; color: string 
     { value: 'returned', label: 'Returned', color: '#ef4444' },
     { value: 'cancelled', label: 'Cancelled', color: '#6b7280' },
 ];
+
+// Shopify sync status types
+export type SyncStatus = 'pending_sync' | 'syncing' | 'synced' | 'failed_sync';
+
+export const SYNC_STATUSES: { value: SyncStatus; label: string; tone: 'warning' | 'info' | 'success' | 'critical' }[] = [
+    { value: 'pending_sync', label: 'Syncing…', tone: 'warning' },
+    { value: 'syncing', label: 'Syncing…', tone: 'info' },
+    { value: 'synced', label: 'Synced', tone: 'success' },
+    { value: 'failed_sync', label: 'Sync Failed', tone: 'critical' },
+];
+
+// Retry backoff delays in seconds per attempt number
+export const RETRY_DELAYS_SEC = [30, 120, 300, 900, 3600];

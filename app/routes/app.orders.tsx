@@ -10,7 +10,7 @@ import { useAppBridge } from "@shopify/app-bridge-react";
 import { Page, Select, Button, ButtonGroup, Pagination, Badge, InlineStack, Text } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import { getOrders, updateOrderStatusSimple } from "../config/supabase.server";
-import { ORDER_STATUSES, type OrderStatus } from "../config/constants";
+import { ORDER_STATUSES, type OrderStatus, SYNC_STATUSES, type SyncStatus } from "../config/constants";
 
 /**
  * Loader: Fetch all orders
@@ -94,6 +94,28 @@ export default function OrdersPage() {
 
     const isPageLoading = navigation.state === "loading";
     const isUpdating = fetcher.state === "submitting" || fetcher.state === "loading";
+
+    // Retry fetcher for sync failures
+    const retryFetcher = useFetcher();
+    const isRetrying = retryFetcher.state === "submitting" || retryFetcher.state === "loading";
+
+    // Handle retry response
+    useEffect(() => {
+        if (retryFetcher.state === "idle" && retryFetcher.data) {
+            if (retryFetcher.data.success) {
+                shopify.toast.show(retryFetcher.data.message || "Retry initiated");
+            } else if (retryFetcher.data.error) {
+                shopify.toast.show(`Retry error: ${retryFetcher.data.error}`);
+            }
+        }
+    }, [retryFetcher.state, retryFetcher.data, shopify]);
+
+    const handleRetryOrder = useCallback((orderId: string) => {
+        retryFetcher.submit(
+            {},
+            { method: "post", action: `/api/retry-failed-orders?orderId=${orderId}` }
+        );
+    }, [retryFetcher]);
 
     // Optimistic status updates
     const [pendingUpdates, setPendingUpdates] = useState<Record<string, string>>({});
@@ -793,6 +815,32 @@ export default function OrdersPage() {
                                         </div>
                                         <div className="date-cell">
                                             {formatDate(order.created_at)}
+                                        </div>
+                                        <div className="sync-cell" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            {(() => {
+                                                const syncStatus = order.sync_status as SyncStatus | undefined;
+                                                if (!syncStatus || syncStatus === 'synced') {
+                                                    return <Badge tone="success">Synced</Badge>;
+                                                }
+                                                if (syncStatus === 'pending_sync' || syncStatus === 'syncing') {
+                                                    return <Badge tone="warning">Syncing…</Badge>;
+                                                }
+                                                if (syncStatus === 'failed_sync') {
+                                                    return (
+                                                        <InlineStack gap="200" blockAlign="center">
+                                                            <Badge tone="critical">Failed</Badge>
+                                                            <Button
+                                                                size="micro"
+                                                                onClick={() => handleRetryOrder(order.id)}
+                                                                disabled={isRetrying}
+                                                            >
+                                                                Retry
+                                                            </Button>
+                                                        </InlineStack>
+                                                    );
+                                                }
+                                                return null;
+                                            })()}
                                         </div>
                                         <div className="action-cell">
                                             <Button onClick={() => navigate(`/app/orders/${order.id}`)}>View</Button>

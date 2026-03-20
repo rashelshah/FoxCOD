@@ -12,7 +12,9 @@ import {
     getShop,
     getFormSettings,
     logOrder,
-    updateOrderStatus
+    acquireSyncLock,
+    markSynced,
+    markSyncFailed,
 } from "../config/supabase.server";
 import { validateOrderAgainstFraudRules } from "../services/fraud-protection.server";
 
@@ -264,17 +266,18 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             );
         }
 
-        // Get shop data from Supabase
-        const shop = await getShop(body.shop);
+        // ── Parallel: fetch shop + form settings simultaneously ──
+        const [shop, formSettings] = await Promise.all([
+            getShop(body.shop),
+            getFormSettings(body.shop),
+        ]);
+
         if (!shop || shop.uninstalled_at) {
             return Response.json(
                 { success: false, error: "Shop not found or app not installed" },
                 { status: 404, headers: corsHeaders }
             );
         }
-
-        // Get form settings
-        const formSettings = await getFormSettings(body.shop);
         if (!formSettings?.enabled) {
             return Response.json(
                 { success: false, error: "COD form is not enabled for this shop" },
@@ -359,7 +362,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             orderNotes += `BUNDLE DISCOUNT: ${discountPercent}% off`;
         }
 
-        // Log order in Supabase - this is the primary order storage
+        // Log order in Supabase — primary storage + save full payload for retry
         const orderLog = await logOrder({
             shop_domain: body.shop,
             customer_name: customer.name,
@@ -378,202 +381,41 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             shipping_label: body.shippingLabel || undefined,
             shipping_price: shippingPrice || undefined,
             currency: currencyCode,
+            order_payload: body,
         });
 
         console.log("[COD Order] Order logged successfully:", orderLog.id, orderName);
 
-        // ── Create Shopify Order (REST Orders API) ──
-        let shopifyOrderName = orderName;
-        let shopifyOrderId = '';
-        try {
-            const accessToken = shop.access_token;
-            if (accessToken) {
-                // Helper: extract numeric variant ID from GID or plain ID (null-safe)
-                const toNumericVariantId = (vid: string | null | undefined): number | null => {
-                    if (!vid) return null;
-                    const s = String(vid);
-                    if (s.startsWith('gid://')) {
-                        const num = Number(s.split('/').pop());
-                        return isNaN(num) || num === 0 ? null : num;
-                    }
-                    const num = Number(s);
-                    return isNaN(num) || num === 0 ? null : num;
-                };
-
-                // Helper: format phone to E.164 (Shopify requires +countrycode format)
-                const formatPhoneE164 = (phone: string): string => {
-                    const digits = phone.replace(/[^\d]/g, '');
-                    if (!digits) return '';
-                    if (phone.startsWith('+')) return phone;
-                    // If 10 digits, assume Indian number
-                    if (digits.length === 10) return `+91${digits}`;
-                    return `+${digits}`;
-                };
-
-                // Helper: safe name split with fallback for empty last name
-                const nameString = customer.name;
-                const firstName = customer.firstName || nameString.split(" ")[0] || "Customer";
-                const lastName = customer.lastName || nameString.split(" ").slice(1).join(" ") || "";
-
-                // Build line items — supports both variant-based and custom (title+price) line items
-                const lineItems: Array<Record<string, any>> = [];
-
-                // Main product — use per-unit price
-                const mainUnitPrice = parseFloat(String(body.price));
-                const mainVariantId = toNumericVariantId(body.variantId);
-                lineItems.push({
-                    variant_id: mainVariantId!,
-                    quantity: body.quantity,
-                    price: mainUnitPrice.toFixed(2),
-                });
-
-                // Upsell / Downsell items — each with its own price (includes tick upsells)
-                // Each item is wrapped in its own try/catch so one bad item doesn't kill the rest
-                if (body.upsell_items && body.upsell_items.length > 0) {
-                    body.upsell_items.forEach(item => {
-                        try {
-                            const upsellVariantId = toNumericVariantId(item.variant_id);
-                            const upsellPrice = parseFloat(String(item.price || 0)).toFixed(2);
-                            const upsellQty = item.quantity || 1;
-                            const upsellTitle = item.title || 'Upsell Item';
-
-                            if (upsellVariantId) {
-                                // Valid variant ID — use variant-based line item
-                                console.log(`[COD Order] Adding upsell line_item (variant): variant=${upsellVariantId}, price=${upsellPrice}, qty=${upsellQty}, type=${item.type}`);
-                                lineItems.push({
-                                    variant_id: upsellVariantId,
-                                    quantity: upsellQty,
-                                    price: upsellPrice,
-                                });
-                            } else {
-                                // No valid variant ID — use custom line item (title + price only)
-                                console.log(`[COD Order] Adding upsell line_item (custom): title="${upsellTitle}", price=${upsellPrice}, qty=${upsellQty}, type=${item.type}`);
-                                lineItems.push({
-                                    title: upsellTitle,
-                                    quantity: upsellQty,
-                                    price: upsellPrice,
-                                });
-                            }
-                        } catch (upsellErr: any) {
-                            console.error(`[COD Order] Failed to add upsell line_item:`, item, upsellErr.message);
-                        }
-                    });
-                }
-
-                // Determine country with fallback
-                const orderCountry = body.customerCountry || 'IN';
-
-                // Format phone for Shopify E.164 requirement
-                const formattedPhone = formatPhoneE164(customer.phone || '');
-
-                // Build REST Orders API payload
-                const orderPayload: Record<string, any> = {
-                    order: {
-                        line_items: lineItems,
-                        customer: {
-                            first_name: firstName,
-                            last_name: lastName,
-                            email: customer.email || undefined,
-                        },
-                        phone: formattedPhone || undefined,
-                        financial_status: 'pending',
-                        fulfillment_status: null,
-                        tags: 'FoxCOD, COD',
-                        note: orderNotes || `Order placed via FoxCOD COD Form - ${orderName}`,
-                        inventory_behaviour: 'decrement_obeying_policy',
-                        source_name: 'FoxCOD',
-                        transactions: [
-                            {
-                                kind: 'authorization',
-                                status: 'success',
-                                gateway: 'Cash on Delivery',
-                                amount: totalPrice.toFixed(2),
-                            },
-                        ],
-                    },
-                };
-
-                // Always add shipping line so delivery method name appears in Shopify
-                // Smart default: if no label provided, show "Free Shipping" for $0, "Shipping" otherwise
-                const shippingTitle = (body.shippingLabel && body.shippingLabel.trim())
-                    ? body.shippingLabel.trim()
-                    : (shippingPrice > 0 ? 'Shipping' : 'Free Shipping');
-                orderPayload.order.shipping_lines = [
-                    {
-                        title: shippingTitle,
-                        price: shippingPrice.toFixed(2),
-                        code: 'COD_SHIPPING',
-                    },
-                ];
-
-                // Add bundle discount if applicable
-                if (discountPercent > 0) {
-                    // Calculate discount based on sum of all line item prices (correct for both bundle and regular)
-                    const itemsSubtotal = lineItems.reduce((sum, li) => sum + (parseFloat(li.price) * li.quantity), 0);
-                    const discountAmount = itemsSubtotal * (discountPercent / 100);
-                    orderPayload.order.discount_codes = [
-                        {
-                            code: `BUNDLE-${discountPercent}OFF`,
-                            amount: discountAmount.toFixed(2),
-                            type: 'fixed_amount',
-                        },
-                    ];
-                }
-
-                // Add shipping address if available
-                if (customer.name || customer.address) {
-                    orderPayload.order.shipping_address = {
-                        first_name: firstName,
-                        last_name: lastName,
-                        address1: customer.address || '',
-                        city: customer.city || '',
-                        province: customer.state || '',
-                        zip: customer.zipcode || '',
-                        country: orderCountry,
-                        phone: formattedPhone || '',
-                    };
-                }
-
-                console.log("[COD Order] Sending line_items to Shopify:", JSON.stringify(lineItems));
-                const shopifyApiUrl = `https://${body.shop}/admin/api/2024-04/orders.json`;
-
-                const shopifyRes = await fetch(shopifyApiUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Shopify-Access-Token': accessToken,
-                    },
-                    body: JSON.stringify(orderPayload),
-                });
-
-                const shopifyData = await shopifyRes.json();
-                console.log("[COD Order] Shopify order response:", JSON.stringify(shopifyData).substring(0, 500));
-
-                if (shopifyData.order) {
-                    shopifyOrderId = String(shopifyData.order.id);
-                    shopifyOrderName = shopifyData.order.name;
-
-                    // Update Supabase record with Shopify order info
-                    await updateOrderStatus(orderLog.id, shopifyOrderId, shopifyOrderName, 'pending');
-                    console.log("[COD Order] ✅ Shopify order created:", shopifyOrderName);
-                } else {
-                    const errors = shopifyData.errors || shopifyData;
-                    console.warn("[COD Order] ❌ Shopify order creation errors:", JSON.stringify(errors));
-                }
-            } else {
-                console.log("[COD Order] No access token found, skipping Shopify order creation");
-            }
-        } catch (shopifyError: any) {
-            // Don't fail the order if Shopify order creation fails
-            console.error("[COD Order] Shopify order creation error (non-fatal):", shopifyError.message);
-        }
-
-        return Response.json({
+        // ── Return success to customer IMMEDIATELY — Shopify order creation runs in background ──
+        // The customer doesn't need to wait for Shopify's API. The order is already saved in Supabase.
+        const successResponse = Response.json({
             success: true,
             orderId: orderLog.id,
-            orderName: shopifyOrderName,
+            orderName: orderName,
             message: "Order placed successfully!",
         }, { headers: corsHeaders });
+
+        // ── Fire-and-forget: Create Shopify Order in background ──
+        const accessToken = shop.access_token;
+        if (accessToken) {
+            createShopifyOrderBackground({
+                shop: body.shop,
+                accessToken,
+                body,
+                customer,
+                totalPrice,
+                shippingPrice,
+                discountPercent,
+                orderNotes,
+                orderName,
+                orderLog,
+                currencyCode,
+            }).catch((err: any) => {
+                console.error('[COD Order] Background Shopify order failed:', err?.message);
+            });
+        }
+
+        return successResponse;
 
     } catch (error: any) {
         console.error("[COD Order] Error:", error);
@@ -584,6 +426,172 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }, { status: 500, headers: corsHeaders });
     }
 };
+
+/**
+ * Background: Build and send Shopify order with atomic lock + idempotency.
+ * Exported so the retry endpoint can reuse it.
+ */
+export async function createShopifyOrderBackground(opts: {
+    shop: string;
+    accessToken: string;
+    body: any;
+    customer: any;
+    totalPrice: number;
+    shippingPrice: number;
+    discountPercent: number;
+    orderNotes: string;
+    orderName: string;
+    orderLog: any;
+    currencyCode: string;
+}) {
+    const { shop, accessToken, body, customer, totalPrice, shippingPrice, discountPercent, orderNotes, orderName, orderLog } = opts;
+    const orderId = String(orderLog.id);
+
+    // Duplicate guard: already synced
+    if (orderLog.shopify_order_id) {
+        console.log('[Sync] Order already has shopify_order_id, skipping:', orderId);
+        return;
+    }
+
+    // Atomic lock — only one process can sync this order
+    const locked = await acquireSyncLock(orderId);
+    if (!locked) {
+        console.log('[Sync] Could not acquire lock (already syncing/synced):', orderId);
+        return;
+    }
+
+    const currentAttempt = orderLog.sync_attempts || 0;
+
+    try {
+        const toNumericVariantId = (vid: string | null | undefined): number | null => {
+            if (!vid) return null;
+            const s = String(vid);
+            if (s.startsWith('gid://')) {
+                const num = Number(s.split('/').pop());
+                return isNaN(num) || num === 0 ? null : num;
+            }
+            const num = Number(s);
+            return isNaN(num) || num === 0 ? null : num;
+        };
+
+        const formatPhoneE164 = (phone: string): string => {
+            const digits = phone.replace(/[^\d]/g, '');
+            if (!digits) return '';
+            if (phone.startsWith('+')) return phone;
+            if (digits.length === 10) return `+91${digits}`;
+            return `+${digits}`;
+        };
+
+        const nameString = customer.name;
+        const firstName = customer.firstName || nameString.split(" ")[0] || "Customer";
+        const lastName = customer.lastName || nameString.split(" ").slice(1).join(" ") || "";
+        const formattedPhone = formatPhoneE164(customer.phone || '');
+        const orderCountry = body.customerCountry || 'IN';
+
+        const lineItems: Array<Record<string, any>> = [];
+        const mainVariantId = toNumericVariantId(body.variantId);
+        lineItems.push({
+            variant_id: mainVariantId!,
+            quantity: body.quantity,
+            price: parseFloat(String(body.price)).toFixed(2),
+        });
+
+        if (body.upsell_items && body.upsell_items.length > 0) {
+            body.upsell_items.forEach((item: any) => {
+                try {
+                    const upsellVariantId = toNumericVariantId(item.variant_id);
+                    const upsellPrice = parseFloat(String(item.price || 0)).toFixed(2);
+                    const upsellQty = item.quantity || 1;
+                    if (upsellVariantId) {
+                        lineItems.push({ variant_id: upsellVariantId, quantity: upsellQty, price: upsellPrice });
+                    } else {
+                        lineItems.push({ title: item.title || 'Upsell Item', quantity: upsellQty, price: upsellPrice });
+                    }
+                } catch (e: any) {
+                    console.error('[Sync] Upsell item error:', e?.message);
+                }
+            });
+        }
+
+        const shippingTitle = (body.shippingLabel && body.shippingLabel.trim())
+            ? body.shippingLabel.trim()
+            : (shippingPrice > 0 ? 'Shipping' : 'Free Shipping');
+
+        const shopifyPayload: Record<string, any> = {
+            order: {
+                line_items: lineItems,
+                customer: { first_name: firstName, last_name: lastName, email: customer.email || undefined },
+                phone: formattedPhone || undefined,
+                financial_status: 'pending',
+                fulfillment_status: null,
+                tags: 'FoxCOD, COD',
+                note: orderNotes || `Order placed via FoxCOD COD Form - ${orderName}`,
+                inventory_behaviour: 'decrement_obeying_policy',
+                source_name: 'FoxCOD',
+                transactions: [{
+                    kind: 'authorization',
+                    status: 'success',
+                    gateway: 'Cash on Delivery',
+                    amount: totalPrice.toFixed(2),
+                }],
+                shipping_lines: [{
+                    title: shippingTitle,
+                    price: shippingPrice.toFixed(2),
+                    code: 'COD_SHIPPING',
+                }],
+            },
+        };
+
+        if (discountPercent > 0) {
+            const itemsSubtotal = lineItems.reduce((sum, li) => sum + (parseFloat(li.price) * li.quantity), 0);
+            shopifyPayload.order.discount_codes = [{
+                code: `BUNDLE-${discountPercent}OFF`,
+                amount: (itemsSubtotal * (discountPercent / 100)).toFixed(2),
+                type: 'fixed_amount',
+            }];
+        }
+
+        if (customer.name || customer.address) {
+            shopifyPayload.order.shipping_address = {
+                first_name: firstName, last_name: lastName,
+                address1: customer.address || '',
+                city: customer.city || '', province: customer.state || '',
+                zip: customer.zipcode || '', country: orderCountry,
+                phone: formattedPhone || '',
+            };
+        }
+
+        const shopifyApiUrl = `https://${shop}/admin/api/2024-04/orders.json`;
+        console.log('[Sync] Sending to Shopify (attempt', currentAttempt + 1, '):', orderId);
+
+        const shopifyRes = await fetch(shopifyApiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Shopify-Access-Token': accessToken,
+                'Idempotency-Key': `foxcod-${orderId}`,
+            },
+            body: JSON.stringify(shopifyPayload),
+        });
+
+        const shopifyData = await shopifyRes.json();
+        console.log('[Sync] Shopify response:', JSON.stringify(shopifyData).substring(0, 500));
+
+        if (shopifyData.order) {
+            const shopifyOrderId = String(shopifyData.order.id);
+            const shopifyOrderName = shopifyData.order.name;
+            await markSynced(orderId, shopifyOrderId, shopifyOrderName);
+            console.log('[Sync] ✅ Synced:', shopifyOrderName, 'for order', orderId);
+        } else {
+            const errMsg = JSON.stringify(shopifyData.errors || shopifyData);
+            console.warn('[Sync] ❌ Shopify errors:', errMsg);
+            await markSyncFailed(orderId, errMsg, currentAttempt);
+        }
+    } catch (error: any) {
+        console.error('[Sync] Exception for order', orderId, ':', error?.message);
+        await markSyncFailed(orderId, error?.message || 'Unknown error', currentAttempt);
+    }
+}
 
 /**
  * Loader: Handle OPTIONS preflight and GET requests

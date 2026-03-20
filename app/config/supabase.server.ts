@@ -4,10 +4,10 @@
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { ORDER_STATUSES, type OrderStatus } from './constants';
+import { ORDER_STATUSES, type OrderStatus, type SyncStatus, RETRY_DELAYS_SEC } from './constants';
 
 // Re-export for other server modules
-export { ORDER_STATUSES, type OrderStatus };
+export { ORDER_STATUSES, type OrderStatus, type SyncStatus, RETRY_DELAYS_SEC };
 
 // Environment variables validation
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -283,6 +283,8 @@ export interface OrderLogEntry {
     is_partial_cod?: boolean;
     advance_amount?: number;
     remaining_cod_amount?: number;
+    // 2-phase sync: full request payload for retry after restart
+    order_payload?: Record<string, any>;
 }
 
 // Order status types are imported from ./constants
@@ -326,6 +328,8 @@ export async function logOrder(order: OrderLogEntry) {
         quantity: order.quantity,
         total_price: totalPrice,
         status: 'pending',
+        sync_status: 'pending_sync',
+        sync_attempts: 0,
         created_at: new Date().toISOString(),
     };
     if (order.city != null) insertPayload.city = order.city;
@@ -334,6 +338,7 @@ export async function logOrder(order: OrderLogEntry) {
     if (order.shipping_label != null) insertPayload.shipping_label = order.shipping_label;
     if (order.shipping_price != null) insertPayload.shipping_price = order.shipping_price;
     if (order.currency != null) insertPayload.currency = order.currency;
+    if (order.order_payload != null) insertPayload.order_payload = order.order_payload;
 
     const { data, error } = await supabase
         .from('order_logs')
@@ -395,6 +400,100 @@ export async function updateOrderStatusSimple(orderId: string, status: OrderStat
 
     console.log(`[Supabase] Successfully updated order:`, data);
     return data;
+}
+
+// =============================================
+// SHOPIFY SYNC OPERATIONS (2-Phase System)
+// =============================================
+
+/**
+ * Atomic lock: attempts to claim an order for syncing.
+ * Returns true if lock acquired, false if already syncing/synced.
+ */
+export async function acquireSyncLock(orderId: string): Promise<boolean> {
+    const { data, error } = await supabase
+        .from('order_logs')
+        .update({ sync_status: 'syncing' })
+        .eq('id', orderId)
+        .in('sync_status', ['pending_sync', 'failed_sync'])
+        .select('id')
+        .maybeSingle();
+
+    if (error) {
+        console.error('[Sync] Error acquiring lock:', error);
+        return false;
+    }
+    // If data is returned, the update matched a row → lock acquired
+    return data !== null;
+}
+
+/**
+ * Mark order as successfully synced to Shopify
+ */
+export async function markSynced(
+    orderId: string,
+    shopifyOrderId: string,
+    shopifyOrderName: string
+) {
+    const { error } = await supabase
+        .from('order_logs')
+        .update({
+            sync_status: 'synced',
+            shopify_order_id: shopifyOrderId,
+            shopify_order_name: shopifyOrderName,
+            last_synced_at: new Date().toISOString(),
+            sync_error: null,
+        })
+        .eq('id', orderId);
+
+    if (error) {
+        console.error('[Sync] Error marking synced:', error);
+        throw error;
+    }
+}
+
+/**
+ * Mark order sync as failed, increment attempts, compute next_retry_at
+ */
+export async function markSyncFailed(orderId: string, errorMsg: string, currentAttempt: number) {
+    const delayIndex = Math.min(currentAttempt, RETRY_DELAYS_SEC.length - 1);
+    const delaySec = RETRY_DELAYS_SEC[delayIndex];
+    const nextRetry = new Date(Date.now() + delaySec * 1000).toISOString();
+
+    const { error } = await supabase
+        .from('order_logs')
+        .update({
+            sync_status: 'failed_sync',
+            sync_error: errorMsg.substring(0, 500),
+            sync_attempts: currentAttempt + 1,
+            next_retry_at: nextRetry,
+        })
+        .eq('id', orderId);
+
+    if (error) {
+        console.error('[Sync] Error marking failed:', error);
+    }
+}
+
+/**
+ * Get orders that are eligible for retry
+ */
+export async function getRetryableOrders(shopDomain: string) {
+    const { data, error } = await supabase
+        .from('order_logs')
+        .select('*')
+        .eq('shop_domain', shopDomain)
+        .in('sync_status', ['pending_sync', 'failed_sync'])
+        .lt('sync_attempts', 5)
+        .or(`next_retry_at.is.null,next_retry_at.lte.${new Date().toISOString()}`)
+        .order('created_at', { ascending: true })
+        .limit(50);
+
+    if (error) {
+        console.error('[Sync] Error fetching retryable orders:', error);
+        return [];
+    }
+    return data || [];
 }
 
 /**
