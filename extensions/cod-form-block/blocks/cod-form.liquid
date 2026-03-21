@@ -153,7 +153,12 @@
 {% endif %}
 
 {% comment %} Only render COD functionality if enabled in the app {% endcomment %}
-{% if cod_enabled == 'true' %}
+{% assign is_enabled = false %}
+{% if cod_enabled == 'true' or cod_enabled == true or shop.metafields.fox_cod.enabled.value == 'true' or shop.metafields.fox_cod.enabled.value == true %}
+  {% assign is_enabled = true %}
+{% endif %}
+
+{% if is_enabled %}
 
 {% comment %} Load Google Fonts for form typography {% endcomment %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -162,6 +167,9 @@
 
 
 {% comment %} Container for COD form data - hidden, used by JavaScript {% endcomment %}
+<script>
+  console.log("[COD Form] Liquid block rendered successfully. App is ENABLED.");
+</script>
 <div class="cod-form-data" 
      id="cod-data-{{ product.id }}"
      style="display: none;"

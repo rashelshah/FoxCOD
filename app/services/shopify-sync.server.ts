@@ -93,12 +93,41 @@ export async function createShopifyOrderBackground(orderId: string): Promise<voi
 
         // ── 6. Build line items ──
         const lineItems: Array<Record<string, any>> = [];
-        const mainVariantId = toNumericVariantId(order.variant_id || body?.variantId);
-        lineItems.push({
-            variant_id: mainVariantId!,
-            quantity: order.quantity,
-            price: parseFloat(String(body?.price || order.total_price || 0)).toFixed(2),
-        });
+        const discountMultiplier = 1 - (discountPercent / 100);
+
+        // Check for bundle variants (user selected different variants per bundle item)
+        const bundleVariants: Array<{variantId: string; title: string; price: number; quantity: number}> =
+            Array.isArray(body?.bundleVariants) && body.bundleVariants.length > 1
+                ? body.bundleVariants
+                : null;
+
+        if (bundleVariants) {
+            // Bundle order: create one line item per variant with its own discounted price
+            console.log('[SYNC] Bundle order detected:', bundleVariants.length, 'variants');
+            for (const bv of bundleVariants) {
+                const bvVariantId = toNumericVariantId(bv.variantId);
+                const originalPrice = parseFloat(String(bv.price || 0));
+                const discountedPrice = (originalPrice * discountMultiplier).toFixed(2);
+                const bvQty = bv.quantity || 1;
+                
+                if (bvVariantId) {
+                    lineItems.push({ variant_id: bvVariantId, quantity: bvQty, price: discountedPrice });
+                } else {
+                    lineItems.push({ title: bv.title || 'Bundle Item', quantity: bvQty, price: discountedPrice });
+                }
+            }
+        } else {
+            // Standard order: single line item with discounted price
+            const mainVariantId = toNumericVariantId(order.variant_id || body?.variantId);
+            const originalPrice = parseFloat(String(body?.price || order.total_price || 0));
+            const discountedPrice = (originalPrice * discountMultiplier).toFixed(2);
+            
+            lineItems.push({
+                variant_id: mainVariantId!,
+                quantity: order.quantity,
+                price: discountedPrice,
+            });
+        }
 
         if (Array.isArray(body?.upsell_items)) {
             body.upsell_items.forEach((item: any) => {
@@ -150,16 +179,7 @@ export async function createShopifyOrderBackground(orderId: string): Promise<voi
             },
         };
 
-        if (discountPercent > 0) {
-            const itemsSubtotal = lineItems.reduce(
-                (sum, li) => sum + parseFloat(li.price) * li.quantity, 0
-            );
-            shopifyPayload.order.discount_codes = [{
-                code: `BUNDLE-${discountPercent}OFF`,
-                amount: (itemsSubtotal * (discountPercent / 100)).toFixed(2),
-                type: 'fixed_amount',
-            }];
-        }
+        // Removed discount_codes block because discounts are now directly applied to line item unit prices.
 
         if (order.customer_name || order.customer_address) {
             shopifyPayload.order.shipping_address = {
