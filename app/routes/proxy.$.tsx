@@ -9,10 +9,11 @@
  */
 
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import { logOrder, supabase, getShop } from "../config/supabase.server";
+import { logOrder, supabase } from "../config/supabase.server";
 import { lookupCustomerByPhone } from "../services/customer-lookup.server";
 import { syncOrderToGoogleSheets } from "../services/google-sheets.server";
 import { validateOrderAgainstFraudRules } from "../services/fraud-protection.server";
+import { createShopifyOrderBackground } from "../services/shopify-sync.server";
 
 const corsHeaders = {
     "Content-Type": "application/json",
@@ -33,6 +34,22 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     if ((path === "api/customer-by-phone" || path.endsWith("customer-by-phone")) && phone && shop) {
         const result = await lookupCustomerByPhone(phone, shop);
         return new Response(JSON.stringify(result), { headers: corsHeaders });
+    }
+
+    // Route order status polling (for storefront to poll Shopify order ID after background sync)
+    const orderId = url.searchParams.get("orderId");
+    if ((path === "api/get-order-status" || path.endsWith("get-order-status")) && orderId) {
+        const { supabase: sb } = await import("../config/supabase.server");
+        const { data, error } = await sb
+            .from("order_logs")
+            .select("shopify_order_id, shopify_order_name, sync_status")
+            .eq("id", orderId)
+            .single();
+
+        return new Response(JSON.stringify({
+            success: !error && !!data,
+            order: data || null,
+        }), { headers: corsHeaders });
     }
 
     return new Response(JSON.stringify({
@@ -395,208 +412,26 @@ async function handleRegularOrder(request: Request, data: any) {
         shipping_label: data.shippingLabel || '',
         shipping_price: shippingPrice,
         currency: currencyCode,
+        order_payload: data,
     });
 
     console.log('[Proxy] Order created:', result);
 
-    // Try to create Shopify Order (REST Orders API)
-    let shopifyOrderName = result.shopify_order_name; // fallback: COD-XXX
-    try {
-        const shop = await getShop(data.shop);
-        console.log('[Proxy] Shop lookup result for', data.shop, ':', shop ? 'found (has token: ' + !!shop.access_token + ')' : 'NOT FOUND');
-        const accessToken = shop?.access_token;
-        if (accessToken) {
-            // Helper: extract numeric variant ID from GID or plain ID
-            const toNumericVariantId = (vid: string): number => {
-                if (String(vid).startsWith('gid://')) {
-                    return Number(String(vid).split('/').pop());
-                }
-                return Number(vid);
-            };
-
-            // Helper: format phone to E.164 (Shopify requires +countrycode format)
-            const formatPhoneE164 = (phone: string): string => {
-                const digits = phone.replace(/[^\d]/g, '');
-                if (!digits) return '';
-                if (phone.startsWith('+')) return phone;
-                // If 10 digits, assume Indian number
-                if (digits.length === 10) return `+91${digits}`;
-                return `+${digits}`;
-            };
-
-            // Helper: safe name split with fallback for empty last name
-            const firstName = (data.customerName || '').split(' ')[0] || 'Customer';
-            const lastName = (data.customerName || '').split(' ').slice(1).join(' ') || '.';
-            const formattedPhone = formatPhoneE164(data.customerPhone || '');
-
-            const lineItems: Array<Record<string, any>> = [];
-
-            // Main product unit price
-            const mainUnitPrice = parseFloat(data.price) || 0;
-
-            // Bundle variants: when customer selected different variants per item
-            if (data.bundleVariants && Array.isArray(data.bundleVariants) && data.bundleVariants.length > 1) {
-                // Bundle variants include their own prices
-                data.bundleVariants.forEach((bv: any) => {
-                    const vid = toNumericVariantId(String(bv.variantId));
-                    const bvPrice = parseFloat(bv.price) || mainUnitPrice;
-                    lineItems.push({
-                        variant_id: vid,
-                        quantity: parseInt(bv.quantity) || 1,
-                        price: bvPrice.toFixed(2),
-                    });
-                });
-                console.log('[Proxy] Bundle variants line items:', lineItems.length);
-
-                // Add variant details to notes
-                const variantNotes = 'BUNDLE VARIANTS:\n' + data.bundleVariants.map((bv: any, idx: number) =>
-                    `  Item ${idx + 1}: ${bv.title || 'Variant'} (${fmtPrice(parseFloat(bv.price) || 0)})`
-                ).join('\n');
-                orderNotes = orderNotes ? orderNotes + '\n' + variantNotes : variantNotes;
-            } else {
-                lineItems.push({
-                    variant_id: toNumericVariantId(data.variantId),
-                    quantity: parseInt(data.quantity) || 1,
-                    price: mainUnitPrice.toFixed(2),
-                });
-            }
-
-            // Upsell / Downsell items — each with its own price
-            // If variant_id is valid → variant-based line item
-            // If variant_id is missing → custom line item using title + price (Shopify supports this)
-            if (upsellItems.length > 0) {
-                upsellItems.forEach((item: any) => {
-                    try {
-                        const upsellPrice = parseFloat(String(item.price || 0)).toFixed(2);
-                        const upsellQty = parseInt(item.quantity) || 1;
-                        const upsellTitle = item.title || 'Upsell Item';
-
-                        if (item.variant_id) {
-                            const numericVid = toNumericVariantId(String(item.variant_id));
-                            if (numericVid && !isNaN(numericVid) && numericVid > 0) {
-                                console.log(`[Proxy] Adding upsell line_item (variant): variant=${numericVid}, price=${upsellPrice}, qty=${upsellQty}, type=${item.type}`);
-                                lineItems.push({
-                                    variant_id: numericVid,
-                                    quantity: upsellQty,
-                                    price: upsellPrice,
-                                });
-                                return;
-                            }
-                        }
-                        // No valid variant ID — use custom line item (title + price only)
-                        console.log(`[Proxy] Adding upsell line_item (custom): title="${upsellTitle}", price=${upsellPrice}, qty=${upsellQty}, type=${item.type}`);
-                        lineItems.push({
-                            title: upsellTitle,
-                            quantity: upsellQty,
-                            price: upsellPrice,
-                        });
-                    } catch (upsellErr: any) {
-                        console.error(`[Proxy] Failed to process upsell item:`, item, upsellErr.message);
-                    }
-                });
-            }
-
-            // Determine country with fallback
-            const orderCountry = data.customerCountry || 'IN';
-
-            // Build REST Orders API payload
-            const orderPayload: Record<string, any> = {
-                order: {
-                    line_items: lineItems,
-                    customer: {
-                        first_name: firstName,
-                        last_name: lastName,
-                        email: data.customerEmail || undefined,
-                    },
-                    phone: formattedPhone || undefined,
-                    financial_status: 'pending',
-                    fulfillment_status: null,
-                    tags: 'FoxCOD, COD',
-                    note: orderNotes || 'Order placed via FoxCOD COD Form',
-                    inventory_behaviour: 'decrement_obeying_policy',
-                    source_name: 'FoxCOD',
-                    transactions: [
-                        {
-                            kind: 'authorization',
-                            status: 'success',
-                            gateway: 'Cash on Delivery',
-                            amount: totalPrice.toFixed(2),
-                        },
-                    ],
-                },
-            };
-
-            // Always add shipping line so delivery method name appears in Shopify
-            // Smart default: if no label provided, show "Free Shipping" for $0, "Shipping" otherwise
-            const shippingTitle = (data.shippingLabel && data.shippingLabel.trim())
-                ? data.shippingLabel.trim()
-                : (shippingPrice > 0 ? 'Shipping' : 'Free Shipping');
-            orderPayload.order.shipping_lines = [
-                {
-                    title: shippingTitle,
-                    price: shippingPrice.toFixed(2),
-                    code: 'COD_SHIPPING',
-                },
-            ];
-
-            // Add bundle discount if applicable
-            if (discountPercent > 0) {
-                // Calculate discount based on sum of all line item prices (correct for both bundle and regular)
-                const itemsSubtotal = lineItems.reduce((sum, li) => sum + (parseFloat(li.price) * li.quantity), 0);
-                const discountAmount = itemsSubtotal * (discountPercent / 100);
-                orderPayload.order.discount_codes = [
-                    {
-                        code: `BUNDLE-${discountPercent}OFF`,
-                        amount: discountAmount.toFixed(2),
-                        type: 'fixed_amount',
-                    },
-                ];
-            }
-
-            // Add shipping address if available
-            if (data.customerName || data.customerAddress) {
-                orderPayload.order.shipping_address = {
-                    first_name: firstName,
-                    last_name: lastName,
-                    address1: data.customerAddress || '',
-                    city: data.customerCity || '',
-                    province: data.customerState || '',
-                    zip: data.customerZipcode || '',
-                    country: orderCountry,
-                    phone: formattedPhone || '',
-                };
-            }
-
-            console.log('[Proxy] Creating Shopify order with payload:', JSON.stringify(orderPayload).substring(0, 500));
-
-            const shopifyRes = await fetch(`https://${data.shop}/admin/api/2024-04/orders.json`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': accessToken },
-                body: JSON.stringify(orderPayload),
-            });
-
-            const shopifyData = await shopifyRes.json();
-            console.log('[Proxy] Shopify order response:', JSON.stringify(shopifyData).substring(0, 800));
-            if (shopifyData.order) {
-                console.log('[Proxy] ✅ Shopify order created:', shopifyData.order.name);
-                shopifyOrderName = shopifyData.order.name;
-                // Update Supabase record
-                const { updateOrderStatus } = await import("../config/supabase.server");
-                await updateOrderStatus(result.id, String(shopifyData.order.id), shopifyData.order.name, 'pending');
-            } else {
-                console.warn('[Proxy] ❌ Shopify order creation failed. Errors:', JSON.stringify(shopifyData.errors || shopifyData));
-            }
-        } else {
-            console.warn('[Proxy] ⚠️ No access token found for shop:', data.shop, '— skipping Shopify order creation');
+    // ── Fire-and-forget: background Shopify sync (fetches shop + token from DB) ──
+    console.log('[Proxy] STEP 1: background triggered for order', result.id);
+    (async () => {
+        try {
+            await createShopifyOrderBackground(String(result.id));
+        } catch (err: any) {
+            console.error('❌ Background sync crashed for order', result.id, ':', err?.message);
         }
-    } catch (shopifyErr: any) {
-        console.error('[Proxy] Shopify order creation error (non-fatal):', shopifyErr.message, shopifyErr.stack);
-    }
+    })();
 
     // Non-blocking Google Sheets sync
+    const orderName = result.shopify_order_name || `COD-${result.id}`;
     syncOrderToGoogleSheets(data.shop, {
         orderId: result.id,
-        orderName: shopifyOrderName || `COD-${result.id}`,
+        orderName,
         customerName: data.customerName || '',
         phone: data.customerPhone || '',
         email: data.customerEmail || '',
@@ -615,7 +450,7 @@ async function handleRegularOrder(request: Request, data: any) {
     return new Response(JSON.stringify({
         success: true,
         orderId: result.id,
-        orderName: shopifyOrderName
+        orderName,
     }), { headers: corsHeaders });
 }
 

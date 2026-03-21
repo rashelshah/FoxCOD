@@ -5284,7 +5284,8 @@ function darkenColor(hex, percent) {
               overlay.className = 'fox-cod-success-overlay';
               
               var successMessage = config.successMessage || 'Your order has been placed successfully!';
-              var orderIdDisplay = result.orderName || result.orderId || 'Pending';
+              var orderIdDisplay = 'Generating...';
+              var pollingOrderId = result.orderId;
               
               overlay.innerHTML = `
                 <style>
@@ -5411,8 +5412,40 @@ function darkenColor(hex, percent) {
               
               document.body.appendChild(overlay);
 
-              // Auto-close after 2.5 seconds
+              // Poll for Shopify order name (background sync runs async)
+              var pollAttempts = 0;
+              var pollInterval = setInterval(function() {
+                  pollAttempts++;
+                  if (pollAttempts > 10) {
+                      clearInterval(pollInterval);
+                      // Fallback: show the local order name
+                      var orderEl = overlay.querySelector('.fox-cod-order-id');
+                      if (orderEl && orderEl.textContent === 'Generating...') {
+                          orderEl.textContent = result.orderName || result.orderId || 'Placed';
+                      }
+                      return;
+                  }
+                  fetch(config.proxyUrl + '/api/get-order-status?orderId=' + pollingOrderId)
+                      .then(function(res) { return res.json(); })
+                      .then(function(statusData) {
+                          if (statusData.success && statusData.order && statusData.order.shopify_order_name) {
+                              clearInterval(pollInterval);
+                              var orderEl = overlay.querySelector('.fox-cod-order-id');
+                              if (orderEl) {
+                                  orderEl.textContent = statusData.order.shopify_order_name;
+                                  orderEl.style.color = '#059669';
+                              }
+                              console.log('[COD Form] Order ID updated:', statusData.order.shopify_order_name);
+                          }
+                      })
+                      .catch(function(err) {
+                          console.warn('[COD Form] Poll error:', err.message);
+                      });
+              }, 1500);
+
+              // Auto-close after 6 seconds (gives polling time to resolve)
               setTimeout(function() {
+                  clearInterval(pollInterval);
                   if (overlay.parentNode) {
                       overlay.style.animation = 'foxCodFadeOut 0.3s ease forwards';
                       var modalContent = overlay.querySelector('.fox-cod-success-modal');
@@ -5423,7 +5456,7 @@ function darkenColor(hex, percent) {
                           }
                       }, 300);
                   }
-              }, 2500);
+              }, 6000);
           } else {
               throw new Error(result.error || result.message || 'Order failed');
           }

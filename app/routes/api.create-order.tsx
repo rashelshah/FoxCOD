@@ -12,11 +12,9 @@ import {
     getShop,
     getFormSettings,
     logOrder,
-    acquireSyncLock,
-    markSynced,
-    markSyncFailed,
 } from "../config/supabase.server";
 import { validateOrderAgainstFraudRules } from "../services/fraud-protection.server";
+import { createShopifyOrderBackground } from "../services/shopify-sync.server";
 
 // CORS headers for storefront requests
 const corsHeaders = {
@@ -386,8 +384,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
         console.log("[COD Order] Order logged successfully:", orderLog.id, orderName);
 
-        // ── Return success to customer IMMEDIATELY — Shopify order creation runs in background ──
-        // The customer doesn't need to wait for Shopify's API. The order is already saved in Supabase.
+        // ── Return success to customer IMMEDIATELY — Shopify sync runs in background ──
         const successResponse = Response.json({
             success: true,
             orderId: orderLog.id,
@@ -395,25 +392,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             message: "Order placed successfully!",
         }, { headers: corsHeaders });
 
-        // ── Fire-and-forget: Create Shopify Order in background ──
-        const accessToken = shop.access_token;
-        if (accessToken) {
-            createShopifyOrderBackground({
-                shop: body.shop,
-                accessToken,
-                body,
-                customer,
-                totalPrice,
-                shippingPrice,
-                discountPercent,
-                orderNotes,
-                orderName,
-                orderLog,
-                currencyCode,
-            }).catch((err: any) => {
-                console.error('[COD Order] Background Shopify order failed:', err?.message);
-            });
-        }
+        // ── Fire-and-forget: pass only the order ID — service fetches everything from DB ──
+        console.log("STEP 1: background triggered for order", orderLog.id);
+        (async () => {
+            try {
+                await createShopifyOrderBackground(String(orderLog.id));
+            } catch (err: any) {
+                console.error('❌ Background sync crashed for order', orderLog.id, ':', err?.message);
+            }
+        })();
 
         return successResponse;
 
@@ -427,171 +414,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
 };
 
-/**
- * Background: Build and send Shopify order with atomic lock + idempotency.
- * Exported so the retry endpoint can reuse it.
- */
-export async function createShopifyOrderBackground(opts: {
-    shop: string;
-    accessToken: string;
-    body: any;
-    customer: any;
-    totalPrice: number;
-    shippingPrice: number;
-    discountPercent: number;
-    orderNotes: string;
-    orderName: string;
-    orderLog: any;
-    currencyCode: string;
-}) {
-    const { shop, accessToken, body, customer, totalPrice, shippingPrice, discountPercent, orderNotes, orderName, orderLog } = opts;
-    const orderId = String(orderLog.id);
-
-    // Duplicate guard: already synced
-    if (orderLog.shopify_order_id) {
-        console.log('[Sync] Order already has shopify_order_id, skipping:', orderId);
-        return;
-    }
-
-    // Atomic lock — only one process can sync this order
-    const locked = await acquireSyncLock(orderId);
-    if (!locked) {
-        console.log('[Sync] Could not acquire lock (already syncing/synced):', orderId);
-        return;
-    }
-
-    const currentAttempt = orderLog.sync_attempts || 0;
-
-    try {
-        const toNumericVariantId = (vid: string | null | undefined): number | null => {
-            if (!vid) return null;
-            const s = String(vid);
-            if (s.startsWith('gid://')) {
-                const num = Number(s.split('/').pop());
-                return isNaN(num) || num === 0 ? null : num;
-            }
-            const num = Number(s);
-            return isNaN(num) || num === 0 ? null : num;
-        };
-
-        const formatPhoneE164 = (phone: string): string => {
-            const digits = phone.replace(/[^\d]/g, '');
-            if (!digits) return '';
-            if (phone.startsWith('+')) return phone;
-            if (digits.length === 10) return `+91${digits}`;
-            return `+${digits}`;
-        };
-
-        const nameString = customer.name;
-        const firstName = customer.firstName || nameString.split(" ")[0] || "Customer";
-        const lastName = customer.lastName || nameString.split(" ").slice(1).join(" ") || "";
-        const formattedPhone = formatPhoneE164(customer.phone || '');
-        const orderCountry = body.customerCountry || 'IN';
-
-        const lineItems: Array<Record<string, any>> = [];
-        const mainVariantId = toNumericVariantId(body.variantId);
-        lineItems.push({
-            variant_id: mainVariantId!,
-            quantity: body.quantity,
-            price: parseFloat(String(body.price)).toFixed(2),
-        });
-
-        if (body.upsell_items && body.upsell_items.length > 0) {
-            body.upsell_items.forEach((item: any) => {
-                try {
-                    const upsellVariantId = toNumericVariantId(item.variant_id);
-                    const upsellPrice = parseFloat(String(item.price || 0)).toFixed(2);
-                    const upsellQty = item.quantity || 1;
-                    if (upsellVariantId) {
-                        lineItems.push({ variant_id: upsellVariantId, quantity: upsellQty, price: upsellPrice });
-                    } else {
-                        lineItems.push({ title: item.title || 'Upsell Item', quantity: upsellQty, price: upsellPrice });
-                    }
-                } catch (e: any) {
-                    console.error('[Sync] Upsell item error:', e?.message);
-                }
-            });
-        }
-
-        const shippingTitle = (body.shippingLabel && body.shippingLabel.trim())
-            ? body.shippingLabel.trim()
-            : (shippingPrice > 0 ? 'Shipping' : 'Free Shipping');
-
-        const shopifyPayload: Record<string, any> = {
-            order: {
-                line_items: lineItems,
-                customer: { first_name: firstName, last_name: lastName, email: customer.email || undefined },
-                phone: formattedPhone || undefined,
-                financial_status: 'pending',
-                fulfillment_status: null,
-                tags: 'FoxCOD, COD',
-                note: orderNotes || `Order placed via FoxCOD COD Form - ${orderName}`,
-                inventory_behaviour: 'decrement_obeying_policy',
-                source_name: 'FoxCOD',
-                transactions: [{
-                    kind: 'authorization',
-                    status: 'success',
-                    gateway: 'Cash on Delivery',
-                    amount: totalPrice.toFixed(2),
-                }],
-                shipping_lines: [{
-                    title: shippingTitle,
-                    price: shippingPrice.toFixed(2),
-                    code: 'COD_SHIPPING',
-                }],
-            },
-        };
-
-        if (discountPercent > 0) {
-            const itemsSubtotal = lineItems.reduce((sum, li) => sum + (parseFloat(li.price) * li.quantity), 0);
-            shopifyPayload.order.discount_codes = [{
-                code: `BUNDLE-${discountPercent}OFF`,
-                amount: (itemsSubtotal * (discountPercent / 100)).toFixed(2),
-                type: 'fixed_amount',
-            }];
-        }
-
-        if (customer.name || customer.address) {
-            shopifyPayload.order.shipping_address = {
-                first_name: firstName, last_name: lastName,
-                address1: customer.address || '',
-                city: customer.city || '', province: customer.state || '',
-                zip: customer.zipcode || '', country: orderCountry,
-                phone: formattedPhone || '',
-            };
-        }
-
-        const shopifyApiUrl = `https://${shop}/admin/api/2024-04/orders.json`;
-        console.log('[Sync] Sending to Shopify (attempt', currentAttempt + 1, '):', orderId);
-
-        const shopifyRes = await fetch(shopifyApiUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Shopify-Access-Token': accessToken,
-                'Idempotency-Key': `foxcod-${orderId}`,
-            },
-            body: JSON.stringify(shopifyPayload),
-        });
-
-        const shopifyData = await shopifyRes.json();
-        console.log('[Sync] Shopify response:', JSON.stringify(shopifyData).substring(0, 500));
-
-        if (shopifyData.order) {
-            const shopifyOrderId = String(shopifyData.order.id);
-            const shopifyOrderName = shopifyData.order.name;
-            await markSynced(orderId, shopifyOrderId, shopifyOrderName);
-            console.log('[Sync] ✅ Synced:', shopifyOrderName, 'for order', orderId);
-        } else {
-            const errMsg = JSON.stringify(shopifyData.errors || shopifyData);
-            console.warn('[Sync] ❌ Shopify errors:', errMsg);
-            await markSyncFailed(orderId, errMsg, currentAttempt);
-        }
-    } catch (error: any) {
-        console.error('[Sync] Exception for order', orderId, ':', error?.message);
-        await markSyncFailed(orderId, error?.message || 'Unknown error', currentAttempt);
-    }
-}
 
 /**
  * Loader: Handle OPTIONS preflight and GET requests

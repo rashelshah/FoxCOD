@@ -428,6 +428,37 @@ export async function acquireSyncLock(orderId: string): Promise<boolean> {
 }
 
 /**
+ * Get a single order log by its ID (used by background sync to reload from DB)
+ */
+export async function getOrderById(orderId: string) {
+    const { data, error } = await supabase
+        .from('order_logs')
+        .select('*')
+        .eq('id', orderId)
+        .single();
+
+    if (error) {
+        console.error('[Supabase] Error fetching order by id:', error);
+        return null;
+    }
+    return data;
+}
+
+/**
+ * Mark order as currently syncing (used before Shopify API call)
+ */
+export async function markSyncSyncing(orderId: string) {
+    const { error } = await supabase
+        .from('order_logs')
+        .update({ sync_status: 'syncing' })
+        .eq('id', orderId);
+
+    if (error) {
+        console.error('[Sync] Error marking syncing:', error);
+    }
+}
+
+/**
  * Mark order as successfully synced to Shopify
  */
 export async function markSynced(
