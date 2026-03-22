@@ -23,6 +23,12 @@ function toNumericVariantId(vid: string | null | undefined): number | null {
         const num = Number(s.split('/').pop());
         return isNaN(num) || num === 0 ? null : num;
     }
+    // Handle values like "ProductVariant/1234567890" or any string ending with digits
+    const tailDigits = s.match(/(\d+)\D*$/);
+    if (tailDigits) {
+        const num = Number(tailDigits[1]);
+        if (!isNaN(num) && num !== 0) return num;
+    }
     const num = Number(s);
     return isNaN(num) || num === 0 ? null : num;
 }
@@ -85,18 +91,23 @@ export async function createShopifyOrderBackground(orderId: string): Promise<voi
         const lastName = nameParts.slice(1).join(' ') || '';
         const formattedPhone = formatPhoneE164(order.customer_phone || '');
         const orderCountry: string = body?.customerCountry || 'IN';
+        const customerAddress: string = order.customer_address || body?.customerAddress || body?.address || '';
+        const customerCity: string = order.city || body?.customerCity || body?.city || '';
+        const customerState: string = order.state || body?.customerState || body?.state || '';
+        const customerZip: string = order.pincode || body?.customerZipcode || body?.zipcode || body?.zip || '';
 
         const totalPrice: number = parseFloat(String(order.total_price || 0));
         const shippingPrice: number = parseFloat(String(order.shipping_price || 0));
         const discountPercent: number = body?.discountPercent || 0;
         const currencyCode: string = order.currency || 'USD';
+        const mainVariantId = toNumericVariantId(order.variant_id || body?.variantId);
 
         // ── 6. Build line items ──
         const lineItems: Array<Record<string, any>> = [];
         const discountMultiplier = 1 - (discountPercent / 100);
 
         // Check for bundle variants (user selected different variants per bundle item)
-        const bundleVariants: Array<{variantId: string; title: string; price: number; quantity: number}> =
+        const bundleVariants: Array<{variantId?: string; variant_id?: string; id?: string; title?: string; price?: number; quantity?: number}> =
             Array.isArray(body?.bundleVariants) && body.bundleVariants.length > 1
                 ? body.bundleVariants
                 : null;
@@ -105,20 +116,32 @@ export async function createShopifyOrderBackground(orderId: string): Promise<voi
             // Bundle order: create one line item per variant with its own discounted price
             console.log('[SYNC] Bundle order detected:', bundleVariants.length, 'variants');
             for (const bv of bundleVariants) {
-                const bvVariantId = toNumericVariantId(bv.variantId);
+                // Product-page bundle offers can sometimes send variant IDs in alternate keys/formats.
+                const rawBundleVariantId = bv?.variantId ?? bv?.variant_id ?? bv?.id ?? null;
+                const bvVariantId = toNumericVariantId(rawBundleVariantId) || mainVariantId;
                 const originalPrice = parseFloat(String(bv.price || 0));
                 const discountedPrice = (originalPrice * discountMultiplier).toFixed(2);
                 const bvQty = bv.quantity || 1;
                 
                 if (bvVariantId) {
-                    lineItems.push({ variant_id: bvVariantId, quantity: bvQty, price: discountedPrice });
+                    lineItems.push({
+                        variant_id: bvVariantId,
+                        quantity: bvQty,
+                        price: discountedPrice,
+                        requires_shipping: true,
+                    });
                 } else {
-                    lineItems.push({ title: bv.title || 'Bundle Item', quantity: bvQty, price: discountedPrice });
+                    // Last-resort fallback only when no variant can be recovered.
+                    lineItems.push({
+                        title: bv.title || 'Bundle Item',
+                        quantity: bvQty,
+                        price: discountedPrice,
+                        requires_shipping: true,
+                    });
                 }
             }
         } else {
             // Standard order: single line item with discounted price
-            const mainVariantId = toNumericVariantId(order.variant_id || body?.variantId);
             const originalPrice = parseFloat(String(body?.price || order.total_price || 0));
             const discountedPrice = (originalPrice * discountMultiplier).toFixed(2);
             
@@ -126,6 +149,7 @@ export async function createShopifyOrderBackground(orderId: string): Promise<voi
                 variant_id: mainVariantId!,
                 quantity: order.quantity,
                 price: discountedPrice,
+                requires_shipping: true,
             });
         }
 
@@ -136,15 +160,30 @@ export async function createShopifyOrderBackground(orderId: string): Promise<voi
                     const upsellPrice = parseFloat(String(item.price || 0)).toFixed(2);
                     const upsellQty = item.quantity || 1;
                     if (upsellVariantId) {
-                        lineItems.push({ variant_id: upsellVariantId, quantity: upsellQty, price: upsellPrice });
+                        lineItems.push({
+                            variant_id: upsellVariantId,
+                            quantity: upsellQty,
+                            price: upsellPrice,
+                            requires_shipping: true,
+                        });
                     } else {
-                        lineItems.push({ title: item.title || 'Upsell Item', quantity: upsellQty, price: upsellPrice });
+                        lineItems.push({
+                            title: item.title || 'Upsell Item',
+                            quantity: upsellQty,
+                            price: upsellPrice,
+                            requires_shipping: true,
+                        });
                     }
                 } catch (e: any) {
                     console.error('[Sync] Upsell item error:', e?.message);
                 }
             });
         }
+
+        console.log(
+            '[SYNC] Prepared line items:',
+            lineItems.map((li) => ({ variant_id: li.variant_id || null, title: li.title || null, requires_shipping: li.requires_shipping === true }))
+        );
 
         // ── 7. Build Shopify payload ──
         const shippingLabel: string = order.shipping_label || (shippingPrice > 0 ? 'Shipping' : 'Free Shipping');
@@ -181,14 +220,24 @@ export async function createShopifyOrderBackground(orderId: string): Promise<voi
 
         // Removed discount_codes block because discounts are now directly applied to line item unit prices.
 
-        if (order.customer_name || order.customer_address) {
+        if (order.customer_name || customerAddress) {
             shopifyPayload.order.shipping_address = {
                 first_name: firstName,
                 last_name: lastName,
-                address1: order.customer_address || '',
-                city: order.city || '',
-                province: order.state || '',
-                zip: order.pincode || '',
+                address1: customerAddress,
+                city: customerCity,
+                province: customerState,
+                zip: customerZip,
+                country: orderCountry,
+                phone: formattedPhone || '',
+            };
+            shopifyPayload.order.billing_address = {
+                first_name: firstName,
+                last_name: lastName,
+                address1: customerAddress,
+                city: customerCity,
+                province: customerState,
+                zip: customerZip,
                 country: orderCountry,
                 phone: formattedPhone || '',
             };
