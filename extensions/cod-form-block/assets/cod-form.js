@@ -1058,7 +1058,7 @@
         card.style.borderColor = design.selectedBorderColor || config.accentColor;
         card.style.color = design.selectedTextColor || '#1f2937';
       } else {
-          card.style.background = design.unselectedBgColor || '#ffffff';
+          card.style.background = design.unselectedBgColor || 'transparent';
           card.style.borderColor = design.unselectedBorderColor || '#e5e7eb';
           card.style.color = '#6b7280';
       }
@@ -1243,7 +1243,7 @@
         // Update selected state
         offersContainer.querySelectorAll('.cod-offer-card').forEach(function(c, i) {
           c.classList.remove('selected');
-          c.style.background = design.unselectedBgColor || '#ffffff';
+          c.style.background = design.unselectedBgColor || 'transparent';
           c.style.borderColor = design.unselectedBorderColor || '#e5e7eb';
           c.style.color = '#6b7280';
         });
@@ -1888,7 +1888,7 @@
     var borderRadius = styles.borderRadius ?? 6;
     var borderColor = styles.borderColor || '#d1d5db';
     var borderWidth = styles.borderWidth ?? 1;
-    var backgroundColor = styles.backgroundColor || '#ffffff';
+    var backgroundColor = styles.background || styles.backgroundImage || styles.backgroundColor || 'transparent';
     var iconColor = styles.iconColor || '#6b7280';
     var iconBackground = styles.iconBackground || 'transparent';
 
@@ -2557,7 +2557,7 @@
       // Use preset / button primary color to theme the order summary,
       // but keep it clearly distinct and easy to identify.
       var styles = config.styles || {};
-      var backgroundColor = styles.backgroundColor || '#ffffff';
+      var backgroundColor = styles.backgroundColor || 'transparent';
       var themeKey = styles.themeKey || 'custom';
       var isPresetTheme = themeKey && themeKey !== 'custom';
 
@@ -3701,7 +3701,7 @@ function darkenColor(hex, percent) {
       var styles = config.styles || {};
       
       // Apply modal style preset (glassmorphism, minimal, modern)
-      var userBgColor = styles.backgroundColor || '#ffffff';
+      var userBgColor = styles.background || styles.backgroundImage || styles.backgroundColor || 'transparent';
       console.log('[COD Form] Modal style:', config.modalStyle, 'Background color:', userBgColor);
       
       if (config.modalStyle === 'glassmorphism') {
@@ -3716,9 +3716,9 @@ function darkenColor(hex, percent) {
       } else {
           // Modern style or default - apply custom styles from seller settings
           
-          // Background color for the entire form container
-          if (styles.backgroundColor) {
-              container.style.backgroundColor = styles.backgroundColor;
+          // Background for the entire form container
+          if (styles.background || styles.backgroundImage || styles.backgroundColor) {
+              container.style.background = styles.background || styles.backgroundImage || styles.backgroundColor;
           }
           
           // Shadow

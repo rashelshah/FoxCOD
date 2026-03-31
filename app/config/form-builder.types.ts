@@ -38,6 +38,8 @@ export interface FormStyles {
     borderColor: string;
     borderWidth: number;
     backgroundColor: string;
+    background?: string;
+    backgroundImage?: string;
     labelAlignment: 'left' | 'center' | 'right';
     iconColor: string;
     iconBackground: string;
@@ -156,20 +158,21 @@ export const DEFAULT_STYLES: FormStyles = {
     textColor: '#333333',
     textSize: 14,
     fontStyle: 'normal',
-    borderColor: '#d1d5db',
+    borderColor: '#E5E7EB',
     borderWidth: 1,
+    background: 'linear-gradient(135deg, #E6F4EA 0%, #FFFFFF 100%)',
     backgroundColor: '#ffffff',
     labelAlignment: 'left',
     iconColor: '#6b7280',
-    iconBackground: '#f3f4f6',
-    borderRadius: 12,
+    iconBackground: '#F0FDF4',
+    borderRadius: 16,
     shadow: true,
     shadowIntensity: 35,
     themeKey: 'custom',
-    fieldBackgroundColor: '#ffffff',
-    labelColor: '#111827',
+    fieldBackgroundColor: '#FFFFFF',
+    labelColor: '#065F46',
     labelFontSize: 14,
-    priceColor: '#111827',
+    priceColor: '#065F46',
     fontFamily: 'Inter',
 };
 

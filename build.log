@@ -1,0 +1,226 @@
+npm warn Unknown project config "shamefully-hoist". This will stop working in the next major version of npm.
+
+> build
+> react-router build
+
+⚠️ Route Path Collision: "/app/orders/:id"
+
+The following routes all define the same URL, only the first one will be used
+
+🟢 routes/app.orders_.$id.tsx
+⭕️️ routes/app.orders.$id.tsx
+
+⚠️ Route Path Collision: "/app/orders/:id"
+
+The following routes all define the same URL, only the first one will be used
+
+🟢 routes/app.orders_.$id.tsx
+⭕️️ routes/app.orders.$id.tsx
+
+⚠️ Route Path Collision: "/app/orders/:id"
+
+The following routes all define the same URL, only the first one will be used
+
+🟢 routes/app.orders_.$id.tsx
+⭕️️ routes/app.orders.$id.tsx
+
+vite v6.4.1 building for production...
+transforming...
+✓ 1447 modules transformed.
+Generated an empty chunk: "api.integrations.google-sheets.callback".
+Generated an empty chunk: "api.integrations.google-sheets.connect".
+Generated an empty chunk: "api.partial-cod.create-checkout".
+Generated an empty chunk: "webhooks.app.scopes_update".
+Generated an empty chunk: "webhooks.orders.cancelled".
+Generated an empty chunk: "webhooks.orders.fulfilled".
+Generated an empty chunk: "webhooks.app.uninstalled".
+Generated an empty chunk: "api.retry-failed-orders".
+Generated an empty chunk: "webhooks.orders.updated".
+Generated an empty chunk: "webhooks.orders.create".
+Generated an empty chunk: "api.customer-by-phone".
+Generated an empty chunk: "api.get-order-status".
+Generated an empty chunk: "api.create-order".
+Generated an empty chunk: "api.settings".
+Generated an empty chunk: "proxy._".
+Generated an empty chunk: "auth._".
+rendering chunks...
+computing gzip size...
+build/client/.vite/manifest.json                                          26.17 kB │ gzip:  2.65 kB
+build/client/assets/route-Xpdx9QZl.css                                     0.76 kB │ gzip:  0.35 kB
+build/client/assets/styles-x1cbIzLV.css                                  444.42 kB │ gzip: 52.38 kB
+build/client/assets/api.integrations.google-sheets.callback-l0sNRNKZ.js    0.00 kB │ gzip:  0.02 kB
+build/client/assets/api.integrations.google-sheets.connect-l0sNRNKZ.js     0.00 kB │ gzip:  0.02 kB
+build/client/assets/api.partial-cod.create-checkout-l0sNRNKZ.js            0.00 kB │ gzip:  0.02 kB
+build/client/assets/webhooks.app.scopes_update-l0sNRNKZ.js                 0.00 kB │ gzip:  0.02 kB
+build/client/assets/webhooks.orders.cancelled-l0sNRNKZ.js                  0.00 kB │ gzip:  0.02 kB
+build/client/assets/webhooks.orders.fulfilled-l0sNRNKZ.js                  0.00 kB │ gzip:  0.02 kB
+build/client/assets/webhooks.app.uninstalled-l0sNRNKZ.js                   0.00 kB │ gzip:  0.02 kB
+build/client/assets/api.retry-failed-orders-l0sNRNKZ.js                    0.00 kB │ gzip:  0.02 kB
+build/client/assets/webhooks.orders.updated-l0sNRNKZ.js                    0.00 kB │ gzip:  0.02 kB
+build/client/assets/webhooks.orders.create-l0sNRNKZ.js                     0.00 kB │ gzip:  0.02 kB
+build/client/assets/api.customer-by-phone-l0sNRNKZ.js                      0.00 kB │ gzip:  0.02 kB
+build/client/assets/api.get-order-status-l0sNRNKZ.js                       0.00 kB │ gzip:  0.02 kB
+build/client/assets/api.create-order-l0sNRNKZ.js                           0.00 kB │ gzip:  0.02 kB
+build/client/assets/api.settings-l0sNRNKZ.js                               0.00 kB │ gzip:  0.02 kB
+build/client/assets/proxy._-l0sNRNKZ.js                                    0.00 kB │ gzip:  0.02 kB
+build/client/assets/auth._-l0sNRNKZ.js                                     0.00 kB │ gzip:  0.02 kB
+build/client/assets/within-content-context-B3k2POlF.js                     0.09 kB │ gzip:  0.11 kB
+build/client/assets/context-DOTeZeTB.js                                    0.10 kB │ gzip:  0.11 kB
+build/client/assets/context--Dsjb1ZM.js                                    0.10 kB │ gzip:  0.11 kB
+build/client/assets/context-Y46iBEzg.js                                    0.10 kB │ gzip:  0.11 kB
+build/client/assets/context-CwqRk-93.js                                    0.13 kB │ gzip:  0.12 kB
+build/client/assets/fraud-protection.types-Bf8NfYgn.js                     0.33 kB │ gzip:  0.20 kB
+build/client/assets/constants-CI7JSNxU.js                                  0.34 kB │ gzip:  0.18 kB
+build/client/assets/useAppBridge-Bj34gXAL.js                               0.39 kB │ gzip:  0.28 kB
+build/client/assets/InlineStack-BC-2NauX.js                                0.51 kB │ gzip:  0.32 kB
+build/client/assets/EventListener-CbkZyKZq.js                              0.56 kB │ gzip:  0.29 kB
+build/client/assets/route-uYix9p3S.js                                      0.64 kB │ gzip:  0.43 kB
+build/client/assets/AppProxyProvider-C2hBwocR.js                           0.67 kB │ gzip:  0.42 kB
+build/client/assets/XIcon.svg-BzwSg41-.js                                  0.82 kB │ gzip:  0.37 kB
+build/client/assets/app.additional-DZdjKnCg.js                             1.13 kB │ gzip:  0.55 kB
+build/client/assets/RadioButton-BwCCZlrZ.js                                1.30 kB │ gzip:  0.65 kB
+build/client/assets/pixel-tracking.types-BnoxtilN.js                       1.37 kB │ gzip:  0.69 kB
+build/client/assets/route-Bly-Cfi7.js                                      1.44 kB │ gzip:  0.70 kB
+build/client/assets/root-BQKTSKsP.js                                       2.98 kB │ gzip:  1.06 kB
+build/client/assets/EmptyState-bSQjpvD-.js                                 3.44 kB │ gzip:  1.51 kB
+build/client/assets/Checkbox-B8mxMjpE.js                                   4.39 kB │ gzip:  1.84 kB
+build/client/assets/context-BE2jr1fx.js                                    5.20 kB │ gzip:  2.06 kB
+build/client/assets/LegacyCard-X-q2_JrB.js                                 5.49 kB │ gzip:  1.89 kB
+build/client/assets/entry.client-Dw1cXyI4.js                               6.55 kB │ gzip:  2.61 kB
+build/client/assets/Select-CI_7Wpeb.js                                     7.22 kB │ gzip:  3.01 kB
+build/client/assets/app.pixel-tracking-CLOdbpAF.js                         7.72 kB │ gzip:  2.91 kB
+build/client/assets/Banner-vvvF9azg.js                                     7.79 kB │ gzip:  2.61 kB
+build/client/assets/CSSTransition-BExs4s3q.js                              8.26 kB │ gzip:  2.90 kB
+build/client/assets/ColorSelector-D0EyjebO.js                              8.30 kB │ gzip:  3.20 kB
+build/client/assets/app.analytics-CINQfFYv.js                              9.18 kB │ gzip:  2.73 kB
+build/client/assets/RangeSlider-D43GNpJR.js                               10.77 kB │ gzip:  3.01 kB
+build/client/assets/app.orders_._id-DSYjakH_.js                           12.21 kB │ gzip:  2.79 kB
+build/client/assets/Modal-BsT3bjR3.js                                     12.44 kB │ gzip:  4.86 kB
+build/client/assets/app.fraud-protection-BF3XVgi6.js                      13.02 kB │ gzip:  3.76 kB
+build/client/assets/Button-DVXKjJ46.js                                    13.29 kB │ gzip:  4.70 kB
+build/client/assets/form-builder.types-Dw0mj2A8.js                        14.36 kB │ gzip:  4.73 kB
+build/client/assets/app.integrations-89XMFB28.js                          17.16 kB │ gzip:  3.80 kB
+build/client/assets/Page-Dv1Qr4hn.js                                      17.94 kB │ gzip:  5.66 kB
+build/client/assets/app-aRTKqaol.js                                       18.56 kB │ gzip:  6.16 kB
+build/client/assets/app._index-CWD7q7H6.js                                18.98 kB │ gzip:  3.95 kB
+build/client/assets/app.app-settings-DrHdcEZv.js                          19.17 kB │ gzip:  5.60 kB
+build/client/assets/Tabs-CZHHpwgj.js                                      20.49 kB │ gzip:  6.86 kB
+build/client/assets/ButtonGroup-Dr5XjXnK.js                               22.71 kB │ gzip:  7.94 kB
+build/client/assets/app.orders-BpHeXk6w.js                                24.12 kB │ gzip:  4.99 kB
+build/client/assets/Popover-Be69idOF.js                                   31.01 kB │ gzip: 10.10 kB
+build/client/assets/sortable.esm-oVFXtwKY.js                              45.91 kB │ gzip: 15.29 kB
+build/client/assets/app.quantity-offers-DgpV1aEt.js                       69.60 kB │ gzip: 15.15 kB
+build/client/assets/use-is-after-initial-mount-DkLIo9ri.js                96.80 kB │ gzip:  8.20 kB
+build/client/assets/app.upsell-downsell-DdtQBibG.js                      100.93 kB │ gzip: 20.69 kB
+build/client/assets/chunk-JZWAC4HX-CwSiua_z.js                           118.33 kB │ gzip: 39.87 kB
+build/client/assets/index-CeGf9ch8.js                                    134.72 kB │ gzip: 43.26 kB
+build/client/assets/app.settings-BvyPQoQY.js                             147.15 kB │ gzip: 31.29 kB
+✓ built in 2.96s
+⚠️ Route Path Collision: "/app/orders/:id"
+
+The following routes all define the same URL, only the first one will be used
+
+🟢 routes/app.orders_.$id.tsx
+⭕️️ routes/app.orders.$id.tsx
+
+vite v6.4.1 building SSR bundle for production...
+transforming...
+✓ 58 modules transformed.
+✗ Build failed in 558ms
+app/routes/api.retry-failed-orders.tsx (20:9): "createShopifyOrderBackground" is not exported by "app/routes/api.create-order.tsx", imported by "app/routes/api.retry-failed-orders.tsx".
+file: /Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/routes/api.retry-failed-orders.tsx:20:9
+
+18:     markSyncFailed,
+19: } from "../config/supabase.server";
+20: import { createShopifyOrderBackground } from "./api.create-order";
+             ^
+21: 
+22: // ─── Helper: reconstruct customer + pricing from stored order_payload ───
+
+    at getRollupError (file:///Users/rashelshah/Desktop/codes/fox-cod-first-test-app/node_modules/rollup/dist/es/shared/parseAst.js:402:41)
+    at error (file:///Users/rashelshah/Desktop/codes/fox-cod-first-test-app/node_modules/rollup/dist/es/shared/parseAst.js:398:42)
+    at Module.error (file:///Users/rashelshah/Desktop/codes/fox-cod-first-test-app/node_modules/rollup/dist/es/shared/node-entry.js:17040:16)
+    at Module.traceVariable (file:///Users/rashelshah/Desktop/codes/fox-cod-first-test-app/node_modules/rollup/dist/es/shared/node-entry.js:17452:29)
+    at ModuleScope.findVariable (file:///Users/rashelshah/Desktop/codes/fox-cod-first-test-app/node_modules/rollup/dist/es/shared/node-entry.js:15070:39)
+    at ReturnValueScope.findVariable (file:///Users/rashelshah/Desktop/codes/fox-cod-first-test-app/node_modules/rollup/dist/es/shared/node-entry.js:5673:38)
+    at FunctionBodyScope.findVariable (file:///Users/rashelshah/Desktop/codes/fox-cod-first-test-app/node_modules/rollup/dist/es/shared/node-entry.js:5673:38)
+    at TrackingScope.findVariable (file:///Users/rashelshah/Desktop/codes/fox-cod-first-test-app/node_modules/rollup/dist/es/shared/node-entry.js:5673:38)
+    at BlockScope.findVariable (file:///Users/rashelshah/Desktop/codes/fox-cod-first-test-app/node_modules/rollup/dist/es/shared/node-entry.js:5673:38)
+    at BlockScope.findVariable (file:///Users/rashelshah/Desktop/codes/fox-cod-first-test-app/node_modules/rollup/dist/es/shared/node-entry.js:5673:38) {
+  binding: 'createShopifyOrderBackground',
+  code: 'MISSING_EXPORT',
+  exporter: '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/routes/api.create-order.tsx',
+  id: '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/routes/api.retry-failed-orders.tsx',
+  url: 'https://rollupjs.org/troubleshooting/#error-name-is-not-exported-by-module',
+  pos: 132,
+  loc: {
+    column: 9,
+    file: '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/routes/api.retry-failed-orders.tsx',
+    line: 20
+  },
+  frame: '18:     markSyncFailed,\n' +
+    '19: } from "../config/supabase.server";\n' +
+    '20: import { createShopifyOrderBackground } from "./api.create-order";\n' +
+    '             ^\n' +
+    '21: \n' +
+    '22: // ─── Helper: reconstruct customer + pricing from stored order_payload ───',
+  watchFiles: [
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/root.tsx',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/entry.server.tsx',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/routes/api.integrations.google-sheets.callback.tsx',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/routes/api.integrations.google-sheets.connect.tsx',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/routes/webhooks.app.scopes_update.tsx',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/routes/api.partial-cod.create-checkout.tsx',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/routes/webhooks.app.uninstalled.tsx',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/routes/webhooks.orders.cancelled.tsx',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/routes/api.customer-by-phone.tsx',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/routes/api.retry-failed-orders.tsx',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/routes/webhooks.orders.create.tsx',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/routes/api.create-order.tsx',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/routes/webhooks.orders.updated.tsx',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/routes/api.get-order-status.tsx',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/routes/ColorSelector.tsx',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/routes/webhooks.orders.fulfilled.tsx',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/routes/api.settings.tsx',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/routes/auth.login/route.tsx',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/routes/auth.$.tsx',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/routes/proxy.$.tsx',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/routes/app.tsx',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/routes/_index/route.tsx',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/routes/app.fraud-protection.tsx',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/routes/app.pixel-tracking.tsx',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/routes/app.quantity-offers.tsx',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/routes/app.app-settings.tsx',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/routes/app.upsell-downsell.tsx',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/routes/app.integrations.tsx',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/routes/app.orders_.$id.tsx',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/routes/app.additional.tsx',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/routes/app.analytics.tsx',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/routes/app._index.tsx',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/routes/app.orders.tsx',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/routes/app.settings.tsx',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/package.json',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/shopify.server.ts',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/db.server.ts',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/services/google-sheets.server.ts',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/config/supabase.server.ts',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/services/customer-lookup.server.ts',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/services/fraud-protection.server.ts',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/services/shopify-sync.server.ts',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/node_modules/@shopify/polaris/locales/en.json',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/node_modules/@shopify/polaris/build/esm/styles.css',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/config/fraud-protection.types.ts',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/config/pixel-tracking.types.ts',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/services/pixel-tracking.server.ts',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/config/integrations.types.ts',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/config/constants.ts',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/config/quantity-offers.types.ts',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/config/form-builder.types.ts',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/routes/auth.login/error.server.tsx',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/services/upsell-offers.server.ts',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/config/upsell-offers.types.ts',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/routes/_index/styles.module.css',
+    '/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/app/services/shipping-rates.server.ts'
+  ],
+  [Symbol(augmented)]: true
+}
