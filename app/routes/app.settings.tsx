@@ -3413,6 +3413,114 @@ export default function SettingsPage() {
                         animation: none !important;
                     }
                 }
+
+                /* =========================
+                   PRESET GALLERY
+                   ========================= */
+                .preset-gallery-wrapper {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 10px;
+                }
+                .preset-category-tabs {
+                    display: flex;
+                    gap: 6px;
+                    flex-wrap: wrap;
+                }
+                .preset-category-tab {
+                    padding: 5px 12px;
+                    border-radius: 20px;
+                    border: 1.5px solid #e5e7eb;
+                    background: #fff;
+                    font-size: 12px;
+                    font-weight: 600;
+                    color: #6b7280;
+                    cursor: pointer;
+                    transition: all 0.18s ease;
+                    font-family: 'Inter', sans-serif;
+                }
+                .preset-category-tab:hover {
+                    border-color: #9ca3af;
+                    color: #374151;
+                    background: #f9fafb;
+                }
+                .preset-category-tab.active {
+                    background: #111827;
+                    color: #fff;
+                    border-color: #111827;
+                }
+                .preset-scroll-container {
+                    display: flex;
+                    gap: 10px;
+                    overflow-x: auto;
+                    padding: 4px 2px 10px;
+                    scroll-snap-type: x mandatory;
+                    -ms-overflow-style: none;
+                    scrollbar-width: none;
+                }
+                .preset-scroll-container::-webkit-scrollbar {
+                    display: none;
+                }
+                .preset-card {
+                    min-width: 110px;
+                    max-width: 110px;
+                    border-radius: 14px;
+                    padding: 10px;
+                    background: #ffffff;
+                    border: 2px solid #e5e7eb;
+                    cursor: pointer;
+                    transition: all 0.22s ease;
+                    scroll-snap-align: start;
+                    flex-shrink: 0;
+                    box-sizing: border-box;
+                    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+                }
+                .preset-card:hover {
+                    transform: translateY(-2px);
+                    border-color: #d1d5db;
+                    box-shadow: 0 6px 16px rgba(0,0,0,0.10);
+                }
+                .preset-card.active {
+                    border-color: #22c55e;
+                    box-shadow: 0 6px 20px rgba(34, 197, 94, 0.20);
+                    transform: translateY(-1px);
+                }
+                .preset-preview {
+                    height: 74px;
+                    border-radius: 10px;
+                    padding: 8px;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 5px;
+                    overflow: hidden;
+                }
+                .preset-input-bar {
+                    height: 9px;
+                    border-radius: 5px;
+                    background: rgba(255,255,255,0.55);
+                    flex-shrink: 0;
+                }
+                .preset-button-bar {
+                    height: 11px;
+                    border-radius: 7px;
+                    margin-top: auto;
+                    flex-shrink: 0;
+                    opacity: 0.92;
+                }
+                .preset-label {
+                    margin-top: 7px;
+                    font-size: 11px;
+                    font-weight: 600;
+                    text-align: center;
+                    color: #374151;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    font-family: 'Inter', sans-serif;
+                }
+                .preset-card.active .preset-label {
+                    color: #16a34a;
+                }
             `}} />
             )}
 
@@ -3927,55 +4035,195 @@ export default function SettingsPage() {
 
                                     {/* Field Styling */}
                                     <AccordionSection id="field-styling" tab="form" title="Field Styling" helperText="Changes the styling of the form fields" expandedSection={expandedSection} toggleSection={toggleSection}>
-                                        {/* ── Style Preset Selector ── */}
-                                        <div className="input-group">
-                                            <label className="input-label">Style Preset</label>
-                                            <select
-                                                style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 10, fontSize: 14, fontFamily: "'Inter', sans-serif", color: '#374151', background: '#fff', cursor: 'pointer' }}
-                                                value={selectedPreset}
-                                                onChange={(e) => {
-                                                    const key = e.target.value;
-                                                    setSelectedPreset(key);
-                                                    const presetMap: Record<string, any> = {
-                                                        default: { styles: { themeKey: 'default', textColor: '#333333', textSize: 14, fontStyle: 'normal' as const, borderColor: '#E5E7EB', borderWidth: 1, background: 'linear-gradient(135deg, #D1FAE5 0%, #ECFDF5 40%, #FFFFFF 100%)', backgroundColor: '#ffffff', labelAlignment: 'left' as const, iconColor: '#6b7280', iconBackground: '#F0FDF4', borderRadius: 5, shadow: true, fieldBackgroundColor: '#FFFFFF', labelColor: '#065F46', labelFontSize: 14, priceColor: '#065F46' }, buttonColor: '#16A34A' },
-                                                        modern_slate: { styles: { themeKey: 'modern_slate', textColor: '#1e293b', textSize: 14, fontStyle: 'normal' as const, borderColor: '#f97316', borderWidth: 2, backgroundColor: '#fff7ed', labelAlignment: 'left' as const, iconColor: '#ea580c', iconBackground: '#fed7aa', borderRadius: 16, shadow: true, fieldBackgroundColor: '#fff7ed', labelColor: '#9a3412', labelFontSize: 14, priceColor: '#ea580c' }, buttonColor: '#ea580c' },
-                                                        dark_mode: { styles: { themeKey: 'dark_mode', textColor: '#f8fafc', textSize: 14, fontStyle: 'normal' as const, borderColor: '#475569', borderWidth: 1, backgroundColor: '#1f2a3a', labelAlignment: 'left' as const, iconColor: '#cbd5f5', iconBackground: '#1f2a3a', borderRadius: 12, shadow: true, fieldBackgroundColor: '#0f172a', labelColor: '#f8fafc', labelFontSize: 14, priceColor: '#f8fafc' }, buttonColor: '#6366f1' },
-                                                        eastern_gold: { styles: { themeKey: 'eastern_gold', textColor: '#78350f', textSize: 14, fontStyle: 'normal' as const, borderColor: '#d4a574', borderWidth: 1, backgroundColor: '#fffbeb', labelAlignment: 'left' as const, iconColor: '#b45309', iconBackground: '#fef3c7', borderRadius: 10, shadow: true, fieldBackgroundColor: '#fef9c3', labelColor: '#713f12', labelFontSize: 14, priceColor: '#b45309' }, buttonColor: '#b45309' },
-                                                        arctic_blue: { styles: { themeKey: 'arctic_blue', textColor: '#164e63', textSize: 14, fontStyle: 'normal' as const, borderColor: '#67e8f9', borderWidth: 1, backgroundColor: '#ecfeff', labelAlignment: 'left' as const, iconColor: '#0891b2', iconBackground: '#cffafe', borderRadius: 12, shadow: true, fieldBackgroundColor: '#ecfeff', labelColor: '#155e75', labelFontSize: 14, priceColor: '#0891b2' }, buttonColor: '#0891b2' },
-                                                        rose_garden: { styles: { themeKey: 'rose_garden', textColor: '#9f1239', textSize: 14, fontStyle: 'normal' as const, borderColor: '#fda4af', borderWidth: 1, backgroundColor: '#fff1f2', labelAlignment: 'left' as const, iconColor: '#e11d48', iconBackground: '#ffe4e6', borderRadius: 14, shadow: true, fieldBackgroundColor: '#fff1f2', labelColor: '#881337', labelFontSize: 14, priceColor: '#e11d48' }, buttonColor: '#e11d48' },
-                                                        forest_green: { styles: { themeKey: 'forest_green', textColor: '#14532d', textSize: 14, fontStyle: 'normal' as const, borderColor: '#86efac', borderWidth: 1, backgroundColor: '#f0fdf4', labelAlignment: 'left' as const, iconColor: '#16a34a', iconBackground: '#dcfce7', borderRadius: 10, shadow: true, fieldBackgroundColor: '#f0fdf4', labelColor: '#15803d', labelFontSize: 14, priceColor: '#16a34a' }, buttonColor: '#16a34a' },
-                                                        professional: { styles: { themeKey: 'professional', textColor: '#1f2937', textSize: 14, fontStyle: 'normal' as const, borderColor: '#9ca3af', borderWidth: 1, backgroundColor: '#f9fafb', labelAlignment: 'left' as const, iconColor: '#4b5563', iconBackground: '#e5e7eb', borderRadius: 6, shadow: false, fieldBackgroundColor: '#ffffff', labelColor: '#111827', labelFontSize: 13, priceColor: '#374151' }, buttonColor: '#374151' },
-                                                        minimal_white: { styles: { themeKey: 'minimal_white', textColor: '#374151', textSize: 14, fontStyle: 'normal' as const, borderColor: '#e5e7eb', borderWidth: 1, backgroundColor: '#ffffff', labelAlignment: 'left' as const, iconColor: '#9ca3af', iconBackground: 'transparent', borderRadius: 8, shadow: false, fieldBackgroundColor: '#ffffff', labelColor: '#6b7280', labelFontSize: 13, priceColor: '#111827' }, buttonColor: '#111827' },
-                                                        luxury_gold: { styles: { themeKey: 'luxury_gold', textColor: '#fbbf24', textSize: 14, fontStyle: 'normal' as const, borderColor: '#d97706', borderWidth: 1, backgroundColor: '#18181b', labelAlignment: 'left' as const, iconColor: '#f59e0b', iconBackground: '#27272a', borderRadius: 10, shadow: true, fieldBackgroundColor: '#27272a', labelColor: '#fcd34d', labelFontSize: 14, priceColor: '#fbbf24' }, buttonColor: '#d97706' },
-                                                        ocean_breeze: { styles: { themeKey: 'ocean_breeze', textColor: '#0f766e', textSize: 14, fontStyle: 'normal' as const, borderColor: '#5eead4', borderWidth: 1, backgroundColor: '#f0fdfa', labelAlignment: 'left' as const, iconColor: '#14b8a6', iconBackground: '#ccfbf1', borderRadius: 14, shadow: true, fieldBackgroundColor: '#f0fdfa', labelColor: '#115e59', labelFontSize: 14, priceColor: '#14b8a6' }, buttonColor: '#14b8a6' },
-                                                        royal_indigo: { styles: { themeKey: 'royal_indigo', textColor: '#e0e7ff', textSize: 14, fontStyle: 'normal' as const, borderColor: '#6366f1', borderWidth: 1, backgroundColor: '#1e1b4b', labelAlignment: 'left' as const, iconColor: '#a5b4fc', iconBackground: '#312e81', borderRadius: 12, shadow: true, fieldBackgroundColor: '#1e1b4b', labelColor: '#f8fafc', labelFontSize: 14, priceColor: '#a5b4fc' }, buttonColor: '#6366f1' },
-                                                        emerald_night: { styles: { themeKey: 'emerald_night', textColor: '#ecfdf5', textSize: 14, fontStyle: 'normal' as const, borderColor: '#10b981', borderWidth: 1, backgroundColor: '#022c22', labelAlignment: 'left' as const, iconColor: '#6ee7b7', iconBackground: '#064e3b', borderRadius: 12, shadow: true, fieldBackgroundColor: '#022c22', labelColor: '#f0fdf4', labelFontSize: 14, priceColor: '#34d399' }, buttonColor: '#10b981' },
-                                                    };
-                                                    if (key !== 'custom' && presetMap[key]) {
-                                                        setFormStyles(presetMap[key].styles);
-                                                        setPrimaryColor(presetMap[key].buttonColor);
-                                                    } else if (key === 'custom') {
-                                                        setFormStyles(s => ({ ...s, themeKey: 'custom' }));
-                                                    }
-                                                }}
-                                            >
-                                                <option value="custom">Select a preset</option>
-                                                <option value="default">Default</option>
-                                                <option value="modern_slate">Modern Coral</option>
-                                                <option value="dark_mode">Dark Mode</option>
-                                                <option value="eastern_gold">Eastern Gold</option>
-                                                <option value="arctic_blue">Arctic Blue</option>
-                                                <option value="rose_garden">Rose Garden</option>
-                                                <option value="forest_green">Forest Green</option>
-                                                <option value="professional">Professional</option>
-                                                <option value="minimal_white">Minimal White</option>
-                                                <option value="luxury_gold">Luxury Gold</option>
-                                                <option value="ocean_breeze">Ocean Breeze</option>
-                                                <option value="royal_indigo">Royal Indigo</option>
-                                                <option value="emerald_night">Emerald Night</option>
-                                            </select>
-                                            <p style={{ fontSize: 12, color: '#9ca3af', margin: '6px 0 0' }}>Apply a curated color theme, then fine-tune below.</p>
-                                        </div>
+                                        {/* ── Style Preset Gallery ── */}
+                                        {(() => {
+                                            // Preset data — keys, names, colors, categories (UI only, no logic change)
+                                            const presetList = [
+                                                { key: 'custom',       name: 'Custom',        bg: '#f9fafb', fieldBg: '#ffffff',  btnColor: '#6b7280', category: 'all' },
+                                                { key: 'default',      name: 'Default',       bg: '#ECFDF5', fieldBg: '#FFFFFF',  btnColor: '#16A34A', category: 'green' },
+                                                { key: 'modern_slate', name: 'Modern Coral',  bg: '#fff7ed', fieldBg: '#fff7ed',  btnColor: '#ea580c', category: 'clean' },
+                                                { key: 'dark_mode',    name: 'Dark Mode',     bg: '#1f2a3a', fieldBg: '#0f172a',  btnColor: '#6366f1', category: 'dark' },
+                                                { key: 'eastern_gold', name: 'Eastern Gold',  bg: '#fffbeb', fieldBg: '#fef9c3',  btnColor: '#b45309', category: 'clean' },
+                                                { key: 'arctic_blue',  name: 'Arctic Blue',   bg: '#ecfeff', fieldBg: '#ecfeff',  btnColor: '#0891b2', category: 'ocean' },
+                                                { key: 'rose_garden',  name: 'Rose Garden',   bg: '#fff1f2', fieldBg: '#fff1f2',  btnColor: '#e11d48', category: 'clean' },
+                                                { key: 'forest_green', name: 'Forest Green',  bg: '#f0fdf4', fieldBg: '#f0fdf4',  btnColor: '#16a34a', category: 'green' },
+                                                { key: 'professional', name: 'Professional',  bg: '#f9fafb', fieldBg: '#ffffff',  btnColor: '#374151', category: 'clean' },
+                                                { key: 'minimal_white',name: 'Minimal',       bg: '#ffffff', fieldBg: '#ffffff',  btnColor: '#111827', category: 'clean' },
+                                                { key: 'luxury_gold',  name: 'Luxury Gold',   bg: '#18181b', fieldBg: '#27272a',  btnColor: '#d97706', category: 'dark' },
+                                                { key: 'ocean_breeze', name: 'Ocean',         bg: '#f0fdfa', fieldBg: '#f0fdfa',  btnColor: '#14b8a6', category: 'ocean' },
+                                                { key: 'royal_indigo', name: 'Royal Indigo',  bg: '#1e1b4b', fieldBg: '#1e1b4b',  btnColor: '#6366f1', category: 'dark' },
+                                                { key: 'emerald_night',name: 'Emerald Night', bg: '#022c22', fieldBg: '#022c22',  btnColor: '#10b981', category: 'dark' },
+                                            ];
+
+                                            const presetMap: Record<string, any> = {
+                                                default: { styles: { themeKey: 'default', textColor: '#333333', textSize: 14, fontStyle: 'normal' as const, borderColor: '#E5E7EB', borderWidth: 1, background: 'linear-gradient(135deg, #D1FAE5 0%, #ECFDF5 40%, #FFFFFF 100%)', backgroundColor: '#ffffff', labelAlignment: 'left' as const, iconColor: '#6b7280', iconBackground: '#F0FDF4', borderRadius: 5, shadow: true, fieldBackgroundColor: '#FFFFFF', labelColor: '#065F46', labelFontSize: 14, priceColor: '#065F46' }, buttonColor: '#16A34A' },
+                                                modern_slate: { styles: { themeKey: 'modern_slate', textColor: '#1e293b', textSize: 14, fontStyle: 'normal' as const, borderColor: '#f97316', borderWidth: 2, backgroundColor: '#fff7ed', labelAlignment: 'left' as const, iconColor: '#ea580c', iconBackground: '#fed7aa', borderRadius: 16, shadow: true, fieldBackgroundColor: '#fff7ed', labelColor: '#9a3412', labelFontSize: 14, priceColor: '#ea580c' }, buttonColor: '#ea580c' },
+                                                dark_mode: { styles: { themeKey: 'dark_mode', textColor: '#f8fafc', textSize: 14, fontStyle: 'normal' as const, borderColor: '#475569', borderWidth: 1, backgroundColor: '#1f2a3a', labelAlignment: 'left' as const, iconColor: '#cbd5f5', iconBackground: '#1f2a3a', borderRadius: 12, shadow: true, fieldBackgroundColor: '#0f172a', labelColor: '#f8fafc', labelFontSize: 14, priceColor: '#f8fafc' }, buttonColor: '#6366f1' },
+                                                eastern_gold: { styles: { themeKey: 'eastern_gold', textColor: '#78350f', textSize: 14, fontStyle: 'normal' as const, borderColor: '#d4a574', borderWidth: 1, backgroundColor: '#fffbeb', labelAlignment: 'left' as const, iconColor: '#b45309', iconBackground: '#fef3c7', borderRadius: 10, shadow: true, fieldBackgroundColor: '#fef9c3', labelColor: '#713f12', labelFontSize: 14, priceColor: '#b45309' }, buttonColor: '#b45309' },
+                                                arctic_blue: { styles: { themeKey: 'arctic_blue', textColor: '#164e63', textSize: 14, fontStyle: 'normal' as const, borderColor: '#67e8f9', borderWidth: 1, backgroundColor: '#ecfeff', labelAlignment: 'left' as const, iconColor: '#0891b2', iconBackground: '#cffafe', borderRadius: 12, shadow: true, fieldBackgroundColor: '#ecfeff', labelColor: '#155e75', labelFontSize: 14, priceColor: '#0891b2' }, buttonColor: '#0891b2' },
+                                                rose_garden: { styles: { themeKey: 'rose_garden', textColor: '#9f1239', textSize: 14, fontStyle: 'normal' as const, borderColor: '#fda4af', borderWidth: 1, backgroundColor: '#fff1f2', labelAlignment: 'left' as const, iconColor: '#e11d48', iconBackground: '#ffe4e6', borderRadius: 14, shadow: true, fieldBackgroundColor: '#fff1f2', labelColor: '#881337', labelFontSize: 14, priceColor: '#e11d48' }, buttonColor: '#e11d48' },
+                                                forest_green: { styles: { themeKey: 'forest_green', textColor: '#14532d', textSize: 14, fontStyle: 'normal' as const, borderColor: '#86efac', borderWidth: 1, backgroundColor: '#f0fdf4', labelAlignment: 'left' as const, iconColor: '#16a34a', iconBackground: '#dcfce7', borderRadius: 10, shadow: true, fieldBackgroundColor: '#f0fdf4', labelColor: '#15803d', labelFontSize: 14, priceColor: '#16a34a' }, buttonColor: '#16a34a' },
+                                                professional: { styles: { themeKey: 'professional', textColor: '#1f2937', textSize: 14, fontStyle: 'normal' as const, borderColor: '#9ca3af', borderWidth: 1, backgroundColor: '#f9fafb', labelAlignment: 'left' as const, iconColor: '#4b5563', iconBackground: '#e5e7eb', borderRadius: 6, shadow: false, fieldBackgroundColor: '#ffffff', labelColor: '#111827', labelFontSize: 13, priceColor: '#374151' }, buttonColor: '#374151' },
+                                                minimal_white: { styles: { themeKey: 'minimal_white', textColor: '#374151', textSize: 14, fontStyle: 'normal' as const, borderColor: '#e5e7eb', borderWidth: 1, backgroundColor: '#ffffff', labelAlignment: 'left' as const, iconColor: '#9ca3af', iconBackground: 'transparent', borderRadius: 8, shadow: false, fieldBackgroundColor: '#ffffff', labelColor: '#6b7280', labelFontSize: 13, priceColor: '#111827' }, buttonColor: '#111827' },
+                                                luxury_gold: { styles: { themeKey: 'luxury_gold', textColor: '#fbbf24', textSize: 14, fontStyle: 'normal' as const, borderColor: '#d97706', borderWidth: 1, backgroundColor: '#18181b', labelAlignment: 'left' as const, iconColor: '#f59e0b', iconBackground: '#27272a', borderRadius: 10, shadow: true, fieldBackgroundColor: '#27272a', labelColor: '#fcd34d', labelFontSize: 14, priceColor: '#fbbf24' }, buttonColor: '#d97706' },
+                                                ocean_breeze: { styles: { themeKey: 'ocean_breeze', textColor: '#0f766e', textSize: 14, fontStyle: 'normal' as const, borderColor: '#5eead4', borderWidth: 1, backgroundColor: '#f0fdfa', labelAlignment: 'left' as const, iconColor: '#14b8a6', iconBackground: '#ccfbf1', borderRadius: 14, shadow: true, fieldBackgroundColor: '#f0fdfa', labelColor: '#115e59', labelFontSize: 14, priceColor: '#14b8a6' }, buttonColor: '#14b8a6' },
+                                                royal_indigo: { styles: { themeKey: 'royal_indigo', textColor: '#e0e7ff', textSize: 14, fontStyle: 'normal' as const, borderColor: '#6366f1', borderWidth: 1, backgroundColor: '#1e1b4b', labelAlignment: 'left' as const, iconColor: '#a5b4fc', iconBackground: '#312e81', borderRadius: 12, shadow: true, fieldBackgroundColor: '#1e1b4b', labelColor: '#f8fafc', labelFontSize: 14, priceColor: '#a5b4fc' }, buttonColor: '#6366f1' },
+                                                emerald_night: { styles: { themeKey: 'emerald_night', textColor: '#ecfdf5', textSize: 14, fontStyle: 'normal' as const, borderColor: '#10b981', borderWidth: 1, backgroundColor: '#022c22', labelAlignment: 'left' as const, iconColor: '#6ee7b7', iconBackground: '#064e3b', borderRadius: 12, shadow: true, fieldBackgroundColor: '#022c22', labelColor: '#f0fdf4', labelFontSize: 14, priceColor: '#34d399' }, buttonColor: '#10b981' },
+                                            };
+
+                                            // Active category is stored in formStyles._cat (written on tab click)
+                                            const activeCategory: string = (formStyles as any)._cat || 'all';
+
+                                            const categories = [
+                                                { key: 'all',   label: 'All' },
+                                                { key: 'clean', label: 'Clean' },
+                                                { key: 'dark',  label: 'Dark' },
+                                                { key: 'ocean', label: 'Ocean' },
+                                                { key: 'green', label: 'Green' },
+                                            ];
+
+                                            const visiblePresets = activeCategory === 'all'
+                                                ? presetList
+                                                : presetList.filter(p => p.category === activeCategory || p.key === 'custom');
+
+                                            return (
+                                                <div className="input-group">
+                                                    <label className="input-label">Style Preset</label>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                                        {/* Category tabs */}
+                                                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                                            {categories.map(cat => (
+                                                                <button
+                                                                    key={cat.key}
+                                                                    type="button"
+                                                                    style={{
+                                                                        padding: '5px 13px',
+                                                                        borderRadius: 20,
+                                                                        border: `1.5px solid ${activeCategory === cat.key ? '#111827' : '#e5e7eb'}`,
+                                                                        background: activeCategory === cat.key ? '#111827' : '#ffffff',
+                                                                        color: activeCategory === cat.key ? '#ffffff' : '#6b7280',
+                                                                        fontSize: 12,
+                                                                        fontWeight: 600,
+                                                                        cursor: 'pointer',
+                                                                        fontFamily: "'Inter', sans-serif",
+                                                                        transition: 'all 0.15s ease',
+                                                                        lineHeight: 1.4,
+                                                                    }}
+                                                                    onClick={() => {
+                                                                        setFormStyles((s: any) => ({ ...s, _cat: cat.key }));
+                                                                    }}
+                                                                >
+                                                                    {cat.label}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+
+                                                        {/* Scrollable preset cards */}
+                                                        <div style={{
+                                                            display: 'flex',
+                                                            gap: 10,
+                                                            overflowX: 'auto',
+                                                            padding: '4px 2px 12px',
+                                                            scrollSnapType: 'x mandatory',
+                                                            msOverflowStyle: 'none',
+                                                            scrollbarWidth: 'none',
+                                                        } as React.CSSProperties}>
+                                                            {visiblePresets.map(preset => {
+                                                                const isSelected = selectedPreset === preset.key;
+                                                                return (
+                                                                    <div
+                                                                        key={preset.key}
+                                                                        onClick={() => {
+                                                                            const key = preset.key;
+                                                                            setSelectedPreset(key);
+                                                                            if (key !== 'custom' && presetMap[key]) {
+                                                                                setFormStyles(presetMap[key].styles);
+                                                                                setPrimaryColor(presetMap[key].buttonColor);
+                                                                            } else if (key === 'custom') {
+                                                                                setFormStyles((s: any) => ({ ...s, themeKey: 'custom' }));
+                                                                            }
+                                                                        }}
+                                                                        title={preset.name}
+                                                                        style={{
+                                                                            minWidth: 100,
+                                                                            maxWidth: 100,
+                                                                            flexShrink: 0,
+                                                                            borderRadius: 14,
+                                                                            padding: 10,
+                                                                            backgroundColor: '#ffffff',
+                                                                            border: isSelected ? '2.5px solid #22c55e' : '2px solid #e5e7eb',
+                                                                            boxShadow: isSelected
+                                                                                ? '0 4px 18px rgba(34,197,94,0.22)'
+                                                                                : '0 1px 4px rgba(0,0,0,0.07)',
+                                                                            cursor: 'pointer',
+                                                                            scrollSnapAlign: 'start',
+                                                                            boxSizing: 'border-box',
+                                                                            transform: isSelected ? 'translateY(-1px)' : 'none',
+                                                                            transition: 'all 0.2s ease',
+                                                                        } as React.CSSProperties}
+                                                                    >
+                                                                        {/* Mini form preview */}
+                                                                        <div style={{
+                                                                            height: 72,
+                                                                            borderRadius: 10,
+                                                                            padding: 8,
+                                                                            background: preset.bg,
+                                                                            display: 'flex',
+                                                                            flexDirection: 'column',
+                                                                            gap: 5,
+                                                                            overflow: 'hidden',
+                                                                        }}>
+                                                                            {/* Input bar 1 */}
+                                                                            <div style={{
+                                                                                height: 9,
+                                                                                borderRadius: 5,
+                                                                                flexShrink: 0,
+                                                                                background: preset.fieldBg === preset.bg
+                                                                                    ? 'rgba(255,255,255,0.55)'
+                                                                                    : preset.fieldBg,
+                                                                            }} />
+                                                                            {/* Input bar 2 */}
+                                                                            <div style={{
+                                                                                height: 9,
+                                                                                borderRadius: 5,
+                                                                                flexShrink: 0,
+                                                                                background: preset.fieldBg === preset.bg
+                                                                                    ? 'rgba(255,255,255,0.55)'
+                                                                                    : preset.fieldBg,
+                                                                            }} />
+                                                                            {/* Button bar */}
+                                                                            <div style={{
+                                                                                height: 11,
+                                                                                borderRadius: 7,
+                                                                                marginTop: 'auto',
+                                                                                flexShrink: 0,
+                                                                                background: preset.btnColor,
+                                                                                opacity: 0.92,
+                                                                            }} />
+                                                                        </div>
+                                                                        {/* Name label */}
+                                                                        <div style={{
+                                                                            marginTop: 7,
+                                                                            fontSize: 11,
+                                                                            fontWeight: 600,
+                                                                            textAlign: 'center',
+                                                                            color: isSelected ? '#16a34a' : '#374151',
+                                                                            whiteSpace: 'nowrap',
+                                                                            overflow: 'hidden',
+                                                                            textOverflow: 'ellipsis',
+                                                                            fontFamily: "'Inter', sans-serif",
+                                                                        }}>
+                                                                            {preset.name}
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                    <p style={{ fontSize: 12, color: '#9ca3af', margin: '6px 0 0' }}>Apply a curated color theme, then fine-tune below.</p>
+                                                </div>
+                                            );
+                                        })()}
 
                                         {/* ── Advanced Style Controls ── */}
                                         <div className="input-group" style={{ marginTop: 16 }}>
