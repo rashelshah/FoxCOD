@@ -208,9 +208,9 @@
 
   // Wait for DOM to be ready
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initCODForms);
+    document.addEventListener('DOMContentLoaded', initFoxCod);
   } else {
-    initCODForms();
+    initFoxCod();
   }
 
   // Clear checkout state on page load/refresh so form starts fresh
@@ -306,6 +306,31 @@
     return element && element.closest ? element.closest('[data-fox-cod-root]') : null;
   }
 
+  function getScopedDomId(prefix, config) {
+    return prefix + '-' + ((config && config.blockId) || (config && config.productId) || '');
+  }
+
+  function getModalContainer(config) {
+    if (config && config.rootElement) {
+      return config.rootElement.querySelector('.cod-form-container.cod-modal');
+    }
+    return document.getElementById(getScopedDomId('cod-form', config));
+  }
+
+  function getModalOverlay(config) {
+    if (config && config.rootElement) {
+      return config.rootElement.querySelector('.cod-modal-overlay');
+    }
+    return document.getElementById(getScopedDomId('cod-modal-overlay', config));
+  }
+
+  function getOrderFormElement(config) {
+    if (config && config.rootElement) {
+      return config.rootElement.querySelector('.cod-order-form');
+    }
+    return document.getElementById(getScopedDomId('cod-order-form', config));
+  }
+
   function setBlockStatus(config, message, tone) {
     if (!config || !config.statusElement) return;
     if (!message) {
@@ -334,26 +359,26 @@
     target.style.display = 'flex';
   }
 
-  function requestProxyJson(config, path, options) {
-    return fetch((config.proxyUrl || '/apps/fox-cod') + path, options || {})
-      .then(function(res) {
-        var contentType = res.headers.get('content-type') || '';
-        var parsedBody = contentType.indexOf('application/json') !== -1
-          ? res.json()
-          : res.text().then(function(text) {
-              return { success: false, error: text || ('Request failed with status ' + res.status) };
-            });
+  async function safeFetch(url, options) {
+    try {
+      var response = await fetch(url, options || {});
+      if (!response.ok) {
+        throw new Error('Request failed');
+      }
+      return await response.json();
+    } catch (error) {
+      console.warn('FoxCOD fetch failed:', error);
+      return null;
+    }
+  }
 
-        return parsedBody.then(function(body) {
-          if (!res.ok) {
-            throw new Error((body && (body.error || body.message)) || ('Request failed with status ' + res.status));
-          }
-          return body;
-        });
-      })
-      .catch(function(error) {
-        throw new Error(error && error.message ? error.message : 'Failed to reach the Fox COD service.');
-      });
+  function requestProxyJson(config, path, options) {
+    return safeFetch((config.proxyUrl || '/apps/fox-cod') + path, options).then(function(data) {
+      if (!data) {
+        throw new Error('Failed to reach the Fox COD service.');
+      }
+      return data;
+    });
   }
 
   function mountBlockRoot(productId, config, state) {
@@ -411,7 +436,7 @@
   /**
    * Initialize all COD forms on the page
    */
-  function initCODForms() {
+  function initFoxCod() {
     // Inject form validation CSS once
     if (!document.getElementById('foxcod-validation-css')) {
       var valStyle = document.createElement('style');
@@ -425,21 +450,34 @@
       document.head.appendChild(valStyle);
     }
 
-    // Find all COD form data containers
-    var dataContainers = Array.prototype.slice.call(document.getElementsByClassName('cod-form-data'));
-    
-    if (dataContainers.length === 0) {
-      console.log('[COD Form] No COD form data found on page');
+    var roots = document.querySelectorAll('[data-fox-cod-root]');
+
+    if (roots.length === 0) {
+      console.log('[COD Form] No Fox COD roots found on page');
       return;
     }
 
-    dataContainers.forEach(function(dataContainer) {
+    roots.forEach(function(rootElement) {
+      var trigger = rootElement.querySelector('[data-foxcod-trigger]');
+      if (!trigger) {
+        console.warn('FoxCOD: trigger not found');
+        return;
+      }
+
+      trigger.textContent = 'Buy with COD';
+      trigger.disabled = false;
+
+      var dataContainer = rootElement.querySelector('.cod-form-data');
+      if (!dataContainer) {
+        console.warn('[COD Form] Missing cod-form-data inside root');
+        return;
+      }
+
       if (dataContainer.dataset.foxcodInitialized === 'true') return;
       dataContainer.dataset.foxcodInitialized = 'true';
 
       var productId = dataContainer.dataset.productId;
       var shop = dataContainer.dataset.shop;
-      var rootElement = findFoxCodRoot(dataContainer);
       
       // Default Fallbacks
       var DEFAULT_FIELDS = [
@@ -526,7 +564,7 @@
         appUrl: dataContainer.dataset.appUrl || '',
         rootElement: rootElement,
         shellElement: rootElement ? rootElement.querySelector('[data-foxcod-shell]') : null,
-        triggerElement: rootElement ? rootElement.querySelector('[data-foxcod-trigger]') : null,
+        triggerElement: trigger,
         statusElement: rootElement ? rootElement.querySelector('[data-foxcod-status]') : null,
         // Form submit button style overrides
         formSubmitButton: (function() {
@@ -598,6 +636,7 @@
   function initializeProduct(productId, config) {
     // Render the primary CTA directly inside the app block root.
     mountBlockRoot(productId, config, { loading: false });
+    mountRootOffers(productId, config);
 
     // Initialize the form structure and events
     initForm(productId, config);
@@ -605,360 +644,72 @@
   }
 
   /**
-   * Find and replace the Buy Now / Add to Cart buttons with COD button
+   * Render offers directly inside the app block root when configured for product-page placement.
    */
-  function replaceBuyButtons(productId, config) {
-    // Common selectors for Buy/Add to Cart buttons
-    var buttonSelectors = [
-      'form[action*="/cart/add"] button[name="add"]',
-      '.product-form__submit',
-      'button.product-form__cart-submit',
-      '#AddToCart',
-      '[data-add-to-cart]',
-      '.shopify-payment-button button',
-      '.shopify-payment-button__button',
-      '[data-shopify="payment-button"] button',
-      '.product-form button[type="submit"]',
-      '.product-form__buttons button',
-      '.product-form__submit-button'
-    ];
+  function mountRootOffers(productId, config) {
+    if (!config || !config.rootElement || !config.shellElement || !config.triggerElement) return;
+    if (config.rootElement.querySelector('.cod-product-page-offers[data-product-id="' + productId + '"]')) return;
 
-    var buttonsFound = false;
-    var primaryCodBtn = null;
+    var offersResult = renderQuantityOffersWithPlacement(config.rootElement, config);
+    if (!offersResult.element || offersResult.placement !== 'in_product_page') return;
 
-    function isInsideDynamicPaymentButton(element) {
-      return !!(element && element.closest('.shopify-payment-button, [data-shopify="payment-button"]'));
+    offersResult.element.classList.add('cod-product-page-offers');
+    offersResult.element.setAttribute('data-product-id', productId);
+    config.shellElement.insertBefore(offersResult.element, config.triggerElement);
+    console.log('[COD Form] Rendered in_product_page offers inside block root');
+
+    var defaultSelectedCard = offersResult.element.querySelector('.cod-offer-card.selected');
+    if (defaultSelectedCard) {
+      var defaultOffer = {
+        quantity: parseInt(defaultSelectedCard.getAttribute('data-quantity'), 10),
+        discountPercent: parseFloat(defaultSelectedCard.getAttribute('data-discount')) || 0
+      };
+      offersResult.element.setAttribute('data-selected-offer', JSON.stringify(defaultOffer));
+      if (defaultOffer.quantity > 1) {
+        renderBundleVariantSelectors(null, config, defaultOffer.quantity, offersResult.element);
+      }
     }
 
-    document.querySelectorAll('.cod-buy-btn.sticky-mobile[data-cod-open="' + productId + '"]').forEach(function(existingStickyBtn) {
-      existingStickyBtn.remove();
-    });
+    offersResult.element.querySelectorAll('.cod-offer-card').forEach(function(card) {
+      card.addEventListener('click', function() {
+        offersResult.element.querySelectorAll('.cod-offer-card').forEach(function(otherCard) {
+          otherCard.classList.remove('selected');
+        });
+        card.classList.add('selected');
 
-    buttonSelectors.forEach(function(selector) {
-      var buttons = document.querySelectorAll(selector);
-      buttons.forEach(function(btn) {
-        if (btn.dataset.codReplaced || btn.classList.contains('cod-buy-btn')) return;
-        
-        buttonsFound = true;
-        
-        // Calculate Button Styles - use button_styles JSON as single source of truth
-        var btnStyles = config.buttonStyles || {};
-        // Use button_styles as the ONLY source for customizations
-        var textColor = btnStyles.textColor || '#ffffff';
-        var borderColor = btnStyles.borderColor || config.primaryColor;
-        var borderWidth = btnStyles.borderWidth ?? 0;
-        
-        // Check if animations are enabled - don't set boxShadow inline if so (CSS handles it)
-        var hasGlowAnim = config.animationPreset === 'glow';
-        var hasBorderGlow = config.borderEffect === 'glowing';
-        var hasHoverGlow = config.hoverGlow;
-        var animationsNeedBoxShadow = hasGlowAnim || hasBorderGlow || hasHoverGlow;
-        
-        // Determine button style type from CSS variable (set by Liquid)
-        var computedStyle = getComputedStyle(document.documentElement);
-        var codBtnBg = computedStyle.getPropertyValue('--cod-btn-bg').trim();
-        var isOutlineStyle = codBtnBg === 'transparent';
-        
-        // For outline buttons, use primary color for text (like preview does)
-        var finalTextColor = textColor;
-        // Always use primaryColor as background - this is the seller's main button color
-        var finalBgColor = config.primaryColor;
-        if (isOutlineStyle) {
-          finalBgColor = 'transparent';
-          // If text color is white (default), use primary color instead for visibility
-          if (textColor.toLowerCase() === '#ffffff' || textColor.toLowerCase() === 'white') {
-            finalTextColor = config.primaryColor;
-          }
-          // Ensure border for outline
-          if (!borderWidth || borderWidth === 0) {
-            borderWidth = 2;
-          }
-        }
-        
-        // Determine if transform-based animations are active
-        var hasTransformAnim = config.animationPreset && config.animationPreset !== 'none' && config.animationPreset !== 'glow' && config.animationPreset !== 'gradient-flow';
-        
-        var baseStyles = {
-          width: '100%',
-          padding: (config.buttonStyles && config.buttonStyles.buttonSize === 'small') ? '10px' : (config.buttonStyles && config.buttonStyles.buttonSize === 'large') ? '16px' : '14px',
-          borderRadius: (btnStyles.borderRadius ?? config.borderRadius) + 'px',
-          fontWeight: btnStyles.fontStyle === 'bold' ? 700 : 400,
-          fontStyle: btnStyles.fontStyle === 'italic' ? 'italic' : 'normal',
-          fontSize: (btnStyles.textSize ?? 15) + 'px',
-          border: borderWidth + 'px solid ' + (isOutlineStyle ? config.primaryColor : borderColor),
-          cursor: 'pointer',
-          transition: hasTransformAnim ? 'opacity 0.2s ease, background-color 0.2s ease' : 'all 0.2s ease',
-          textAlign: 'center',
-          display: 'block',
-          boxSizing: 'border-box',
-          color: finalTextColor,
-          backgroundColor: finalBgColor
+        var offer = {
+          quantity: parseInt(card.getAttribute('data-quantity'), 10),
+          discountPercent: parseFloat(card.getAttribute('data-discount')) || 0
         };
-        
-        // Only add boxShadow if no CSS animations need to control it
-        if (!animationsNeedBoxShadow) {
-          baseStyles.boxShadow = btnStyles.shadow ? '0 4px 6px rgba(0,0,0,0.1)' : 'none';
-        }
+        offersResult.element.setAttribute('data-selected-offer', JSON.stringify(offer));
+        renderBundleVariantSelectors(null, config, offer.quantity, offersResult.element);
 
-        // Apply styles to string
-        var styleString = Object.keys(baseStyles).map(function(key) {
-           // specific overrides for gradient
-           return key.replace(/([A-Z])/g, '-$1').toLowerCase() + ':' + baseStyles[key];
-        }).join(';');
+        var modalContainer = getModalContainer(config);
+        if (!modalContainer) return;
 
-        // Create COD button
-        var codBtn = document.createElement('button');
-        codBtn.type = 'button';
-        codBtn.className = 'cod-buy-btn ' + getButtonAnimationClasses(config);
-        setButtonContent(codBtn, config.buttonText, config.buttonStyles);
-        codBtn.style.cssText = styleString;
-        codBtn.dataset.codOpen = productId;
-
-        // Inject marching-ants SVG if dashed-moving border effect is active
-        if (config.borderEffect === 'dashed-moving') {
-            codBtn.style.position = 'relative';
-            var svgNS = 'http://www.w3.org/2000/svg';
-            var svg = document.createElementNS(svgNS, 'svg');
-            svg.setAttribute('class', 'marching-ants-svg');
-            svg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;';
-            svg.setAttribute('preserveAspectRatio', 'none');
-            var rect = document.createElementNS(svgNS, 'rect');
-            rect.setAttribute('x', '1'); rect.setAttribute('y', '1');
-            // SVG attributes don't support calc(), use style for percentage sizing
-            rect.style.width = 'calc(100% - 2px)';
-            rect.style.height = 'calc(100% - 2px)';
-            var radius = config.borderRadius || 12;
-            rect.setAttribute('rx', String(radius)); rect.setAttribute('ry', String(radius));
-            svg.appendChild(rect);
-            codBtn.appendChild(svg);
-        }
-
-        // Only apply default hover if no custom effects defined
-        var hasCustomHover = config.hoverLift;
-        var hasCustomClick = config.clickPress || config.clickRipple;
-        var hasAnimation = config.animationPreset && config.animationPreset !== 'none';
-        var hasBorderEffect = config.borderEffect && config.borderEffect !== 'static';
-        
-        if (!hasCustomHover && !hasAnimation && !hasBorderEffect) {
-          codBtn.addEventListener('mouseenter', function() {
-            if (this.disabled) return;
-            this.style.opacity = '0.9';
-            this.style.transform = 'translateY(-1px)';
+        var modalOffers = modalContainer.querySelector('.cod-quantity-offers');
+        if (modalOffers) {
+          modalOffers.setAttribute('data-selected-offer', JSON.stringify(offer));
+          modalOffers.querySelectorAll('.cod-offer-card').forEach(function(modalCard) {
+            modalCard.classList.remove('selected');
           });
-          codBtn.addEventListener('mouseleave', function() {
-            if (this.disabled) return;
-            this.style.opacity = '1';
-            this.style.transform = 'translateY(0)';
-          });
+          var matchCard = modalOffers.querySelector('[data-quantity="' + offer.quantity + '"]');
+          if (matchCard) matchCard.classList.add('selected');
         }
 
-        // Click handler
-        codBtn.addEventListener('click', function(e) {
-          e.preventDefault();
-          e.stopPropagation();
-          openModal(productId, config);
-        });
+        var qtyInput = modalContainer.querySelector('.cod-qty-input');
+        if (qtyInput) {
+          qtyInput.value = offer.quantity;
+          qtyInput.dispatchEvent(new Event('change', { bubbles: true }));
+        }
 
-        // Insert COD button BEFORE the original button, then hide original
-        btn.parentNode.insertBefore(codBtn, btn);
-        btn.style.display = 'none';
-        btn.dataset.codReplaced = 'true';
-        if (!primaryCodBtn || (isInsideDynamicPaymentButton(primaryCodBtn) && !isInsideDynamicPaymentButton(codBtn))) {
-          primaryCodBtn = codBtn;
+        var form = modalContainer.querySelector('form');
+        if (form) {
+          updateOfferPrice(form, config, offer);
+          updateOrderSummaryWithOffer(form, config, offer);
         }
-        
-        // Track variant changes to disable/enable the COD button based on stock
-        setupVariantObserver(btn, codBtn, config);
-        
-        // In Product Page placement: render offers above the COD button on the product page
-        if (!document.querySelector('.cod-product-page-offers[data-product-id="' + productId + '"]')) {
-          var offersResult = renderQuantityOffersWithPlacement(codBtn.parentNode, config);
-          if (offersResult.element && offersResult.placement === 'in_product_page') {
-            offersResult.element.classList.add('cod-product-page-offers');
-            offersResult.element.setAttribute('data-product-id', productId);
-            codBtn.parentNode.insertBefore(offersResult.element, codBtn);
-            console.log('[COD Form] Rendered in_product_page offers above COD button');
-            
-            // Set default selected offer data so modal can read it on open
-            var defaultSelectedCard = offersResult.element.querySelector('.cod-offer-card.selected');
-            if (defaultSelectedCard) {
-              var defaultOffer = {
-                quantity: parseInt(defaultSelectedCard.getAttribute('data-quantity')),
-                discountPercent: parseFloat(defaultSelectedCard.getAttribute('data-discount')) || 0
-              };
-              offersResult.element.setAttribute('data-selected-offer', JSON.stringify(defaultOffer));
-              
-              // Auto-render variant selectors for preselected bundle offer on product page
-              if (defaultOffer.quantity > 1) {
-                renderBundleVariantSelectors(null, config, defaultOffer.quantity, offersResult.element);
-              }
-            }
-            
-            // Wire up click handlers to sync with modal
-            offersResult.element.querySelectorAll('.cod-offer-card').forEach(function(card) {
-              card.addEventListener('click', function() {
-                // Update visual selection on product page cards
-                offersResult.element.querySelectorAll('.cod-offer-card').forEach(function(c) {
-                  c.classList.remove('selected');
-                });
-                card.classList.add('selected');
-                
-                // Store selected offer on the product page offers container
-                var offer = {
-                  quantity: parseInt(card.getAttribute('data-quantity')),
-                  discountPercent: parseFloat(card.getAttribute('data-discount')) || 0
-                };
-                offersResult.element.setAttribute('data-selected-offer', JSON.stringify(offer));
-                
-                // Render variant selectors on the product page
-                renderBundleVariantSelectors(null, config, offer.quantity, offersResult.element);
-                
-                // Also sync to any modal offers container
-                var modalContainer = document.getElementById('cod-form-' + productId);
-                if (modalContainer) {
-                  var modalOffers = modalContainer.querySelector('.cod-quantity-offers');
-                  if (modalOffers) {
-                    modalOffers.setAttribute('data-selected-offer', JSON.stringify(offer));
-                    // Update visual selection in modal too
-                    modalOffers.querySelectorAll('.cod-offer-card').forEach(function(mc) {
-                      mc.classList.remove('selected');
-                    });
-                    var matchCard = modalOffers.querySelector('[data-quantity="' + offer.quantity + '"]');
-                    if (matchCard) matchCard.classList.add('selected');
-                  }
-                  // Update quantity input
-                  var qtyInput = modalContainer.querySelector('.cod-qty-input');
-                  if (qtyInput) {
-                    qtyInput.value = offer.quantity;
-                    qtyInput.dispatchEvent(new Event('change', { bubbles: true }));
-                  }
-                  // Update order summary
-                  var form = modalContainer.querySelector('form');
-                  if (form) {
-                    updateOfferPrice(form, config, offer);
-                    updateOrderSummaryWithOffer(form, config, offer);
-                  }
-                }
-              });
-            });
-          }
-        }
-        
       });
     });
-
-    // Hide Shopify payment buttons container
-    var paymentContainers = document.querySelectorAll('.shopify-payment-button, [data-shopify="payment-button"]');
-    paymentContainers.forEach(function(container) {
-      container.style.display = 'none';
-    });
-
-    // Create a single sticky button per product on mobile.
-    if (config.stickyOnMobile && primaryCodBtn && window.innerWidth <= 600) {
-      var stickyBtn = primaryCodBtn.cloneNode(true);
-      stickyBtn.classList.add('sticky-mobile');
-      stickyBtn.setAttribute('aria-hidden', 'true');
-      stickyBtn.style.setProperty('display', 'none', 'important');
-      stickyBtn._originalCodBtn = primaryCodBtn;
-      stickyBtn.addEventListener('click', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        openModal(productId, config);
-      });
-
-      document.body.appendChild(stickyBtn);
-
-      function isElementVisibleInViewport(element) {
-        if (!element || !element.isConnected) return false;
-
-        var computedStyle = window.getComputedStyle(element);
-        if (
-          computedStyle.display === 'none' ||
-          computedStyle.visibility === 'hidden' ||
-          parseFloat(computedStyle.opacity || '1') === 0
-        ) {
-          return false;
-        }
-
-        if (element.getClientRects().length === 0) {
-          return false;
-        }
-
-        var rect = element.getBoundingClientRect();
-        var viewportHeight = window.innerHeight || document.documentElement.clientHeight;
-        var viewportWidth = window.innerWidth || document.documentElement.clientWidth;
-
-        return rect.width > 0 &&
-          rect.height > 0 &&
-          rect.bottom > 0 &&
-          rect.right > 0 &&
-          rect.top < viewportHeight &&
-          rect.left < viewportWidth;
-      }
-
-      function getOriginalCodButtons() {
-        return Array.prototype.slice.call(
-          document.querySelectorAll('.cod-buy-btn[data-cod-open="' + productId + '"]:not(.sticky-mobile)')
-        );
-      }
-
-      function showStickyButton() {
-        stickyBtn.style.removeProperty('display');
-        stickyBtn.classList.add('visible');
-        stickyBtn.setAttribute('aria-hidden', 'false');
-      }
-
-      function hideStickyButton() {
-        stickyBtn.classList.remove('visible');
-        stickyBtn.style.setProperty('display', 'none', 'important');
-        stickyBtn.setAttribute('aria-hidden', 'true');
-      }
-
-      function updateStickyVisibility() {
-        if (stickyBtn.getAttribute('data-hidden-by-modal') === 'true') return;
-
-        var originalButtons = getOriginalCodButtons();
-        var hasVisibleOriginalButton = originalButtons.some(function(buttonEl) {
-          return isElementVisibleInViewport(buttonEl);
-        });
-
-        if (window.innerWidth > 600 || hasVisibleOriginalButton) {
-          hideStickyButton();
-          return;
-        }
-
-        showStickyButton();
-      }
-
-      window.addEventListener('scroll', updateStickyVisibility, { passive: true });
-      window.addEventListener('resize', updateStickyVisibility);
-      window.addEventListener('orientationchange', updateStickyVisibility);
-      window.addEventListener('load', updateStickyVisibility);
-
-      if (typeof IntersectionObserver === 'function') {
-        var stickyIntersectionObserver = new IntersectionObserver(function() {
-          updateStickyVisibility();
-        }, {
-          threshold: [0, 0.01, 0.99, 1]
-        });
-        getOriginalCodButtons().forEach(function(buttonEl) {
-          stickyIntersectionObserver.observe(buttonEl);
-        });
-      }
-
-      if (typeof ResizeObserver === 'function') {
-        var stickyResizeObserver = new ResizeObserver(function() {
-          updateStickyVisibility();
-        });
-        getOriginalCodButtons().forEach(function(buttonEl) {
-          stickyResizeObserver.observe(buttonEl);
-        });
-      }
-
-      stickyBtn._updateVisibility = updateStickyVisibility;
-      updateStickyVisibility();
-      requestAnimationFrame(updateStickyVisibility);
-    }
   }
 
   /**
@@ -1819,9 +1570,9 @@
    * Initialize form functionality and render fields
    */
   function initForm(productId, config) {
-    var container = document.getElementById('cod-form-' + productId);
-    var form = document.getElementById('cod-order-form-' + productId);
-    var fieldsContainer = form.querySelector('.cod-dynamic-fields-container');
+    var container = getModalContainer(config);
+    var form = getOrderFormElement(config);
+    var fieldsContainer = form ? form.querySelector('.cod-dynamic-fields-container') : null;
     
     if (!form || !container || !fieldsContainer) return;
 
@@ -1837,8 +1588,8 @@
         console.log('[COD Form] Quantity offers placement:', placement);
         
         if (placement === 'in_product_page') {
-            // Skip rendering inside modal - already rendered on product page via replaceBuyButtons
-            console.log('[COD Form] Skipping modal offers - in_product_page placement handled on product page');
+            // Skip rendering inside modal when the offer cards are mounted in the block root.
+            console.log('[COD Form] Skipping modal offers - in_product_page placement handled in block root');
         } else if (placement === 'above_button') {
             // Insert before submit button (after all other form elements like order summary)
             var submitBtn = form.querySelector('button[type="submit"]');
@@ -3041,7 +2792,9 @@ function darkenColor(hex, percent) {
    * Priority: bundle offer selection > quantity input > default 1
    */
   function getProductPageOffersForConfig(config) {
-      var all = document.querySelectorAll('.cod-product-page-offers');
+      var all = (config && config.rootElement)
+        ? config.rootElement.querySelectorAll('.cod-product-page-offers')
+        : document.querySelectorAll('.cod-product-page-offers');
       if (!all || !all.length) return null;
       if (!config || !config.productId) return all[0];
       var target = String(config.productId).replace('gid://shopify/Product/', '');
@@ -4124,14 +3877,16 @@ function darkenColor(hex, percent) {
    * Modal Event Listeners
    */
   function setupModalEvents(productId, config) {
-    var closeButtons = document.querySelectorAll('[data-cod-close="' + productId + '"]');
+    var closeButtons = (config && config.rootElement)
+      ? config.rootElement.querySelectorAll('[data-cod-close="' + config.blockId + '"]')
+      : document.querySelectorAll('[data-cod-close="' + productId + '"]');
     closeButtons.forEach(function(btn) {
       btn.addEventListener('click', function() {
         closeModal(productId, config);
       });
     });
 
-    var overlay = document.getElementById('cod-modal-overlay-' + productId);
+    var overlay = getModalOverlay(config);
     if (overlay) {
       overlay.addEventListener('click', function(e) {
         if (e.target === overlay) closeModal(productId, config);
@@ -4196,9 +3951,9 @@ function darkenColor(hex, percent) {
   }
 
   function openModal(productId, config) {
-    var modal = document.getElementById('cod-form-' + productId);
-    var overlay = document.getElementById('cod-modal-overlay-' + productId);
-    var form = document.getElementById('cod-order-form-' + productId);
+    var modal = getModalContainer(config);
+    var overlay = getModalOverlay(config);
+    var form = getOrderFormElement(config);
     var hasBundleOffersActive = !!getProductPageOffersForConfig(config);
     
     if (modal) {
@@ -4210,11 +3965,13 @@ function darkenColor(hex, percent) {
 
     // Hide sticky mobile button IMMEDIATELY while form is open
     // Must use display:none because sticky z-index (10000) is above modal z-index (9999)
-    document.querySelectorAll('.cod-buy-btn.sticky-mobile').forEach(function(btn) {
-        btn.classList.remove('visible');
-        btn.style.setProperty('display', 'none', 'important');
-        btn.setAttribute('data-hidden-by-modal', 'true');
-    });
+    if (config && config.rootElement) {
+        config.rootElement.querySelectorAll('.cod-buy-btn.sticky-mobile').forEach(function(btn) {
+            btn.classList.remove('visible');
+            btn.style.setProperty('display', 'none', 'important');
+            btn.setAttribute('data-hidden-by-modal', 'true');
+        });
+    }
 
     // ── Pixel Tracking: InitiateCheckout ──
     foxCodTrackEvent('InitiateCheckout', { currency: (FoxCod.currencyConfig && FoxCod.currencyConfig.code) || 'USD' });
@@ -4454,8 +4211,8 @@ function darkenColor(hex, percent) {
   }
 
   function closeModal(productId, config) {
-    var modal = document.getElementById('cod-form-' + productId);
-    var overlay = document.getElementById('cod-modal-overlay-' + productId);
+    var modal = getModalContainer(config);
+    var overlay = getModalOverlay(config);
 
     // Check for downsell campaigns before closing
     if (config && config.upsellOffers && config.upsellOffers.downsells && config.upsellOffers.downsells.length > 0) {
@@ -4482,7 +4239,7 @@ function darkenColor(hex, percent) {
                 document.body.style.overflow = '';
 
                 // Show downsell modal after a brief delay
-                var form = document.getElementById('cod-order-form-' + productId);
+                var form = getOrderFormElement(config);
                 setTimeout(function() {
                     showDownsellModal(form, config, productId, ds, [], function(acceptedItems) {
                         if (acceptedItems.length > 0) {
@@ -4607,7 +4364,7 @@ function darkenColor(hex, percent) {
 
     // Normal close (no downsell or threshold not reached)
     // Save form state BEFORE closing so it persists across reopen
-    var form = document.getElementById('cod-order-form-' + productId);
+    var form = getOrderFormElement(config);
     if (form) {
         saveFoxCodCheckoutState(form);
     }
@@ -4621,17 +4378,17 @@ function darkenColor(hex, percent) {
 
     // Re-show sticky mobile button that was hidden when modal opened
     // But ONLY if the original COD button is NOT visible in the viewport
-    document.querySelectorAll('.cod-buy-btn.sticky-mobile[data-hidden-by-modal="true"]').forEach(function(btn) {
-        btn.removeAttribute('data-hidden-by-modal');
-        btn.style.removeProperty('display');
-        // Use the stored updateVisibility function to properly re-evaluate position
-        if (typeof btn._updateVisibility === 'function') {
-            // Small delay to let scroll position settle after body overflow restore
-            setTimeout(function() {
-                btn._updateVisibility();
-            }, 50);
-        }
-    });
+    if (config && config.rootElement) {
+        config.rootElement.querySelectorAll('.cod-buy-btn.sticky-mobile[data-hidden-by-modal="true"]').forEach(function(btn) {
+            btn.removeAttribute('data-hidden-by-modal');
+            btn.style.removeProperty('display');
+            if (typeof btn._updateVisibility === 'function') {
+                setTimeout(function() {
+                    btn._updateVisibility();
+                }, 50);
+            }
+        });
+    }
   }
 
   // =============================================
@@ -5620,7 +5377,8 @@ function darkenColor(hex, percent) {
               closeModal(productId);
               
               // Reset the form
-              var f = document.getElementById('cod-form-' + productId).querySelector('form');
+              var modalContainerAfterSuccess = getModalContainer(config);
+              var f = modalContainerAfterSuccess ? modalContainerAfterSuccess.querySelector('form') : null;
               if (f) {
                   f.reset();
                   // Reset dynamic displays if any form fields were hidden

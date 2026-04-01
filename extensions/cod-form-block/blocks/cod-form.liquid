@@ -323,14 +323,14 @@
 </script>
 
 {% comment %} Modal Overlay {% endcomment %}
-<div class="cod-modal-overlay" id="cod-modal-overlay-{{ product.id }}" style="display: none;">
+<div class="cod-modal-overlay" id="cod-modal-overlay-{{ block.id }}" style="display: none;">
 
 <div class="cod-form-container cod-modal" 
-     id="cod-form-{{ product.id }}"
+     id="cod-form-{{ block.id }}"
      style="display: none;">
   
   {% comment %} Close Button {% endcomment %}
-  <button type="button" class="cod-close-btn" data-cod-close="{{ product.id }}">&times;</button>
+  <button type="button" class="cod-close-btn" data-cod-close="{{ block.id }}">&times;</button>
 
   {% comment %} Product Info {% endcomment %}
   {% if cod_show_product_image == 'true' or cod_show_price == 'true' %}
@@ -370,7 +370,7 @@
   </div>
 
   {% comment %} COD Form - Dynamic Content Rendered by JS {% endcomment %}
-  <form id="cod-order-form-{{ product.id }}" class="cod-order-form" novalidate>
+  <form id="cod-order-form-{{ block.id }}" class="cod-order-form" novalidate>
       <div class="cod-dynamic-fields-container">
           <!-- Fields will be injected here by cod-form.js -->
       </div>
@@ -1596,7 +1596,9 @@
   }
 </style>
 
-<script src="{{ 'cod-form.js' | asset_url }}" defer></script>
+{% unless content_for_header contains 'cod-form.js' %}
+  <script src="{{ 'cod-form.js' | asset_url }}" defer></script>
+{% endunless %}
 
 </div>
 
