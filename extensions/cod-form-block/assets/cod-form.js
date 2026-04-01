@@ -444,7 +444,7 @@
   function ensureStickyButton(productId, config) {
     if (!config || !config.rootElement || !config.triggerElement || isShopifyEditor) return;
 
-    if (!config.stickyOnMobile) {
+    if (!config.stickyOnMobile || window.innerWidth > 600) {
       if (config._stickyButton && config._stickyButton.parentNode) {
         config._stickyButton.parentNode.removeChild(config._stickyButton);
       }
@@ -637,6 +637,30 @@
           btn._updateVisibility();
         });
       }
+    });
+  }
+
+  function hideMainTriggerDuringModal(config) {
+    if (!config || !config.rootElement) return;
+
+    config.rootElement.querySelectorAll('.foxcod-block-trigger').forEach(function(btn) {
+      if (!btn || !btn.isConnected) return;
+      btn.setAttribute('data-hidden-by-modal', 'true');
+      btn.style.setProperty('visibility', 'hidden', 'important');
+      btn.style.setProperty('opacity', '0', 'important');
+      btn.style.setProperty('pointer-events', 'none', 'important');
+    });
+  }
+
+  function restoreMainTriggerAfterModal(config) {
+    if (!config || !config.rootElement) return;
+
+    config.rootElement.querySelectorAll('.foxcod-block-trigger').forEach(function(btn) {
+      if (!btn || !btn.isConnected) return;
+      btn.removeAttribute('data-hidden-by-modal');
+      btn.style.removeProperty('visibility');
+      btn.style.removeProperty('opacity');
+      btn.style.removeProperty('pointer-events');
     });
   }
 
@@ -4421,6 +4445,8 @@ function darkenColor(hex, percent) {
         config._foxcodModalHistoryActive = true;
     }
 
+    hideMainTriggerDuringModal(config);
+
     // Hide sticky mobile button IMMEDIATELY while form is open
     // Must use display:none because sticky z-index (10000) is above modal z-index (9999)
     if (config && config.rootElement) {
@@ -4848,6 +4874,7 @@ function darkenColor(hex, percent) {
     }
 
     // Re-evaluate sticky button visibility after closing the modal.
+    restoreMainTriggerAfterModal(config);
     restoreStickyButtonsAfterModal(config);
   }
 

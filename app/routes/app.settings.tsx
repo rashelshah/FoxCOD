@@ -972,11 +972,11 @@ const PreviewDisplay = memo(({
             address: <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>,
             notes: <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14,2 14,8 20,8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10,9 9,9 8,9" /></svg>,
             quantity: <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><line x1="9" y1="9" x2="15" y2="15" /><line x1="15" y1="9" x2="9" y2="15" /></svg>,
-            zip: <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>,
+            zip: <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="9" x2="20" y2="9" /><line x1="4" y1="15" x2="20" y2="15" /><line x1="10" y1="3" x2="8" y2="21" /><line x1="16" y1="3" x2="14" y2="21" /></svg>,
             state: <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>,
             city: <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>,
             marketing: <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg>,
-            hash: <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>,
+            hash: <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="9" x2="20" y2="9" /><line x1="4" y1="15" x2="20" y2="15" /><line x1="10" y1="3" x2="8" y2="21" /><line x1="16" y1="3" x2="14" y2="21" /></svg>,
             user: <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>,
             text: <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 7 4 4 20 4 20 7" /><line x1="9" y1="20" x2="15" y2="20" /><line x1="12" y1="4" x2="12" y2="20" /></svg>,
             list: <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg>,
@@ -1316,7 +1316,7 @@ const PreviewDisplay = memo(({
                                                     }}>
                                                         {/* Icon pill */}
                                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '30px', height: '30px', borderRadius: '7px', color: (formStyles as any)?.iconColor || '#6b7280', backgroundColor: `${formThemeColor}14` }}>
-                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2" /><line x1="2" y1="10" x2="22" y2="10" /></svg>
                                                         </div>
                                                         {/* Center: label + description */}
                                                         <div style={{ flex: 1, minWidth: 0 }}>
@@ -1337,7 +1337,7 @@ const PreviewDisplay = memo(({
                                                     }}>
                                                         {/* Icon pill */}
                                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '30px', height: '30px', borderRadius: '7px', color: (formStyles as any)?.iconColor || '#6b7280', backgroundColor: `${formThemeColor}14` }}>
-                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/></svg>
+                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2" /><line x1="2" y1="10" x2="22" y2="10" /><line x1="6" y1="15" x2="10" y2="15" /></svg>
                                                         </div>
                                                         {/* Center: label + description */}
                                                         <div style={{ flex: 1, minWidth: 0 }}>
@@ -2058,7 +2058,7 @@ export default function SettingsPage() {
     const DropdownIcon = ({ iconType }: { iconType: string }) => {
         const s: React.CSSProperties = { width: 18, height: 18, color: '#6b7280' };
         if (iconType === 'user') return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>;
-        if (iconType === 'hash') return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>;
+        if (iconType === 'hash') return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="9" x2="20" y2="9" /><line x1="4" y1="15" x2="20" y2="15" /><line x1="10" y1="3" x2="8" y2="21" /><line x1="16" y1="3" x2="14" y2="21" /></svg>;
         if (iconType === 'phone') return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" /></svg>;
         if (iconType === 'email') return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg>;
         if (iconType === 'list') return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg>;
@@ -3809,10 +3809,10 @@ export default function SettingsPage() {
                                                     <Popover
                                                         active={btnIconPopoverActive}
                                                         activator={
-                                                            <button 
-                                                                type="button" 
-                                                                className="style-option" 
-                                                                style={{ width: '100%', justifyContent: 'space-between', display: 'flex', alignItems: 'center', background: '#fff' }} 
+                                                            <button
+                                                                type="button"
+                                                                className="style-option"
+                                                                style={{ width: '100%', justifyContent: 'space-between', display: 'flex', alignItems: 'center', background: '#fff' }}
                                                                 onClick={() => setBtnIconPopoverActive(!btnIconPopoverActive)}
                                                             >
                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -3829,10 +3829,10 @@ export default function SettingsPage() {
                                                         <ActionList
                                                             actionRole="menuitem"
                                                             items={[
-                                                                { 
-                                                                    content: 'None', 
-                                                                    icon: () => <svg style={{ width: 18, height: 18, color: '#6b7280', margin: '0 8px' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" /></svg>, 
-                                                                    onAction: () => { setButtonStylesState(s => ({ ...s, iconType: 'none' })); setBtnIconPopoverActive(false); } 
+                                                                {
+                                                                    content: 'None',
+                                                                    icon: () => <svg style={{ width: 18, height: 18, color: '#6b7280', margin: '0 8px' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" /></svg>,
+                                                                    onAction: () => { setButtonStylesState(s => ({ ...s, iconType: 'none' })); setBtnIconPopoverActive(false); }
                                                                 },
                                                                 { content: 'Cart', icon: () => <div style={{ margin: '0 8px' }}><ButtonIconSvg iconType="cart" color="#6b7280" /></div>, onAction: () => { setButtonStylesState(s => ({ ...s, iconType: 'cart' })); setBtnIconPopoverActive(false); } },
                                                                 { content: 'Bag', icon: () => <div style={{ margin: '0 8px' }}><ButtonIconSvg iconType="bag" color="#6b7280" /></div>, onAction: () => { setButtonStylesState(s => ({ ...s, iconType: 'bag' })); setBtnIconPopoverActive(false); } },
@@ -4256,24 +4256,24 @@ export default function SettingsPage() {
                                         {(() => {
                                             // Preset data — keys, names, colors, categories (UI only, no logic change)
                                             const presetList = [
-                                                { key: 'custom',       name: 'Custom',        bg: '#f9fafb', fieldBg: '#ffffff',  btnColor: '#6b7280', category: 'all' },
-                                                { key: 'default',      name: 'Default',       bg: '#ECFDF5', fieldBg: '#FFFFFF',  btnColor: '#16A34A', category: 'green' },
-                                                { key: 'modern_slate', name: 'Modern Coral',  bg: '#fff7ed', fieldBg: '#fff7ed',  btnColor: '#ea580c', category: 'clean' },
-                                                { key: 'dark_mode',    name: 'Dark Mode',     bg: '#1f2a3a', fieldBg: '#0f172a',  btnColor: '#6366f1', category: 'dark' },
-                                                { key: 'eastern_gold', name: 'Eastern Gold',  bg: '#fffbeb', fieldBg: '#fef9c3',  btnColor: '#b45309', category: 'clean' },
-                                                { key: 'arctic_blue',  name: 'Arctic Blue',   bg: '#ecfeff', fieldBg: '#ecfeff',  btnColor: '#0891b2', category: 'ocean' },
-                                                { key: 'rose_garden',  name: 'Rose Garden',   bg: '#fff1f2', fieldBg: '#fff1f2',  btnColor: '#e11d48', category: 'clean' },
-                                                { key: 'forest_green', name: 'Forest Green',  bg: '#f0fdf4', fieldBg: '#f0fdf4',  btnColor: '#16a34a', category: 'green' },
-                                                { key: 'professional', name: 'Professional',  bg: '#f9fafb', fieldBg: '#ffffff',  btnColor: '#374151', category: 'clean' },
-                                                { key: 'minimal_white',name: 'Minimal',       bg: '#ffffff', fieldBg: '#ffffff',  btnColor: '#111827', category: 'clean' },
-                                                { key: 'luxury_gold',  name: 'Luxury Gold',   bg: '#18181b', fieldBg: '#27272a',  btnColor: '#d97706', category: 'dark' },
-                                                { key: 'ocean_breeze', name: 'Ocean',         bg: '#f0fdfa', fieldBg: '#f0fdfa',  btnColor: '#14b8a6', category: 'ocean' },
-                                                { key: 'royal_indigo', name: 'Royal Indigo',  bg: '#1e1b4b', fieldBg: '#1e1b4b',  btnColor: '#6366f1', category: 'dark' },
-                                                { key: 'emerald_night',name: 'Emerald Night', bg: '#022c22', fieldBg: '#022c22',  btnColor: '#10b981', category: 'dark' },
+                                                { key: 'custom', name: 'Custom', bg: '#f9fafb', fieldBg: '#ffffff', btnColor: '#6b7280', category: 'all' },
+                                                { key: 'default', name: 'Default', bg: '#ECFDF5', fieldBg: '#FFFFFF', btnColor: '#16A34A', category: 'green' },
+                                                { key: 'modern_slate', name: 'Modern Coral', bg: '#fff7ed', fieldBg: '#fff7ed', btnColor: '#ea580c', category: 'clean' },
+                                                { key: 'dark_mode', name: 'Dark Mode', bg: '#1f2a3a', fieldBg: '#0f172a', btnColor: '#6366f1', category: 'dark' },
+                                                { key: 'eastern_gold', name: 'Eastern Gold', bg: '#fffbeb', fieldBg: '#fef9c3', btnColor: '#b45309', category: 'clean' },
+                                                { key: 'arctic_blue', name: 'Arctic Blue', bg: '#ecfeff', fieldBg: '#ecfeff', btnColor: '#0891b2', category: 'ocean' },
+                                                { key: 'rose_garden', name: 'Rose Garden', bg: '#fff1f2', fieldBg: '#fff1f2', btnColor: '#e11d48', category: 'clean' },
+                                                { key: 'forest_green', name: 'Forest Green', bg: '#f0fdf4', fieldBg: '#f0fdf4', btnColor: '#16a34a', category: 'green' },
+                                                { key: 'professional', name: 'Professional', bg: '#f9fafb', fieldBg: '#ffffff', btnColor: '#374151', category: 'clean' },
+                                                { key: 'minimal_white', name: 'Minimal', bg: '#ffffff', fieldBg: '#ffffff', btnColor: '#111827', category: 'clean' },
+                                                { key: 'luxury_gold', name: 'Luxury Gold', bg: '#18181b', fieldBg: '#27272a', btnColor: '#d97706', category: 'dark' },
+                                                { key: 'ocean_breeze', name: 'Ocean', bg: '#f0fdfa', fieldBg: '#f0fdfa', btnColor: '#14b8a6', category: 'ocean' },
+                                                { key: 'royal_indigo', name: 'Royal Indigo', bg: '#1e1b4b', fieldBg: '#1e1b4b', btnColor: '#6366f1', category: 'dark' },
+                                                { key: 'emerald_night', name: 'Emerald Night', bg: '#022c22', fieldBg: '#022c22', btnColor: '#10b981', category: 'dark' },
                                             ];
 
                                             const presetMap: Record<string, any> = {
-                                                default: { styles: { themeKey: 'default', textColor: '#333333', textSize: 14, fontStyle: 'normal' as const, borderColor: '#E5E7EB', borderWidth: 1, background: 'linear-gradient(135deg, #D1FAE5 0%, #ECFDF5 40%, #FFFFFF 100%)', backgroundColor: '#ffffff', labelAlignment: 'left' as const, iconColor: '#6b7280', iconBackground: '#F0FDF4', borderRadius: 5, shadow: true, fieldBackgroundColor: '#FFFFFF', labelColor: '#065F46', labelFontSize: 14, priceColor: '#065F46' }, buttonColor: '#16A34A' },
+                                                default: { styles: { themeKey: 'default', textColor: '#333333', textSize: 14, fontStyle: 'normal' as const, borderColor: '#065F46', borderWidth: 1, background: 'linear-gradient(135deg, #D1FAE5 0%, #ECFDF5 40%, #FFFFFF 100%)', backgroundColor: '#ffffff', labelAlignment: 'left' as const, iconColor: '#6b7280', iconBackground: '#F0FDF4', borderRadius: 5, shadow: true, fieldBackgroundColor: '#FFFFFF', labelColor: '#065F46', labelFontSize: 14, priceColor: '#065F46' }, buttonColor: '#16A34A' },
                                                 modern_slate: { styles: { themeKey: 'modern_slate', textColor: '#1e293b', textSize: 14, fontStyle: 'normal' as const, borderColor: '#f97316', borderWidth: 2, backgroundColor: '#fff7ed', labelAlignment: 'left' as const, iconColor: '#ea580c', iconBackground: '#fed7aa', borderRadius: 16, shadow: true, fieldBackgroundColor: '#fff7ed', labelColor: '#9a3412', labelFontSize: 14, priceColor: '#ea580c' }, buttonColor: '#ea580c' },
                                                 dark_mode: { styles: { themeKey: 'dark_mode', textColor: '#f8fafc', textSize: 14, fontStyle: 'normal' as const, borderColor: '#475569', borderWidth: 1, backgroundColor: '#1f2a3a', labelAlignment: 'left' as const, iconColor: '#cbd5f5', iconBackground: '#1f2a3a', borderRadius: 12, shadow: true, fieldBackgroundColor: '#0f172a', labelColor: '#f8fafc', labelFontSize: 14, priceColor: '#f8fafc' }, buttonColor: '#6366f1' },
                                                 eastern_gold: { styles: { themeKey: 'eastern_gold', textColor: '#78350f', textSize: 14, fontStyle: 'normal' as const, borderColor: '#d4a574', borderWidth: 1, backgroundColor: '#fffbeb', labelAlignment: 'left' as const, iconColor: '#b45309', iconBackground: '#fef3c7', borderRadius: 10, shadow: true, fieldBackgroundColor: '#fef9c3', labelColor: '#713f12', labelFontSize: 14, priceColor: '#b45309' }, buttonColor: '#b45309' },
@@ -4292,9 +4292,9 @@ export default function SettingsPage() {
                                             const activeCategory: string = (formStyles as any)._cat || 'all';
 
                                             const categories = [
-                                                { key: 'all',   label: 'All' },
+                                                { key: 'all', label: 'All' },
                                                 { key: 'clean', label: 'Clean' },
-                                                { key: 'dark',  label: 'Dark' },
+                                                { key: 'dark', label: 'Dark' },
                                                 { key: 'ocean', label: 'Ocean' },
                                                 { key: 'green', label: 'Green' },
                                             ];
