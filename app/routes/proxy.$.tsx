@@ -286,11 +286,13 @@ async function handlePartialCodCheckout(request: Request, data: any) {
 
 // Handle Regular COD Order
 async function handleRegularOrder(request: Request, data: any) {
+    const normalizedProductId = data.productId || data.variantId || "";
+
     // Validate required fields
-    if (!data.shop || !data.productId || !data.variantId) {
+    if (!data.shop || !data.variantId) {
         return new Response(JSON.stringify({
             success: false,
-            error: "Missing required fields: shop, productId, variantId"
+            error: "Missing required fields: shop, variantId"
         }), {
             status: 400,
             headers: corsHeaders
@@ -425,7 +427,7 @@ async function handleRegularOrder(request: Request, data: any) {
         city: data.customerCity || '',
         state: data.customerState || '',
         pincode: data.customerZipcode || '',
-        product_id: data.productId,
+        product_id: normalizedProductId,
         product_title: data.productTitle || 'Product',
         variant_id: data.variantId || '',
         quantity: parseInt(data.quantity) || 1,

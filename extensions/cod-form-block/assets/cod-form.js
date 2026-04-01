@@ -417,6 +417,28 @@
     }
   }
 
+  function hideNativeBuyButtons(root) {
+    if (!root || !root.closest) return;
+
+    var productSection = root.closest('section, product-info, .product, .product__info');
+    if (!productSection) return;
+
+    var selectors = [
+      'form[action*="/cart/add"]',
+      '.product-form',
+      '.shopify-payment-button',
+      'button[name="add"]',
+      'button[type="submit"]'
+    ];
+
+    selectors.forEach(function(selector) {
+      productSection.querySelectorAll(selector).forEach(function(element) {
+        if (element.closest('[data-fox-cod-root]')) return;
+        element.style.display = 'none';
+      });
+    });
+  }
+
   function mountBlockRoot(productId, config, state) {
     if (!config || !config.triggerElement) return;
 
@@ -452,9 +474,6 @@
 
   function hydratePublicSettings(config) {
     if (!config || !config.shop) return;
-
-    setBlockStatus(config, 'Loading checkout options...', 'info');
-    mountBlockRoot(config.productId, config, { loading: true, buttonText: 'Loading COD...' });
 
     requestProxyJson(config, '/api/settings?shop=' + encodeURIComponent(config.shop))
       .then(function(result) {
@@ -497,9 +516,12 @@
       var trigger = rootElement.querySelector('[data-foxcod-trigger]');
       if (!trigger) return;
 
-      trigger.textContent = 'Buy with COD';
+      var dataContainer = rootElement.querySelector('.cod-form-data');
+      var initialButtonText = (dataContainer && dataContainer.dataset.buttonText) || trigger.textContent || 'Buy with COD';
+      trigger.textContent = initialButtonText;
       trigger.disabled = false;
       trigger.setAttribute('aria-busy', 'false');
+      hideNativeBuyButtons(rootElement);
 
       if (isShopifyEditor) {
         return;
@@ -5190,7 +5212,7 @@ function darkenColor(hex, percent) {
           customerZipcode: normalizedCustomer.zipcode || formData.get('zip') || formData.get('zipcode') || '',
           notes: formData.get('notes') || '',
           productId: config.productId,
-          variantId: config.variantId,
+          variantId: config.variantId || ((config.rootElement && config.rootElement.querySelector('.cod-form-data')) || {}).dataset?.variantId || '',
           quantity: parseInt(formData.get('quantity') || ((form.closest('.cod-form-container') || form.parentElement).querySelector('.cod-product-qty .cod-qty-input') || {}).value || '1'),
           price: parseFloat(config.productPrice),
           productTitle: config.productTitle,

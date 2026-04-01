@@ -34,7 +34,7 @@ interface OrderRequestBody {
     customerCity?: string;
     customerZipcode?: string;
     customerCountry?: string;
-    productId: string;
+    productId?: string;
     variantId: string;
     quantity: number;
     price: number;
@@ -207,8 +207,8 @@ function validateOrderInput(body: OrderRequestBody, formSettings: any, customer:
     }
 
     // Validate product/variant IDs
-    if (!body.productId || !body.variantId) {
-        return "Product and variant are required";
+    if (!body.variantId) {
+        return "Variant is required";
     }
 
     if (!body.productTitle) {
@@ -253,6 +253,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         // Parse request body
         const body: OrderRequestBody = await request.json();
         const customer = normalizeCustomerFields(body);
+        const normalizedProductId = body.productId || body.variantId;
 
         console.log("[COD Order] Received order request:", body.shop, body.productTitle, "qty:", body.quantity, "discount:", body.discountPercent, "finalTotal:", body.finalTotal);
 
@@ -367,7 +368,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             customer_phone: customer.phone,
             customer_address: customer.address,
             customer_email: customer.email || undefined,
-            product_id: body.productId,
+            product_id: normalizedProductId,
             product_title: body.productTitle,
             variant_id: body.variantId,
             quantity: body.quantity,
