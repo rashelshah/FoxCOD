@@ -167,8 +167,8 @@
 
 <div id="fox-cod-root-{{ block.id }}" class="foxcod-block-root" data-fox-cod-root data-product-id="{{ product.id }}" {{ block.shopify_attributes }}>
   <div class="foxcod-block-shell" data-foxcod-shell>
-    <button type="button" class="foxcod-block-trigger" data-foxcod-trigger aria-busy="true">
-      Loading COD...
+    <button type="button" class="foxcod-block-trigger" data-foxcod-trigger aria-busy="false">
+      {{ cod_button_text | default: 'Buy with COD' }}
     </button>
     <p class="foxcod-block-status" data-foxcod-status hidden></p>
   </div>

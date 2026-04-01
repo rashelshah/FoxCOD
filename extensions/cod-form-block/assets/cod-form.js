@@ -12,6 +12,15 @@
   window.FoxCod = window.FoxCod || {};
   window.FoxCod.pixelTracking = window.FoxCod.pixelTracking || {};
 
+  var isShopifyEditor = !!(
+    window.Shopify &&
+    (window.Shopify.designMode || window.Shopify.visualPreviewMode)
+  );
+
+  if (isShopifyEditor) {
+    console.log('FoxCOD: Running in Theme Editor (safe mode)');
+  }
+
   // =============================================
   // CENTRAL CURRENCY CONFIGURATION
   // =============================================
@@ -187,30 +196,43 @@
   // =============================================
   // Load pixel scripts on page load
   // =============================================
-  if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', loadPixelScripts);
-  } else {
-      loadPixelScripts();
+  if (!isShopifyEditor) {
+      if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', loadPixelScripts);
+      } else {
+          loadPixelScripts();
+      }
   }
 
   // =============================================
   // Track ViewContent on page load
   // =============================================
-  setTimeout(function() {
-      var pixels = (window.FoxCod && window.FoxCod.pixelTracking) || {};
-      if (pixels.facebook && pixels.facebook.track_view_content ||
-          pixels.google && pixels.google.track_view_content ||
-          pixels.kwai && pixels.kwai.track_view_content ||
-          (pixels.snapchat || pixels.snap || {}).track_view_content) {
-          foxCodTrackEvent('ViewContent', {});
-      }
-  }, 1000);
+  if (!isShopifyEditor) {
+      setTimeout(function() {
+          var pixels = (window.FoxCod && window.FoxCod.pixelTracking) || {};
+          if (pixels.facebook && pixels.facebook.track_view_content ||
+              pixels.google && pixels.google.track_view_content ||
+              pixels.kwai && pixels.kwai.track_view_content ||
+              (pixels.snapchat || pixels.snap || {}).track_view_content) {
+              foxCodTrackEvent('ViewContent', {});
+          }
+      }, 1000);
+  }
 
-  // Wait for DOM to be ready
+  function scheduleFoxCodBoot() {
+    waitForStableDOM();
+  }
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initFoxCod);
+    document.addEventListener('DOMContentLoaded', scheduleFoxCodBoot);
   } else {
-    initFoxCod();
+    scheduleFoxCodBoot();
+  }
+
+  if (isShopifyEditor) {
+    document.addEventListener('shopify:section:load', scheduleFoxCodBoot);
+    document.addEventListener('shopify:section:select', scheduleFoxCodBoot);
+    document.addEventListener('shopify:block:select', scheduleFoxCodBoot);
   }
 
   // Clear checkout state on page load/refresh so form starts fresh
@@ -381,6 +403,20 @@
     });
   }
 
+  function ensureValidationStyles() {
+    if (!document.getElementById('foxcod-validation-css')) {
+      var valStyle = document.createElement('style');
+      valStyle.id = 'foxcod-validation-css';
+      valStyle.textContent = [
+        '.foxcod-error{border:2px solid #d82c0d!important;background-color:#fff5f5!important;transition:border 0.2s ease,background-color 0.2s ease}',
+        '@keyframes foxcodShake{0%{transform:translateX(0)}15%{transform:translateX(-6px)}30%{transform:translateX(6px)}45%{transform:translateX(-5px)}60%{transform:translateX(5px)}75%{transform:translateX(-3px)}90%{transform:translateX(3px)}100%{transform:translateX(0)}}',
+        '.foxcod-shake{animation:foxcodShake 0.4s ease!important}',
+        '.foxcod-error-text{color:#d82c0d;font-size:13px;margin-top:4px;font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}'
+      ].join('');
+      document.head.appendChild(valStyle);
+    }
+  }
+
   function mountBlockRoot(productId, config, state) {
     if (!config || !config.triggerElement) return;
 
@@ -396,6 +432,11 @@
     trigger.setAttribute('aria-busy', isLoading ? 'true' : 'false');
     trigger.style.width = '100%';
     trigger.style.margin = '0';
+
+    if (isShopifyEditor) {
+      applySubmitButtonStyles(trigger, config);
+      return;
+    }
 
     if (!trigger.dataset.foxcodBound) {
       trigger.addEventListener('click', function(e) {
@@ -433,40 +474,65 @@
       });
   }
 
-  /**
-   * Initialize all COD forms on the page
-   */
-  function initFoxCod() {
-    // Inject form validation CSS once
-    if (!document.getElementById('foxcod-validation-css')) {
-      var valStyle = document.createElement('style');
-      valStyle.id = 'foxcod-validation-css';
-      valStyle.textContent = [
-        '.foxcod-error{border:2px solid #d82c0d!important;background-color:#fff5f5!important;transition:border 0.2s ease,background-color 0.2s ease}',
-        '@keyframes foxcodShake{0%{transform:translateX(0)}15%{transform:translateX(-6px)}30%{transform:translateX(6px)}45%{transform:translateX(-5px)}60%{transform:translateX(5px)}75%{transform:translateX(-3px)}90%{transform:translateX(3px)}100%{transform:translateX(0)}}',
-        '.foxcod-shake{animation:foxcodShake 0.4s ease!important}',
-        '.foxcod-error-text{color:#d82c0d;font-size:13px;margin-top:4px;font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}'
-      ].join('');
-      document.head.appendChild(valStyle);
-    }
+  function initFoxCodSafe() {
+    ensureValidationStyles();
 
     var roots = document.querySelectorAll('[data-fox-cod-root]');
 
-    if (roots.length === 0) {
-      console.log('[COD Form] No Fox COD roots found on page');
-      return;
+    if (!roots.length) {
+      console.warn('FoxCOD: No roots found');
+      return false;
     }
 
+    var hasStableRoot = false;
+
     roots.forEach(function(rootElement) {
-      var trigger = rootElement.querySelector('[data-foxcod-trigger]');
-      if (!trigger) {
-        console.warn('FoxCOD: trigger not found');
+      if (!rootElement.isConnected) {
+        console.warn('FoxCOD: Root not attached yet');
         return;
       }
 
+      hasStableRoot = true;
+
+      var trigger = rootElement.querySelector('[data-foxcod-trigger]');
+      if (!trigger) return;
+
       trigger.textContent = 'Buy with COD';
       trigger.disabled = false;
+      trigger.setAttribute('aria-busy', 'false');
 
+      if (isShopifyEditor) {
+        return;
+      }
+
+      initFoxCod(rootElement, trigger);
+    });
+
+    return hasStableRoot;
+  }
+
+  function waitForStableDOM(retries) {
+    var remainingRetries = typeof retries === 'number' ? retries : 10;
+    var roots = document.querySelectorAll('[data-fox-cod-root]');
+
+    if (roots.length > 0 && initFoxCodSafe()) {
+      return;
+    }
+
+    if (remainingRetries > 0) {
+      setTimeout(function() {
+        waitForStableDOM(remainingRetries - 1);
+      }, 300);
+      return;
+    }
+
+    console.warn('FoxCOD: DOM never stabilized');
+  }
+
+  /**
+   * Initialize a single Fox COD root after the DOM is stable.
+   */
+  function initFoxCod(rootElement, trigger) {
       var dataContainer = rootElement.querySelector('.cod-form-data');
       if (!dataContainer) {
         console.warn('[COD Form] Missing cod-form-data inside root');
@@ -594,7 +660,7 @@
       // Initialize form immediately
       initializeProduct(productId, config);
       hydratePublicSettings(config);
-    });
+  }
   }
 
   /**
@@ -3951,6 +4017,11 @@ function darkenColor(hex, percent) {
   }
 
   function openModal(productId, config) {
+    if (isShopifyEditor) {
+        console.log('FoxCOD: Skipping modal open in Theme Editor safe mode');
+        return;
+    }
+
     var modal = getModalContainer(config);
     var overlay = getModalOverlay(config);
     var form = getOrderFormElement(config);
