@@ -22,5 +22,5 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     console.error(`Error marking shop uninstalled in Supabase:`, error);
   }
 
-  return new Response();
+  return new Response(null, { status: 200 });
 };
