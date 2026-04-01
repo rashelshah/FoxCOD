@@ -507,6 +507,15 @@
     ];
 
     var buttonsFound = false;
+    var primaryCodBtn = null;
+
+    function isInsideDynamicPaymentButton(element) {
+      return !!(element && element.closest('.shopify-payment-button, [data-shopify="payment-button"]'));
+    }
+
+    document.querySelectorAll('.cod-buy-btn.sticky-mobile[data-cod-open="' + productId + '"]').forEach(function(existingStickyBtn) {
+      existingStickyBtn.remove();
+    });
 
     buttonSelectors.forEach(function(selector) {
       var buttons = document.querySelectorAll(selector);
@@ -637,6 +646,9 @@
         btn.parentNode.insertBefore(codBtn, btn);
         btn.style.display = 'none';
         btn.dataset.codReplaced = 'true';
+        if (!primaryCodBtn || (isInsideDynamicPaymentButton(primaryCodBtn) && !isInsideDynamicPaymentButton(codBtn))) {
+          primaryCodBtn = codBtn;
+        }
         
         // Track variant changes to disable/enable the COD button based on stock
         setupVariantObserver(btn, codBtn, config);
@@ -715,46 +727,6 @@
           }
         }
         
-        // Create sticky button clone for mobile (separate button)
-        if (config.stickyOnMobile && window.innerWidth <= 600) {
-          var stickyBtn = codBtn.cloneNode(true);
-          stickyBtn.classList.add('sticky-mobile');
-          // Store reference to original button so closeModal can check its position
-          stickyBtn._originalCodBtn = codBtn;
-          stickyBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            openModal(productId, config);
-          });
-          
-          // Append to body
-          document.body.appendChild(stickyBtn);
-          
-          // Helper: check if original button is visible and toggle sticky
-          function updateStickyVisibility() {
-            // Don't update if hidden by modal
-            if (stickyBtn.getAttribute('data-hidden-by-modal') === 'true') return;
-            var rect = codBtn.getBoundingClientRect();
-            var viewportHeight = window.innerHeight || document.documentElement.clientHeight;
-            if (rect.bottom < 0) {
-              // Original button is above viewport (user scrolled past it) - show sticky
-              stickyBtn.classList.add('visible');
-            } else if (rect.top < viewportHeight && rect.bottom > 0) {
-              // Original button is visible in viewport - hide sticky
-              stickyBtn.classList.remove('visible');
-            } else {
-              // Original button is below viewport (hasn't reached it yet) - hide sticky
-              stickyBtn.classList.remove('visible');
-            }
-          }
-          
-          // Use scroll listener for reliable visibility checks
-          window.addEventListener('scroll', updateStickyVisibility, { passive: true });
-          // Also store the update function on the sticky btn for closeModal to call
-          stickyBtn._updateVisibility = updateStickyVisibility;
-          // Initial check
-          updateStickyVisibility();
-        }
       });
     });
 
@@ -763,6 +735,113 @@
     paymentContainers.forEach(function(container) {
       container.style.display = 'none';
     });
+
+    // Create a single sticky button per product on mobile.
+    if (config.stickyOnMobile && primaryCodBtn && window.innerWidth <= 600) {
+      var stickyBtn = primaryCodBtn.cloneNode(true);
+      stickyBtn.classList.add('sticky-mobile');
+      stickyBtn.setAttribute('aria-hidden', 'true');
+      stickyBtn.style.setProperty('display', 'none', 'important');
+      stickyBtn._originalCodBtn = primaryCodBtn;
+      stickyBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        openModal(productId, config);
+      });
+
+      document.body.appendChild(stickyBtn);
+
+      function isElementVisibleInViewport(element) {
+        if (!element || !element.isConnected) return false;
+
+        var computedStyle = window.getComputedStyle(element);
+        if (
+          computedStyle.display === 'none' ||
+          computedStyle.visibility === 'hidden' ||
+          parseFloat(computedStyle.opacity || '1') === 0
+        ) {
+          return false;
+        }
+
+        if (element.getClientRects().length === 0) {
+          return false;
+        }
+
+        var rect = element.getBoundingClientRect();
+        var viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+        var viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+
+        return rect.width > 0 &&
+          rect.height > 0 &&
+          rect.bottom > 0 &&
+          rect.right > 0 &&
+          rect.top < viewportHeight &&
+          rect.left < viewportWidth;
+      }
+
+      function getOriginalCodButtons() {
+        return Array.prototype.slice.call(
+          document.querySelectorAll('.cod-buy-btn[data-cod-open="' + productId + '"]:not(.sticky-mobile)')
+        );
+      }
+
+      function showStickyButton() {
+        stickyBtn.style.removeProperty('display');
+        stickyBtn.classList.add('visible');
+        stickyBtn.setAttribute('aria-hidden', 'false');
+      }
+
+      function hideStickyButton() {
+        stickyBtn.classList.remove('visible');
+        stickyBtn.style.setProperty('display', 'none', 'important');
+        stickyBtn.setAttribute('aria-hidden', 'true');
+      }
+
+      function updateStickyVisibility() {
+        if (stickyBtn.getAttribute('data-hidden-by-modal') === 'true') return;
+
+        var originalButtons = getOriginalCodButtons();
+        var hasVisibleOriginalButton = originalButtons.some(function(buttonEl) {
+          return isElementVisibleInViewport(buttonEl);
+        });
+
+        if (window.innerWidth > 600 || hasVisibleOriginalButton) {
+          hideStickyButton();
+          return;
+        }
+
+        showStickyButton();
+      }
+
+      window.addEventListener('scroll', updateStickyVisibility, { passive: true });
+      window.addEventListener('resize', updateStickyVisibility);
+      window.addEventListener('orientationchange', updateStickyVisibility);
+      window.addEventListener('load', updateStickyVisibility);
+
+      if (typeof IntersectionObserver === 'function') {
+        var stickyIntersectionObserver = new IntersectionObserver(function() {
+          updateStickyVisibility();
+        }, {
+          threshold: [0, 0.01, 0.99, 1]
+        });
+        getOriginalCodButtons().forEach(function(buttonEl) {
+          stickyIntersectionObserver.observe(buttonEl);
+        });
+      }
+
+      if (typeof ResizeObserver === 'function') {
+        var stickyResizeObserver = new ResizeObserver(function() {
+          updateStickyVisibility();
+        });
+        getOriginalCodButtons().forEach(function(buttonEl) {
+          stickyResizeObserver.observe(buttonEl);
+        });
+      }
+
+      stickyBtn._updateVisibility = updateStickyVisibility;
+      updateStickyVisibility();
+      requestAnimationFrame(updateStickyVisibility);
+    }
   }
 
   /**
