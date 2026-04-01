@@ -479,12 +479,15 @@
     });
   }
 
-  function pollForFinalOrderName(config, pollingOrderId, fallbackOrderId) {
+  function pollForFinalOrderName(config, pollingOrderId, fallbackOrderId, onResolved) {
     var attempts = 0;
     var intervalId = setInterval(function() {
       attempts++;
-      if (attempts > 10) {
+      if (attempts > 6) {
         clearInterval(intervalId);
+        if (typeof onResolved === 'function' && fallbackOrderId) {
+          onResolved(fallbackOrderId);
+        }
         return;
       }
 
@@ -492,15 +495,19 @@
         .then(function(statusData) {
           if (statusData.success && statusData.order && statusData.order.shopify_order_name) {
             clearInterval(intervalId);
-            setBlockStatus(config, 'Order placed successfully! Order ID: ' + statusData.order.shopify_order_name, 'success');
+            if (typeof onResolved === 'function') {
+              onResolved(statusData.order.shopify_order_name);
+            }
           } else if (fallbackOrderId) {
-            setBlockStatus(config, 'Order placed successfully! Order ID: ' + fallbackOrderId, 'success');
+            if (typeof onResolved === 'function') {
+              onResolved(fallbackOrderId);
+            }
           }
         })
         .catch(function(err) {
           console.warn('[COD Form] Poll error:', err.message);
         });
-    }, 1500);
+    }, 300);
   }
 
   function handleOrderSuccess(config, form, submitBtn, originalBtnText, result) {
@@ -509,11 +516,9 @@
     config._orderPlaced = true;
     config._isSubmitting = false;
 
+    var modal = getModalContainer(config);
+    var overlay = getModalOverlay(config);
     var orderId = result && (result.orderName || result.orderId || result.id) ? (result.orderName || result.orderId || result.id) : 'Placed';
-
-    hideSuccessModal(config);
-    setFormMessage(form, 'success', 'Order placed successfully! Order ID: ' + orderId);
-    setBlockStatus(config, 'Order placed successfully! Order ID: ' + orderId, 'success');
 
     if (config.triggerElement) {
       config.triggerElement.disabled = true;
@@ -528,9 +533,41 @@
 
     try { localStorage.removeItem('foxcod_checkout_state'); } catch (e) {}
 
-    if (result && result.orderId) {
-      pollForFinalOrderName(config, result.orderId, orderId);
+    if (modal) {
+      modal.innerHTML = [
+        '<div class="cod-success">',
+        '  <div class="cod-success-icon" aria-hidden="true">✓</div>',
+        '  <h2>Order Placed Successfully</h2>',
+        '  <p>Your Order ID: <strong data-foxcod-success-order-id>' + orderId + '</strong></p>',
+        '  <p>Redirecting...</p>',
+        '</div>'
+      ].join('');
+      modal.style.display = 'block';
+      modal.classList.add('visible');
     }
+
+    if (overlay) {
+      overlay.style.display = 'flex';
+    }
+
+    document.body.style.overflow = 'hidden';
+
+    if (result && result.orderId && modal) {
+      pollForFinalOrderName(config, result.orderId, orderId, function(resolvedOrderId) {
+        var orderIdEl = modal.querySelector('[data-foxcod-success-order-id]');
+        if (orderIdEl && resolvedOrderId) {
+          orderIdEl.textContent = resolvedOrderId;
+        }
+      });
+    }
+
+    if (config._successReloadTimer) {
+      clearTimeout(config._successReloadTimer);
+    }
+
+    config._successReloadTimer = setTimeout(function() {
+      window.location.reload();
+    }, 2000);
   }
 
   function mountBlockRoot(productId, config, state) {
