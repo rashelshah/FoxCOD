@@ -92,6 +92,10 @@ export interface ButtonStyles {
     clickRipple: boolean;
     clickPress: boolean;
 
+    // Button Icon
+    iconType?: string;
+    iconPosition?: 'left' | 'right';
+
     // Timing Controls
     animationTrigger: 'page-load' | 'form-filled' | 'inactivity';
     inactivityDelay: number;  // seconds
@@ -204,6 +208,10 @@ export const DEFAULT_BUTTON_STYLES: ButtonStyles = {
     hoverGlow: false,
     clickRipple: false,
     clickPress: false,
+
+    // Button Icon
+    iconType: 'none',
+    iconPosition: 'left',
 
     // Timing Controls
     animationTrigger: 'page-load',

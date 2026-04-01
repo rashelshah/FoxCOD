@@ -651,6 +651,18 @@ const darkenColor = (hex: string, percent: number) => {
     return `#${(r << 16 | g << 8 | b).toString(16).padStart(6, '0')}`;
 };
 
+export const ButtonIconSvg = ({ iconType, color = 'currentColor', size = 18 }: { iconType: string, color?: string, size?: number }) => {
+    const s: React.CSSProperties = { width: size, height: size, color };
+    if (iconType === 'cart') return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" /><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" /></svg>;
+    if (iconType === 'bag') return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" /><line x1="3" y1="6" x2="21" y2="6" /><path d="M16 10a4 4 0 0 1-8 0" /></svg>;
+    if (iconType === 'box') return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" /><polyline points="3.27 6.96 12 12.01 20.73 6.96" /><line x1="12" y1="22.08" x2="12" y2="12" /></svg>;
+    if (iconType === 'card') return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>;
+    if (iconType === 'wallet') return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4" /><path d="M4 6v12c0 1.1.9 2 2 2h14v-4" /><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z" /></svg>;
+    if (iconType === 'checkout') return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 11 12 14 22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>;
+    if (iconType === 'lock') return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>;
+    return null;
+};
+
 // Memoized Preview Component
 const PreviewDisplay = memo(({
     showProductImage, showPrice, buttonText, formTitle, formSubtitle,
@@ -1052,7 +1064,15 @@ const PreviewDisplay = memo(({
                                                 <rect x="1" y="1" style={{ width: 'calc(100% - 2px)', height: 'calc(100% - 2px)', fill: 'none', stroke: buttonStylesState?.borderColor || primaryColor || '#6366f1', strokeWidth: 2, strokeDasharray: '8 4', animation: 'border-dash 0.6s linear infinite' }} rx={buttonStylesState?.borderRadius ?? 12} ry={buttonStylesState?.borderRadius ?? 12} />
                                             </svg>
                                         )}
-                                        {buttonText || 'Buy with COD'}
+                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
+                                            {buttonStylesState?.iconType && buttonStylesState.iconType !== 'none' && buttonStylesState.iconPosition !== 'right' && (
+                                                <ButtonIconSvg iconType={buttonStylesState.iconType} />
+                                            )}
+                                            <span>{buttonText || 'Buy with COD'}</span>
+                                            {buttonStylesState?.iconType && buttonStylesState.iconType !== 'none' && buttonStylesState.iconPosition === 'right' && (
+                                                <ButtonIconSvg iconType={buttonStylesState.iconType} />
+                                            )}
+                                        </span>
                                     </button>
                                 </>
                             )}
@@ -2010,6 +2030,8 @@ export default function SettingsPage() {
     const [newFieldOptions, setNewFieldOptions] = useState('');
     const [newFieldIconType, setNewFieldIconType] = useState('text');
     const [iconPopoverActive, setIconPopoverActive] = useState(false);
+    const [btnIconPopoverActive, setBtnIconPopoverActive] = useState(false);
+
 
     const DropdownIcon = ({ iconType }: { iconType: string }) => {
         const s: React.CSSProperties = { width: 18, height: 18, color: '#6b7280' };
@@ -3716,6 +3738,74 @@ export default function SettingsPage() {
                                                         {size.charAt(0).toUpperCase() + size.slice(1)}
                                                     </button>
                                                 ))}
+                                            </div>
+                                        </div>
+                                        <div className="input-group" style={{ marginTop: 16 }}>
+                                            <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                                                <div style={{ flex: 1 }}>
+                                                    <label className="input-label" style={{ marginBottom: 4 }}>Button Icon</label>
+                                                    <Popover
+                                                        active={btnIconPopoverActive}
+                                                        activator={
+                                                            <button 
+                                                                type="button" 
+                                                                className="style-option" 
+                                                                style={{ width: '100%', justifyContent: 'space-between', display: 'flex', alignItems: 'center', background: '#fff' }} 
+                                                                onClick={() => setBtnIconPopoverActive(!btnIconPopoverActive)}
+                                                            >
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                    {buttonStylesState?.iconType && buttonStylesState.iconType !== 'none' ? <ButtonIconSvg iconType={buttonStylesState.iconType} color="#333" /> : (
+                                                                        <svg style={{ width: 18, height: 18, color: '#6b7280' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" /></svg>
+                                                                    )}
+                                                                    <span>{buttonStylesState?.iconType && buttonStylesState.iconType !== 'none' ? buttonStylesState.iconType.charAt(0).toUpperCase() + buttonStylesState.iconType.slice(1) : 'None'}</span>
+                                                                </div>
+                                                                <svg style={{ width: 16, height: 16, color: '#6b7280' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9" /></svg>
+                                                            </button>
+                                                        }
+                                                        onClose={() => setBtnIconPopoverActive(false)}
+                                                    >
+                                                        <ActionList
+                                                            actionRole="menuitem"
+                                                            items={[
+                                                                { 
+                                                                    content: 'None', 
+                                                                    icon: () => <svg style={{ width: 18, height: 18, color: '#6b7280', margin: '0 8px' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" /></svg>, 
+                                                                    onAction: () => { setButtonStylesState(s => ({ ...s, iconType: 'none' })); setBtnIconPopoverActive(false); } 
+                                                                },
+                                                                { content: 'Cart', icon: () => <div style={{ margin: '0 8px' }}><ButtonIconSvg iconType="cart" color="#6b7280" /></div>, onAction: () => { setButtonStylesState(s => ({ ...s, iconType: 'cart' })); setBtnIconPopoverActive(false); } },
+                                                                { content: 'Bag', icon: () => <div style={{ margin: '0 8px' }}><ButtonIconSvg iconType="bag" color="#6b7280" /></div>, onAction: () => { setButtonStylesState(s => ({ ...s, iconType: 'bag' })); setBtnIconPopoverActive(false); } },
+                                                                { content: 'Box', icon: () => <div style={{ margin: '0 8px' }}><ButtonIconSvg iconType="box" color="#6b7280" /></div>, onAction: () => { setButtonStylesState(s => ({ ...s, iconType: 'box' })); setBtnIconPopoverActive(false); } },
+                                                                { content: 'Card', icon: () => <div style={{ margin: '0 8px' }}><ButtonIconSvg iconType="card" color="#6b7280" /></div>, onAction: () => { setButtonStylesState(s => ({ ...s, iconType: 'card' })); setBtnIconPopoverActive(false); } },
+                                                                { content: 'Wallet', icon: () => <div style={{ margin: '0 8px' }}><ButtonIconSvg iconType="wallet" color="#6b7280" /></div>, onAction: () => { setButtonStylesState(s => ({ ...s, iconType: 'wallet' })); setBtnIconPopoverActive(false); } },
+                                                                { content: 'Checkout', icon: () => <div style={{ margin: '0 8px' }}><ButtonIconSvg iconType="checkout" color="#6b7280" /></div>, onAction: () => { setButtonStylesState(s => ({ ...s, iconType: 'checkout' })); setBtnIconPopoverActive(false); } },
+                                                                { content: 'Lock', icon: () => <div style={{ margin: '0 8px' }}><ButtonIconSvg iconType="lock" color="#6b7280" /></div>, onAction: () => { setButtonStylesState(s => ({ ...s, iconType: 'lock' })); setBtnIconPopoverActive(false); } }
+                                                            ]}
+                                                        />
+                                                    </Popover>
+                                                </div>
+                                                {buttonStylesState?.iconType && buttonStylesState.iconType !== 'none' && (
+                                                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                                        <label className="input-label" style={{ marginBottom: 4 }}>Alignment</label>
+                                                        <div style={{ display: 'flex', gap: '4px' }}>
+                                                            <button
+                                                                className={`style-option ${buttonStylesState.iconPosition === 'left' || !buttonStylesState.iconPosition ? 'active' : ''}`}
+                                                                style={{ padding: '6px 12px', minWidth: 'auto', background: '#fff' }}
+                                                                onClick={() => setButtonStylesState(s => ({ ...s, iconPosition: 'left' }))}
+                                                                title="Left Aligned"
+                                                            >
+                                                                <svg style={{ width: 16, height: 16 }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="14" y2="12" /><line x1="4" y1="18" x2="18" y2="18" /></svg>
+                                                            </button>
+                                                            <button
+                                                                className={`style-option ${buttonStylesState.iconPosition === 'right' ? 'active' : ''}`}
+                                                                style={{ padding: '6px 12px', minWidth: 'auto', background: '#fff' }}
+                                                                onClick={() => setButtonStylesState(s => ({ ...s, iconPosition: 'right' }))}
+                                                                title="Right Aligned"
+                                                            >
+                                                                <svg style={{ width: 16, height: 16 }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="6" x2="20" y2="6" /><line x1="10" y1="12" x2="20" y2="12" /><line x1="6" y1="18" x2="20" y2="18" /></svg>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     </AccordionSection>

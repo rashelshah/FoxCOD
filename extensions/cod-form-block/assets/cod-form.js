@@ -241,6 +241,44 @@
     }
   }
 
+  /**
+   * Normalize config blobs that may arrive as an object, JSON string, or HTML-escaped JSON string.
+   */
+  function normalizeConfigObject(value, fallback) {
+    if (!value) return fallback;
+    if (typeof value === 'object') return value;
+    if (typeof value === 'string') return safeJSONParse(value, fallback);
+    return fallback;
+  }
+
+  function getButtonIconSvg(buttonStyles) {
+    if (!buttonStyles || !buttonStyles.iconType || buttonStyles.iconType === 'none') return null;
+    var typ = buttonStyles.iconType;
+    if (typ === 'cart') return '<svg style="width:1.2em;height:1.2em;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>';
+    if (typ === 'bag') return '<svg style="width:1.2em;height:1.2em;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>';
+    if (typ === 'box') return '<svg style="width:1.2em;height:1.2em;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>';
+    if (typ === 'card') return '<svg style="width:1.2em;height:1.2em;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>';
+    if (typ === 'wallet') return '<svg style="width:1.2em;height:1.2em;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"></path><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"></path><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z"></path></svg>';
+    if (typ === 'checkout') return '<svg style="width:1.2em;height:1.2em;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>';
+    if (typ === 'lock') return '<svg style="width:1.2em;height:1.2em;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>';
+    return null;
+  }
+
+  function setButtonContent(buttonEl, label, buttonStyles) {
+    var btnIconSvg = getButtonIconSvg(buttonStyles);
+    if (btnIconSvg) {
+      var iconPos = (buttonStyles && buttonStyles.iconPosition) || 'left';
+      var innerContent = '<span style="display:inline-flex;align-items:center;justify-content:center;gap:8px;width:100%;">';
+      if (iconPos === 'left') innerContent += btnIconSvg;
+      innerContent += '<span>' + label + '</span>';
+      if (iconPos === 'right') innerContent += btnIconSvg;
+      innerContent += '</span>';
+      buttonEl.innerHTML = innerContent;
+      return;
+    }
+    buttonEl.textContent = label;
+  }
+
 
   // ── Embedded SVG background presets (data URIs) ──
   // These are inlined so the storefront never needs to fetch from appUrl
@@ -376,9 +414,17 @@
         upsellOffers: (window.FoxCod && window.FoxCod.upsellOffers) || safeJSONParse(dataContainer.dataset.upsellOffers, { tick_upsells: [], click_upsells: [], downsells: [] }),
         appUrl: dataContainer.dataset.appUrl || '',
         // Form submit button style overrides
-        formSubmitButton: (window.FoxCod && window.FoxCod.formSubmitButton) || safeJSONParse(dataContainer.dataset.formSubmitButton, {}),
-        // Product button styles — used as baseline for submit button styling
-        buttonStyles: (window.FoxCod && window.FoxCod.buttonStyles) || {}
+        formSubmitButton: (function() {
+          var attrStyles = safeJSONParse(dataContainer.dataset.formSubmitButton, {});
+          var globalStyles = normalizeConfigObject(window.FoxCod && window.FoxCod.formSubmitButton, {});
+          return Object.assign({}, attrStyles, globalStyles);
+        })(),
+        // Product button styles — merge data attribute + global injection so storefront keeps icon settings
+        buttonStyles: (function() {
+          var attrStyles = safeJSONParse(dataContainer.dataset.buttonStyles, {});
+          var globalStyles = normalizeConfigObject(window.FoxCod && window.FoxCod.buttonStyles, {});
+          return Object.assign({}, attrStyles, globalStyles);
+        })()
       };
 
       // Debug: Log quantity offers data
@@ -538,7 +584,7 @@
         var codBtn = document.createElement('button');
         codBtn.type = 'button';
         codBtn.className = 'cod-buy-btn ' + getButtonAnimationClasses(config);
-        codBtn.textContent = config.buttonText;
+        setButtonContent(codBtn, config.buttonText, config.buttonStyles);
         codBtn.style.cssText = styleString;
         codBtn.dataset.codOpen = productId;
 
@@ -732,7 +778,7 @@
           if (v) {
               if (v.available) {
                   codBtn.disabled = false;
-                  codBtn.textContent = config.buttonText;
+                  setButtonContent(codBtn, config.buttonText, config.buttonStyles);
                   codBtn.style.opacity = '1';
                   codBtn.style.cursor = 'pointer';
               } else {

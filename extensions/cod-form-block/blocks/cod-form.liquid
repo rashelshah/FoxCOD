@@ -193,7 +193,7 @@
      data-blocks="{{ cod_blocks | escape }}"
      data-custom-fields="{{ cod_custom_fields | escape }}"
      data-styles="{{ cod_styles_parsed | json | escape }}"
-     data-button-styles="{{ cod_button_styles | escape }}"
+     data-button-styles="{{ btn_styles_raw | json | escape }}"
      data-button-text-color="{{ btn_styles.textColor | default: '#ffffff' }}"
      data-button-border-color="{{ btn_styles.borderColor | default: cod_primary_color }}"
      data-button-border-width="{{ btn_styles.borderWidth | default: 0 }}"
@@ -267,11 +267,17 @@
     
     // Form submit button style overrides
     var fsbRaw = {{ shop.metafields.fox_cod.form_submit_button_json.value | json | default: 'null' }};
+    if (typeof fsbRaw === 'string') {
+      try { fsbRaw = JSON.parse(fsbRaw); } catch (e) {}
+    }
     window.FoxCod.formSubmitButton = (fsbRaw && typeof fsbRaw === 'object') ? fsbRaw : {};
     console.log('[FoxCod] formSubmitButton injected:', window.FoxCod.formSubmitButton);
     
     // Product button styles (used as base for submit button when useProductButtonStyle is true)
     var btnStylesRaw = {{ shop.metafields.fox_cod.button_styles_json.value | json | default: 'null' }};
+    if (typeof btnStylesRaw === 'string') {
+      try { btnStylesRaw = JSON.parse(btnStylesRaw); } catch (e) {}
+    }
     window.FoxCod.buttonStyles = (btnStylesRaw && typeof btnStylesRaw === 'object') ? btnStylesRaw : {};
     console.log('[FoxCod] buttonStyles injected:', window.FoxCod.buttonStyles);
   } catch (e) {
