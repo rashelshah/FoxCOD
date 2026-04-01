@@ -302,6 +302,112 @@
     return path;
   }
 
+  function findFoxCodRoot(element) {
+    return element && element.closest ? element.closest('[data-fox-cod-root]') : null;
+  }
+
+  function setBlockStatus(config, message, tone) {
+    if (!config || !config.statusElement) return;
+    if (!message) {
+      config.statusElement.hidden = true;
+      config.statusElement.textContent = '';
+      config.statusElement.removeAttribute('data-tone');
+      return;
+    }
+    config.statusElement.hidden = false;
+    config.statusElement.textContent = message;
+    config.statusElement.setAttribute('data-tone', tone || 'info');
+  }
+
+  function setFormMessage(form, type, message) {
+    if (!form) return;
+    var successBox = form.querySelector('.cod-message-success');
+    var errorBox = form.querySelector('.cod-message-error');
+    if (successBox) successBox.style.display = 'none';
+    if (errorBox) errorBox.style.display = 'none';
+
+    var target = type === 'success' ? successBox : errorBox;
+    if (!target) return;
+
+    var textNode = target.querySelector('.cod-message-text');
+    if (textNode) textNode.textContent = message;
+    target.style.display = 'flex';
+  }
+
+  function requestProxyJson(config, path, options) {
+    return fetch((config.proxyUrl || '/apps/fox-cod') + path, options || {})
+      .then(function(res) {
+        var contentType = res.headers.get('content-type') || '';
+        var parsedBody = contentType.indexOf('application/json') !== -1
+          ? res.json()
+          : res.text().then(function(text) {
+              return { success: false, error: text || ('Request failed with status ' + res.status) };
+            });
+
+        return parsedBody.then(function(body) {
+          if (!res.ok) {
+            throw new Error((body && (body.error || body.message)) || ('Request failed with status ' + res.status));
+          }
+          return body;
+        });
+      })
+      .catch(function(error) {
+        throw new Error(error && error.message ? error.message : 'Failed to reach the Fox COD service.');
+      });
+  }
+
+  function mountBlockRoot(productId, config, state) {
+    if (!config || !config.triggerElement) return;
+
+    var trigger = config.triggerElement;
+    var isLoading = !!(state && state.loading);
+    var buttonText = (state && state.buttonText) || config.buttonText || 'Buy with COD';
+
+    trigger.type = 'button';
+    trigger.className = 'foxcod-block-trigger cod-buy-btn ' + getButtonAnimationClasses(config);
+    setButtonContent(trigger, buttonText, config.buttonStyles);
+    trigger.dataset.codOpen = productId;
+    trigger.disabled = !!(state && state.disabled);
+    trigger.setAttribute('aria-busy', isLoading ? 'true' : 'false');
+    trigger.style.width = '100%';
+    trigger.style.margin = '0';
+
+    if (!trigger.dataset.foxcodBound) {
+      trigger.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        openModal(productId, config);
+      });
+      trigger.dataset.foxcodBound = 'true';
+    }
+
+    applySubmitButtonStyles(trigger, config);
+  }
+
+  function hydratePublicSettings(config) {
+    if (!config || !config.shop) return;
+
+    setBlockStatus(config, 'Loading checkout options...', 'info');
+    mountBlockRoot(config.productId, config, { loading: true, buttonText: 'Loading COD...' });
+
+    requestProxyJson(config, '/api/settings?shop=' + encodeURIComponent(config.shop))
+      .then(function(result) {
+        var settings = result && result.settings ? result.settings : {};
+
+        if (settings.button_text) config.buttonText = settings.button_text;
+        if (settings.primary_color) config.primaryColor = settings.primary_color;
+        if (settings.max_quantity) config.maxQuantity = parseInt(settings.max_quantity, 10) || config.maxQuantity;
+
+        mountBlockRoot(config.productId, config, { loading: false });
+        setBlockStatus(config, '', 'info');
+      })
+      .catch(function(error) {
+        console.warn('[COD Form] Settings fetch failed, using Liquid fallback:', error.message);
+        mountBlockRoot(config.productId, config, { loading: false });
+        setBlockStatus(config, 'COD is ready. Live settings could not be refreshed, so fallback settings are being used.', 'warning');
+      });
+  }
+
   /**
    * Initialize all COD forms on the page
    */
@@ -320,7 +426,7 @@
     }
 
     // Find all COD form data containers
-    var dataContainers = document.querySelectorAll('.cod-form-data');
+    var dataContainers = Array.prototype.slice.call(document.getElementsByClassName('cod-form-data'));
     
     if (dataContainers.length === 0) {
       console.log('[COD Form] No COD form data found on page');
@@ -328,8 +434,12 @@
     }
 
     dataContainers.forEach(function(dataContainer) {
+      if (dataContainer.dataset.foxcodInitialized === 'true') return;
+      dataContainer.dataset.foxcodInitialized = 'true';
+
       var productId = dataContainer.dataset.productId;
       var shop = dataContainer.dataset.shop;
+      var rootElement = findFoxCodRoot(dataContainer);
       
       // Default Fallbacks
       var DEFAULT_FIELDS = [
@@ -349,12 +459,13 @@
       // Get configuration from data container
       var config = {
         productId: productId,
+        blockId: dataContainer.dataset.blockId || '',
         variantId: dataContainer.dataset.variantId,
         productTitle: dataContainer.dataset.productTitle,
         productPrice: parseFloat(dataContainer.dataset.productPrice),
         productImage: dataContainer.dataset.productImage || '',
         shop: shop,
-        proxyUrl: '/apps/fox-cod',
+        proxyUrl: dataContainer.dataset.proxyBase || '/apps/fox-cod',
         maxQuantity: parseInt(dataContainer.dataset.maxQuantity) || 10,
         buttonText: dataContainer.dataset.buttonText || 'Buy with COD',
         primaryColor: dataContainer.dataset.primaryColor || '#667eea',
@@ -413,6 +524,10 @@
         // Upsell Offers Configuration
         upsellOffers: (window.FoxCod && window.FoxCod.upsellOffers) || safeJSONParse(dataContainer.dataset.upsellOffers, { tick_upsells: [], click_upsells: [], downsells: [] }),
         appUrl: dataContainer.dataset.appUrl || '',
+        rootElement: rootElement,
+        shellElement: rootElement ? rootElement.querySelector('[data-foxcod-shell]') : null,
+        triggerElement: rootElement ? rootElement.querySelector('[data-foxcod-trigger]') : null,
+        statusElement: rootElement ? rootElement.querySelector('[data-foxcod-status]') : null,
         // Form submit button style overrides
         formSubmitButton: (function() {
           var attrStyles = safeJSONParse(dataContainer.dataset.formSubmitButton, {});
@@ -440,6 +555,7 @@
       
       // Initialize form immediately
       initializeProduct(productId, config);
+      hydratePublicSettings(config);
     });
   }
 
@@ -480,11 +596,12 @@
    * Initialize a specific product
    */
   function initializeProduct(productId, config) {
-    // Replace buy buttons with COD button
-    replaceBuyButtons(productId, config);
+    // Render the primary CTA directly inside the app block root.
+    mountBlockRoot(productId, config, { loading: false });
 
     // Initialize the form structure and events
     initForm(productId, config);
+    setupVariantObserver(config.rootElement, config.triggerElement, config);
   }
 
   /**
@@ -2579,8 +2696,7 @@
 
         // Priority 2: Database via API
         console.log('[COD Form] 10 digits entered, fetching customer data from DB...');
-        fetch(config.proxyUrl + '/api/customer-by-phone?phone=' + encodeURIComponent(phone) + '&shop=' + encodeURIComponent(config.shop))
-            .then(function(res) { return res.json(); })
+        requestProxyJson(config, '/api/customer-by-phone?phone=' + encodeURIComponent(phone) + '&shop=' + encodeURIComponent(config.shop))
             .then(function(data) {
                 if (data.found) {
                     var customerData = { 
@@ -5404,21 +5520,12 @@ function darkenColor(hex, percent) {
 
           console.log('[COD Form] Partial COD checkout:', partialCodPayload);
 
-          fetch(config.proxyUrl + '/api/partial-cod/create-checkout', {
+          requestProxyJson(config, '/api/partial-cod/create-checkout', {
               method: 'POST',
               headers: {
                   'Content-Type': 'application/json'
               },
               body: JSON.stringify(partialCodPayload)
-          })
-          .then(function(res) {
-              var ct = res.headers.get('content-type');
-              if (!res.ok) {
-                  if (ct && ct.indexOf('application/json') !== -1) return res.json().then(function(j) { throw new Error(j.error || j.message || 'Request failed'); });
-                  throw new Error('Server error ' + res.status);
-              }
-              if (ct && ct.indexOf('application/json') !== -1) return res.json();
-              return res.text().then(function() { throw new Error('Invalid response'); });
           })
           .then(function(result) {
               console.log('[COD Form] Partial COD response:', result);
@@ -5427,17 +5534,18 @@ function darkenColor(hex, percent) {
                   // Redirect to Shopify checkout
                   window.location.href = result.checkoutUrl;
               } else {
-                  // Show error
-                  alert('Unable to create checkout: ' + (result.error || 'Unknown error'));
                   submitBtn.disabled = false;
                   submitBtn.textContent = originalBtnText;
+                  setFormMessage(form, 'error', result.error || 'Unable to create checkout right now. Please try again.');
+                  setBlockStatus(config, 'Checkout could not be started. The form is still available to try again.', 'warning');
               }
           })
           .catch(function(err) {
               console.error('[COD Form] Partial COD error:', err);
-              alert('Network error. Please try again.');
               submitBtn.disabled = false;
               submitBtn.textContent = originalBtnText;
+              setFormMessage(form, 'error', err.message || 'Network error. Please try again.');
+              setBlockStatus(config, 'Live checkout request failed. The form stays visible so the customer can retry.', 'warning');
           });
 
           return; // Exit - partial COD handling complete
@@ -5474,23 +5582,12 @@ function darkenColor(hex, percent) {
       }
 
       // Full COD: Send to regular backend
-      fetch(config.proxyUrl + '/api/orders/', {
+      requestProxyJson(config, '/api/orders/', {
           method: 'POST',
           headers: {
               'Content-Type': 'application/json'
           },
           body: JSON.stringify(payload)
-      })
-      .then(function(res) {
-          var ct = res.headers.get('content-type');
-          if (!res.ok) {
-              if (ct && ct.indexOf('application/json') !== -1) {
-                  return res.json().then(function(j) { throw new Error(j.error || j.message || 'Order failed'); });
-              }
-              throw new Error('Server error ' + res.status + '. Please try again.');
-          }
-          if (ct && ct.indexOf('application/json') !== -1) return res.json();
-          return res.text().then(function(t) { throw new Error('Invalid server response'); });
       })
       .then(function(result) {
           console.log('[COD Form] Order response:', result);
@@ -5684,8 +5781,7 @@ function darkenColor(hex, percent) {
                       }
                       return;
                   }
-                  fetch(config.proxyUrl + '/api/get-order-status?orderId=' + pollingOrderId)
-                      .then(function(res) { return res.json(); })
+                  requestProxyJson(config, '/api/get-order-status?orderId=' + pollingOrderId)
                       .then(function(statusData) {
                           if (statusData.success && statusData.order && statusData.order.shopify_order_name) {
                               clearInterval(pollInterval);
@@ -5724,9 +5820,8 @@ function darkenColor(hex, percent) {
           console.error('[COD Form] Error:', err);
           submitBtn.disabled = false;
           submitBtn.textContent = originalBtnText;
-          
-          // Use the custom fraud popup for all order errors (covers server-side fraud blocks)
-          showFraudBlockPopup(err.message || 'Something went wrong. Please try again.');
+          setFormMessage(form, 'error', err.message || 'Something went wrong. Please try again.');
+          setBlockStatus(config, 'Order submission failed, but the checkout block is still active for another attempt.', 'warning');
       });
   }
 

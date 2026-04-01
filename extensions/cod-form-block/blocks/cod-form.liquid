@@ -165,6 +165,13 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700&family=Cormorant+Garamond:wght@400;500;600;700&family=Abril+Fatface:wght@400;500;600;700&family=Syne:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 
+<div id="fox-cod-root-{{ block.id }}" class="foxcod-block-root" data-fox-cod-root data-product-id="{{ product.id }}" {{ block.shopify_attributes }}>
+  <div class="foxcod-block-shell" data-foxcod-shell>
+    <button type="button" class="foxcod-block-trigger" data-foxcod-trigger aria-busy="true">
+      Loading COD...
+    </button>
+    <p class="foxcod-block-status" data-foxcod-status hidden></p>
+  </div>
 
 {% comment %} Container for COD form data - hidden, used by JavaScript {% endcomment %}
 <script>
@@ -174,12 +181,15 @@
      id="cod-data-{{ product.id }}"
      style="display: none;"
      data-product-id="{{ product.id }}"
+     data-block-id="{{ block.id }}"
      data-currency="{{ shop.currency }}"
      data-variant-id="{{ current_variant.id }}"
      data-product-title="{{ product.title | escape }}"
      data-product-price="{{ current_variant.price | divided_by: 100.0 }}"
      data-product-image="{% if product.featured_image %}{{ product.featured_image | image_url: width: 300 }}{% endif %}"
      data-shop="{{ shop.permanent_domain }}"
+     data-enabled="{{ is_enabled }}"
+     data-proxy-base="/apps/fox-cod"
      data-app-url="{{ cod_app_url }}"
      data-max-quantity="{{ cod_max_quantity }}"
      data-button-text="{{ cod_button_text }}"
@@ -396,6 +406,36 @@
 </div>
 
 <style>
+  .foxcod-block-root {
+    width: 100%;
+  }
+
+  .foxcod-block-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+  }
+
+  .foxcod-block-trigger[aria-busy="true"] {
+    opacity: 0.8;
+  }
+
+  .foxcod-block-status {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.45;
+    color: #4b5563;
+  }
+
+  .foxcod-block-status[data-tone="warning"] {
+    color: #b45309;
+  }
+
+  .foxcod-block-status[data-tone="error"] {
+    color: #dc2626;
+  }
+
   /* COD Buy Button - styled to match theme buttons */
   .cod-buy-btn {
     width: 100%;
@@ -1557,6 +1597,8 @@
 </style>
 
 <script src="{{ 'cod-form.js' | asset_url }}" defer></script>
+
+</div>
 
 {% else %}
 {% comment %} COD is disabled - don't render anything {% endcomment %}

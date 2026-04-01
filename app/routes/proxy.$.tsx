@@ -9,7 +9,7 @@
  */
 
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import { logOrder, supabase } from "../config/supabase.server";
+import { getFormSettings, logOrder, supabase } from "../config/supabase.server";
 import { lookupCustomerByPhone } from "../services/customer-lookup.server";
 import { syncOrderToGoogleSheets } from "../services/google-sheets.server";
 import { validateOrderAgainstFraudRules } from "../services/fraud-protection.server";
@@ -29,6 +29,27 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     const path = params["*"] || params["$"] || "";
     const shop = url.searchParams.get("shop");
     const phone = url.searchParams.get("phone");
+
+    if ((path === "api/settings" || path.endsWith("settings")) && shop) {
+        const settings = await getFormSettings(shop);
+        return new Response(JSON.stringify({
+            success: true,
+            appUrl: process.env.SHOPIFY_APP_URL || url.origin,
+            settings: settings ? {
+                enabled: settings.enabled,
+                button_text: settings.button_text,
+                primary_color: settings.primary_color,
+                required_fields: settings.required_fields,
+                max_quantity: settings.max_quantity,
+            } : {
+                enabled: false,
+                button_text: "Buy with COD",
+                primary_color: "#667eea",
+                required_fields: ["name", "phone", "address"],
+                max_quantity: 10,
+            },
+        }), { headers: corsHeaders });
+    }
 
     // Route customer lookup for autofill
     if ((path === "api/customer-by-phone" || path.endsWith("customer-by-phone")) && phone && shop) {
@@ -453,4 +474,3 @@ async function handleRegularOrder(request: Request, data: any) {
         orderName,
     }), { headers: corsHeaders });
 }
-
