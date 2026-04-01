@@ -16,6 +16,7 @@ export interface FormField {
     placeholder?: string;
     options?: string[]; // For dropdown type
     isCustom?: boolean; // True for seller-created custom fields
+    iconType?: string; // Icon identifier for custom fields
 }
 
 /**
