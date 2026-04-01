@@ -1,7 +1,7 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
 client_id = "7c386161d2e35b3ec0a4fcbe0a8f4045"
-name = "FoxCod-first-test-app"
+name = "Fox COD Form+Partial & Prepaid"
 application_url = "https://example.com"
 embedded = true
 
