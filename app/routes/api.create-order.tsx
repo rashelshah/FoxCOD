@@ -385,25 +385,23 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
         console.log("[COD Order] Order logged successfully:", orderLog.id, orderName);
 
-        // ── Return success to customer IMMEDIATELY — Shopify sync runs in background ──
-        const successResponse = Response.json({
+        console.log("[COD Order] Waiting for Shopify sync for order", orderLog.id);
+        const syncResult = await createShopifyOrderBackground(String(orderLog.id));
+
+        if (!syncResult.success || !syncResult.shopifyOrderName) {
+            return Response.json({
+                success: false,
+                error: syncResult.error || "Shopify order could not be created right now. Please try again.",
+            }, { status: 502, headers: corsHeaders });
+        }
+
+        return Response.json({
             success: true,
             orderId: orderLog.id,
-            orderName: orderName,
+            shopifyOrderId: syncResult.shopifyOrderId || null,
+            orderName: syncResult.shopifyOrderName,
             message: "Order placed successfully!",
         }, { headers: corsHeaders });
-
-        // ── Fire-and-forget: pass only the order ID — service fetches everything from DB ──
-        console.log("STEP 1: background triggered for order", orderLog.id);
-        (async () => {
-            try {
-                await createShopifyOrderBackground(String(orderLog.id));
-            } catch (err: any) {
-                console.error('❌ Background sync crashed for order', orderLog.id, ':', err?.message);
-            }
-        })();
-
-        return successResponse;
 
     } catch (error: any) {
         console.error("[COD Order] Error:", error);

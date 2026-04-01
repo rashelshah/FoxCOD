@@ -440,20 +440,24 @@ async function handleRegularOrder(request: Request, data: any) {
 
     console.log('[Proxy] Order created:', result);
 
-    // ── Fire-and-forget: background Shopify sync (fetches shop + token from DB) ──
-    console.log('[Proxy] STEP 1: background triggered for order', result.id);
-    (async () => {
-        try {
-            await createShopifyOrderBackground(String(result.id));
-        } catch (err: any) {
-            console.error('❌ Background sync crashed for order', result.id, ':', err?.message);
-        }
-    })();
+    // Wait for the real Shopify order so the storefront only shows success
+    // when the seller can actually see the order in Shopify admin.
+    console.log('[Proxy] STEP 1: synchronizing Shopify order for', result.id);
+    const syncResult = await createShopifyOrderBackground(String(result.id));
+    if (!syncResult.success || !syncResult.shopifyOrderName) {
+        return new Response(JSON.stringify({
+            success: false,
+            error: syncResult.error || 'Shopify order could not be created right now. Please try again.',
+        }), {
+            status: 502,
+            headers: corsHeaders
+        });
+    }
 
     // Non-blocking Google Sheets sync
-    const orderName = result.shopify_order_name || `COD-${result.id}`;
+    const orderName = syncResult.shopifyOrderName;
     syncOrderToGoogleSheets(data.shop, {
-        orderId: result.id,
+        orderId: syncResult.shopifyOrderId || result.id,
         orderName,
         customerName: data.customerName || '',
         phone: data.customerPhone || '',
@@ -473,6 +477,7 @@ async function handleRegularOrder(request: Request, data: any) {
     return new Response(JSON.stringify({
         success: true,
         orderId: result.id,
+        shopifyOrderId: syncResult.shopifyOrderId || null,
         orderName,
     }), { headers: corsHeaders });
 }

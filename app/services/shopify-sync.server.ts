@@ -43,11 +43,18 @@ function formatPhoneE164(phone: string): string {
 
 // ─── Main Export ──────────────────────────────────────────────────────────────
 
+interface ShopifySyncResult {
+    success: boolean;
+    shopifyOrderId?: string;
+    shopifyOrderName?: string;
+    error?: string;
+}
+
 /**
  * Create a Shopify order in the background for the given order log ID.
  * Safe to call fire-and-forget; all errors are caught and written to the DB.
  */
-export async function createShopifyOrderBackground(orderId: string): Promise<void> {
+export async function createShopifyOrderBackground(orderId: string): Promise<ShopifySyncResult> {
     const id = String(orderId);
     console.log('[SYNC] Starting background sync for order', id);
 
@@ -55,17 +62,21 @@ export async function createShopifyOrderBackground(orderId: string): Promise<voi
     const order = await getOrderById(id);
     if (!order) {
         console.error('[SYNC] Order not found:', id);
-        return;
+        return { success: false, error: 'Order not found' };
     }
 
     // ── 2. Duplicate guard ──
     if (order.shopify_order_id) {
         console.log('[SYNC] Already synced, skipping:', id);
-        return;
+        return {
+            success: true,
+            shopifyOrderId: String(order.shopify_order_id),
+            shopifyOrderName: order.shopify_order_name || undefined,
+        };
     }
     if (order.sync_status === 'syncing') {
         console.log('[SYNC] Already in progress, skipping:', id);
-        return;
+        return { success: false, error: 'Order sync already in progress' };
     }
 
     // ── 3. Mark syncing ──
@@ -292,13 +303,27 @@ export async function createShopifyOrderBackground(orderId: string): Promise<voi
                     sync_error: `DB update failed: ${updateError.message}`,
                 })
                 .eq('id', id);
+            return {
+                success: true,
+                shopifyOrderId,
+                shopifyOrderName,
+            };
         } else {
             console.log('✅ SUPABASE UPDATE SUCCESS:', updateData);
             console.log('STEP 4: DB updated — order', id, 'marked as synced:', shopifyOrderName);
+            return {
+                success: true,
+                shopifyOrderId,
+                shopifyOrderName,
+            };
         }
 
     } catch (err: any) {
         console.error('❌ Sync failed for order', id, ':', err.message);
         await markSyncFailed(id, err.message || 'Unknown error', currentAttempt);
+        return {
+            success: false,
+            error: err.message || 'Unknown error',
+        };
     }
 }

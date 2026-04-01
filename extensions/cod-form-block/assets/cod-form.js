@@ -552,7 +552,9 @@
 
     document.body.style.overflow = 'hidden';
 
-    if (result && result.orderId && modal) {
+    var needsPolling = !result || !result.orderName || /^COD-/i.test(String(result.orderName));
+
+    if (needsPolling && result && result.orderId && modal) {
       pollForFinalOrderName(config, result.orderId, orderId, function(resolvedOrderId) {
         var orderIdEl = modal.querySelector('[data-foxcod-success-order-id]');
         if (orderIdEl && resolvedOrderId) {
