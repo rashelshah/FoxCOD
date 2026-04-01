@@ -2074,6 +2074,42 @@ export default function SettingsPage() {
         !['#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f59e0b', '#10b981', '#06b6d4', '#3b82f6', '#000000'].includes(settings.primary_color)
     );
     const [showCustomPickerPopover, setShowCustomPickerPopover] = useState(false);
+    const customColorPickerRef = useRef<HTMLDivElement>(null);
+    const customColorPopoverRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!showCustomPickerPopover) return;
+
+        function handleOutsideInteraction(event: Event) {
+            const target = event.target as Node;
+            const picker = customColorPickerRef.current;
+            const popover = customColorPopoverRef.current;
+
+            if (
+                picker &&
+                !picker.contains(target) &&
+                (!popover || !popover.contains(target))
+            ) {
+                setShowCustomPickerPopover(false);
+            }
+        }
+
+        function handleEscape(event: KeyboardEvent) {
+            if (event.key === 'Escape') {
+                setShowCustomPickerPopover(false);
+            }
+        }
+
+        document.addEventListener('pointerdown', handleOutsideInteraction, true);
+        document.addEventListener('focusin', handleOutsideInteraction, true);
+        document.addEventListener('keydown', handleEscape);
+
+        return () => {
+            document.removeEventListener('pointerdown', handleOutsideInteraction, true);
+            document.removeEventListener('focusin', handleOutsideInteraction, true);
+            document.removeEventListener('keydown', handleEscape);
+        };
+    }, [showCustomPickerPopover]);
 
     // Track saved settings as STATE (not ref) so changes trigger re-render
     const [savedSettingsString, setSavedSettingsString] = useState<string>(() => JSON.stringify(settings));
@@ -3840,7 +3876,7 @@ export default function SettingsPage() {
                                             </div>
 
                                             {/* Custom Color Row: Swatch + Hex Input */}
-                                            <div className="custom-color-row">
+                                            <div className="custom-color-row" ref={customColorPickerRef}>
                                                 <div className="color-picker-wrapper">
                                                     <div
                                                         className="polaris-color-swatch"
@@ -3887,7 +3923,7 @@ export default function SettingsPage() {
                                                 </div>
                                             </div>
                                             {showCustomPickerPopover && (
-                                                <div className="polaris-picker-popover" style={{ marginTop: 8, position: 'absolute', left: 0, right: 0, zIndex: 9999 }}>
+                                                <div ref={customColorPopoverRef} className="polaris-picker-popover" style={{ marginTop: 8, position: 'absolute', left: 0, right: 0, zIndex: 9999 }}>
                                                     <ColorPicker
                                                         onChange={(color: any) => {
                                                             // Convert HSB to hex

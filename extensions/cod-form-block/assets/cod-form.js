@@ -4376,6 +4376,31 @@ function darkenColor(hex, percent) {
     if (overlay) overlay.style.display = 'flex';
     document.body.style.overflow = 'hidden';
 
+    if (config && !config._foxcodModalPopHandler) {
+        config._foxcodModalPopHandler = function() {
+            var modalEl = getModalContainer(config);
+            var overlayEl = getModalOverlay(config);
+            var modalVisible = !!(modalEl && modalEl.style.display !== 'none');
+            var overlayVisible = !!(overlayEl && overlayEl.style.display !== 'none');
+
+            if (config._foxcodIgnoreNextPopstate) {
+                config._foxcodIgnoreNextPopstate = false;
+                return;
+            }
+
+            if (config._foxcodModalHistoryActive && (modalVisible || overlayVisible)) {
+                config._foxcodModalHistoryActive = false;
+                closeModal(productId, config, { fromHistory: true });
+            }
+        };
+        window.addEventListener('popstate', config._foxcodModalPopHandler);
+    }
+
+    if (config && !config._foxcodModalHistoryActive) {
+        history.pushState({ foxcodModalOpen: true }, document.title, window.location.href);
+        config._foxcodModalHistoryActive = true;
+    }
+
     // Hide sticky mobile button IMMEDIATELY while form is open
     // Must use display:none because sticky z-index (10000) is above modal z-index (9999)
     if (config && config.rootElement) {
@@ -4623,7 +4648,8 @@ function darkenColor(hex, percent) {
     }
   }
 
-  function closeModal(productId, config) {
+  function closeModal(productId, config, options) {
+    options = options || {};
     var modal = getModalContainer(config);
     var overlay = getModalOverlay(config);
 
@@ -4642,6 +4668,12 @@ function darkenColor(hex, percent) {
             if (currentCloses >= formCloseCount) {
                 // Threshold reached — show downsell and reset counter
                 localStorage.removeItem(closeKey);
+
+                if (config && config._foxcodModalHistoryActive && !options.fromHistory) {
+                    config._foxcodModalHistoryActive = false;
+                    config._foxcodIgnoreNextPopstate = true;
+                    history.back();
+                }
 
                 // Close the COD form first
                 if (modal) {
@@ -4788,6 +4820,12 @@ function darkenColor(hex, percent) {
     }
     if (overlay) overlay.style.display = 'none';
     document.body.style.overflow = '';
+
+    if (config && config._foxcodModalHistoryActive && !options.fromHistory) {
+        config._foxcodModalHistoryActive = false;
+        config._foxcodIgnoreNextPopstate = true;
+        history.back();
+    }
 
     // Re-show sticky mobile button that was hidden when modal opened
     // But ONLY if the original COD button is NOT visible in the viewport

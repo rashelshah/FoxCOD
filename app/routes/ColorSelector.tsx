@@ -99,7 +99,7 @@ export function ColorSelector({ label, value, onChange }: ColorSelectorProps) {
 
     // Close picker when clicking outside (supports fixed-position popover)
     useEffect(() => {
-        function handleClickOutside(e: MouseEvent) {
+        function handleInteractionOutside(e: Event) {
             const target = e.target as Node;
             const wrapper = wrapperRef.current;
             const popover = popoverRef.current;
@@ -111,9 +111,22 @@ export function ColorSelector({ label, value, onChange }: ColorSelectorProps) {
                 setPickerOpen(false);
             }
         }
+
+        function handleEscape(e: KeyboardEvent) {
+            if (e.key === 'Escape') {
+                setPickerOpen(false);
+            }
+        }
+
         if (pickerOpen) {
-            document.addEventListener('mousedown', handleClickOutside);
-            return () => document.removeEventListener('mousedown', handleClickOutside);
+            document.addEventListener('pointerdown', handleInteractionOutside, true);
+            document.addEventListener('focusin', handleInteractionOutside, true);
+            document.addEventListener('keydown', handleEscape);
+            return () => {
+                document.removeEventListener('pointerdown', handleInteractionOutside, true);
+                document.removeEventListener('focusin', handleInteractionOutside, true);
+                document.removeEventListener('keydown', handleEscape);
+            };
         }
     }, [pickerOpen]);
 
