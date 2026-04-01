@@ -386,7 +386,16 @@
     try {
       var response = await fetch(url, options || {});
       if (!response.ok) {
-        throw new Error('Request failed');
+        var contentType = response.headers.get('content-type') || '';
+        var errorMessage = 'Request failed';
+        if (contentType.indexOf('application/json') !== -1) {
+          var errorBody = await response.json();
+          errorMessage = (errorBody && (errorBody.error || errorBody.message)) || errorMessage;
+        } else {
+          var textBody = await response.text();
+          if (textBody) errorMessage = textBody;
+        }
+        throw new Error(errorMessage);
       }
       return await response.json();
     } catch (error) {

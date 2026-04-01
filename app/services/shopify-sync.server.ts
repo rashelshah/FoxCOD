@@ -41,6 +41,44 @@ function formatPhoneE164(phone: string): string {
     return `+${digits}`;
 }
 
+function buildCatalogOrCustomLineItem(input: {
+    variantId?: number | null;
+    title?: string;
+    quantity?: number;
+    price?: string;
+}) {
+    const quantity = input.quantity || 1;
+    if (input.variantId) {
+        const lineItem: Record<string, any> = {
+            variant_id: input.variantId,
+            quantity,
+            requires_shipping: true,
+        };
+        if (input.price != null) {
+            lineItem.price = input.price;
+        }
+        return lineItem;
+    }
+
+    return {
+        title: input.title || 'Product',
+        quantity,
+        price: input.price || '0.00',
+        requires_shipping: true,
+    };
+}
+
+function sanitizeVariantPricedLineItems(lineItems: Array<Record<string, any>>) {
+    return lineItems.map((item) => {
+        if (!item.variant_id) return item;
+        return {
+            variant_id: item.variant_id,
+            quantity: item.quantity,
+            requires_shipping: item.requires_shipping === true,
+        };
+    });
+}
+
 // ─── Main Export ──────────────────────────────────────────────────────────────
 
 interface ShopifySyncResult {
@@ -133,35 +171,25 @@ export async function createShopifyOrderBackground(orderId: string): Promise<Sho
                 const originalPrice = parseFloat(String(bv.price || 0));
                 const discountedPrice = (originalPrice * discountMultiplier).toFixed(2);
                 const bvQty = bv.quantity || 1;
-                
-                if (bvVariantId) {
-                    lineItems.push({
-                        variant_id: bvVariantId,
-                        quantity: bvQty,
-                        price: discountedPrice,
-                        requires_shipping: true,
-                    });
-                } else {
-                    // Last-resort fallback only when no variant can be recovered.
-                    lineItems.push({
-                        title: bv.title || 'Bundle Item',
-                        quantity: bvQty,
-                        price: discountedPrice,
-                        requires_shipping: true,
-                    });
-                }
+
+                lineItems.push(buildCatalogOrCustomLineItem({
+                    variantId: bvVariantId,
+                    title: bv.title || 'Bundle Item',
+                    quantity: bvQty,
+                    price: discountedPrice,
+                }));
             }
         } else {
             // Standard order: single line item with discounted price
             const originalPrice = parseFloat(String(body?.price || order.total_price || 0));
             const discountedPrice = (originalPrice * discountMultiplier).toFixed(2);
-            
-            lineItems.push({
-                variant_id: mainVariantId!,
+
+            lineItems.push(buildCatalogOrCustomLineItem({
+                variantId: mainVariantId,
+                title: order.product_title || body?.productTitle || 'Product',
                 quantity: order.quantity,
                 price: discountedPrice,
-                requires_shipping: true,
-            });
+            }));
         }
 
         if (Array.isArray(body?.upsell_items)) {
@@ -170,21 +198,12 @@ export async function createShopifyOrderBackground(orderId: string): Promise<Sho
                     const upsellVariantId = toNumericVariantId(item.variant_id);
                     const upsellPrice = parseFloat(String(item.price || 0)).toFixed(2);
                     const upsellQty = item.quantity || 1;
-                    if (upsellVariantId) {
-                        lineItems.push({
-                            variant_id: upsellVariantId,
-                            quantity: upsellQty,
-                            price: upsellPrice,
-                            requires_shipping: true,
-                        });
-                    } else {
-                        lineItems.push({
-                            title: item.title || 'Upsell Item',
-                            quantity: upsellQty,
-                            price: upsellPrice,
-                            requires_shipping: true,
-                        });
-                    }
+                    lineItems.push(buildCatalogOrCustomLineItem({
+                        variantId: upsellVariantId,
+                        title: item.title || 'Upsell Item',
+                        quantity: upsellQty,
+                        price: upsellPrice,
+                    }));
                 } catch (e: any) {
                     console.error('[Sync] Upsell item error:', e?.message);
                 }
@@ -213,14 +232,8 @@ export async function createShopifyOrderBackground(orderId: string): Promise<Sho
                 fulfillment_status: null,
                 tags: 'FoxCOD, COD',
                 note: orderNotes || `Order placed via FoxCOD COD Form`,
-                inventory_behaviour: 'decrement_obeying_policy',
+                inventory_behavior: 'decrement_obeying_policy',
                 source_name: 'FoxCOD',
-                transactions: [{
-                    kind: 'authorization',
-                    status: 'success',
-                    gateway: 'Cash on Delivery',
-                    amount: totalPrice.toFixed(2),
-                }],
                 shipping_lines: [{
                     title: shippingLabel,
                     price: shippingPrice.toFixed(2),
@@ -258,7 +271,7 @@ export async function createShopifyOrderBackground(orderId: string): Promise<Sho
         const shopifyApiUrl = `https://${order.shop_domain}/admin/api/2024-04/orders.json`;
         console.log('STEP 3: Shopify called for order', id, '(attempt', currentAttempt + 1, ')');
 
-        const shopifyRes = await fetch(shopifyApiUrl, {
+        let shopifyRes = await fetch(shopifyApiUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -268,11 +281,34 @@ export async function createShopifyOrderBackground(orderId: string): Promise<Sho
             body: JSON.stringify(shopifyPayload),
         });
 
-        const shopifyData = await shopifyRes.json();
+        let shopifyData = await shopifyRes.json();
         console.log('[SYNC] Shopify response status:', shopifyRes.status, '— body:', JSON.stringify(shopifyData).substring(0, 500));
 
         if (!shopifyData.order) {
-            throw new Error(JSON.stringify(shopifyData.errors || shopifyData));
+            console.warn('[SYNC] Primary order create failed, retrying with sanitized line items');
+            const fallbackPayload = {
+                order: {
+                    ...shopifyPayload.order,
+                    line_items: sanitizeVariantPricedLineItems(lineItems),
+                },
+            };
+
+            shopifyRes = await fetch(shopifyApiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Shopify-Access-Token': shop.access_token,
+                    'Idempotency-Key': `foxcod-${id}-fallback`,
+                },
+                body: JSON.stringify(fallbackPayload),
+            });
+
+            shopifyData = await shopifyRes.json();
+            console.log('[SYNC] Fallback Shopify response status:', shopifyRes.status, '— body:', JSON.stringify(shopifyData).substring(0, 500));
+
+            if (!shopifyData.order) {
+                throw new Error(JSON.stringify(shopifyData.errors || shopifyData));
+            }
         }
 
         // ── 9. Write result to DB ──
