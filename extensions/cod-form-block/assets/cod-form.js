@@ -367,6 +367,174 @@
     config.statusElement.style.display = 'block';
   }
 
+  function isElementRenderable(element) {
+    if (!element || !element.isConnected) return false;
+
+    var computedStyle = window.getComputedStyle(element);
+    if (
+      computedStyle.display === 'none' ||
+      computedStyle.visibility === 'hidden' ||
+      parseFloat(computedStyle.opacity || '1') === 0
+    ) {
+      return false;
+    }
+
+    return element.getClientRects().length > 0;
+  }
+
+  function applyFoxCodButtonState(buttonEl, config, state) {
+    if (!buttonEl || !config) return;
+
+    var isLoading = !!(state && state.loading);
+    var isDisabled = !!(state && state.disabled);
+    var buttonText = (state && state.buttonText) || (isDisabled ? 'Out of Stock' : (config.buttonText || 'Buy with COD'));
+
+    if (isDisabled) {
+      buttonEl.textContent = buttonText;
+    } else {
+      setButtonContent(buttonEl, buttonText, config.buttonStyles);
+    }
+
+    buttonEl.disabled = isDisabled;
+    buttonEl.setAttribute('aria-busy', isLoading ? 'true' : 'false');
+    buttonEl.setAttribute('aria-disabled', isDisabled ? 'true' : 'false');
+
+    applySubmitButtonStyles(buttonEl, config);
+
+    if (isDisabled) {
+      buttonEl.style.background = '#9ca3af';
+      buttonEl.style.backgroundColor = '#9ca3af';
+      buttonEl.style.border = 'none';
+      buttonEl.style.color = '#ffffff';
+      buttonEl.style.boxShadow = 'none';
+      buttonEl.style.opacity = '1';
+      buttonEl.style.cursor = 'not-allowed';
+      buttonEl.style.pointerEvents = 'none';
+      return;
+    }
+
+    buttonEl.style.opacity = '1';
+    buttonEl.style.cursor = 'pointer';
+    buttonEl.style.pointerEvents = 'auto';
+  }
+
+  function syncFoxCodButtons(config) {
+    if (!config) return;
+
+    var buttonState = {
+      loading: false,
+      disabled: !!config._isSoldOut,
+      buttonText: config._isSoldOut ? 'Out of Stock' : (config.buttonText || 'Buy with COD')
+    };
+
+    if (config.triggerElement) {
+      applyFoxCodButtonState(config.triggerElement, config, buttonState);
+    }
+
+    if (config._stickyButton && config._stickyButton.isConnected) {
+      config._stickyButton.className = 'foxcod-block-trigger cod-buy-btn sticky-mobile ' + getButtonAnimationClasses(config);
+      config._stickyButton.dataset.codOpen = config.productId;
+      applyFoxCodButtonState(config._stickyButton, config, buttonState);
+    }
+  }
+
+  function ensureStickyButton(productId, config) {
+    if (!config || !config.rootElement || !config.triggerElement || isShopifyEditor) return;
+
+    if (!config.stickyOnMobile) {
+      if (config._stickyButton && config._stickyButton.parentNode) {
+        config._stickyButton.parentNode.removeChild(config._stickyButton);
+      }
+      config._stickyButton = null;
+      return;
+    }
+
+    var stickyBtn = config._stickyButton;
+    if (!stickyBtn || !stickyBtn.isConnected) {
+      stickyBtn = config.triggerElement.cloneNode(true);
+      stickyBtn.className = 'foxcod-block-trigger cod-buy-btn sticky-mobile ' + getButtonAnimationClasses(config);
+      stickyBtn.dataset.codOpen = productId;
+      stickyBtn.setAttribute('aria-hidden', 'true');
+      stickyBtn.style.setProperty('display', 'none', 'important');
+      stickyBtn.addEventListener('click', function(e) {
+        if (stickyBtn.disabled) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        openModal(productId, config);
+      });
+      config.rootElement.appendChild(stickyBtn);
+      config._stickyButton = stickyBtn;
+    }
+
+    function hideStickyButton() {
+      stickyBtn.classList.remove('visible');
+      stickyBtn.style.setProperty('display', 'none', 'important');
+      stickyBtn.setAttribute('aria-hidden', 'true');
+    }
+
+    function showStickyButton() {
+      stickyBtn.style.removeProperty('display');
+      stickyBtn.classList.add('visible');
+      stickyBtn.setAttribute('aria-hidden', 'false');
+    }
+
+    function updateStickyVisibility() {
+      if (!config._stickyButton || !config._stickyButton.isConnected) return;
+      if (stickyBtn.getAttribute('data-hidden-by-modal') === 'true') return;
+
+      if (window.innerWidth > 600 || !isElementRenderable(config.triggerElement)) {
+        hideStickyButton();
+        return;
+      }
+
+      var rect = config.triggerElement.getBoundingClientRect();
+      if (rect.bottom < 0) {
+        showStickyButton();
+      } else {
+        hideStickyButton();
+      }
+    }
+
+    stickyBtn._updateVisibility = updateStickyVisibility;
+
+    syncFoxCodButtons(config);
+
+    if (!config._stickyVisibilityHandler) {
+      config._stickyVisibilityHandler = function() {
+        if (config._stickyButton && typeof config._stickyButton._updateVisibility === 'function') {
+          config._stickyButton._updateVisibility();
+        }
+      };
+      window.addEventListener('scroll', config._stickyVisibilityHandler, { passive: true });
+      window.addEventListener('resize', config._stickyVisibilityHandler);
+      window.addEventListener('orientationchange', config._stickyVisibilityHandler);
+      window.addEventListener('load', config._stickyVisibilityHandler);
+    }
+
+    if (!config._stickyIntersectionObserver && typeof IntersectionObserver === 'function') {
+      config._stickyIntersectionObserver = new IntersectionObserver(function() {
+        config._stickyVisibilityHandler();
+      }, {
+        threshold: [0, 0.01, 0.99, 1]
+      });
+      config._stickyIntersectionObserver.observe(config.triggerElement);
+    }
+
+    if (!config._stickyResizeObserver && typeof ResizeObserver === 'function') {
+      config._stickyResizeObserver = new ResizeObserver(function() {
+        config._stickyVisibilityHandler();
+      });
+      config._stickyResizeObserver.observe(config.triggerElement);
+    }
+
+    updateStickyVisibility();
+    requestAnimationFrame(updateStickyVisibility);
+  }
+
   function setFormMessage(form, type, message) {
     if (!form) return;
     var successBox = form.querySelector('.cod-message-success');
@@ -586,19 +754,17 @@
 
     var trigger = config.triggerElement;
     var isLoading = !!(state && state.loading);
-    var buttonText = (state && state.buttonText) || config.buttonText || 'Buy with COD';
+    var buttonText = (state && state.buttonText) || (config._isSoldOut ? 'Out of Stock' : (config.buttonText || 'Buy with COD'));
+    var isDisabled = !!((state && state.disabled) || config._isSoldOut);
 
     trigger.type = 'button';
     trigger.className = 'foxcod-block-trigger cod-buy-btn ' + getButtonAnimationClasses(config);
-    setButtonContent(trigger, buttonText, config.buttonStyles);
     trigger.dataset.codOpen = productId;
-    trigger.disabled = !!(state && state.disabled);
-    trigger.setAttribute('aria-busy', isLoading ? 'true' : 'false');
     trigger.style.width = '100%';
     trigger.style.margin = '0';
 
     if (isShopifyEditor) {
-      applySubmitButtonStyles(trigger, config);
+      applyFoxCodButtonState(trigger, config, { loading: isLoading, disabled: isDisabled, buttonText: buttonText });
       return;
     }
 
@@ -611,7 +777,8 @@
       trigger.dataset.foxcodBound = 'true';
     }
 
-    applySubmitButtonStyles(trigger, config);
+    applyFoxCodButtonState(trigger, config, { loading: isLoading, disabled: isDisabled, buttonText: buttonText });
+    ensureStickyButton(productId, config);
   }
 
   function hydratePublicSettings(config) {
@@ -625,12 +792,12 @@
         if (settings.primary_color) config.primaryColor = settings.primary_color;
         if (settings.max_quantity) config.maxQuantity = parseInt(settings.max_quantity, 10) || config.maxQuantity;
 
-        mountBlockRoot(config.productId, config, { loading: false });
+        mountBlockRoot(config.productId, config, { loading: false, disabled: !!config._isSoldOut });
         setBlockStatus(config, '', 'info');
       })
       .catch(function(error) {
         console.warn('[COD Form] Settings fetch failed, using Liquid fallback:', error.message);
-        mountBlockRoot(config.productId, config, { loading: false });
+        mountBlockRoot(config.productId, config, { loading: false, disabled: !!config._isSoldOut });
         setBlockStatus(config, 'COD is ready. Live settings could not be refreshed, so fallback settings are being used.', 'warning');
       });
   }
@@ -870,6 +1037,7 @@
     // Initialize the form structure and events
     initForm(productId, config);
     setupVariantObserver(config.rootElement, config.triggerElement, config);
+    ensureStickyButton(productId, config);
   }
 
   /**
@@ -952,26 +1120,30 @@
           if (!variantId) return;
           var v = variants.find(function(vr) { return String(vr.id) === String(variantId); });
           if (v) {
+              config._isSoldOut = !v.available;
               if (v.available) {
-                  codBtn.disabled = false;
-                  setButtonContent(codBtn, config.buttonText, config.buttonStyles);
-                  codBtn.style.opacity = '1';
-                  codBtn.style.cursor = 'pointer';
+                  syncFoxCodButtons(config);
               } else {
-                  codBtn.disabled = true;
-                  codBtn.textContent = 'Out of stock';
-                  codBtn.style.opacity = '0.5';
-                  codBtn.style.cursor = 'not-allowed';
+                  syncFoxCodButtons(config);
               }
               config.variantId = v.id;
               config.productPrice = v.price;
               if (v.title && v.title !== 'Default Title') {
                   config.productTitle = window.FoxCod.productTitle ? (window.FoxCod.productTitle + ' - ' + v.title) : v.title;
               }
+              if (config._stickyButton && typeof config._stickyButton._updateVisibility === 'function') {
+                  config._stickyButton._updateVisibility();
+              }
           }
       }
 
-      var form = origBtn.closest('form');
+      var form = origBtn && origBtn.closest ? origBtn.closest('form[action*="/cart/add"], .product-form, form') : null;
+      if (!form && config && config.rootElement) {
+          var productSection = config.rootElement.closest('section, product-info, .product, .product__info');
+          if (productSection) {
+              form = productSection.querySelector('form[action*="/cart/add"], .product-form, form');
+          }
+      }
       var idInput = form ? form.querySelector('input[name="id"]') : null;
 
       if (idInput && idInput.value) {
