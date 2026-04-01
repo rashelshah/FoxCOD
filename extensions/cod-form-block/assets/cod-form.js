@@ -404,18 +404,21 @@
     if (isDisabled) {
       buttonEl.style.background = '#9ca3af';
       buttonEl.style.backgroundColor = '#9ca3af';
+      buttonEl.style.backgroundImage = 'none';
       buttonEl.style.border = 'none';
       buttonEl.style.color = '#ffffff';
       buttonEl.style.boxShadow = 'none';
       buttonEl.style.opacity = '1';
       buttonEl.style.cursor = 'not-allowed';
       buttonEl.style.pointerEvents = 'none';
+      buttonEl.style.filter = 'grayscale(1)';
       return;
     }
 
     buttonEl.style.opacity = '1';
     buttonEl.style.cursor = 'pointer';
     buttonEl.style.pointerEvents = 'auto';
+    buttonEl.style.filter = 'none';
   }
 
   function syncFoxCodButtons(config) {
