@@ -598,25 +598,45 @@
     }
   }
 
-  function hideNativeBuyButtons(root) {
+  function hideNativeBuyButtons(root, config) {
     if (!root || !root.closest) return;
 
     var productSection = root.closest('section, product-info, .product, .product__info');
     if (!productSection) return;
 
+    var showAddToCart = !!(config && config.buttonStyles && config.buttonStyles.showAddToCart);
     var selectors = [
-      'form[action*="/cart/add"]',
-      '.product-form',
       '.shopify-payment-button',
-      'button[name="add"]',
-      'button[type="submit"]'
+      '.shopify-payment-button__button'
     ];
+
+    if (!showAddToCart) {
+      selectors.push('button[name="add"]', '.product-form__submit');
+    }
 
     selectors.forEach(function(selector) {
       productSection.querySelectorAll(selector).forEach(function(element) {
         if (element.closest('[data-fox-cod-root]')) return;
-        element.style.display = 'none';
+        element.style.setProperty('display', 'none', 'important');
+        element.style.setProperty('visibility', 'hidden', 'important');
+        element.style.setProperty('opacity', '0', 'important');
       });
+    });
+  }
+
+  function restoreStickyButtonsAfterModal(config) {
+    if (!config || !config.rootElement) return;
+
+    config.rootElement.querySelectorAll('.cod-buy-btn.sticky-mobile').forEach(function(btn) {
+      btn.removeAttribute('data-hidden-by-modal');
+      btn.style.removeProperty('display');
+
+      if (typeof btn._updateVisibility === 'function') {
+        btn._updateVisibility();
+        requestAnimationFrame(function() {
+          btn._updateVisibility();
+        });
+      }
     });
   }
 
@@ -833,7 +853,7 @@
       trigger.textContent = initialButtonText;
       trigger.disabled = false;
       trigger.setAttribute('aria-busy', 'false');
-      hideNativeBuyButtons(rootElement);
+      hideNativeBuyButtons(rootElement, { buttonStyles: safeJSONParse((dataContainer && dataContainer.dataset.buttonStyles) || '{}', {}) });
 
       if (isShopifyEditor) {
         return;
@@ -4827,19 +4847,8 @@ function darkenColor(hex, percent) {
         history.back();
     }
 
-    // Re-show sticky mobile button that was hidden when modal opened
-    // But ONLY if the original COD button is NOT visible in the viewport
-    if (config && config.rootElement) {
-        config.rootElement.querySelectorAll('.cod-buy-btn.sticky-mobile[data-hidden-by-modal="true"]').forEach(function(btn) {
-            btn.removeAttribute('data-hidden-by-modal');
-            btn.style.removeProperty('display');
-            if (typeof btn._updateVisibility === 'function') {
-                setTimeout(function() {
-                    btn._updateVisibility();
-                }, 50);
-            }
-        });
-    }
+    // Re-evaluate sticky button visibility after closing the modal.
+    restoreStickyButtonsAfterModal(config);
   }
 
   // =============================================
@@ -5300,6 +5309,7 @@ function darkenColor(hex, percent) {
       modal.querySelector('.cod-upsell-decline').addEventListener('click', function() {
           if (overlay._timerInterval) clearInterval(overlay._timerInterval);
           overlay.remove();
+          restoreStickyButtonsAfterModal(config);
           onComplete(acceptedItems);
       });
   }

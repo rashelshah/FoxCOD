@@ -100,6 +100,28 @@ const defaultSettings: Omit<FormSettings, "shop_domain"> = {
     form_submit_button: DEFAULT_FORM_SUBMIT_BUTTON,
 };
 
+const PRESET_KEYS = new Set([
+    'custom',
+    'default',
+    'modern_slate',
+    'dark_mode',
+    'eastern_gold',
+    'arctic_blue',
+    'rose_garden',
+    'forest_green',
+    'professional',
+    'minimal_white',
+    'luxury_gold',
+    'ocean_breeze',
+    'royal_indigo',
+    'emerald_night',
+]);
+
+function getSelectedPresetFromStyles(styles?: Partial<FormStyles> | null) {
+    const themeKey = styles?.themeKey || 'custom';
+    return PRESET_KEYS.has(themeKey) ? themeKey : 'custom';
+}
+
 /**
  * Helper: Ensure metafield definitions exist with storefront access
  * This allows Liquid templates to read the metafield values
@@ -2019,7 +2041,7 @@ export default function SettingsPage() {
     const [fields, setFields] = useState<FormField[]>(mergeFieldsWithDefaults(settings.fields, settings.custom_fields));
     const [blocks, setBlocks] = useState<ContentBlocks>(settings.blocks || DEFAULT_BLOCKS);
     const [formStyles, setFormStyles] = useState<FormStyles>(settings.styles || DEFAULT_STYLES);
-    const [selectedPreset, setSelectedPreset] = useState('custom');
+    const [selectedPreset, setSelectedPreset] = useState(() => getSelectedPresetFromStyles(settings.styles));
     const [buttonStylesState, setButtonStylesState] = useState<ButtonStyles>(settings.button_styles || DEFAULT_BUTTON_STYLES);
     const [shippingOpts, setShippingOpts] = useState<ShippingOptions>(settings.shipping_options || DEFAULT_SHIPPING_OPTIONS);
     const [formSubmitButtonState, setFormSubmitButtonState] = useState<FormSubmitButtonStyles>(settings.form_submit_button || DEFAULT_FORM_SUBMIT_BUTTON);
@@ -2118,6 +2140,10 @@ export default function SettingsPage() {
     const lastProcessedActionRef = useRef<any>(null);
     // Track save errors for display
     const [saveError, setSaveError] = useState<string | null>(null);
+
+    useEffect(() => {
+        setSelectedPreset(getSelectedPresetFromStyles(formStyles));
+    }, [formStyles?.themeKey]);
 
     // Compute current settings state for comparison
     const hasUnsavedChanges = useMemo(() => {
@@ -4155,6 +4181,10 @@ export default function SettingsPage() {
                                             <span className="toggle-option-label">Enable Animations on Mobile</span>
                                             <div className={`mini-toggle ${buttonStylesState?.enableMobile !== false ? 'on' : 'off'}`} />
                                         </div>
+                                        <div className="toggle-option" style={{ marginTop: 10 }} onClick={() => setButtonStylesState(s => ({ ...s, showAddToCart: !s.showAddToCart }))}>
+                                            <span className="toggle-option-label">Show Add to Cart Button</span>
+                                            <div className={`mini-toggle ${buttonStylesState?.showAddToCart ? 'on' : 'off'}`} />
+                                        </div>
                                         <div className="toggle-option" style={{ marginTop: 10 }} onClick={() => setButtonStylesState(s => ({ ...s, stickyOnMobile: !s.stickyOnMobile }))}>
                                             <span className="toggle-option-label">Sticky Button on Mobile (below fold)</span>
                                             <div className={`mini-toggle ${buttonStylesState?.stickyOnMobile ? 'on' : 'off'}`} />
@@ -4515,7 +4545,7 @@ export default function SettingsPage() {
                                             <ColorSelector
                                                 label="Background Color"
                                                 value={formStyles?.backgroundColor || '#ffffff'}
-                                                onChange={(c) => setFormStyles(s => ({ ...s, backgroundColor: c }))}
+                                                onChange={(c) => setFormStyles(s => ({ ...s, backgroundColor: c, background: undefined, backgroundImage: undefined }))}
                                             />
                                         </div>
                                         <div className="input-group" style={{ marginTop: 12 }}>

@@ -121,6 +121,7 @@
 
 {% assign btn_styles_raw = shop.metafields.fox_cod.button_styles_json.value %}
 {% assign btn_styles = btn_styles_raw | parse_json %}
+{% assign show_add_to_cart = btn_styles.showAddToCart | default: false %}
 {% assign cod_shipping_options = shop.metafields.fox_cod.shipping_options | default: '{}' %}
 
 {% comment %} Partial COD Settings {% endcomment %}
@@ -166,13 +167,19 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700&family=Cormorant+Garamond:wght@400;500;600;700&family=Abril+Fatface:wght@400;500;600;700&family=Syne:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 
 <style>
-  #shopify-section-{{ section.id }} form[action*="/cart/add"],
-  #shopify-section-{{ section.id }} .shopify-payment-button,
-  #shopify-section-{{ section.id }} button[name="add"] {
+  #shopify-section-{{ section.id }} .shopify-payment-button {
     display: none !important;
     visibility: hidden !important;
     opacity: 0 !important;
   }
+  {% unless show_add_to_cart == true or show_add_to_cart == 'true' %}
+  #shopify-section-{{ section.id }} button[name="add"],
+  #shopify-section-{{ section.id }} .product-form__submit {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+  }
+  {% endunless %}
 </style>
 
 <div id="fox-cod-root-{{ block.id }}" class="foxcod-block-root" data-fox-cod-root data-product-id="{{ product.id }}" {{ block.shopify_attributes }}>
