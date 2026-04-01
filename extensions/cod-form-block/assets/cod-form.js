@@ -661,7 +661,6 @@
       initializeProduct(productId, config);
       hydratePublicSettings(config);
   }
-  }
 
   /**
    * Generate animation CSS classes based on config
