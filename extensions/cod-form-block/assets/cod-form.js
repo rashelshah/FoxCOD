@@ -364,6 +364,7 @@
     config.statusElement.hidden = false;
     config.statusElement.textContent = message;
     config.statusElement.setAttribute('data-tone', tone || 'info');
+    config.statusElement.style.display = 'block';
   }
 
   function setFormMessage(form, type, message) {
@@ -437,6 +438,99 @@
         element.style.display = 'none';
       });
     });
+  }
+
+  function hideSuccessModal(config) {
+    var modal = getModalContainer(config);
+    var overlay = getModalOverlay(config);
+
+    if (modal) {
+      modal.classList.remove('visible');
+      modal.style.display = 'none';
+    }
+
+    if (overlay) {
+      overlay.style.display = 'none';
+    }
+
+    document.body.style.overflow = '';
+  }
+
+  function validateOrderPayload(payload) {
+    if (!payload.variantId) throw new Error('Missing variant_id');
+    if (!payload.customerPhone || !String(payload.customerPhone).trim()) throw new Error('Phone required');
+    if (!payload.customerName || !String(payload.customerName).trim()) throw new Error('Name required');
+  }
+
+  function createOrderWithRetry(config, payload, retries) {
+    var remainingRetries = typeof retries === 'number' ? retries : 2;
+
+    return requestProxyJson(config, '/api/order', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    }).catch(function(err) {
+      if (remainingRetries > 0) {
+        return createOrderWithRetry(config, payload, remainingRetries - 1);
+      }
+      throw err;
+    });
+  }
+
+  function pollForFinalOrderName(config, pollingOrderId, fallbackOrderId) {
+    var attempts = 0;
+    var intervalId = setInterval(function() {
+      attempts++;
+      if (attempts > 10) {
+        clearInterval(intervalId);
+        return;
+      }
+
+      requestProxyJson(config, '/api/get-order-status?orderId=' + pollingOrderId)
+        .then(function(statusData) {
+          if (statusData.success && statusData.order && statusData.order.shopify_order_name) {
+            clearInterval(intervalId);
+            setBlockStatus(config, 'Order placed successfully! Order ID: ' + statusData.order.shopify_order_name, 'success');
+          } else if (fallbackOrderId) {
+            setBlockStatus(config, 'Order placed successfully! Order ID: ' + fallbackOrderId, 'success');
+          }
+        })
+        .catch(function(err) {
+          console.warn('[COD Form] Poll error:', err.message);
+        });
+    }, 1500);
+  }
+
+  function handleOrderSuccess(config, form, submitBtn, originalBtnText, result) {
+    if (!config || config._orderPlaced) return;
+
+    config._orderPlaced = true;
+    config._isSubmitting = false;
+
+    var orderId = result && (result.orderName || result.orderId || result.id) ? (result.orderName || result.orderId || result.id) : 'Placed';
+
+    hideSuccessModal(config);
+    setFormMessage(form, 'success', 'Order placed successfully! Order ID: ' + orderId);
+    setBlockStatus(config, 'Order placed successfully! Order ID: ' + orderId, 'success');
+
+    if (config.triggerElement) {
+      config.triggerElement.disabled = true;
+      config.triggerElement.textContent = 'Order Placed';
+      config.triggerElement.setAttribute('aria-busy', 'false');
+    }
+
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Order Placed';
+    }
+
+    try { localStorage.removeItem('foxcod_checkout_state'); } catch (e) {}
+
+    if (result && result.orderId) {
+      pollForFinalOrderName(config, result.orderId, orderId);
+    }
   }
 
   function mountBlockRoot(productId, config, state) {
@@ -4043,6 +4137,10 @@ function darkenColor(hex, percent) {
         return;
     }
 
+    if (config && config._orderPlaced) {
+        return;
+    }
+
     var modal = getModalContainer(config);
     var overlay = getModalOverlay(config);
     var form = getOrderFormElement(config);
@@ -5079,6 +5177,14 @@ function darkenColor(hex, percent) {
       e.preventDefault();
       var form = e.target;
 
+      if (config && config._orderPlaced) {
+          return;
+      }
+
+      if (config && config._isSubmitting) {
+          return;
+      }
+
       // ── Field Validation ──
       var requiredFields = form.querySelectorAll('[data-required="true"]');
       var firstInvalid = null;
@@ -5192,6 +5298,7 @@ function darkenColor(hex, percent) {
 
       var submitBtn = form.querySelector('button[type="submit"]');
       var originalBtnText = submitBtn.textContent;
+      config._isSubmitting = true;
       
       submitBtn.disabled = true;
       submitBtn.textContent = 'Processing...';
@@ -5267,11 +5374,23 @@ function darkenColor(hex, percent) {
           payload.customFieldData = customFieldData;
       }
 
+      try {
+          validateOrderPayload(payload);
+      } catch (validationError) {
+          config._isSubmitting = false;
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalBtnText;
+          setFormMessage(form, 'error', validationError.message || 'Please complete the required fields.');
+          setBlockStatus(config, validationError.message || 'Please complete the required fields.', 'warning');
+          return;
+      }
+
       // ── Fraud Protection: client-side validation ──
       var fraudResult = validateFraudProtection(payload);
       if (!fraudResult.allowed) {
           console.warn('[COD Form] Blocked by fraud protection:', fraudResult.message);
           showFraudBlockPopup(fraudResult.message);
+          config._isSubmitting = false;
           submitBtn.disabled = false;
           submitBtn.textContent = originalBtnText;
           return;
@@ -5379,21 +5498,23 @@ function darkenColor(hex, percent) {
           .then(function(result) {
               console.log('[COD Form] Partial COD response:', result);
               
-              if (result.success && result.checkoutUrl) {
-                  // Redirect to Shopify checkout
-                  window.location.href = result.checkoutUrl;
-              } else {
-                  submitBtn.disabled = false;
-                  submitBtn.textContent = originalBtnText;
-                  setFormMessage(form, 'error', result.error || 'Unable to create checkout right now. Please try again.');
+	              if (result.success && result.checkoutUrl) {
+	                  // Redirect to Shopify checkout
+	                  window.location.href = result.checkoutUrl;
+	              } else {
+	                  config._isSubmitting = false;
+	                  submitBtn.disabled = false;
+	                  submitBtn.textContent = originalBtnText;
+	                  setFormMessage(form, 'error', result.error || 'Unable to create checkout right now. Please try again.');
                   setBlockStatus(config, 'Checkout could not be started. The form is still available to try again.', 'warning');
               }
           })
-          .catch(function(err) {
-              console.error('[COD Form] Partial COD error:', err);
-              submitBtn.disabled = false;
-              submitBtn.textContent = originalBtnText;
-              setFormMessage(form, 'error', err.message || 'Network error. Please try again.');
+	          .catch(function(err) {
+	              console.error('[COD Form] Partial COD error:', err);
+	              config._isSubmitting = false;
+	              submitBtn.disabled = false;
+	              submitBtn.textContent = originalBtnText;
+	              setFormMessage(form, 'error', err.message || 'Network error. Please try again.');
               setBlockStatus(config, 'Live checkout request failed. The form stays visible so the customer can retry.', 'warning');
           });
 
@@ -5431,22 +5552,13 @@ function darkenColor(hex, percent) {
       }
 
       // Full COD: Send to regular backend
-      requestProxyJson(config, '/api/orders/', {
-          method: 'POST',
-          headers: {
-              'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(payload)
-      })
+      createOrderWithRetry(config, payload, 2)
       .then(function(result) {
           console.log('[COD Form] Order response:', result);
           
           if (result.success) {
               // Save customer data to LocalStorage for future auto-fill
               saveCustomerToLocalStorage(form);
-              // Clear persistent checkout state after successful order
-              // Set flag to prevent auto-save from re-writing during reset
-              window._foxcodOrderComplete = true;
               localStorage.removeItem('foxcod_checkout_state');
 
               // ── Pixel Tracking: Purchase ──
@@ -5464,210 +5576,14 @@ function darkenColor(hex, percent) {
               }
               console.log('[FoxCod Pixels] Correct Purchase total:', purchaseValue);
               foxCodTrackEvent('Purchase', { value: purchaseValue, currency: (FoxCod.currencyConfig && FoxCod.currencyConfig.code) || 'USD' });
-              
-              // Close the main checkout modal immediately
-              closeModal(productId);
-              
-              // Reset the form
-              var modalContainerAfterSuccess = getModalContainer(config);
-              var f = modalContainerAfterSuccess ? modalContainerAfterSuccess.querySelector('form') : null;
-              if (f) {
-                  f.reset();
-                  // Reset dynamic displays if any form fields were hidden
-                  f.querySelectorAll('.cod-dynamic-fields-container, button[type=submit], .cod-total, .cod-order-summary, .cod-product-info, .cod-form-headers, .cod-shipping-section').forEach(function(e){
-                      e.style.display = e.classList.contains('cod-product-info') || e.classList.contains('cod-total') ? 'flex' : '';
-                  });
-              }
-              // Clear checkout state again after reset (form.reset may trigger auto-save)
-              localStorage.removeItem('foxcod_checkout_state');
-              // Set flag so the next openModal knows to reset the form
-              localStorage.setItem('foxcod_order_just_completed', 'true');
-              // Allow auto-save to resume after a delay
-              setTimeout(function() { window._foxcodOrderComplete = false; }, 1000);
-
-              // Create and show premium global success modal
-              var overlay = document.createElement('div');
-              overlay.className = 'fox-cod-success-overlay';
-              
-              var successMessage = config.successMessage || 'Your order has been placed successfully!';
-              var orderIdDisplay = 'Generating...';
-              var pollingOrderId = result.orderId;
-              
-              overlay.innerHTML = `
-                <style>
-                  .fox-cod-success-overlay {
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    width: 100vw;
-                    height: 100vh;
-                    background: rgba(0, 0, 0, 0.4);
-                    backdrop-filter: blur(8px);
-                    -webkit-backdrop-filter: blur(8px);
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    z-index: 2147483647;
-                    opacity: 0;
-                    animation: foxCodFadeIn 0.3s ease forwards;
-                    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-                    padding: 20px;
-                    box-sizing: border-box;
-                  }
-                  .fox-cod-success-modal {
-                    background: #ffffff;
-                    width: 100%;
-                    max-width: 420px;
-                    border-radius: 24px;
-                    padding: 40px 32px;
-                    text-align: center;
-                    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-                    transform: translateY(20px) scale(0.95);
-                    opacity: 0;
-                    animation: foxCodSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards 0.1s;
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                    box-sizing: border-box;
-                  }
-                  .fox-cod-success-icon {
-                    width: 72px;
-                    height: 72px;
-                    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-                    border-radius: 50%;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    margin-bottom: 24px;
-                    box-shadow: 0 12px 24px rgba(16, 185, 129, 0.3);
-                  }
-                  .fox-cod-success-icon svg {
-                    width: 36px;
-                    height: 36px;
-                    color: white;
-                  }
-                  .fox-cod-success-modal h2 {
-                    font-size: 24px !important;
-                    font-weight: 800 !important;
-                    color: #111827 !important;
-                    margin: 0 0 12px 0 !important;
-                    line-height: 1.2 !important;
-                    letter-spacing: -0.02em !important;
-                  }
-                  .fox-cod-success-modal p {
-                    font-size: 15px !important;
-                    color: #4b5563 !important;
-                    margin: 0 0 24px 0 !important;
-                    line-height: 1.5 !important;
-                  }
-                  .fox-cod-order-box {
-                    background: #f9fafb;
-                    border: 1px dashed #d1d5db;
-                    border-radius: 12px;
-                    padding: 16px;
-                    width: 100%;
-                    box-sizing: border-box;
-                  }
-                  .fox-cod-order-label {
-                    display: block;
-                    font-size: 12px !important;
-                    color: #6b7280 !important;
-                    text-transform: uppercase;
-                    letter-spacing: 0.05em;
-                    font-weight: 600 !important;
-                    margin-bottom: 6px !important;
-                  }
-                  .fox-cod-order-id {
-                    font-size: 22px !important;
-                    color: #111827 !important;
-                    font-weight: 800 !important;
-                    letter-spacing: 0.02em;
-                    margin: 0 !important;
-                  }
-                  @keyframes foxCodFadeIn {
-                    from { opacity: 0; }
-                    to { opacity: 1; }
-                  }
-                  @keyframes foxCodSlideUp {
-                    from { opacity: 0; transform: translateY(20px) scale(0.95); }
-                    to { opacity: 1; transform: translateY(0) scale(1); }
-                  }
-                  @keyframes foxCodFadeOut {
-                    from { opacity: 1; }
-                    to { opacity: 0; }
-                  }
-                  @keyframes foxCodSlideDown {
-                    from { opacity: 1; transform: translateY(0) scale(1); }
-                    to { opacity: 0; transform: translateY(20px) scale(0.95); }
-                  }
-                </style>
-                <div class="fox-cod-success-modal">
-                  <div class="fox-cod-success-icon">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                      <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
-                    </svg>
-                  </div>
-                  <h2>Order Confirmed!</h2>
-                  <p>${successMessage}</p>
-                  <div class="fox-cod-order-box">
-                    <span class="fox-cod-order-label">Order ID</span>
-                    <p class="fox-cod-order-id">${orderIdDisplay}</p>
-                  </div>
-                </div>
-              `;
-              
-              document.body.appendChild(overlay);
-
-              // Poll for Shopify order name (background sync runs async)
-              var pollAttempts = 0;
-              var pollInterval = setInterval(function() {
-                  pollAttempts++;
-                  if (pollAttempts > 10) {
-                      clearInterval(pollInterval);
-                      // Fallback: show the local order name
-                      var orderEl = overlay.querySelector('.fox-cod-order-id');
-                      if (orderEl && orderEl.textContent === 'Generating...') {
-                          orderEl.textContent = result.orderName || result.orderId || 'Placed';
-                      }
-                      return;
-                  }
-                  requestProxyJson(config, '/api/get-order-status?orderId=' + pollingOrderId)
-                      .then(function(statusData) {
-                          if (statusData.success && statusData.order && statusData.order.shopify_order_name) {
-                              clearInterval(pollInterval);
-                              var orderEl = overlay.querySelector('.fox-cod-order-id');
-                              if (orderEl) {
-                                  orderEl.textContent = statusData.order.shopify_order_name;
-                                  orderEl.style.color = '#059669';
-                              }
-                              console.log('[COD Form] Order ID updated:', statusData.order.shopify_order_name);
-                          }
-                      })
-                      .catch(function(err) {
-                          console.warn('[COD Form] Poll error:', err.message);
-                      });
-              }, 1500);
-
-              // Auto-close after 6 seconds (gives polling time to resolve)
-              setTimeout(function() {
-                  clearInterval(pollInterval);
-                  if (overlay.parentNode) {
-                      overlay.style.animation = 'foxCodFadeOut 0.3s ease forwards';
-                      var modalContent = overlay.querySelector('.fox-cod-success-modal');
-                      if (modalContent) modalContent.style.animation = 'foxCodSlideDown 0.3s ease forwards';
-                      setTimeout(function() {
-                          if (overlay.parentNode) {
-                              overlay.remove();
-                          }
-                      }, 300);
-                  }
-              }, 6000);
+              handleOrderSuccess(config, form, submitBtn, originalBtnText, result);
           } else {
               throw new Error(result.error || result.message || 'Order failed');
           }
       })
-      .catch(err => {
+      .catch(function(err) {
           console.error('[COD Form] Error:', err);
+          config._isSubmitting = false;
           submitBtn.disabled = false;
           submitBtn.textContent = originalBtnText;
           setFormMessage(form, 'error', err.message || 'Something went wrong. Please try again.');

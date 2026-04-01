@@ -330,7 +330,6 @@ export async function logOrder(order: OrderLogEntry) {
         status: 'pending',
         sync_status: 'pending_sync',
         sync_attempts: 0,
-        created_at: new Date().toISOString(),
     };
     if (order.city != null) insertPayload.city = order.city;
     if (order.state != null) insertPayload.state = order.state;

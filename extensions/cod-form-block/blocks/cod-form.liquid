@@ -165,9 +165,19 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600;700&family=Cormorant+Garamond:wght@400;500;600;700&family=Abril+Fatface:wght@400;500;600;700&family=Syne:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 
+<style>
+  #shopify-section-{{ section.id }} form[action*="/cart/add"],
+  #shopify-section-{{ section.id }} .shopify-payment-button,
+  #shopify-section-{{ section.id }} button[name="add"] {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+  }
+</style>
+
 <div id="fox-cod-root-{{ block.id }}" class="foxcod-block-root" data-fox-cod-root data-product-id="{{ product.id }}" {{ block.shopify_attributes }}>
   <div class="foxcod-block-shell" data-foxcod-shell>
-    <button type="button" class="foxcod-block-trigger" data-foxcod-trigger aria-busy="false">
+    <button type="button" class="foxcod-block-trigger" data-foxcod-trigger aria-busy="false" style="display:block !important; opacity:1 !important;">
       {{ cod_button_text | default: 'Buy with COD' }}
     </button>
     <p class="foxcod-block-status" data-foxcod-status hidden></p>
@@ -430,6 +440,10 @@
 
   .foxcod-block-status[data-tone="warning"] {
     color: #b45309;
+  }
+
+  .foxcod-block-status[data-tone="success"] {
+    color: #059669;
   }
 
   .foxcod-block-status[data-tone="error"] {
