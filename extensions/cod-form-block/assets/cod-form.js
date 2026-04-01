@@ -2938,6 +2938,10 @@ function darkenColor(hex, percent) {
       var styles = config.styles || {};
       // Field background color chosen in the form builder (falls back to a soft grey)
       var fieldBg = styles.fieldBackgroundColor || '#f3f4f6';
+      // Icon colors — match the same variables used by form field icons and payment section
+      var shippingIconColor = styles.iconColor || '#6b7280';
+      var shippingIconBg = styles.iconBackground || 'transparent';
+      var shippingAccent = config.accentColor;
 
       var container = document.createElement('div');
       container.className = 'cod-shipping-section';
@@ -2972,53 +2976,44 @@ function darkenColor(hex, percent) {
 
       applicableRates.forEach(function(rate, index) {
           var card = document.createElement('label');
-          card.style.cssText = 'display:flex;align-items:center;gap:12px;padding:12px 14px;border:2px solid #e5e7eb;border-radius:10px;cursor:pointer;margin-bottom:8px;background:#fff;transition:all 0.2s ease;';
-          
+          card.style.cssText = 'display:flex;align-items:center;gap:12px;padding:12px 14px;border:2px solid #e5e7eb;border-radius:10px;cursor:pointer;margin-bottom:8px;background:#fff;transition:all 0.2s ease;position:relative;';
+
+          // Hidden native radio (keeps form value submission working)
           var radio = document.createElement('input');
           radio.type = 'radio';
           radio.name = 'shipping_method';
           radio.value = rate.id;
           radio.setAttribute('data-price', rate.price);
           radio.setAttribute('data-label', rate.name || '');
-          radio.style.cssText = 'accent-color:' + config.accentColor + ';width:18px;height:18px;flex-shrink:0;cursor:pointer;margin:0;';
-          
-          // Add change listener to update total and card styles
-          radio.addEventListener('change', function() {
-              updateTotalHelper(form, config, rate.price);
-              // Update all card styles
-              var allCards = container.querySelectorAll('label');
-              allCards.forEach(function(c) {
-                  var r = c.querySelector('input[type="radio"]');
-                  if (r && r.checked) {
-                      c.style.borderColor = config.accentColor;
-                      c.style.background = fieldBg;
-                      c.style.boxShadow = '0 0 0 1px ' + config.accentColor + ', 0 0 0 4px ' + (hexToRgba(config.accentColor, 0.2) || 'transparent');
-                  } else {
-                      c.style.borderColor = '#e5e7eb';
-                      c.style.background = '#fff';
-                      c.style.boxShadow = 'none';
-                  }
-              });
-          });
+          radio.style.cssText = 'position:absolute;opacity:0;width:0;height:0;pointer-events:none;';
 
-          // Text content area
+          card.appendChild(radio);
+
+          // ── Left: icon pill (matches payment section icon style) ──
+          var shippingIconPill = document.createElement('div');
+          shippingIconPill.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>';
+          shippingIconPill.style.cssText = 'display:flex;align-items:center;justify-content:center;flex-shrink:0;width:36px;height:36px;border-radius:8px;color:' + shippingIconColor + ';background-color:' + (shippingIconBg !== 'transparent' ? shippingIconBg : (hexToRgba(shippingAccent, 0.08) || '#f3f4f6')) + ';';
+
+          // ── Center: name + description ──
           var textDiv = document.createElement('div');
           textDiv.style.cssText = 'flex:1;min-width:0;';
-          
+
           var nameEl = document.createElement('div');
-          nameEl.style.cssText = 'font-weight:600;font-size:14px;color:#1f2937;margin-bottom:2px;';
+          nameEl.style.cssText = 'font-weight:600;font-size:14px;color:#1f2937;margin-bottom:2px;line-height:1.3;';
           nameEl.textContent = rate.name;
           textDiv.appendChild(nameEl);
-          
-          // Show description as delivery info with icon
+
           if (rate.description) {
               var descEl = document.createElement('div');
-              descEl.style.cssText = 'font-size:12px;color:#6b7280;display:flex;align-items:center;gap:4px;';
+              descEl.style.cssText = 'font-size:12px;color:#6b7280;display:flex;align-items:center;gap:4px;line-height:1.4;';
               descEl.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> ' + rate.description;
               textDiv.appendChild(descEl);
           }
-          
-          // Price badge on the right
+
+          // ── Right: price badge + native radio pill (same line, matches payment section) ──
+          var rightSection = document.createElement('div');
+          rightSection.style.cssText = 'display:flex;align-items:center;gap:10px;flex-shrink:0;';
+
           var priceEl = document.createElement('div');
           priceEl.style.cssText = 'flex-shrink:0;text-align:right;';
           if (rate.price === 0) {
@@ -3027,12 +3022,51 @@ function darkenColor(hex, percent) {
               priceEl.innerHTML = '<span style="font-weight:700;font-size:15px;color:#1f2937;">' + formatMoney(rate.price) + '</span>';
           }
 
-          card.appendChild(radio);
+          // Native radio pill with accent-color (identical to payment section)
+          var radioPill = document.createElement('input');
+          radioPill.type = 'radio';
+          radioPill.name = 'shipping_method_visual';
+          radioPill.tabIndex = -1;
+          radioPill.style.cssText = 'accent-color:' + shippingAccent + ';width:18px;height:18px;flex-shrink:0;cursor:pointer;margin:0;pointer-events:none;';
+          radioPill.checked = false;
+
+          rightSection.appendChild(priceEl);
+          rightSection.appendChild(radioPill);
+
+          card.appendChild(shippingIconPill);
           card.appendChild(textDiv);
-          card.appendChild(priceEl);
+          card.appendChild(rightSection);
           container.appendChild(card);
-          
-          // Neutral hover effects (no blue tint) – lightly hint the field background
+
+          // Add change listener to update total and card styles
+          radio.addEventListener('change', function() {
+              updateTotalHelper(form, config, rate.price);
+              // Update all card styles + sync visual radio pills
+              var allCards = container.querySelectorAll('label');
+              allCards.forEach(function(c) {
+                  var r = c.querySelector('input[name="shipping_method"]');
+                  var rPill = c.querySelector('input[name="shipping_method_visual"]');
+                  var isSelected = r && r.checked;
+                  if (isSelected) {
+                      c.style.borderColor = shippingAccent;
+                      c.style.background = fieldBg;
+                      c.style.boxShadow = '0 0 0 1px ' + shippingAccent + ', 0 0 0 4px ' + (hexToRgba(shippingAccent, 0.2) || 'transparent');
+                  } else {
+                      c.style.borderColor = '#e5e7eb';
+                      c.style.background = '#fff';
+                      c.style.boxShadow = 'none';
+                  }
+                  if (rPill) rPill.checked = isSelected;
+              });
+          });
+
+          // Click on card triggers the hidden radio
+          card.addEventListener('click', function() {
+              radio.checked = true;
+              radio.dispatchEvent(new Event('change', { bubbles: true }));
+          });
+
+          // Hover effects
           card.addEventListener('mouseenter', function() {
               if (!radio.checked) { card.style.borderColor = '#d1d5db'; card.style.background = fieldBg; }
           });
@@ -3129,6 +3163,9 @@ function darkenColor(hex, percent) {
       var borderColor = hexToRgba(primaryTheme, 0.35) || '#e5e7eb';
       // Field background from form styling (used when a payment option is selected)
       var fieldBg = styles.fieldBackgroundColor || '#f3f4f6';
+      // Icon colors – match the same variables used by form field icons
+      var iconColor = styles.iconColor || '#6b7280';
+      var iconBackground = styles.iconBackground || 'transparent';
 
       container.style.background = baseBg;
       container.style.borderRadius = '12px';
@@ -3151,7 +3188,6 @@ function darkenColor(hex, percent) {
       var orderTotal = config.productPrice || 0;
       var summaryTotalEl = form.querySelector('#cod-summary-total');
       if (summaryTotalEl) {
-          // Parse the total from the rendered order summary (which includes discounts, shipping, upsells, downsells)
           var totalText = summaryTotalEl.textContent;
           var parsedTotal = parseFloat(totalText.replace(/[^0-9.]/g, '')) || 0;
           if (parsedTotal > 0) {
@@ -3161,17 +3197,25 @@ function darkenColor(hex, percent) {
       var remainingAmount = orderTotal - config.partialCodAdvance;
       if (remainingAmount < 0) remainingAmount = 0;
 
+      // SVG icons for each payment mode — match form field icon style
+      var paymentIcons = {
+          full_cod: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>',
+          partial_cod: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/></svg>'
+      };
+
       var paymentOptions = [
           {
               id: 'full_cod',
-              label: 'Full COD',
+              label: 'Cash On Delivery',
               description: 'Pay ' + formatMoney(orderTotal) + ' on delivery',
+              amount: orderTotal,
               checked: false
           },
           {
               id: 'partial_cod',
               label: 'Partial COD',
               description: 'Pay ' + formatMoney(config.partialCodAdvance) + ' now, ' + formatMoney(remainingAmount) + ' on delivery',
+              amount: config.partialCodAdvance,
               checked: false
           }
       ];
@@ -3180,48 +3224,101 @@ function darkenColor(hex, percent) {
       var originalButtonText = submitBtn ? submitBtn.textContent : 'Place Order';
 
       paymentOptions.forEach(function(opt) {
+          // Hidden native radio (keeps form value submission working)
+          var radio = document.createElement('input');
+          radio.type = 'radio';
+          radio.name = 'payment_method';
+          radio.value = opt.id;
+          radio.checked = opt.checked;
+          radio.style.position = 'absolute';
+          radio.style.opacity = '0';
+          radio.style.width = '0';
+          radio.style.height = '0';
+          radio.style.pointerEvents = 'none';
+
           var row = document.createElement('label');
           row.style.display = 'flex';
-          row.style.alignItems = 'flex-start';
+          row.style.alignItems = 'center';
           row.style.gap = '12px';
-          row.style.padding = '14px';
+          row.style.padding = '12px 14px';
           row.style.background = opt.checked ? fieldBg : '#fff';
           row.style.borderRadius = '10px';
           row.style.border = '2px solid ' + (opt.checked ? config.accentColor : '#e5e7eb');
           row.style.boxShadow = opt.checked ? ('0 0 0 1px ' + config.accentColor + ', 0 0 0 4px ' + (hexToRgba(config.accentColor, 0.2) || 'transparent')) : 'none';
           row.style.cursor = 'pointer';
           row.style.transition = 'all 0.2s ease';
+          row.style.position = 'relative';
 
-          var radio = document.createElement('input');
-          radio.type = 'radio';
-          radio.name = 'payment_method';
-          radio.value = opt.id;
-          radio.checked = opt.checked;
-          var row_isChecked = opt.checked;
-          radio.style.marginTop = '2px';
-          radio.style.accentColor = config.accentColor;
+          row.appendChild(radio);
 
+          // ── Left: icon pill (matches form field icon style) ──
+          var iconPill = document.createElement('div');
+          iconPill.innerHTML = paymentIcons[opt.id] || paymentIcons['full_cod'];
+          iconPill.style.display = 'flex';
+          iconPill.style.alignItems = 'center';
+          iconPill.style.justifyContent = 'center';
+          iconPill.style.flexShrink = '0';
+          iconPill.style.width = '36px';
+          iconPill.style.height = '36px';
+          iconPill.style.borderRadius = '8px';
+          iconPill.style.color = iconColor;
+          iconPill.style.backgroundColor = iconBackground !== 'transparent' ? iconBackground : (hexToRgba(primaryTheme, 0.08) || '#f3f4f6');
+          iconPill.style.transition = 'background-color 0.2s ease, color 0.2s ease';
+
+          // ── Center: label + description ──
           var textContainer = document.createElement('div');
           textContainer.style.flex = '1';
-          
+          textContainer.style.minWidth = '0';
+
           var labelText = document.createElement('div');
           labelText.textContent = opt.label;
           labelText.style.fontWeight = '600';
           labelText.style.color = '#1f2937';
           labelText.style.fontSize = '14px';
+          labelText.style.lineHeight = '1.3';
 
           var descText = document.createElement('div');
           descText.textContent = opt.description;
           descText.setAttribute('data-payment-desc', opt.id);
           descText.style.color = '#6b7280';
-          descText.style.fontSize = '13px';
+          descText.style.fontSize = '12px';
           descText.style.marginTop = '2px';
+          descText.style.lineHeight = '1.4';
 
           textContainer.appendChild(labelText);
           textContainer.appendChild(descText);
 
-          row.appendChild(radio);
+          // ── Right: amount + radio pill (same line, matches shipping section logic) ──
+          var rightSection = document.createElement('div');
+          rightSection.style.display = 'flex';
+          rightSection.style.flexDirection = 'row';
+          rightSection.style.alignItems = 'center';
+          rightSection.style.gap = '10px';
+          rightSection.style.flexShrink = '0';
+
+          var amountEl = document.createElement('div');
+          amountEl.setAttribute('data-payment-amount', opt.id);
+          amountEl.textContent = formatMoney(opt.amount);
+          amountEl.style.fontWeight = '700';
+          amountEl.style.fontSize = '15px';
+          amountEl.style.color = '#1f2937';
+          amountEl.style.lineHeight = '1';
+
+          // Native radio pill — matches shipping section (accent-color driven)
+          var pill = document.createElement('input');
+          pill.type = 'radio';
+          pill.name = 'payment_method_visual';
+          pill.className = 'cod-pm-pill';
+          pill.tabIndex = -1;
+          pill.style.cssText = 'accent-color:' + config.accentColor + ';width:18px;height:18px;flex-shrink:0;cursor:pointer;margin:0;pointer-events:none;';
+          pill.checked = opt.checked;
+
+          rightSection.appendChild(amountEl);
+          rightSection.appendChild(pill);
+
+          row.appendChild(iconPill);
           row.appendChild(textContainer);
+          row.appendChild(rightSection);
           optionsWrapper.appendChild(row);
 
           // Mouse events for hover
@@ -3238,23 +3335,32 @@ function darkenColor(hex, percent) {
               }
           });
 
-          // Change event to update UI and button text
+          // Click on the row triggers radio check
+          row.addEventListener('click', function() {
+              radio.checked = true;
+              radio.dispatchEvent(new Event('change', { bubbles: true }));
+          });
+
+          // Change event: update row styles + native radio pills (matches shipping section logic)
           radio.addEventListener('change', function() {
-              // Update all row styles
               var allRows = optionsWrapper.querySelectorAll('label');
               allRows.forEach(function(r) {
-                  var rInput = r.querySelector('input[type="radio"]');
+                  var rInput = r.querySelector('input[type="radio"][name="payment_method"]');
                   if (!rInput) return;
                   var isSelected = rInput.checked;
                   r.style.borderColor = isSelected ? config.accentColor : '#e5e7eb';
-                  // Selected option uses the same background color as form fields
                   r.style.background = isSelected ? fieldBg : '#fff';
                   r.style.boxShadow = isSelected ? ('0 0 0 1px ' + config.accentColor + ', 0 0 0 4px ' + (hexToRgba(config.accentColor, 0.2) || 'transparent')) : 'none';
+
+                  // Sync the visual native radio pill
+                  var rPill = r.querySelector('.cod-pm-pill');
+                  if (rPill) {
+                      rPill.checked = isSelected;
+                  }
               });
 
               // Update submit button text and styling
               if (submitBtn) {
-                  // Always restore the seller's configured submit button styling
                   applySubmitButtonStyles(submitBtn, config);
                   if (opt.id === 'partial_cod') {
                       submitBtn.textContent = 'Pay ' + formatMoney(config.partialCodAdvance) + ' Now';
@@ -3272,7 +3378,6 @@ function darkenColor(hex, percent) {
       // If no marker exists, fall back to inserting before the submit button.
       var marker = form.querySelector('.cod-section-marker[data-section="payment_mode"]');
       if (marker) {
-          // Will be moved by the marker logic — just append to form for now
           form.appendChild(container);
       } else {
           var submitBtn2 = form.querySelector('button[type="submit"]');
@@ -3344,7 +3449,7 @@ function darkenColor(hex, percent) {
       var paymentContainer = form.querySelector('.cod-payment-method-options');
       if (!paymentContainer) return;
       
-      // Update Full COD description
+      // Update Full COD description and right-side amount
       var fullCodRadio = paymentContainer.querySelector('input[name="payment_method"][value="full_cod"]');
       if (fullCodRadio) {
           var fullCodRow = fullCodRadio.closest('label');
@@ -3353,10 +3458,14 @@ function darkenColor(hex, percent) {
               if (descEl) {
                   descEl.textContent = 'Pay ' + formatMoney(orderTotal) + ' on delivery';
               }
+              var amountEl = fullCodRow.querySelector('[data-payment-amount="full_cod"]');
+              if (amountEl) {
+                  amountEl.textContent = formatMoney(orderTotal);
+              }
           }
       }
       
-      // Update Partial COD description
+      // Update Partial COD description and right-side amount
       var partialCodRadio = paymentContainer.querySelector('input[name="payment_method"][value="partial_cod"]');
       if (partialCodRadio) {
           var partialRow = partialCodRadio.closest('label');
@@ -3364,6 +3473,10 @@ function darkenColor(hex, percent) {
               var descEl = partialRow.querySelector('[data-payment-desc]');
               if (descEl) {
                   descEl.textContent = 'Pay ' + formatMoney(partialAdvance) + ' now, ' + formatMoney(remainingAmount) + ' on delivery';
+              }
+              var amountEl = partialRow.querySelector('[data-payment-amount="partial_cod"]');
+              if (amountEl) {
+                  amountEl.textContent = formatMoney(partialAdvance);
               }
           }
       }

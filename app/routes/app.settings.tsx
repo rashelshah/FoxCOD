@@ -836,7 +836,7 @@ const PreviewDisplay = memo(({
     // Get modal container styles based on modalStyle and formStyles
     const getModalStyle = () => {
         console.log('[Modal] Background color from formStyles:', formStyles?.backgroundColor);
-        const userBgColor = formStyles?.backgroundColor || '#ffffff';
+        const userBgColor = (formStyles as any)?.background || formStyles?.backgroundColor || '#ffffff';
 
         // Shadow intensity slider (0–100) mapped to a softer modal shadow
         const rawIntensity = formStyles?.shadowIntensity;
@@ -1102,48 +1102,64 @@ const PreviewDisplay = memo(({
                                                     {hasNewRates ? (
                                                         shippingRates.filter((r: any) => r.is_active).slice(0, 3).map((rate: any, idx: number) => (
                                                             <div key={rate.id} style={{
-                                                                display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px',
+                                                                display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px',
                                                                 border: idx === 0 ? `2px solid ${formThemeColor}` : '2px solid #e5e7eb',
-                                                                borderRadius: '10px', background: idx === 0 ? 'rgba(99,102,241,0.04)' : '#fff',
+                                                                borderRadius: '10px',
+                                                                background: idx === 0 ? `${formThemeColor}08` : '#fff',
+                                                                boxShadow: idx === 0 ? `0 0 0 1px ${formThemeColor}, 0 0 0 4px ${formThemeColor}33` : 'none',
                                                                 marginBottom: '6px', cursor: 'default'
                                                             }}>
-                                                                <input type="radio" name="shipping-preview" disabled checked={idx === 0} style={{ width: '14px', height: '14px', accentColor: formThemeColor, flexShrink: 0 }} />
+                                                                {/* Icon pill */}
+                                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '30px', height: '30px', borderRadius: '7px', color: (formStyles as any)?.iconColor || '#6b7280', backgroundColor: `${formThemeColor}14` }}>
+                                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
+                                                                </div>
+                                                                {/* Center: name + description */}
                                                                 <div style={{ flex: 1, minWidth: 0 }}>
-                                                                    <div style={{ fontWeight: 600, fontSize: '12px', color: '#1f2937', marginBottom: '1px' }}>{rate.name}</div>
+                                                                    <div style={{ fontWeight: 600, fontSize: '12px', color: '#1f2937', marginBottom: '1px', lineHeight: 1.3 }}>{rate.name}</div>
                                                                     {rate.description && (
-                                                                        <div style={{ fontSize: '10px', color: '#6b7280', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                                                        <div style={{ fontSize: '10px', color: '#6b7280', display: 'flex', alignItems: 'center', gap: '3px', lineHeight: 1.4 }}>
                                                                             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
                                                                             {rate.description}
                                                                         </div>
                                                                     )}
                                                                 </div>
-                                                                <div style={{ flexShrink: 0 }}>
+                                                                {/* Right: price + radio pill */}
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                                                                     {rate.price === 0 ? (
                                                                         <span style={{ background: '#10b981', color: 'white', padding: '3px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 600 }}>FREE</span>
                                                                     ) : (
                                                                         <span style={{ fontWeight: 700, fontSize: '12px', color: '#1f2937' }}>{fmtCurrency(rate.price)}</span>
                                                                     )}
+                                                                    <input type="radio" name="shipping-preview" disabled checked={idx === 0} style={{ width: '14px', height: '14px', accentColor: formThemeColor, flexShrink: 0, margin: 0 }} />
                                                                 </div>
                                                             </div>
                                                         ))
                                                     ) : (
                                                         shippingOpts.options?.slice(0, 2).map((opt: any) => (
                                                             <div key={opt.id} style={{
-                                                                display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px',
+                                                                display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px',
                                                                 border: opt.id === shippingOpts.defaultOption ? `2px solid ${formThemeColor}` : '2px solid #e5e7eb',
-                                                                borderRadius: '10px', background: opt.id === shippingOpts.defaultOption ? 'rgba(99,102,241,0.04)' : '#fff',
+                                                                borderRadius: '10px',
+                                                                background: opt.id === shippingOpts.defaultOption ? `${formThemeColor}08` : '#fff',
+                                                                boxShadow: opt.id === shippingOpts.defaultOption ? `0 0 0 1px ${formThemeColor}, 0 0 0 4px ${formThemeColor}33` : 'none',
                                                                 marginBottom: '6px', cursor: 'default'
                                                             }}>
-                                                                <input type="radio" name="shipping-preview" disabled checked={opt.id === shippingOpts.defaultOption} style={{ width: '14px', height: '14px', accentColor: formThemeColor, flexShrink: 0 }} />
-                                                                <div style={{ flex: 1, minWidth: 0 }}>
-                                                                    <div style={{ fontWeight: 600, fontSize: '12px', color: '#1f2937' }}>{opt.label}</div>
+                                                                {/* Icon pill */}
+                                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '30px', height: '30px', borderRadius: '7px', color: (formStyles as any)?.iconColor || '#6b7280', backgroundColor: `${formThemeColor}14` }}>
+                                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
                                                                 </div>
-                                                                <div style={{ flexShrink: 0 }}>
+                                                                {/* Center */}
+                                                                <div style={{ flex: 1, minWidth: 0 }}>
+                                                                    <div style={{ fontWeight: 600, fontSize: '12px', color: '#1f2937', lineHeight: 1.3 }}>{opt.label}</div>
+                                                                </div>
+                                                                {/* Right: price + radio pill */}
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                                                                     {opt.price === 0 ? (
                                                                         <span style={{ background: '#10b981', color: 'white', padding: '3px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 600 }}>Free</span>
                                                                     ) : (
                                                                         <span style={{ fontWeight: 700, fontSize: '12px', color: '#1f2937' }}>{fmtCurrency(opt.price)}</span>
                                                                     )}
+                                                                    <input type="radio" name="shipping-preview" disabled checked={opt.id === shippingOpts.defaultOption} style={{ width: '14px', height: '14px', accentColor: formThemeColor, flexShrink: 0, margin: 0 }} />
                                                                 </div>
                                                             </div>
                                                         ))
@@ -1233,8 +1249,8 @@ const PreviewDisplay = memo(({
                                                 <div key={field.id} style={{
                                                     marginBottom: '12px', padding: '14px',
                                                     background: formStyles?.fieldBackgroundColor || '#f9fafb',
-                                                    borderRadius: '10px',
-                                                    border: '1px solid #e5e7eb',
+                                                    borderRadius: '12px',
+                                                    border: `1px solid ${formThemeColor}59`,
                                                 }}>
                                                     <div style={{ fontSize: '12px', fontWeight: 600, color: '#1f2937', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>
@@ -1242,26 +1258,44 @@ const PreviewDisplay = memo(({
                                                     </div>
                                                     {/* Full COD option */}
                                                     <label style={{
-                                                        display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '10px',
-                                                        background: '#fff', borderRadius: '8px', border: '2px solid #e5e7eb',
-                                                        marginBottom: '6px', cursor: 'default', fontSize: '11px',
+                                                        display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px',
+                                                        background: '#fff', borderRadius: '10px', border: '2px solid #e5e7eb',
+                                                        marginBottom: '6px', cursor: 'default', position: 'relative',
                                                     }}>
-                                                        <input type="radio" name="preview-payment" disabled style={{ width: '12px', height: '12px', marginTop: '1px', accentColor: formThemeColor }} />
-                                                        <div style={{ flex: 1 }}>
-                                                            <div style={{ fontWeight: 600, color: '#1f2937' }}>Full COD</div>
-                                                            <div style={{ color: '#6b7280', fontSize: '10px', marginTop: '1px' }}>Pay on delivery</div>
+                                                        {/* Icon pill */}
+                                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '30px', height: '30px', borderRadius: '7px', color: (formStyles as any)?.iconColor || '#6b7280', backgroundColor: `${formThemeColor}14` }}>
+                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                                                        </div>
+                                                        {/* Center: label + description */}
+                                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                                            <div style={{ fontWeight: 600, fontSize: '12px', color: '#1f2937', lineHeight: 1.3 }}>Cash On Delivery</div>
+                                                            <div style={{ color: '#6b7280', fontSize: '10px', marginTop: '2px', lineHeight: 1.4 }}>Pay {fmtCurrency(total)} on delivery</div>
+                                                        </div>
+                                                        {/* Right: amount + radio pill */}
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                                                            <span style={{ fontWeight: 700, fontSize: '12px', color: '#1f2937' }}>{fmtCurrency(total)}</span>
+                                                            <input type="radio" name="preview-payment" disabled style={{ width: '14px', height: '14px', accentColor: formThemeColor, flexShrink: 0, margin: 0 }} />
                                                         </div>
                                                     </label>
                                                     {/* Partial COD option */}
                                                     <label style={{
-                                                        display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '10px',
-                                                        background: '#fff', borderRadius: '8px', border: '2px solid #e5e7eb',
-                                                        cursor: 'default', fontSize: '11px',
+                                                        display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px',
+                                                        background: '#fff', borderRadius: '10px', border: '2px solid #e5e7eb',
+                                                        cursor: 'default', position: 'relative',
                                                     }}>
-                                                        <input type="radio" name="preview-payment" disabled style={{ width: '12px', height: '12px', marginTop: '1px', accentColor: formThemeColor }} />
-                                                        <div style={{ flex: 1 }}>
-                                                            <div style={{ fontWeight: 600, color: '#1f2937' }}>Partial COD</div>
-                                                            <div style={{ color: '#6b7280', fontSize: '10px', marginTop: '1px' }}>Pay advance, rest on delivery</div>
+                                                        {/* Icon pill */}
+                                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '30px', height: '30px', borderRadius: '7px', color: (formStyles as any)?.iconColor || '#6b7280', backgroundColor: `${formThemeColor}14` }}>
+                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/></svg>
+                                                        </div>
+                                                        {/* Center: label + description */}
+                                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                                            <div style={{ fontWeight: 600, fontSize: '12px', color: '#1f2937', lineHeight: 1.3 }}>Partial COD</div>
+                                                            <div style={{ color: '#6b7280', fontSize: '10px', marginTop: '2px', lineHeight: 1.4 }}>Pay advance, rest on delivery</div>
+                                                        </div>
+                                                        {/* Right: amount + radio pill */}
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                                                            <span style={{ fontWeight: 700, fontSize: '12px', color: '#1f2937' }}>{fmtCurrency(total)}</span>
+                                                            <input type="radio" name="preview-payment" disabled style={{ width: '14px', height: '14px', accentColor: formThemeColor, flexShrink: 0, margin: 0 }} />
                                                         </div>
                                                     </label>
                                                 </div>

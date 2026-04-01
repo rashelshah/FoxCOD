@@ -738,11 +738,11 @@ export default function UpsellDownsellPage() {
                                                 <h3>Live Preview</h3>
                                             </div>
                                             <div className="pv-phone">
-                                                <div className="pv-phone-screen" ref={tickPreviewRef}>
+                                                <div className="pv-phone-screen" ref={tickPreviewRef} style={{ background: (formSettings?.styles as any)?.background || formSettings?.styles?.backgroundColor || '#ffffff' }}>
 
                                                     {/* Product Section + Form Modal - same structure as Form Builder */}
                                                     {/* Product Section - horizontal layout matching storefront mobile */}
-                                                    <div className="tick-pv-product" style={{ background: formSettings?.styles?.backgroundColor || '#ffffff' }}>
+                                                    <div className="tick-pv-product" style={{ background: (formSettings?.styles as any)?.background || formSettings?.styles?.backgroundColor || '#ffffff' }}>
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingBottom: '10px', borderBottom: '1px solid #e5e5e5', marginBottom: '6px', position: 'relative' }}>
                                                             <div style={{ position: 'relative', flexShrink: 0 }}>
                                                                 <img
@@ -784,7 +784,7 @@ export default function UpsellDownsellPage() {
                                                         <div style={(() => {
                                                             const ms = formSettings?.modal_style || 'modern';
                                                             const fs: any = formSettings?.styles || {};
-                                                            const bg = fs.backgroundColor || '#ffffff';
+                                                            const bg = fs.background || fs.backgroundColor || '#ffffff';
                                                             const br = (fs.borderRadius || 12) + 'px';
                                                             const base: any = {
                                                                 background: bg,
@@ -844,7 +844,7 @@ export default function UpsellDownsellPage() {
                                                                 .sort((a: any, b: any) => a.order - b.order)
                                                                 .map((field: any) => {
                                                                     // Shipping section field
-                                                                    if (field.id === 'shipping') {
+                                                                        if (field.id === 'shipping') {
                                                                         const fsAny: any = formSettings?.styles || {};
                                                                         const themeKey = fsAny.themeKey || 'custom';
                                                                         let formThemeColor = formSettings?.primary_color || '#6366f1';
@@ -870,21 +870,29 @@ export default function UpsellDownsellPage() {
                                                                                 </div>
                                                                                 {formSettings?.shipping_options?.options?.slice(0, 2).map((opt: any) => (
                                                                                     <div key={opt.id} style={{
-                                                                                        display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 10px',
+                                                                                        display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px',
                                                                                         border: opt.id === formSettings?.shipping_options?.defaultOption ? `2px solid ${formThemeColor}` : '2px solid #e5e7eb',
-                                                                                        borderRadius: '8px', background: opt.id === formSettings?.shipping_options?.defaultOption ? 'rgba(99,102,241,0.04)' : '#fff',
+                                                                                        borderRadius: '10px',
+                                                                                        background: opt.id === formSettings?.shipping_options?.defaultOption ? `${formThemeColor}08` : '#fff',
+                                                                                        boxShadow: opt.id === formSettings?.shipping_options?.defaultOption ? `0 0 0 1px ${formThemeColor}, 0 0 0 4px ${formThemeColor}33` : 'none',
                                                                                         marginBottom: '5px', cursor: 'default'
                                                                                     }}>
-                                                                                        <input type="radio" name="tick-shipping-preview" disabled checked={opt.id === formSettings?.shipping_options?.defaultOption} style={{ width: '12px', height: '12px', accentColor: formThemeColor, flexShrink: 0 }} />
-                                                                                        <div style={{ flex: 1, minWidth: 0 }}>
-                                                                                            <div style={{ fontWeight: 600, fontSize: '10px', color: '#1f2937' }}>{opt.label}</div>
+                                                                                        {/* Icon pill */}
+                                                                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '26px', height: '26px', borderRadius: '6px', color: fsAny?.iconColor || '#6b7280', backgroundColor: `${formThemeColor}14` }}>
+                                                                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
                                                                                         </div>
-                                                                                        <div style={{ flexShrink: 0 }}>
+                                                                                        {/* Center */}
+                                                                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                                                                            <div style={{ fontWeight: 600, fontSize: '10px', color: '#1f2937', lineHeight: 1.3 }}>{opt.label}</div>
+                                                                                        </div>
+                                                                                        {/* Right: price + radio pill */}
+                                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                                                                                             {opt.price === 0 ? (
                                                                                                 <span style={{ background: '#10b981', color: 'white', padding: '2px 6px', borderRadius: '5px', fontSize: '9px', fontWeight: 600 }}>Free</span>
                                                                                             ) : (
                                                                                                 <span style={{ fontWeight: 700, fontSize: '11px', color: '#1f2937' }}>{fmtCurrency(opt.price)}</span>
                                                                                             )}
+                                                                                            <input type="radio" name="tick-shipping-preview" disabled checked={opt.id === formSettings?.shipping_options?.defaultOption} style={{ width: '12px', height: '12px', accentColor: formThemeColor, flexShrink: 0, margin: 0 }} />
                                                                                         </div>
                                                                                     </div>
                                                                                 ))}
@@ -899,7 +907,7 @@ export default function UpsellDownsellPage() {
                                                                         const isPresetTheme = themeKey && themeKey !== 'custom';
                                                                         const formBackgroundColor = fsAny.backgroundColor || '#ffffff';
                                                                         // Use priceColor from styles, fallback to primaryColor
-                                                                        const priceColor = fsAny.priceColor || primaryTheme || '#111827';
+                                                                        const priceColor = fsAny.priceColor || formSettings?.primary_color || '#111827';
 
                                                                         const customGreyBg = '#f3f4f6';
                                                                         const customBorder = '1px solid #e5e7eb';
@@ -969,29 +977,44 @@ export default function UpsellDownsellPage() {
                                                                         else if (themeKey === 'ocean_breeze') formThemeColor = '#14b8a6';
                                                                         else if (themeKey === 'default') formThemeColor = '#000000';
 
+                                                                        const tickSubtotal = 1999;
                                                                         return (
                                                                             <div key={field.id} style={{
                                                                                 marginBottom: '12px', padding: '14px',
                                                                                 background: formSettings?.styles?.fieldBackgroundColor || '#f9fafb',
-                                                                                borderRadius: '10px',
-                                                                                border: '1px solid #e5e7eb',
+                                                                                borderRadius: '12px',
+                                                                                border: `1px solid ${formThemeColor}59`,
                                                                             }}>
                                                                                 <div style={{ fontSize: '12px', fontWeight: 600, color: '#1f2937', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>
                                                                                     Payment Method
                                                                                 </div>
-                                                                                <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '10px', background: '#fff', borderRadius: '8px', border: '2px solid #e5e7eb', marginBottom: '6px', cursor: 'default', fontSize: '11px' }}>
-                                                                                    <input type="radio" name="tick-payment-preview" disabled style={{ width: '12px', height: '12px', marginTop: '1px', accentColor: formThemeColor }} />
-                                                                                    <div style={{ flex: 1 }}>
-                                                                                        <div style={{ fontWeight: 600, color: '#1f2937' }}>Full COD</div>
-                                                                                        <div style={{ color: '#6b7280', fontSize: '10px', marginTop: '1px' }}>Pay on delivery</div>
+                                                                                {/* Full COD option */}
+                                                                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', background: '#fff', borderRadius: '10px', border: '2px solid #e5e7eb', marginBottom: '6px', cursor: 'default', position: 'relative' }}>
+                                                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '26px', height: '26px', borderRadius: '6px', color: fsAny?.iconColor || '#6b7280', backgroundColor: `${formThemeColor}14` }}>
+                                                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                                                                                    </div>
+                                                                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                                                                        <div style={{ fontWeight: 600, fontSize: '10px', color: '#1f2937', lineHeight: 1.3 }}>Cash On Delivery</div>
+                                                                                        <div style={{ color: '#6b7280', fontSize: '9px', marginTop: '2px', lineHeight: 1.4 }}>Pay {fmtCurrency(tickSubtotal)} on delivery</div>
+                                                                                    </div>
+                                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                                                                                        <span style={{ fontWeight: 700, fontSize: '11px', color: '#1f2937' }}>{fmtCurrency(tickSubtotal)}</span>
+                                                                                        <input type="radio" name="tick-payment-preview" disabled style={{ width: '12px', height: '12px', accentColor: formThemeColor, flexShrink: 0, margin: 0 }} />
                                                                                     </div>
                                                                                 </label>
-                                                                                <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '10px', background: '#fff', borderRadius: '8px', border: '2px solid #e5e7eb', cursor: 'default', fontSize: '11px' }}>
-                                                                                    <input type="radio" name="tick-payment-preview" disabled style={{ width: '12px', height: '12px', marginTop: '1px', accentColor: formThemeColor }} />
-                                                                                    <div style={{ flex: 1 }}>
-                                                                                        <div style={{ fontWeight: 600, color: '#1f2937' }}>Partial COD</div>
-                                                                                        <div style={{ color: '#6b7280', fontSize: '10px', marginTop: '1px' }}>Pay advance, rest on delivery</div>
+                                                                                {/* Partial COD option */}
+                                                                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px', background: '#fff', borderRadius: '10px', border: '2px solid #e5e7eb', cursor: 'default', position: 'relative' }}>
+                                                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '26px', height: '26px', borderRadius: '6px', color: fsAny?.iconColor || '#6b7280', backgroundColor: `${formThemeColor}14` }}>
+                                                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/></svg>
+                                                                                    </div>
+                                                                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                                                                        <div style={{ fontWeight: 600, fontSize: '10px', color: '#1f2937', lineHeight: 1.3 }}>Partial COD</div>
+                                                                                        <div style={{ color: '#6b7280', fontSize: '9px', marginTop: '2px', lineHeight: 1.4 }}>Pay advance, rest on delivery</div>
+                                                                                    </div>
+                                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                                                                                        <span style={{ fontWeight: 700, fontSize: '11px', color: '#1f2937' }}>{fmtCurrency(tickSubtotal)}</span>
+                                                                                        <input type="radio" name="tick-payment-preview" disabled style={{ width: '12px', height: '12px', accentColor: formThemeColor, flexShrink: 0, margin: 0 }} />
                                                                                     </div>
                                                                                 </label>
                                                                             </div>
@@ -1718,7 +1741,7 @@ export default function UpsellDownsellPage() {
                                             </div>
                                             {editing.show_condition_type === 'specific_products' && (
                                                 <>
-                                                    <Button onClick={pickTrigger}>Select products ({editing.trigger_product_ids?.length || 0} selected)</Button>
+                                                    <Button onClick={() => pickTrigger()}>Select products ({String(editing.trigger_product_ids?.length || 0)} selected)</Button>
                                                     {editing._triggerProducts?.map((p: any) => (
                                                         <div key={p.id} className="prod-row">
                                                             {p.images?.[0] && <img src={p.images[0].originalSrc || p.images[0].url} alt="" />}

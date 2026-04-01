@@ -1092,7 +1092,7 @@ export default function QuantityOffersPage() {
                             </div>
                             <div className="preview-content">
                                 <div className="preview-phone">
-                                    <div className="preview-phone-screen">
+                                    <div className="preview-phone-screen" style={{ background: (formSettings?.styles as any)?.background || formSettings?.styles?.backgroundColor || '#ffffff' }}>
                                         {/* In Product Page placement: show offers on the product page itself */}
                                         {activeGroup && activeGroup.placement === 'in_product_page' ? (
                                             <div style={{ padding: '16px' }}>
@@ -1223,12 +1223,37 @@ export default function QuantityOffersPage() {
                                                
 
                                                 {/* Form Modal Container - Matching Form Builder exactly */}
-                                                <div style={{
-                                                    background: formSettings?.styles?.backgroundColor || '#ffffff',
-                                                    borderRadius: (formSettings?.styles?.borderRadius || 12) + 'px',
-                                                    padding: '16px',
-                                                    boxShadow: formSettings?.styles?.shadow ? '0 4px 6px rgba(0,0,0,0.05)' : 'none',
-                                                }}>
+                                                <div style={(() => {
+                                                    const ms = formSettings?.modal_style || 'modern';
+                                                    const fs: any = formSettings?.styles || {};
+                                                    const bg = fs.background || fs.backgroundColor || '#ffffff';
+                                                    const br = (fs.borderRadius || 12) + 'px';
+                                                    const rawShadow = fs.shadowIntensity;
+                                                    const sliderVal = typeof rawShadow === 'number' ? rawShadow : (fs.shadow ? 35 : 0);
+                                                    const clamped = Math.max(0, Math.min(100, sliderVal));
+                                                    const shadowOpacity = clamped === 0 ? 0 : 0.05 + (clamped / 100) * 0.25;
+                                                    const base: any = {
+                                                        background: bg,
+                                                        borderRadius: br,
+                                                        padding: '16px',
+                                                        transition: 'all 0.3s ease',
+                                                        boxShadow: clamped > 0 ? `0 10px 25px rgba(0,0,0,${shadowOpacity.toFixed(2)})` : 'none',
+                                                    };
+                                                    if (ms === 'glassmorphism') {
+                                                        base.backdropFilter = 'blur(10px)';
+                                                        base.WebkitBackdropFilter = 'blur(10px)';
+                                                        base.border = '1px solid rgba(255,255,255,0.3)';
+                                                        base.boxShadow = clamped > 0 ? `0 8px 32px rgba(0,0,0,${shadowOpacity.toFixed(2)})` : 'none';
+                                                    } else if (ms === 'minimal') {
+                                                        base.border = '1px solid #e5e7eb';
+                                                        base.boxShadow = 'none';
+                                                    } else {
+                                                        base.boxShadow = clamped > 0 ? `0 4px 16px rgba(0,0,0,${shadowOpacity.toFixed(2)})` : '0 4px 6px rgba(0,0,0,0.05)';
+                                                        const bw = fs.borderWidth ?? 0;
+                                                        base.border = bw > 0 ? `${bw}px solid ${fs.borderColor || '#e5e7eb'}` : '1px solid rgba(0,0,0,0.06)';
+                                                    }
+                                                    return base;
+                                                })()}>
                                                     {/* Form Title */}
                                                     <div style={{
                                                         fontWeight: 700,
@@ -1399,21 +1424,29 @@ export default function QuantityOffersPage() {
                                                                         </div>
                                                                         {formSettings?.shipping_options?.options?.slice(0, 2).map((opt: any) => (
                                                                             <div key={opt.id} style={{
-                                                                                display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px',
+                                                                                display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px',
                                                                                 border: opt.id === formSettings?.shipping_options?.defaultOption ? `2px solid ${formThemeColor}` : '2px solid #e5e7eb',
-                                                                                borderRadius: '10px', background: opt.id === formSettings?.shipping_options?.defaultOption ? 'rgba(99,102,241,0.04)' : '#fff',
+                                                                                borderRadius: '10px',
+                                                                                background: opt.id === formSettings?.shipping_options?.defaultOption ? `${formThemeColor}08` : '#fff',
+                                                                                boxShadow: opt.id === formSettings?.shipping_options?.defaultOption ? `0 0 0 1px ${formThemeColor}, 0 0 0 4px ${formThemeColor}33` : 'none',
                                                                                 marginBottom: '6px', cursor: 'default'
                                                                             }}>
-                                                                                <input type="radio" name="shipping-preview" disabled checked={opt.id === formSettings?.shipping_options?.defaultOption} style={{ width: '14px', height: '14px', accentColor: formThemeColor, flexShrink: 0 }} />
-                                                                                <div style={{ flex: 1, minWidth: 0 }}>
-                                                                                    <div style={{ fontWeight: 600, fontSize: '12px', color: '#1f2937' }}>{opt.label}</div>
+                                                                                {/* Icon pill */}
+                                                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '30px', height: '30px', borderRadius: '7px', color: fsAny?.iconColor || '#6b7280', backgroundColor: `${formThemeColor}14` }}>
+                                                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
                                                                                 </div>
-                                                                                <div style={{ flexShrink: 0 }}>
+                                                                                {/* Center */}
+                                                                                <div style={{ flex: 1, minWidth: 0 }}>
+                                                                                    <div style={{ fontWeight: 600, fontSize: '12px', color: '#1f2937', lineHeight: 1.3 }}>{opt.label}</div>
+                                                                                </div>
+                                                                                {/* Right: price + radio pill */}
+                                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                                                                                     {opt.price === 0 ? (
                                                                                         <span style={{ background: '#10b981', color: 'white', padding: '3px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 600 }}>Free</span>
                                                                                     ) : (
                                                                                         <span style={{ fontWeight: 700, fontSize: '12px', color: '#1f2937' }}>{fmtCurrency(opt.price)}</span>
                                                                                     )}
+                                                                                    <input type="radio" name="qo-shipping-preview" disabled checked={opt.id === formSettings?.shipping_options?.defaultOption} style={{ width: '14px', height: '14px', accentColor: formThemeColor, flexShrink: 0, margin: 0 }} />
                                                                                 </div>
                                                                             </div>
                                                                         ))}
@@ -1520,29 +1553,51 @@ export default function QuantityOffersPage() {
                                                                 else if (themeKey === 'ocean_breeze') formThemeColor = '#14b8a6';
                                                                 else if (themeKey === 'default') formThemeColor = '#000000';
 
+                                                                const selectedOffer = activeGroup?.offers?.find((o: any) => o.preselect) || activeGroup?.offers?.[0];
+                                                                const qtyForPayment = selectedOffer?.quantity || 1;
+                                                                const qoTotal = (() => {
+                                                                    const sub = samplePrice * qtyForPayment;
+                                                                    const disc = sub * ((selectedOffer?.discountPercent || 0) / 100);
+                                                                    return sub - disc;
+                                                                })();
+
                                                                 return (
                                                                     <div key={field.id} style={{
                                                                         marginBottom: '12px', padding: '14px',
                                                                         background: formSettings?.styles?.fieldBackgroundColor || '#f9fafb',
-                                                                        borderRadius: '10px',
-                                                                        border: '1px solid #e5e7eb',
+                                                                        borderRadius: '12px',
+                                                                        border: `1px solid ${formThemeColor}59`,
                                                                     }}>
                                                                         <div style={{ fontSize: '12px', fontWeight: 600, color: '#1f2937', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                                                                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>
                                                                             Payment Method
                                                                         </div>
-                                                                        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '10px', background: '#fff', borderRadius: '8px', border: '2px solid #e5e7eb', marginBottom: '6px', cursor: 'default', fontSize: '11px' }}>
-                                                                            <input type="radio" name="qo-payment-preview" disabled style={{ width: '12px', height: '12px', marginTop: '1px', accentColor: formThemeColor }} />
-                                                                            <div style={{ flex: 1 }}>
-                                                                                <div style={{ fontWeight: 600, color: '#1f2937' }}>Full COD</div>
-                                                                                <div style={{ color: '#6b7280', fontSize: '10px', marginTop: '1px' }}>Pay on delivery</div>
+                                                                        {/* Full COD option */}
+                                                                        <label style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: '#fff', borderRadius: '10px', border: '2px solid #e5e7eb', marginBottom: '6px', cursor: 'default', position: 'relative' }}>
+                                                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '30px', height: '30px', borderRadius: '7px', color: fsAny?.iconColor || '#6b7280', backgroundColor: `${formThemeColor}14` }}>
+                                                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                                                                            </div>
+                                                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                                                <div style={{ fontWeight: 600, fontSize: '12px', color: '#1f2937', lineHeight: 1.3 }}>Cash On Delivery</div>
+                                                                                <div style={{ color: '#6b7280', fontSize: '10px', marginTop: '2px', lineHeight: 1.4 }}>Pay {fmtCurrency(qoTotal)} on delivery</div>
+                                                                            </div>
+                                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                                                                                <span style={{ fontWeight: 700, fontSize: '12px', color: '#1f2937' }}>{fmtCurrency(qoTotal)}</span>
+                                                                                <input type="radio" name="qo-payment-preview" disabled style={{ width: '14px', height: '14px', accentColor: formThemeColor, flexShrink: 0, margin: 0 }} />
                                                                             </div>
                                                                         </label>
-                                                                        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '10px', background: '#fff', borderRadius: '8px', border: '2px solid #e5e7eb', cursor: 'default', fontSize: '11px' }}>
-                                                                            <input type="radio" name="qo-payment-preview" disabled style={{ width: '12px', height: '12px', marginTop: '1px', accentColor: formThemeColor }} />
-                                                                            <div style={{ flex: 1 }}>
-                                                                                <div style={{ fontWeight: 600, color: '#1f2937' }}>Partial COD</div>
-                                                                                <div style={{ color: '#6b7280', fontSize: '10px', marginTop: '1px' }}>Pay advance, rest on delivery</div>
+                                                                        {/* Partial COD option */}
+                                                                        <label style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: '#fff', borderRadius: '10px', border: '2px solid #e5e7eb', cursor: 'default', position: 'relative' }}>
+                                                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '30px', height: '30px', borderRadius: '7px', color: fsAny?.iconColor || '#6b7280', backgroundColor: `${formThemeColor}14` }}>
+                                                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/></svg>
+                                                                            </div>
+                                                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                                                <div style={{ fontWeight: 600, fontSize: '12px', color: '#1f2937', lineHeight: 1.3 }}>Partial COD</div>
+                                                                                <div style={{ color: '#6b7280', fontSize: '10px', marginTop: '2px', lineHeight: 1.4 }}>Pay advance, rest on delivery</div>
+                                                                            </div>
+                                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                                                                                <span style={{ fontWeight: 700, fontSize: '12px', color: '#1f2937' }}>{fmtCurrency(qoTotal)}</span>
+                                                                                <input type="radio" name="qo-payment-preview" disabled style={{ width: '14px', height: '14px', accentColor: formThemeColor, flexShrink: 0, margin: 0 }} />
                                                                             </div>
                                                                         </label>
                                                                     </div>
