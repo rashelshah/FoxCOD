@@ -386,13 +386,27 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         console.log("[COD Order] Order logged successfully:", orderLog.id, orderName);
 
         console.log("[COD Order] Waiting for Shopify sync for order", orderLog.id);
-        const syncResult = await createShopifyOrderBackground(String(orderLog.id));
+        let syncResult: { success: boolean; shopifyOrderId?: string; shopifyOrderName?: string; error?: string };
+        try {
+            syncResult = await createShopifyOrderBackground(String(orderLog.id));
+        } catch (syncErr: any) {
+            console.error("[COD Order] Shopify sync threw unexpectedly:", syncErr.message);
+            syncResult = { success: false, error: syncErr.message };
+        }
 
         if (!syncResult.success || !syncResult.shopifyOrderName) {
+            // Sync failed BUT the order is saved in our database.
+            // Return success to the customer — the seller can retry from the dashboard.
+            console.warn("[COD Order] ⚠️ Shopify sync failed for order", orderLog.id,
+                "— returning success to customer anyway. Error:", syncResult.error);
             return Response.json({
-                success: false,
-                error: syncResult.error || "Shopify order could not be created right now. Please try again.",
-            }, { status: 502, headers: corsHeaders });
+                success: true,
+                orderId: orderLog.id,
+                shopifyOrderId: null,
+                orderName: `COD-${String(orderLog.id).slice(-8).toUpperCase()}`,
+                message: "Order placed successfully!",
+                _syncPending: true,
+            }, { headers: corsHeaders });
         }
 
         return Response.json({

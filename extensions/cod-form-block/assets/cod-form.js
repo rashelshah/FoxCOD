@@ -558,19 +558,28 @@
       var response = await fetch(url, options || {});
       if (!response.ok) {
         var contentType = response.headers.get('content-type') || '';
-        var errorMessage = 'Request failed';
+        var errorMessage = 'Request failed (status ' + response.status + ')';
         if (contentType.indexOf('application/json') !== -1) {
-          var errorBody = await response.json();
-          errorMessage = (errorBody && (errorBody.error || errorBody.message)) || errorMessage;
+          try {
+            var errorBody = await response.json();
+            // If the server returned success:true despite HTTP error, treat as success
+            if (errorBody && errorBody.success === true) return errorBody;
+            errorMessage = (errorBody && (errorBody.error || errorBody.message)) || errorMessage;
+          } catch (e) { /* ignore parse error */ }
         } else {
-          var textBody = await response.text();
-          if (textBody) errorMessage = textBody;
+          try {
+            var textBody = await response.text();
+            if (textBody && textBody.length < 200) errorMessage = textBody;
+          } catch (e) { /* ignore */ }
         }
-        throw new Error(errorMessage);
+        var serverError = new Error(errorMessage);
+        serverError._isServerError = true;
+        throw serverError;
       }
       return await response.json();
     } catch (error) {
-      console.warn('FoxCOD fetch failed:', error);
+      if (error && error._isServerError) throw error;
+      console.warn('FoxCOD fetch failed (network):', error);
       return null;
     }
   }
@@ -578,7 +587,7 @@
   function requestProxyJson(config, path, options) {
     return safeFetch((config.proxyUrl || '/apps/fox-cod') + path, options).then(function(data) {
       if (!data) {
-        throw new Error('Failed to reach the Fox COD service.');
+        throw new Error('Failed to reach the Fox COD service. Please try again.');
       }
       return data;
     });

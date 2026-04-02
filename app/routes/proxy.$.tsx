@@ -442,16 +442,30 @@ async function handleRegularOrder(request: Request, data: any) {
 
     // Wait for the real Shopify order so the storefront only shows success
     // when the seller can actually see the order in Shopify admin.
+    // BUT: if sync fails (e.g. stale token), still return success to the customer.
+    // The order IS saved in our database and can be retried by the seller.
     console.log('[Proxy] STEP 1: synchronizing Shopify order for', result.id);
-    const syncResult = await createShopifyOrderBackground(String(result.id));
+    let syncResult: { success: boolean; shopifyOrderId?: string; shopifyOrderName?: string; error?: string };
+    try {
+        syncResult = await createShopifyOrderBackground(String(result.id));
+    } catch (syncErr: any) {
+        console.error('[Proxy] Shopify sync threw unexpectedly:', syncErr.message);
+        syncResult = { success: false, error: syncErr.message };
+    }
+
     if (!syncResult.success || !syncResult.shopifyOrderName) {
+        // Sync failed BUT the order is saved in our database.
+        // Return success to the customer — the seller can retry from the dashboard.
+        console.warn('[Proxy] ⚠️ Shopify sync failed for order', result.id,
+            '— returning success to customer anyway. Error:', syncResult.error);
         return new Response(JSON.stringify({
-            success: false,
-            error: syncResult.error || 'Shopify order could not be created right now. Please try again.',
-        }), {
-            status: 502,
-            headers: corsHeaders
-        });
+            success: true,
+            orderId: result.id,
+            shopifyOrderId: null,
+            orderName: `COD-${String(result.id).slice(-8).toUpperCase()}`,
+            message: 'Order placed successfully!',
+            _syncPending: true,
+        }), { headers: corsHeaders });
     }
 
     // Non-blocking Google Sheets sync
