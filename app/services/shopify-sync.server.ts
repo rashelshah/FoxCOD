@@ -13,7 +13,7 @@ import {
     markSyncFailed,
     supabase,
 } from '../config/supabase.server';
-import db from '../db.server';
+// Prisma db import removed — no longer needed for token refresh fallback
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -268,33 +268,13 @@ export async function createShopifyOrderBackground(orderId: string): Promise<Sho
             };
         }
 
-        // ── 8. Call Shopify API (with token refresh on 401) ──
+        // ── 8. Call Shopify API ──
+        // Token is always fresh — supabaseSessionStorage.storeSession() keeps
+        // shops.access_token updated on every OAuth flow.
         const shopifyApiUrl = `https://${order.shop_domain}/admin/api/2024-04/orders.json`;
         console.log('STEP 3: Shopify called for order', id, '(attempt', currentAttempt + 1, ')');
 
-        // Helper: try to get a fresh access token from Prisma session store
-        async function tryRefreshAccessToken(shopDomain: string, staleToken: string): Promise<string | null> {
-            try {
-                // Check if Prisma has a session with a different (newer) token
-                const sessions = await db.session.findMany({
-                    where: { shop: shopDomain },
-                    orderBy: { id: 'desc' },
-                    take: 1,
-                });
-                if (sessions.length > 0 && sessions[0].accessToken && sessions[0].accessToken !== staleToken) {
-                    const freshToken = sessions[0].accessToken;
-                    console.log('[SYNC] Found fresher token in Prisma session store — updating Supabase');
-                    // Update Supabase with the fresh token
-                    await supabase.from('shops').update({ access_token: freshToken }).eq('shop_domain', shopDomain);
-                    return freshToken;
-                }
-            } catch (e: any) {
-                console.warn('[SYNC] Could not refresh token from Prisma:', e.message);
-            }
-            return null;
-        }
-
-        let accessToken = shop.access_token;
+        const accessToken = shop.access_token;
 
         let shopifyRes = await fetch(shopifyApiUrl, {
             method: 'POST',
@@ -308,27 +288,6 @@ export async function createShopifyOrderBackground(orderId: string): Promise<Sho
 
         let shopifyData = await shopifyRes.json();
         console.log('[SYNC] Shopify response status:', shopifyRes.status, '— body:', JSON.stringify(shopifyData).substring(0, 500));
-
-        // ── 8a. If 401 (token expired/invalid), try refreshing from Prisma ──
-        if (shopifyRes.status === 401 || (shopifyData.errors && JSON.stringify(shopifyData.errors).includes('Invalid API key'))) {
-            console.warn('[SYNC] ⚠️ Got 401 / invalid token — attempting token refresh for', order.shop_domain);
-            const freshToken = await tryRefreshAccessToken(order.shop_domain, accessToken);
-            if (freshToken) {
-                accessToken = freshToken;
-                console.log('[SYNC] Retrying Shopify call with refreshed token');
-                shopifyRes = await fetch(shopifyApiUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Shopify-Access-Token': accessToken,
-                        'Idempotency-Key': `foxcod-${id}-refreshed`,
-                    },
-                    body: JSON.stringify(shopifyPayload),
-                });
-                shopifyData = await shopifyRes.json();
-                console.log('[SYNC] Refreshed Shopify response status:', shopifyRes.status, '— body:', JSON.stringify(shopifyData).substring(0, 500));
-            }
-        }
 
         if (!shopifyData.order) {
             console.warn('[SYNC] Primary order create failed, retrying with sanitized line items');

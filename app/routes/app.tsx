@@ -4,25 +4,16 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
 
 import { authenticate } from "../shopify.server";
-import { saveShop } from "../config/supabase.server";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 import { AppProvider as PolarisAppProvider } from "@shopify/polaris";
 import enTranslations from "@shopify/polaris/locales/en.json";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  await authenticate.admin(request);
 
-  // CRITICAL: Save access token to Supabase on EVERY admin page load.
-  // MemorySessionStorage on Vercel loses sessions on cold starts.
-  // When Shopify re-authenticates, this ensures the fresh token is always
-  // persisted to Supabase so the order sync service can use it.
-  try {
-    if (session?.accessToken) {
-      await saveShop(session.shop, session.accessToken, session.scope || "");
-    }
-  } catch (e) {
-    console.error("[App Layout] Error saving access token to Supabase:", e);
-  }
+  // No manual token sync needed — supabaseSessionStorage.storeSession()
+  // automatically persists the access token to both shopify_sessions and
+  // shops.access_token on every OAuth / session refresh.
 
   // eslint-disable-next-line no-undef
   return { apiKey: process.env.SHOPIFY_API_KEY || "" };
