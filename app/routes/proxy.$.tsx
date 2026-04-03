@@ -323,8 +323,14 @@ async function handleRegularOrder(request: Request, data: any) {
     ]);
     console.log('⏱ [Proxy] Session + fraud settings loaded:', Date.now() - start, 'ms');
 
-    // Extract offline session — SINGLE SOURCE OF TRUTH for access token
-    const offlineSession = sessions.find((s) => !s.isOnline);
+    // Extract LATEST offline session — sorted by updatedAt desc to handle token rotation
+    const offlineSession = sessions
+        .filter((s) => !s.isOnline)
+        .sort((a, b) => {
+            const aTime = (a as any).updatedAt ? new Date((a as any).updatedAt).getTime() : 0;
+            const bTime = (b as any).updatedAt ? new Date((b as any).updatedAt).getTime() : 0;
+            return bTime - aTime;
+        })[0];
     if (!offlineSession || !offlineSession.accessToken) {
         console.error('[Proxy] ❌ No offline session found for shop:', data.shop);
         return new Response(JSON.stringify({
@@ -332,7 +338,8 @@ async function handleRegularOrder(request: Request, data: any) {
             error: "Store not authenticated. Merchant must re-open admin panel.",
         }), { status: 401, headers: corsHeaders });
     }
-    const accessToken = offlineSession.accessToken;
+    let accessToken = offlineSession.accessToken;
+    console.log('[Proxy] Using token from session:', offlineSession.id);
 
     // ── 2. FRAUD CHECKS ──
     const clientIp =
@@ -514,13 +521,50 @@ async function handleRegularOrder(request: Request, data: any) {
     let shopifyData = await shopifyRes.json();
     console.log('⏱ [Proxy] Shopify API responded:', Date.now() - start, 'ms — status:', shopifyRes.status);
 
-    // Fail fast on auth errors
+    // ── 401 RECOVERY: Single retry with fresh session ──
     if (shopifyRes.status === 401) {
-        console.error('[Proxy] ❌ Shopify 401 — offline session token invalid for', data.shop);
-        return new Response(JSON.stringify({
-            success: false,
-            error: 'Store authentication expired. Merchant must re-open admin panel.',
-        }), { status: 500, headers: corsHeaders });
+        console.warn('⚠️ [Proxy] 401 detected — reloading session and retrying once for', data.shop);
+
+        const freshSessions = await supabaseSessionStorage.findSessionsByShop(data.shop);
+        const latestSession = freshSessions
+            .filter((s) => !s.isOnline)
+            .sort((a, b) => {
+                const aTime = (a as any).updatedAt ? new Date((a as any).updatedAt).getTime() : 0;
+                const bTime = (b as any).updatedAt ? new Date((b as any).updatedAt).getTime() : 0;
+                return bTime - aTime;
+            })[0];
+
+        if (!latestSession || !latestSession.accessToken) {
+            console.error('[Proxy] ❌ No valid session after reload for', data.shop);
+            return new Response(JSON.stringify({
+                success: false,
+                error: 'Store authentication expired. Merchant must re-open admin panel.',
+            }), { status: 500, headers: corsHeaders });
+        }
+
+        accessToken = latestSession.accessToken;
+        console.log('[Proxy] Retrying with fresh token from session:', latestSession.id);
+
+        shopifyRes = await fetch(shopifyApiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Shopify-Access-Token': accessToken,
+                'Idempotency-Key': `${idempotencyKey}-retry`,
+            },
+            body: JSON.stringify(shopifyPayload),
+        });
+
+        shopifyData = await shopifyRes.json();
+        console.log('⏱ [Proxy] Shopify retry responded:', Date.now() - start, 'ms — status:', shopifyRes.status);
+
+        if (shopifyRes.status === 401) {
+            console.error('[Proxy] ❌ Retry also returned 401 — token truly invalid for', data.shop);
+            return new Response(JSON.stringify({
+                success: false,
+                error: 'Store authentication expired. Merchant must re-open admin panel.',
+            }), { status: 500, headers: corsHeaders });
+        }
     }
 
     // Retry with sanitized line items if first attempt fails (e.g. variant price mismatch)

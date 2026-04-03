@@ -134,17 +134,22 @@ export async function createShopifyOrderBackground(orderId: string): Promise<Sho
             throw new Error(`Shop not found: ${order.shop_domain}`);
         }
 
-        // Load offline session — this is the ONLY source of the access token.
-        // No shops.access_token, no fallback, no 401 retry.
+        // Load LATEST offline session — sorted by updatedAt desc to handle token rotation.
         const sessions = await supabaseSessionStorage.findSessionsByShop(order.shop_domain);
-        const offlineSession = sessions.find((s) => !s.isOnline);
+        const offlineSession = sessions
+            .filter((s) => !s.isOnline)
+            .sort((a, b) => {
+                const aTime = (a as any).updatedAt ? new Date((a as any).updatedAt).getTime() : 0;
+                const bTime = (b as any).updatedAt ? new Date((b as any).updatedAt).getTime() : 0;
+                return bTime - aTime;
+            })[0];
 
         if (!offlineSession || !offlineSession.accessToken) {
             throw new Error(`No offline session found for shop: ${order.shop_domain}. Merchant must re-open admin panel to re-authenticate.`);
         }
 
-        const accessToken = offlineSession.accessToken;
-        console.log('[SYNC] Using offline session token for shop:', order.shop_domain);
+        let accessToken = offlineSession.accessToken;
+        console.log('[SYNC] Using offline session token for shop:', order.shop_domain, '| session:', offlineSession.id);
         console.log('[SYNC] Creating Shopify order for', id, '(attempt', currentAttempt + 1, ')');
 
         // ── 5. Reconstruct payload from stored order_payload ──
@@ -302,9 +307,42 @@ export async function createShopifyOrderBackground(orderId: string): Promise<Sho
         let shopifyData = await shopifyRes.json();
         console.log('[SYNC] Shopify response status:', shopifyRes.status, '— body:', JSON.stringify(shopifyData).substring(0, 500));
 
-        // ── 8a. Fail fast on auth errors — no silent fallback ──
+        // ── 8a. 401 RECOVERY: Single retry with fresh session ──
         if (shopifyRes.status === 401) {
-            throw new Error(`Shopify returned 401 Unauthorized for ${order.shop_domain}. Offline session token may be invalid. Merchant must re-authenticate.`);
+            console.warn('⚠️ [SYNC] 401 detected — reloading session and retrying once for', order.shop_domain);
+
+            const freshSessions = await supabaseSessionStorage.findSessionsByShop(order.shop_domain);
+            const latestSession = freshSessions
+                .filter((s) => !s.isOnline)
+                .sort((a, b) => {
+                    const aTime = (a as any).updatedAt ? new Date((a as any).updatedAt).getTime() : 0;
+                    const bTime = (b as any).updatedAt ? new Date((b as any).updatedAt).getTime() : 0;
+                    return bTime - aTime;
+                })[0];
+
+            if (!latestSession || !latestSession.accessToken) {
+                throw new Error(`Shopify returned 401 and no valid session found after reload for ${order.shop_domain}. Merchant must re-authenticate.`);
+            }
+
+            accessToken = latestSession.accessToken;
+            console.log('[SYNC] Retrying with fresh token from session:', latestSession.id);
+
+            shopifyRes = await fetch(shopifyApiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Shopify-Access-Token': accessToken,
+                    'Idempotency-Key': `foxcod-${id}-retry`,
+                },
+                body: JSON.stringify(shopifyPayload),
+            });
+
+            shopifyData = await shopifyRes.json();
+            console.log('[SYNC] Shopify retry response status:', shopifyRes.status);
+
+            if (shopifyRes.status === 401) {
+                throw new Error(`Shopify returned 401 Unauthorized on retry for ${order.shop_domain}. Token truly invalid. Merchant must re-authenticate.`);
+            }
         }
 
         if (!shopifyData.order) {
