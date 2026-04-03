@@ -12,9 +12,9 @@ import { getFormSettings, saveShop } from "../config/supabase.server";
 import { ORDER_STATUSES } from "../config/constants";
 
 // ─── Shopify Orders fetch via SDK RestClient with pagination ────────────
-// Uses getRestClientFromSession with the session from authenticate.admin()
-// which guarantees a fresh token — SDK auto-refreshes expired tokens.
-import { getRestClientFromSession } from "../shopify/rest-client.server";
+// Uses getRestClient(shop) which gets session from unauthenticated.admin(shop)
+// — guarantees a fresh token via SDK auto-refresh.
+import { getRestClient } from "../shopify/rest-client.server";
 
 async function fetchShopifyOrderStats(restClient: any) {
   const fields = "id,created_at,total_price,financial_status,cancelled_at";
@@ -98,8 +98,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
   const shopDomain = session.shop;
 
-  // Create SDK REST client from the authenticated session
-  const restClient = getRestClientFromSession(session);
+  // Get REST client — session always from unauthenticated.admin(shop)
+  const restClient = await getRestClient(shopDomain);
 
   // Query shop currency from Shopify Admin API
   let shopCurrency = 'USD';

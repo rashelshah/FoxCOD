@@ -54,9 +54,9 @@ interface AnalyticsData {
 }
 
 // ─── Fetch ALL orders from Shopify via SDK RestClient with pagination ──
-// Uses getRestClientFromSession with the session from authenticate.admin()
-// which guarantees a fresh token — SDK auto-refreshes expired tokens.
-import { getRestClientFromSession } from "../shopify/rest-client.server";
+// Uses getRestClient(shop) which gets session from unauthenticated.admin(shop)
+// — guarantees a fresh token via SDK auto-refresh.
+import { getRestClient } from "../shopify/rest-client.server";
 
 async function fetchAllShopifyOrders(
     restClient: any,
@@ -198,8 +198,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const { admin, session } = await authenticate.admin(request);
     const shop = session.shop;
 
-    // Create SDK REST client from the authenticated session
-    const restClient = getRestClientFromSession(session);
+    // Get REST client — session always from unauthenticated.admin(shop)
+    const restClient = await getRestClient(shop);
 
     // Get shop currency
     let shopCurrency = "USD";
