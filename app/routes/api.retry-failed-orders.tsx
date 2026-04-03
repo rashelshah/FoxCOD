@@ -6,10 +6,12 @@
  * - POST /api/retry-failed-orders?orderId=123 → retry single order
  * 
  * Uses atomic locking so concurrent calls are safe.
+ * 
+ * ⚠️ NO OAuth/session dependency — uses offline access token from shops table.
+ * The shop domain comes from the request body (sent by the admin dashboard).
  */
 
 import type { ActionFunctionArgs } from "react-router";
-import { authenticate } from "../shopify.server";
 import {
     getShop,
     getRetryableOrders,
@@ -17,13 +19,25 @@ import {
 import { createShopifyOrderBackground } from "../services/shopify-sync.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-    const { session } = await authenticate.admin(request);
-    const shopDomain = session.shop;
+    // Extract shop domain from request body — no OAuth required
+    let shopDomain: string;
+    try {
+        const body = await request.json();
+        shopDomain = body.shop || body.shopDomain || '';
+    } catch {
+        return Response.json({ success: false, error: 'Invalid request body' }, { status: 400 });
+    }
+
+    if (!shopDomain) {
+        return Response.json({ success: false, error: 'Shop domain is required (send { shop: "your-shop.myshopify.com" })' }, { status: 400 });
+    }
+
+    console.log('[Retry] Using offline token for shop:', shopDomain);
 
     const url = new URL(request.url);
     const singleOrderId = url.searchParams.get('orderId');
 
-    // Get shop for access token
+    // Get shop for validation — access token is used inside createShopifyOrderBackground
     const shop = await getShop(shopDomain);
     if (!shop || !shop.access_token) {
         return Response.json({ success: false, error: 'Shop not found or no access token' }, { status: 404 });

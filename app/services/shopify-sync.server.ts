@@ -3,6 +3,9 @@
  *
  * Takes only an orderId — fetches all required data from the DB itself.
  * This makes it safe to call from any context (initial request, retry endpoint, cron).
+ *
+ * SINGLE SOURCE OF TRUTH: offline session from shopify_sessions table.
+ * NO fallback tokens, NO shops.access_token for API calls, NO 401 retry.
  */
 
 import {
@@ -13,7 +16,7 @@ import {
     markSyncFailed,
     supabase,
 } from '../config/supabase.server';
-import { getValidAccessToken, supabaseSessionStorage } from '../shopify/session-storage.server';
+import { supabaseSessionStorage } from '../shopify/session-storage.server';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -125,11 +128,24 @@ export async function createShopifyOrderBackground(orderId: string): Promise<Sho
     const currentAttempt: number = order.sync_attempts || 0;
 
     try {
-        // ── 4. Load shop (for access token) ──
+        // ── 4. Load shop (existence check) + offline session (SINGLE SOURCE OF TRUTH) ──
         const shop = await getShop(order.shop_domain);
-        if (!shop || !shop.access_token) {
-            throw new Error(`Shop not found or missing access token: ${order.shop_domain}`);
+        if (!shop) {
+            throw new Error(`Shop not found: ${order.shop_domain}`);
         }
+
+        // Load offline session — this is the ONLY source of the access token.
+        // No shops.access_token, no fallback, no 401 retry.
+        const sessions = await supabaseSessionStorage.findSessionsByShop(order.shop_domain);
+        const offlineSession = sessions.find((s) => !s.isOnline);
+
+        if (!offlineSession || !offlineSession.accessToken) {
+            throw new Error(`No offline session found for shop: ${order.shop_domain}. Merchant must re-open admin panel to re-authenticate.`);
+        }
+
+        const accessToken = offlineSession.accessToken;
+        console.log('[SYNC] Using offline session token for shop:', order.shop_domain);
+        console.log('[SYNC] Creating Shopify order for', id, '(attempt', currentAttempt + 1, ')');
 
         // ── 5. Reconstruct payload from stored order_payload ──
         const body = order.order_payload || {};
@@ -268,22 +284,10 @@ export async function createShopifyOrderBackground(orderId: string): Promise<Sho
             };
         }
 
-        // ── 8. Get a VALID access token (auto-refreshes if expired) ──
-        // This is the key fix: getValidAccessToken() loads the offline session
-        // from shopify_sessions and uses the refresh token to get a fresh
-        // access token if the current one is expired. Works even when the
-        // seller's admin panel is closed.
+        // ── 8. Call Shopify Admin API with offline session token ──
+        // Single source of truth: offlineSession.accessToken loaded in step 4.
+        // NO fallback, NO 401 retry, NO shops.access_token.
         const shopifyApiUrl = `https://${order.shop_domain}/admin/api/2024-04/orders.json`;
-        console.log('STEP 3: Shopify called for order', id, '(attempt', currentAttempt + 1, ')');
-
-        let accessToken: string;
-        try {
-            accessToken = await getValidAccessToken(order.shop_domain);
-        } catch (tokenErr: any) {
-            // If token refresh fails, fall back to shops.access_token as last resort
-            console.warn('[SYNC] getValidAccessToken failed, falling back to shops table:', tokenErr.message);
-            accessToken = shop.access_token;
-        }
 
         let shopifyRes = await fetch(shopifyApiUrl, {
             method: 'POST',
@@ -298,35 +302,9 @@ export async function createShopifyOrderBackground(orderId: string): Promise<Sho
         let shopifyData = await shopifyRes.json();
         console.log('[SYNC] Shopify response status:', shopifyRes.status, '— body:', JSON.stringify(shopifyData).substring(0, 500));
 
-        // ── 8a. If 401, force-refresh the token and retry once ──
-        if (shopifyRes.status === 401 || (shopifyData.errors && JSON.stringify(shopifyData.errors).includes('Invalid API key'))) {
-            console.warn('[SYNC] ⚠️ Got 401 — force-refreshing token for', order.shop_domain);
-            try {
-                // Force-refresh: load session, set expires to past, then refresh
-                const sessionId = `offline_${order.shop_domain}`;
-                const session = await supabaseSessionStorage.loadSession(sessionId);
-                if (session && session.refreshToken) {
-                    // Mark as expired so getValidAccessToken will refresh
-                    session.expires = new Date(0);
-                    await supabaseSessionStorage.storeSession(session);
-                    accessToken = await getValidAccessToken(order.shop_domain);
-
-                    console.log('[SYNC] Retrying Shopify call with refreshed token');
-                    shopifyRes = await fetch(shopifyApiUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-Shopify-Access-Token': accessToken,
-                            'Idempotency-Key': `foxcod-${id}-refreshed`,
-                        },
-                        body: JSON.stringify(shopifyPayload),
-                    });
-                    shopifyData = await shopifyRes.json();
-                    console.log('[SYNC] Refreshed response status:', shopifyRes.status, '— body:', JSON.stringify(shopifyData).substring(0, 500));
-                }
-            } catch (refreshErr: any) {
-                console.error('[SYNC] Token refresh on 401 failed:', refreshErr.message);
-            }
+        // ── 8a. Fail fast on auth errors — no silent fallback ──
+        if (shopifyRes.status === 401) {
+            throw new Error(`Shopify returned 401 Unauthorized for ${order.shop_domain}. Offline session token may be invalid. Merchant must re-authenticate.`);
         }
 
         if (!shopifyData.order) {

@@ -87,7 +87,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
  * Orders Page Component - Premium Design
  */
 export default function OrdersPage() {
-    const { orders, totalCount, currentPage, totalPages, statusFilter, pendingCount, confirmedCount, shopCurrency } = useLoaderData<typeof loader>();
+    const { shop, orders, totalCount, currentPage, totalPages, statusFilter, pendingCount, confirmedCount, shopCurrency } = useLoaderData<typeof loader>();
     const navigation = useNavigation();
     const fetcher = useFetcher();
     const shopify = useAppBridge();
@@ -112,10 +112,10 @@ export default function OrdersPage() {
 
     const handleRetryOrder = useCallback((orderId: string) => {
         retryFetcher.submit(
-            {},
-            { method: "post", action: `/api/retry-failed-orders?orderId=${orderId}` }
+            JSON.stringify({ shop }),
+            { method: "post", action: `/api/retry-failed-orders?orderId=${orderId}`, encType: "application/json" }
         );
-    }, [retryFetcher]);
+    }, [retryFetcher, shop]);
 
     // Optimistic status updates
     const [pendingUpdates, setPendingUpdates] = useState<Record<string, string>>({});

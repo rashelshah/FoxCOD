@@ -223,14 +223,6 @@ function validateOrderInput(body: OrderRequestBody, formSettings: any, customer:
     return null; // No validation errors
 }
 
-/**
- * Generate a unique order name for COD orders
- */
-function generateOrderName(): string {
-    const timestamp = Date.now().toString(36).toUpperCase();
-    const random = Math.random().toString(36).substring(2, 6).toUpperCase();
-    return `COD-${timestamp}-${random}`;
-}
 
 /**
  * Action Handler: Create COD order
@@ -316,9 +308,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             );
         }
 
-        // Generate order name
-        const orderName = generateOrderName();
-
         // Calculate total price:
         // Priority 1: finalTotal from order summary DOM (most accurate — includes qty, discounts, shipping, upsells)
         // Priority 2: Compute from individual fields
@@ -383,30 +372,24 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             order_payload: body,
         });
 
-        console.log("[COD Order] Order logged successfully:", orderLog.id, orderName);
-
-        console.log("[COD Order] Waiting for Shopify sync for order", orderLog.id);
+        // Create Shopify order — STRICT: customer only sees success when Shopify order exists.
+        // NO fallback, NO COD-xxxx, NO "success even if Shopify fails".
+        console.log("[COD Order] Creating Shopify order for", orderLog.id);
         let syncResult: { success: boolean; shopifyOrderId?: string; shopifyOrderName?: string; error?: string };
         try {
             syncResult = await createShopifyOrderBackground(String(orderLog.id));
         } catch (syncErr: any) {
-            console.error("[COD Order] Shopify sync threw unexpectedly:", syncErr.message);
+            console.error("[COD Order] ❌ Shopify order creation failed:", syncErr.message);
             syncResult = { success: false, error: syncErr.message };
         }
 
         if (!syncResult.success || !syncResult.shopifyOrderName) {
-            // Sync failed BUT the order is saved in our database.
-            // Return success to the customer — the seller can retry from the dashboard.
-            console.warn("[COD Order] ⚠️ Shopify sync failed for order", orderLog.id,
-                "— returning success to customer anyway. Error:", syncResult.error);
+            // Shopify failed — return FAILURE to customer. No fallback.
+            console.error("[COD Order] ❌ Shopify order creation failed for order", orderLog.id, "— Error:", syncResult.error);
             return Response.json({
-                success: true,
-                orderId: orderLog.id,
-                shopifyOrderId: null,
-                orderName: `COD-${String(orderLog.id).slice(-8).toUpperCase()}`,
-                message: "Order placed successfully!",
-                _syncPending: true,
-            }, { headers: corsHeaders });
+                success: false,
+                error: "Failed to create order. Please try again.",
+            }, { status: 500, headers: corsHeaders });
         }
 
         return Response.json({

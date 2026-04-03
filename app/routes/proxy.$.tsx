@@ -440,32 +440,24 @@ async function handleRegularOrder(request: Request, data: any) {
 
     console.log('[Proxy] Order created:', result);
 
-    // Wait for the real Shopify order so the storefront only shows success
-    // when the seller can actually see the order in Shopify admin.
-    // BUT: if sync fails (e.g. stale token), still return success to the customer.
-    // The order IS saved in our database and can be retried by the seller.
-    console.log('[Proxy] STEP 1: synchronizing Shopify order for', result.id);
+    // Create Shopify order — STRICT: customer only sees success when Shopify order exists.
+    // NO fallback, NO COD-xxxx, NO "success even if Shopify fails".
+    console.log('[Proxy] Creating Shopify order for', result.id);
     let syncResult: { success: boolean; shopifyOrderId?: string; shopifyOrderName?: string; error?: string };
     try {
         syncResult = await createShopifyOrderBackground(String(result.id));
     } catch (syncErr: any) {
-        console.error('[Proxy] Shopify sync threw unexpectedly:', syncErr.message);
+        console.error('[Proxy] ❌ Shopify order creation failed:', syncErr.message);
         syncResult = { success: false, error: syncErr.message };
     }
 
     if (!syncResult.success || !syncResult.shopifyOrderName) {
-        // Sync failed BUT the order is saved in our database.
-        // Return success to the customer — the seller can retry from the dashboard.
-        console.warn('[Proxy] ⚠️ Shopify sync failed for order', result.id,
-            '— returning success to customer anyway. Error:', syncResult.error);
+        // Shopify failed — return FAILURE to customer. No fallback.
+        console.error('[Proxy] ❌ Shopify order creation failed for order', result.id, '— Error:', syncResult.error);
         return new Response(JSON.stringify({
-            success: true,
-            orderId: result.id,
-            shopifyOrderId: null,
-            orderName: `COD-${String(result.id).slice(-8).toUpperCase()}`,
-            message: 'Order placed successfully!',
-            _syncPending: true,
-        }), { headers: corsHeaders });
+            success: false,
+            error: 'Failed to create order. Please try again.',
+        }), { status: 500, headers: corsHeaders });
     }
 
     // Non-blocking Google Sheets sync
