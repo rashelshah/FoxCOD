@@ -19,7 +19,7 @@ import {
     buildCatalogOrCustomLineItem,
     sanitizeVariantPricedLineItems,
 } from "../services/shopify-sync.server";
-import { supabaseSessionStorage } from "../shopify/session-storage.server";
+import { getRestClient } from "../shopify/rest-client.server";
 
 const corsHeaders = {
     "Content-Type": "application/json",
@@ -315,31 +315,13 @@ async function handleRegularOrder(request: Request, data: any) {
         }), { status: 400, headers: corsHeaders });
     }
 
-    // ── 1. PARALLEL: Load offline session + fraud settings ──
-    // These are the only 2 DB calls needed before Shopify API.
-    const [sessions, fraudSettings] = await Promise.all([
-        supabaseSessionStorage.findSessionsByShop(data.shop),
+    // ── 1. PARALLEL: Load Shopify SDK REST client + fraud settings ──
+    // SDK handles session loading, token expiry check, and refresh automatically.
+    const [restClient, fraudSettings] = await Promise.all([
+        getRestClient(data.shop),
         getFraudProtectionSettings(data.shop),
     ]);
-    console.log('⏱ [Proxy] Session + fraud settings loaded:', Date.now() - start, 'ms');
-
-    // Extract LATEST offline session — sorted by updatedAt desc to handle token rotation
-    const offlineSession = sessions
-        .filter((s) => !s.isOnline)
-        .sort((a, b) => {
-            const aTime = (a as any).updatedAt ? new Date((a as any).updatedAt).getTime() : 0;
-            const bTime = (b as any).updatedAt ? new Date((b as any).updatedAt).getTime() : 0;
-            return bTime - aTime;
-        })[0];
-    if (!offlineSession || !offlineSession.accessToken) {
-        console.error('[Proxy] ❌ No offline session found for shop:', data.shop);
-        return new Response(JSON.stringify({
-            success: false,
-            error: "Store not authenticated. Merchant must re-open admin panel.",
-        }), { status: 401, headers: corsHeaders });
-    }
-    let accessToken = offlineSession.accessToken;
-    console.log('[Proxy] Using token from session:', offlineSession.id);
+    console.log('⏱ [Proxy] SDK REST client + fraud settings loaded:', Date.now() - start, 'ms');
 
     // ── 2. FRAUD CHECKS ──
     const clientIp =
@@ -504,71 +486,22 @@ async function handleRegularOrder(request: Request, data: any) {
         shopifyPayload.order.billing_address = { ...shopifyPayload.order.shipping_address };
     }
 
-    // ── 4. CALL SHOPIFY API — direct fetch, no middleware ──
-    const shopifyApiUrl = `https://${data.shop}/admin/api/2024-04/orders.json`;
+    // ── 4. CALL SHOPIFY API via SDK — automatic token refresh ──
     const idempotencyKey = `foxcod-proxy-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-    let shopifyRes = await fetch(shopifyApiUrl, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-Shopify-Access-Token': accessToken,
+    let shopifyResponse = await restClient.post({
+        path: "orders",
+        data: shopifyPayload,
+        extraHeaders: {
             'Idempotency-Key': idempotencyKey,
         },
-        body: JSON.stringify(shopifyPayload),
     });
 
-    let shopifyData = await shopifyRes.json();
-    console.log('⏱ [Proxy] Shopify API responded:', Date.now() - start, 'ms — status:', shopifyRes.status);
-
-    // ── 401 RECOVERY: Single retry with fresh session ──
-    if (shopifyRes.status === 401) {
-        console.warn('⚠️ [Proxy] 401 detected — reloading session and retrying once for', data.shop);
-
-        const freshSessions = await supabaseSessionStorage.findSessionsByShop(data.shop);
-        const latestSession = freshSessions
-            .filter((s) => !s.isOnline)
-            .sort((a, b) => {
-                const aTime = (a as any).updatedAt ? new Date((a as any).updatedAt).getTime() : 0;
-                const bTime = (b as any).updatedAt ? new Date((b as any).updatedAt).getTime() : 0;
-                return bTime - aTime;
-            })[0];
-
-        if (!latestSession || !latestSession.accessToken) {
-            console.error('[Proxy] ❌ No valid session after reload for', data.shop);
-            return new Response(JSON.stringify({
-                success: false,
-                error: 'Store authentication expired. Merchant must re-open admin panel.',
-            }), { status: 500, headers: corsHeaders });
-        }
-
-        accessToken = latestSession.accessToken;
-        console.log('[Proxy] Retrying with fresh token from session:', latestSession.id);
-
-        shopifyRes = await fetch(shopifyApiUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Shopify-Access-Token': accessToken,
-                'Idempotency-Key': `${idempotencyKey}-retry`,
-            },
-            body: JSON.stringify(shopifyPayload),
-        });
-
-        shopifyData = await shopifyRes.json();
-        console.log('⏱ [Proxy] Shopify retry responded:', Date.now() - start, 'ms — status:', shopifyRes.status);
-
-        if (shopifyRes.status === 401) {
-            console.error('[Proxy] ❌ Retry also returned 401 — token truly invalid for', data.shop);
-            return new Response(JSON.stringify({
-                success: false,
-                error: 'Store authentication expired. Merchant must re-open admin panel.',
-            }), { status: 500, headers: corsHeaders });
-        }
-    }
+    let shopifyOrder = shopifyResponse?.body?.order;
+    console.log('⏱ [Proxy] Shopify API responded:', Date.now() - start, 'ms');
 
     // Retry with sanitized line items if first attempt fails (e.g. variant price mismatch)
-    if (!shopifyData.order) {
+    if (!shopifyOrder) {
         console.warn('[Proxy] Primary Shopify call failed, retrying with sanitized line items');
         const fallbackPayload = {
             order: {
@@ -577,21 +510,19 @@ async function handleRegularOrder(request: Request, data: any) {
             },
         };
 
-        shopifyRes = await fetch(shopifyApiUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Shopify-Access-Token': accessToken,
+        shopifyResponse = await restClient.post({
+            path: "orders",
+            data: fallbackPayload,
+            extraHeaders: {
                 'Idempotency-Key': `${idempotencyKey}-fallback`,
             },
-            body: JSON.stringify(fallbackPayload),
         });
 
-        shopifyData = await shopifyRes.json();
-        console.log('⏱ [Proxy] Shopify fallback responded:', Date.now() - start, 'ms — status:', shopifyRes.status);
+        shopifyOrder = shopifyResponse?.body?.order;
+        console.log('⏱ [Proxy] Shopify fallback responded:', Date.now() - start, 'ms');
 
-        if (!shopifyData.order) {
-            console.error('[Proxy] ❌ Shopify order creation failed:', JSON.stringify(shopifyData.errors || shopifyData).substring(0, 500));
+        if (!shopifyOrder) {
+            console.error('[Proxy] ❌ Shopify order creation failed');
             return new Response(JSON.stringify({
                 success: false,
                 error: 'Failed to create order. Please try again.',
@@ -599,8 +530,8 @@ async function handleRegularOrder(request: Request, data: any) {
         }
     }
 
-    const shopifyOrderId = String(shopifyData.order.id);
-    const shopifyOrderName = shopifyData.order.name;
+    const shopifyOrderId = String(shopifyOrder.id);
+    const shopifyOrderName = shopifyOrder.name;
     console.log('⏱ [Proxy] Shopify order created:', shopifyOrderName, '— saving to DB...');
 
     // ── 5. SAVE ORDER TO DB — single call with Shopify IDs (already synced) ──

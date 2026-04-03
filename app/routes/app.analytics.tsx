@@ -53,47 +53,60 @@ interface AnalyticsData {
     pendingRevenue: number;
 }
 
-// ─── Fetch ALL orders from Shopify with Link header pagination ──
+// ─── Fetch ALL orders from Shopify via SDK RestClient with pagination ──
+// Uses getRestClientFromSession with the session from authenticate.admin()
+// which guarantees a fresh token — SDK auto-refreshes expired tokens.
+import { getRestClientFromSession } from "../shopify/rest-client.server";
+
 async function fetchAllShopifyOrders(
-    shop: string,
-    accessToken: string,
+    restClient: any,
     createdAtMin?: string,
 ): Promise<ShopifyOrder[]> {
     const fields = "id,created_at,total_price,financial_status,fulfillment_status,cancelled_at";
-    let url: string | null =
-        `https://${shop}/admin/api/2024-10/orders.json?status=any&limit=250&fields=${fields}`;
 
+    const query: Record<string, string> = {
+        status: "any",
+        limit: "250",
+        fields,
+    };
     if (createdAtMin) {
-        url += `&created_at_min=${createdAtMin}`;
+        query.created_at_min = createdAtMin;
     }
 
     const allOrders: ShopifyOrder[] = [];
 
-    while (url) {
-        const res: Response = await fetch(url, {
-            headers: { "X-Shopify-Access-Token": accessToken },
+    // First page via SDK RestClient
+    let response = await restClient.get({
+        path: "orders",
+        query,
+    });
+
+    if (response?.body?.orders) {
+        allOrders.push(...response.body.orders);
+    }
+
+    // Paginate using Link header
+    while (response?.headers?.get?.("link") || response?.headers?.link) {
+        const linkHeader = typeof response.headers.get === 'function'
+            ? response.headers.get("link")
+            : response.headers.link;
+
+        if (!linkHeader || !linkHeader.includes('rel="next"')) break;
+
+        const nextPageInfo = linkHeader
+            .split(",")
+            .find((l: string) => l.includes('rel="next"'))
+            ?.match(/<[^>]*page_info=([^&>]+)/)?.[1];
+
+        if (!nextPageInfo) break;
+
+        response = await restClient.get({
+            path: "orders",
+            query: { ...query, page_info: nextPageInfo },
         });
 
-        if (!res.ok) {
-            console.error(`[Analytics] Shopify API error: ${res.status} ${res.statusText}`);
-            break;
-        }
-
-        const data = await res.json();
-        if (data.orders) {
-            allOrders.push(...data.orders);
-        }
-
-        // Parse Link header for pagination
-        const linkHeader: string | null = res.headers.get("link");
-        if (linkHeader && linkHeader.includes('rel="next"')) {
-            url =
-                linkHeader
-                    .split(",")
-                    .find((l: string) => l.includes('rel="next"'))
-                    ?.match(/<([^>]+)>/)?.[1] || null;
-        } else {
-            url = null;
+        if (response?.body?.orders) {
+            allOrders.push(...response.body.orders);
         }
     }
 
@@ -184,7 +197,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     // Single authenticate call — get both admin and session
     const { admin, session } = await authenticate.admin(request);
     const shop = session.shop;
-    const accessToken = session.accessToken || "";
+
+    // Create SDK REST client from the authenticated session
+    const restClient = getRestClientFromSession(session);
 
     // Get shop currency
     let shopCurrency = "USD";
@@ -214,7 +229,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     // Fetch fresh data from Shopify on every request (no caching)
     let metrics: AnalyticsData;
     try {
-        const orders = await fetchAllShopifyOrders(shop, accessToken, createdAtMin);
+        const orders = await fetchAllShopifyOrders(restClient, createdAtMin);
         metrics = computeMetrics(orders);
     } catch (error) {
         console.error("[Analytics] Error fetching Shopify orders:", error);

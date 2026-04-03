@@ -11,28 +11,49 @@ import { authenticate } from "../shopify.server";
 import { getFormSettings, saveShop } from "../config/supabase.server";
 import { ORDER_STATUSES } from "../config/constants";
 
-// ─── Shopify Orders fetch with Link-header pagination ────────────
-async function fetchShopifyOrderStats(shop: string, accessToken: string) {
+// ─── Shopify Orders fetch via SDK RestClient with pagination ────────────
+// Uses getRestClientFromSession with the session from authenticate.admin()
+// which guarantees a fresh token — SDK auto-refreshes expired tokens.
+import { getRestClientFromSession } from "../shopify/rest-client.server";
+
+async function fetchShopifyOrderStats(restClient: any) {
   const fields = "id,created_at,total_price,financial_status,cancelled_at";
-  let nextUrl: string | null =
-    `https://${shop}/admin/api/2024-10/orders.json?status=any&limit=250&fields=${fields}`;
 
   type ShopifyOrder = { created_at: string; total_price: string; financial_status: string; cancelled_at: string | null };
   const allOrders: ShopifyOrder[] = [];
 
-  while (nextUrl) {
-    const res: Response = await fetch(nextUrl, {
-      headers: { "X-Shopify-Access-Token": accessToken },
-    });
-    if (!res.ok) break;
-    const data = await res.json();
-    if (data.orders) allOrders.push(...data.orders);
+  // First page via SDK RestClient
+  let response = await restClient.get({
+    path: "orders",
+    query: { status: "any", limit: "250", fields },
+  });
 
-    const linkHeader: string | null = res.headers.get("link");
-    if (linkHeader && linkHeader.includes('rel="next"')) {
-      nextUrl = linkHeader.split(",").find((l: string) => l.includes('rel="next"'))?.match(/<([^>]+)>/)?.[1] || null;
-    } else {
-      nextUrl = null;
+  if (response?.body?.orders) {
+    allOrders.push(...response.body.orders);
+  }
+
+  // Paginate using Link header
+  while (response?.headers?.get?.("link") || response?.headers?.link) {
+    const linkHeader = typeof response.headers.get === 'function'
+      ? response.headers.get("link")
+      : response.headers.link;
+
+    if (!linkHeader || !linkHeader.includes('rel="next"')) break;
+
+    const nextPageInfo = linkHeader
+      .split(",")
+      .find((l: string) => l.includes('rel="next"'))
+      ?.match(/<[^>]*page_info=([^&>]+)/)?.[1];
+
+    if (!nextPageInfo) break;
+
+    response = await restClient.get({
+      path: "orders",
+      query: { status: "any", limit: "250", fields, page_info: nextPageInfo },
+    });
+
+    if (response?.body?.orders) {
+      allOrders.push(...response.body.orders);
     }
   }
 
@@ -70,11 +91,15 @@ async function fetchShopifyOrderStats(shop: string, accessToken: string) {
 
 /**
  * Loader: Fetch dashboard data from Supabase
+ * authenticate.admin() guarantees a fresh session token —
+ * the SDK auto-refreshes expired tokens before returning.
  */
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
   const shopDomain = session.shop;
-  const accessToken = session.accessToken || "";
+
+  // Create SDK REST client from the authenticated session
+  const restClient = getRestClientFromSession(session);
 
   // Query shop currency from Shopify Admin API
   let shopCurrency = 'USD';
@@ -96,7 +121,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   // Get current settings
   const settings = await getFormSettings(shopDomain);
 
-  // Get order statistics from Shopify Orders API
+  // Get order statistics from Shopify Orders API via SDK
   let stats = {
     totalOrders: 0,
     pendingOrders: 0,
@@ -109,7 +134,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   };
 
   try {
-    const shopifyStats = await fetchShopifyOrderStats(shopDomain, accessToken);
+    const shopifyStats = await fetchShopifyOrderStats(restClient);
     stats = { ...stats, ...shopifyStats };
   } catch (error) {
     console.log("Error fetching Shopify order stats:", error);
