@@ -20,7 +20,7 @@ import { supabaseSessionStorage } from '../shopify/session-storage.server';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function toNumericVariantId(vid: string | null | undefined): number | null {
+export function toNumericVariantId(vid: string | null | undefined): number | null {
     if (!vid) return null;
     const s = String(vid);
     if (s.startsWith('gid://')) {
@@ -37,7 +37,7 @@ function toNumericVariantId(vid: string | null | undefined): number | null {
     return isNaN(num) || num === 0 ? null : num;
 }
 
-function formatPhoneE164(phone: string): string {
+export function formatPhoneE164(phone: string): string {
     const digits = phone.replace(/[^\d]/g, '');
     if (!digits) return '';
     if (phone.startsWith('+')) return phone;
@@ -45,7 +45,7 @@ function formatPhoneE164(phone: string): string {
     return `+${digits}`;
 }
 
-function buildCatalogOrCustomLineItem(input: {
+export function buildCatalogOrCustomLineItem(input: {
     variantId?: number | null;
     title?: string;
     quantity?: number;
@@ -72,7 +72,7 @@ function buildCatalogOrCustomLineItem(input: {
     };
 }
 
-function sanitizeVariantPricedLineItems(lineItems: Array<Record<string, any>>) {
+export function sanitizeVariantPricedLineItems(lineItems: Array<Record<string, any>>) {
     return lineItems.map((item) => {
         if (!item.variant_id) return item;
         return {

@@ -9,11 +9,17 @@
  */
 
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import { getFormSettings, logOrder, supabase } from "../config/supabase.server";
+import { getFormSettings, logOrder, logOrderWithShopifyIds, supabase } from "../config/supabase.server";
 import { lookupCustomerByPhone } from "../services/customer-lookup.server";
 import { syncOrderToGoogleSheets } from "../services/google-sheets.server";
-import { validateOrderAgainstFraudRules } from "../services/fraud-protection.server";
-import { createShopifyOrderBackground } from "../services/shopify-sync.server";
+import { getFraudProtectionSettings, validateOrderAgainstFraudRulesWithSettings } from "../services/fraud-protection.server";
+import {
+    toNumericVariantId,
+    formatPhoneE164,
+    buildCatalogOrCustomLineItem,
+    sanitizeVariantPricedLineItems,
+} from "../services/shopify-sync.server";
+import { supabaseSessionStorage } from "../shopify/session-storage.server";
 
 const corsHeaders = {
     "Content-Type": "application/json",
@@ -284,8 +290,21 @@ async function handlePartialCodCheckout(request: Request, data: any) {
     }
 }
 
-// Handle Regular COD Order
+// ─── Optimized Regular COD Order Flow ─────────────────────────────────────────
+// Target: <3s warm, <5s cold. 4 DB calls total (down from 8-12).
+//
+// Flow:
+//   1. Session + fraud settings (2 parallel DB calls)
+//   2. FAST fraud checks (in-memory) + heavy fraud checks (if enabled)
+//   3. Shopify API call (direct, from request data — no DB round-trip)
+//   4. Save order to DB (1 call, with Shopify IDs included)
+//   5. Non-blocking: customer upsert + Sheets sync
+// ──────────────────────────────────────────────────────────────────────────────
+
 async function handleRegularOrder(request: Request, data: any) {
+    const start = Date.now();
+    console.log('⏱ [Proxy] Start order for shop:', data.shop);
+
     const normalizedProductId = data.productId || data.variantId || "";
 
     // Validate required fields
@@ -293,39 +312,45 @@ async function handleRegularOrder(request: Request, data: any) {
         return new Response(JSON.stringify({
             success: false,
             error: "Missing required fields: shop, variantId"
-        }), {
-            status: 400,
-            headers: corsHeaders
-        });
+        }), { status: 400, headers: corsHeaders });
     }
 
-    // ── Fraud Protection: server-side validation ──
-    // Log ALL IP-related headers for debugging
-    console.log('[Proxy] ===== IP HEADER DEBUG =====');
-    console.log('[Proxy] x-forwarded-for:', request.headers.get('x-forwarded-for'));
-    console.log('[Proxy] cf-connecting-ip:', request.headers.get('cf-connecting-ip'));
-    console.log('[Proxy] x-real-ip:', request.headers.get('x-real-ip'));
-    console.log('[Proxy] x-shopify-client-ip:', request.headers.get('x-shopify-client-ip'));
-    console.log('[Proxy] x-request-id:', request.headers.get('x-request-id'));
-    console.log('[Proxy] ================================');
+    // ── 1. PARALLEL: Load offline session + fraud settings ──
+    // These are the only 2 DB calls needed before Shopify API.
+    const [sessions, fraudSettings] = await Promise.all([
+        supabaseSessionStorage.findSessionsByShop(data.shop),
+        getFraudProtectionSettings(data.shop),
+    ]);
+    console.log('⏱ [Proxy] Session + fraud settings loaded:', Date.now() - start, 'ms');
 
+    // Extract offline session — SINGLE SOURCE OF TRUTH for access token
+    const offlineSession = sessions.find((s) => !s.isOnline);
+    if (!offlineSession || !offlineSession.accessToken) {
+        console.error('[Proxy] ❌ No offline session found for shop:', data.shop);
+        return new Response(JSON.stringify({
+            success: false,
+            error: "Store not authenticated. Merchant must re-open admin panel.",
+        }), { status: 401, headers: corsHeaders });
+    }
+    const accessToken = offlineSession.accessToken;
+
+    // ── 2. FRAUD CHECKS ──
     const clientIp =
         request.headers.get('x-shopify-client-ip')
         || request.headers.get('cf-connecting-ip')
         || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
         || request.headers.get('x-real-ip')
         || 'unknown';
-    console.log('[Proxy] >>> CUSTOMER IP:', clientIp, '<<<');
 
     try {
-        const fraudResult = await validateOrderAgainstFraudRules({
+        const fraudResult = await validateOrderAgainstFraudRulesWithSettings({
             phone: data.customerPhone,
             email: data.customerEmail,
             ip: clientIp,
             zipcode: data.customerZipcode,
             quantity: parseInt(data.quantity) || 1,
             shopDomain: data.shop,
-        });
+        }, fraudSettings);
         if (!fraudResult.allowed) {
             console.warn('[Proxy] Blocked by fraud protection:', fraudResult.message);
             return new Response(JSON.stringify({
@@ -333,64 +358,28 @@ async function handleRegularOrder(request: Request, data: any) {
                 error: fraudResult.message
             }), { status: 403, headers: corsHeaders });
         }
-        console.log('[Proxy] Fraud check passed');
     } catch (fraudErr: any) {
         console.error('[Proxy] Fraud check error (allowing order):', fraudErr.message);
-        // If fraud check fails due to DB error, allow the order to proceed
     }
+    console.log('⏱ [Proxy] Fraud checks done:', Date.now() - start, 'ms');
 
-    // Save/update customer data in customers table for autofill
-    try {
-        if (data.customerPhone && data.customerPhone.trim()) {
-            const customerData = {
-                shop_domain: data.shop,
-                phone: data.customerPhone.trim(),
-                name: data.customerName || '',
-                address: data.customerAddress || '',
-                state: data.customerState || '',
-                city: data.customerCity || '',
-                zipcode: data.customerZipcode || '',
-                email: data.customerEmail || '',
-                updated_at: new Date().toISOString()
-            };
-
-            const { error: customerError } = await supabase
-                .from('customers')
-                .upsert(customerData, {
-                    onConflict: 'shop_domain,phone',
-                    ignoreDuplicates: false
-                });
-
-            if (customerError) {
-                console.error('[Proxy] Error saving customer data:', customerError);
-            } else {
-                console.log('[Proxy] Customer data saved/updated for phone:', data.customerPhone);
-            }
-        }
-    } catch (custError) {
-        console.error('[Proxy] Customer save error:', custError);
-    }
-
-    // Calculate prices including upsell items
+    // ── 3. BUILD SHOPIFY PAYLOAD (from request data — no DB round-trip) ──
     const upsellItems = data.upsell_items || [];
     const upsellTotal = upsellItems.reduce((sum: number, item: any) => sum + (parseFloat(item.price) * (parseInt(item.quantity) || 1)), 0);
     const shippingPrice = parseFloat(data.shippingPrice) || 0;
     const discountPercent = parseFloat(data.discountPercent) || 0;
 
-    // Use finalTotal from storefront DOM (most accurate — includes qty, discounts, shipping, upsells)
-    // Fallback: compute from individual fields
+    // Use finalTotal from storefront DOM (most accurate)
     let totalPrice: number;
     if (data.finalTotal && parseFloat(data.finalTotal) > 0) {
         totalPrice = parseFloat(data.finalTotal);
-        console.log('[Proxy] Using finalTotal from storefront:', totalPrice);
     } else {
         const subtotal = parseFloat(data.price) * (parseInt(data.quantity) || 1);
         const discount = subtotal * (discountPercent / 100);
         totalPrice = subtotal - discount + shippingPrice + upsellTotal;
-        console.log('[Proxy] Computed total:', totalPrice, '(subtotal:', subtotal, 'discount:', discount, 'shipping:', shippingPrice, 'upsells:', upsellTotal, ')');
     }
 
-    // Build notes including upsell details, shipping, and discount
+    // Build notes
     let orderNotes = data.notes || data.customerNotes || '';
     const currencyCode = data.currency || 'USD';
     const fmtPrice = (amt: number) => { try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: currencyCode }).format(amt); } catch { return `${currencyCode} ${amt.toFixed(2)}`; } };
@@ -408,63 +397,221 @@ async function handleRegularOrder(request: Request, data: any) {
         orderNotes = orderNotes ? orderNotes + '\n' : '';
         orderNotes += `BUNDLE DISCOUNT: ${discountPercent}% off`;
     }
-    // Append custom field data to order notes
     if (data.customFieldData && Array.isArray(data.customFieldData) && data.customFieldData.length > 0) {
         const cfNotes = 'CUSTOM FIELDS:\n' + data.customFieldData.map((cf: any) => `  ${cf.label}: ${cf.value}`).join('\n');
         orderNotes = orderNotes ? orderNotes + '\n' + cfNotes : cfNotes;
     }
 
-    console.log('[Proxy] Total price:', totalPrice, 'Qty:', data.quantity, 'Discount:', discountPercent + '%', 'Upsell items:', upsellItems.length);
+    // Build line items directly from request data
+    const mainVariantId = toNumericVariantId(data.variantId);
+    const discountMultiplier = 1 - (discountPercent / 100);
+    const lineItems: Array<Record<string, any>> = [];
 
-    // Create the order using logOrder
-    const result = await logOrder({
-        shop_domain: data.shop,
-        customer_name: data.customerName || '',
-        customer_phone: data.customerPhone || '',
-        customer_address: data.customerAddress || '',
-        customer_email: data.customerEmail || '',
-        notes: orderNotes,
-        city: data.customerCity || '',
-        state: data.customerState || '',
-        pincode: data.customerZipcode || '',
-        product_id: normalizedProductId,
-        product_title: data.productTitle || 'Product',
-        variant_id: data.variantId || '',
-        quantity: parseInt(data.quantity) || 1,
-        price: totalPrice.toString(),
-        shipping_label: data.shippingLabel || '',
-        shipping_price: shippingPrice,
-        currency: currencyCode,
-        order_payload: data,
-    });
+    const bundleVariants: Array<any> =
+        Array.isArray(data.bundleVariants) && data.bundleVariants.length > 1
+            ? data.bundleVariants : null;
 
-    console.log('[Proxy] Order created:', result);
-
-    // Create Shopify order — STRICT: customer only sees success when Shopify order exists.
-    // NO fallback, NO COD-xxxx, NO "success even if Shopify fails".
-    console.log('[Proxy] Creating Shopify order for', result.id);
-    let syncResult: { success: boolean; shopifyOrderId?: string; shopifyOrderName?: string; error?: string };
-    try {
-        syncResult = await createShopifyOrderBackground(String(result.id));
-    } catch (syncErr: any) {
-        console.error('[Proxy] ❌ Shopify order creation failed:', syncErr.message);
-        syncResult = { success: false, error: syncErr.message };
+    if (bundleVariants) {
+        for (const bv of bundleVariants) {
+            const rawBundleVariantId = bv?.variantId ?? bv?.variant_id ?? bv?.id ?? null;
+            const bvVariantId = toNumericVariantId(rawBundleVariantId) || mainVariantId;
+            const originalPrice = parseFloat(String(bv.price || 0));
+            const discountedPrice = (originalPrice * discountMultiplier).toFixed(2);
+            lineItems.push(buildCatalogOrCustomLineItem({
+                variantId: bvVariantId,
+                title: bv.title || 'Bundle Item',
+                quantity: bv.quantity || 1,
+                price: discountedPrice,
+            }));
+        }
+    } else {
+        const originalPrice = parseFloat(String(data.price || 0));
+        const discountedPrice = (originalPrice * discountMultiplier).toFixed(2);
+        lineItems.push(buildCatalogOrCustomLineItem({
+            variantId: mainVariantId,
+            title: data.productTitle || 'Product',
+            quantity: parseInt(data.quantity) || 1,
+            price: discountedPrice,
+        }));
     }
 
-    if (!syncResult.success || !syncResult.shopifyOrderName) {
-        // Shopify failed — return FAILURE to customer. No fallback.
-        console.error('[Proxy] ❌ Shopify order creation failed for order', result.id, '— Error:', syncResult.error);
+    if (Array.isArray(data.upsell_items)) {
+        data.upsell_items.forEach((item: any) => {
+            try {
+                lineItems.push(buildCatalogOrCustomLineItem({
+                    variantId: toNumericVariantId(item.variant_id),
+                    title: item.title || 'Upsell Item',
+                    quantity: item.quantity || 1,
+                    price: parseFloat(String(item.price || 0)).toFixed(2),
+                }));
+            } catch (e: any) {
+                console.error('[Proxy] Upsell item error:', e?.message);
+            }
+        });
+    }
+
+    // Customer data
+    const customerName = data.customerName || 'Customer';
+    const nameParts = customerName.trim().split(/\s+/);
+    const firstName = nameParts[0] || 'Customer';
+    const lastName = nameParts.slice(1).join(' ') || '';
+    const formattedPhone = formatPhoneE164(data.customerPhone || '');
+    const orderCountry = data.customerCountry || 'IN';
+    const shippingLabel = data.shippingLabel || (shippingPrice > 0 ? 'Shipping' : 'Free Shipping');
+
+    // Build Shopify order payload
+    const shopifyPayload: Record<string, any> = {
+        order: {
+            line_items: lineItems,
+            customer: {
+                first_name: firstName,
+                last_name: lastName,
+                email: data.customerEmail || undefined,
+            },
+            phone: formattedPhone || undefined,
+            financial_status: 'pending',
+            fulfillment_status: null,
+            tags: 'FoxCOD, COD',
+            note: orderNotes || 'Order placed via FoxCOD COD Form',
+            inventory_behavior: 'decrement_obeying_policy',
+            source_name: 'FoxCOD',
+            shipping_lines: [{
+                title: shippingLabel,
+                price: shippingPrice.toFixed(2),
+                code: 'COD_SHIPPING',
+            }],
+        },
+    };
+
+    if (customerName || data.customerAddress) {
+        shopifyPayload.order.shipping_address = {
+            first_name: firstName,
+            last_name: lastName,
+            address1: data.customerAddress || '',
+            city: data.customerCity || '',
+            province: data.customerState || '',
+            zip: data.customerZipcode || '',
+            country: orderCountry,
+            phone: formattedPhone || '',
+        };
+        shopifyPayload.order.billing_address = { ...shopifyPayload.order.shipping_address };
+    }
+
+    // ── 4. CALL SHOPIFY API — direct fetch, no middleware ──
+    const shopifyApiUrl = `https://${data.shop}/admin/api/2024-04/orders.json`;
+    const idempotencyKey = `foxcod-proxy-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    let shopifyRes = await fetch(shopifyApiUrl, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Shopify-Access-Token': accessToken,
+            'Idempotency-Key': idempotencyKey,
+        },
+        body: JSON.stringify(shopifyPayload),
+    });
+
+    let shopifyData = await shopifyRes.json();
+    console.log('⏱ [Proxy] Shopify API responded:', Date.now() - start, 'ms — status:', shopifyRes.status);
+
+    // Fail fast on auth errors
+    if (shopifyRes.status === 401) {
+        console.error('[Proxy] ❌ Shopify 401 — offline session token invalid for', data.shop);
         return new Response(JSON.stringify({
             success: false,
-            error: 'Failed to create order. Please try again.',
+            error: 'Store authentication expired. Merchant must re-open admin panel.',
         }), { status: 500, headers: corsHeaders });
     }
 
-    // Non-blocking Google Sheets sync
-    const orderName = syncResult.shopifyOrderName;
+    // Retry with sanitized line items if first attempt fails (e.g. variant price mismatch)
+    if (!shopifyData.order) {
+        console.warn('[Proxy] Primary Shopify call failed, retrying with sanitized line items');
+        const fallbackPayload = {
+            order: {
+                ...shopifyPayload.order,
+                line_items: sanitizeVariantPricedLineItems(lineItems),
+            },
+        };
+
+        shopifyRes = await fetch(shopifyApiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Shopify-Access-Token': accessToken,
+                'Idempotency-Key': `${idempotencyKey}-fallback`,
+            },
+            body: JSON.stringify(fallbackPayload),
+        });
+
+        shopifyData = await shopifyRes.json();
+        console.log('⏱ [Proxy] Shopify fallback responded:', Date.now() - start, 'ms — status:', shopifyRes.status);
+
+        if (!shopifyData.order) {
+            console.error('[Proxy] ❌ Shopify order creation failed:', JSON.stringify(shopifyData.errors || shopifyData).substring(0, 500));
+            return new Response(JSON.stringify({
+                success: false,
+                error: 'Failed to create order. Please try again.',
+            }), { status: 500, headers: corsHeaders });
+        }
+    }
+
+    const shopifyOrderId = String(shopifyData.order.id);
+    const shopifyOrderName = shopifyData.order.name;
+    console.log('⏱ [Proxy] Shopify order created:', shopifyOrderName, '— saving to DB...');
+
+    // ── 5. SAVE ORDER TO DB — single call with Shopify IDs (already synced) ──
+    let dbOrderId: any = null;
+    try {
+        const result = await logOrderWithShopifyIds({
+            shop_domain: data.shop,
+            customer_name: customerName,
+            customer_phone: data.customerPhone || '',
+            customer_address: data.customerAddress || '',
+            customer_email: data.customerEmail || '',
+            notes: orderNotes,
+            city: data.customerCity || '',
+            state: data.customerState || '',
+            pincode: data.customerZipcode || '',
+            product_id: normalizedProductId,
+            product_title: data.productTitle || 'Product',
+            variant_id: data.variantId || '',
+            quantity: parseInt(data.quantity) || 1,
+            price: totalPrice.toString(),
+            shipping_label: data.shippingLabel || '',
+            shipping_price: shippingPrice,
+            currency: currencyCode,
+            order_payload: data,
+        }, shopifyOrderId, shopifyOrderName);
+        dbOrderId = result.id;
+    } catch (dbErr: any) {
+        // Shopify order already created — DB failure is non-fatal, log and continue
+        console.error('[Proxy] ⚠️ DB save failed (Shopify order exists):', dbErr.message);
+    }
+    console.log('⏱ [Proxy] DB save done:', Date.now() - start, 'ms');
+
+    // ── 6. NON-BLOCKING: Customer upsert + Google Sheets sync ──
+    // Fire-and-forget — do NOT await
+    if (data.customerPhone && data.customerPhone.trim()) {
+        Promise.resolve(
+            supabase
+                .from('customers')
+                .upsert({
+                    shop_domain: data.shop,
+                    phone: data.customerPhone.trim(),
+                    name: data.customerName || '',
+                    address: data.customerAddress || '',
+                    state: data.customerState || '',
+                    city: data.customerCity || '',
+                    zipcode: data.customerZipcode || '',
+                    email: data.customerEmail || '',
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'shop_domain,phone', ignoreDuplicates: false })
+        ).catch((err: any) => console.error('[Proxy] Customer upsert error (non-blocking):', err.message));
+    }
+
     syncOrderToGoogleSheets(data.shop, {
-        orderId: syncResult.shopifyOrderId || result.id,
-        orderName,
+        orderId: shopifyOrderId || dbOrderId,
+        orderName: shopifyOrderName,
         customerName: data.customerName || '',
         phone: data.customerPhone || '',
         email: data.customerEmail || '',
@@ -480,10 +627,12 @@ async function handleRegularOrder(request: Request, data: any) {
         console.error('[Proxy] Google Sheets sync error (non-blocking):', err.message);
     });
 
+    console.log('⏱ [Proxy] Total time:', Date.now() - start, 'ms');
+
     return new Response(JSON.stringify({
         success: true,
-        orderId: result.id,
-        shopifyOrderId: syncResult.shopifyOrderId || null,
-        orderName,
+        orderId: dbOrderId,
+        shopifyOrderId,
+        orderName: shopifyOrderName,
     }), { headers: corsHeaders });
 }

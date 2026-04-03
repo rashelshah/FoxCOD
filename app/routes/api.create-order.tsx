@@ -9,12 +9,17 @@
 
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import {
-    getShop,
     getFormSettings,
-    logOrder,
+    logOrderWithShopifyIds,
 } from "../config/supabase.server";
-import { validateOrderAgainstFraudRules } from "../services/fraud-protection.server";
-import { createShopifyOrderBackground } from "../services/shopify-sync.server";
+import { getFraudProtectionSettings, validateOrderAgainstFraudRulesWithSettings } from "../services/fraud-protection.server";
+import {
+    toNumericVariantId,
+    formatPhoneE164,
+    buildCatalogOrCustomLineItem,
+    sanitizeVariantPricedLineItems,
+} from "../services/shopify-sync.server";
+import { supabaseSessionStorage } from "../shopify/session-storage.server";
 
 // CORS headers for storefront requests
 const corsHeaders = {
@@ -225,7 +230,15 @@ function validateOrderInput(body: OrderRequestBody, formSettings: any, customer:
 
 
 /**
- * Action Handler: Create COD order
+ * Action Handler: Create COD order (optimized)
+ *
+ * Flow:
+ *   1. Parse + validate input
+ *   2. Parallel: Load session + fraud settings + form settings
+ *   3. Fraud checks (in-memory + DB frequency limit if enabled)
+ *   4. Shopify API call (direct)
+ *   5. Save order to DB (with Shopify IDs)
+ *   6. Return response
  */
 export const action = async ({ request }: ActionFunctionArgs) => {
     // Handle preflight OPTIONS request
@@ -241,13 +254,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         );
     }
 
+    const start = Date.now();
+
     try {
         // Parse request body
         const body: OrderRequestBody = await request.json();
         const customer = normalizeCustomerFields(body);
         const normalizedProductId = body.productId || body.variantId;
 
-        console.log("[COD Order] Received order request:", body.shop, body.productTitle, "qty:", body.quantity, "discount:", body.discountPercent, "finalTotal:", body.finalTotal);
+        console.log("⏱ [COD Order] Start for:", body.shop, body.productTitle);
 
         // Validate shop domain
         if (!body.shop) {
@@ -257,18 +272,24 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             );
         }
 
-        // ── Parallel: fetch shop + form settings simultaneously ──
-        const [shop, formSettings] = await Promise.all([
-            getShop(body.shop),
+        // ── 1. PARALLEL: Load session + fraud settings + form settings ──
+        const [sessions, fraudSettings, formSettings] = await Promise.all([
+            supabaseSessionStorage.findSessionsByShop(body.shop),
+            getFraudProtectionSettings(body.shop),
             getFormSettings(body.shop),
         ]);
+        console.log("⏱ [COD Order] Parallel fetch done:", Date.now() - start, "ms");
 
-        if (!shop || shop.uninstalled_at) {
+        // Extract offline session
+        const offlineSession = sessions.find((s) => !s.isOnline);
+        if (!offlineSession || !offlineSession.accessToken) {
             return Response.json(
-                { success: false, error: "Shop not found or app not installed" },
-                { status: 404, headers: corsHeaders }
+                { success: false, error: "Store not authenticated. Merchant must re-open admin panel." },
+                { status: 401, headers: corsHeaders }
             );
         }
+        const accessToken = offlineSession.accessToken;
+
         if (!formSettings?.enabled) {
             return Response.json(
                 { success: false, error: "COD form is not enabled for this shop" },
@@ -285,21 +306,21 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             );
         }
 
-        // ── Fraud Protection: server-side validation ──
+        // ── 2. FRAUD CHECKS ──
         const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
             || request.headers.get('cf-connecting-ip')
             || request.headers.get('x-real-ip')
             || request.headers.get('x-shopify-client-ip')
             || '';
-        console.log('[COD Order] Fraud check — detected IP:', clientIp);
-        const fraudResult = await validateOrderAgainstFraudRules({
+
+        const fraudResult = await validateOrderAgainstFraudRulesWithSettings({
             phone: customer.phone,
             email: customer.email,
             ip: clientIp,
             zipcode: customer.zipcode,
             quantity: Number(body.quantity || 0),
             shopDomain: body.shop,
-        });
+        }, fraudSettings);
         if (!fraudResult.allowed) {
             console.warn('[COD Order] Blocked by fraud protection:', fraudResult.message);
             return Response.json(
@@ -307,10 +328,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 { status: 403, headers: corsHeaders }
             );
         }
+        console.log("⏱ [COD Order] Fraud checks done:", Date.now() - start, "ms");
 
-        // Calculate total price:
-        // Priority 1: finalTotal from order summary DOM (most accurate — includes qty, discounts, shipping, upsells)
-        // Priority 2: Compute from individual fields
+        // ── 3. BUILD SHOPIFY PAYLOAD ──
         const upsellTotal = (body.upsell_items || []).reduce((sum, item) => sum + (item.price * item.quantity), 0);
         const shippingPrice = body.shippingPrice || 0;
         const discountPercent = body.discountPercent || 0;
@@ -318,18 +338,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         let totalPrice: number;
         if (body.finalTotal && body.finalTotal > 0) {
             totalPrice = body.finalTotal;
-            console.log("[COD Order] Using finalTotal from storefront:", totalPrice);
         } else {
             const subtotal = body.price * body.quantity;
             const discount = subtotal * (discountPercent / 100);
             totalPrice = subtotal - discount + shippingPrice + upsellTotal;
-            console.log("[COD Order] Computed total:", totalPrice, "(subtotal:", subtotal, "discount:", discount, "shipping:", shippingPrice, "upsells:", upsellTotal, ")");
         }
 
-        // Build notes with upsell details
+        // Build notes
         let orderNotes = body.notes || '';
         const currencyCode = body.currency || 'USD';
-        // Helper to format price with currency for notes
         const fmtPrice = (amt: number) => {
             try {
                 return new Intl.NumberFormat(undefined, { style: 'currency', currency: currencyCode }).format(amt);
@@ -350,8 +367,129 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             orderNotes += `BUNDLE DISCOUNT: ${discountPercent}% off`;
         }
 
-        // Log order in Supabase — primary storage + save full payload for retry
-        const orderLog = await logOrder({
+        // Build line items
+        const mainVariantId = toNumericVariantId(body.variantId);
+        const discountMultiplier = 1 - (discountPercent / 100);
+        const lineItems: Array<Record<string, any>> = [];
+
+        const originalPrice = parseFloat(String(body.price || 0));
+        const discountedPrice = (originalPrice * discountMultiplier).toFixed(2);
+        lineItems.push(buildCatalogOrCustomLineItem({
+            variantId: mainVariantId,
+            title: body.productTitle || 'Product',
+            quantity: body.quantity,
+            price: discountedPrice,
+        }));
+
+        if (Array.isArray(body.upsell_items)) {
+            body.upsell_items.forEach((item) => {
+                lineItems.push(buildCatalogOrCustomLineItem({
+                    variantId: toNumericVariantId(item.variant_id),
+                    title: item.title || 'Upsell Item',
+                    quantity: item.quantity || 1,
+                    price: parseFloat(String(item.price || 0)).toFixed(2),
+                }));
+            });
+        }
+
+        const formattedPhone = formatPhoneE164(customer.phone || '');
+        const shippingLabel = body.shippingLabel || (shippingPrice > 0 ? 'Shipping' : 'Free Shipping');
+
+        const shopifyPayload: Record<string, any> = {
+            order: {
+                line_items: lineItems,
+                customer: {
+                    first_name: customer.firstName,
+                    last_name: customer.lastName,
+                    email: customer.email || undefined,
+                },
+                phone: formattedPhone || undefined,
+                financial_status: 'pending',
+                fulfillment_status: null,
+                tags: 'FoxCOD, COD',
+                note: orderNotes || 'Order placed via FoxCOD COD Form',
+                inventory_behavior: 'decrement_obeying_policy',
+                source_name: 'FoxCOD',
+                shipping_lines: [{
+                    title: shippingLabel,
+                    price: shippingPrice.toFixed(2),
+                    code: 'COD_SHIPPING',
+                }],
+            },
+        };
+
+        if (customer.name || customer.address) {
+            shopifyPayload.order.shipping_address = {
+                first_name: customer.firstName,
+                last_name: customer.lastName,
+                address1: customer.address || '',
+                city: customer.city || '',
+                province: customer.state || '',
+                zip: customer.zipcode || '',
+                country: body.customerCountry || 'IN',
+                phone: formattedPhone || '',
+            };
+            shopifyPayload.order.billing_address = { ...shopifyPayload.order.shipping_address };
+        }
+
+        // ── 4. CALL SHOPIFY API ──
+        const shopifyApiUrl = `https://${body.shop}/admin/api/2024-04/orders.json`;
+        const idempotencyKey = `foxcod-api-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+        let shopifyRes = await fetch(shopifyApiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Shopify-Access-Token': accessToken,
+                'Idempotency-Key': idempotencyKey,
+            },
+            body: JSON.stringify(shopifyPayload),
+        });
+
+        let shopifyData = await shopifyRes.json();
+        console.log("⏱ [COD Order] Shopify responded:", Date.now() - start, "ms — status:", shopifyRes.status);
+
+        if (shopifyRes.status === 401) {
+            return Response.json({
+                success: false,
+                error: 'Store authentication expired. Merchant must re-open admin panel.',
+            }, { status: 500, headers: corsHeaders });
+        }
+
+        // Retry with sanitized line items
+        if (!shopifyData.order) {
+            console.warn('[COD Order] Primary call failed, retrying with sanitized line items');
+            shopifyRes = await fetch(shopifyApiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Shopify-Access-Token': accessToken,
+                    'Idempotency-Key': `${idempotencyKey}-fallback`,
+                },
+                body: JSON.stringify({
+                    order: {
+                        ...shopifyPayload.order,
+                        line_items: sanitizeVariantPricedLineItems(lineItems),
+                    },
+                }),
+            });
+
+            shopifyData = await shopifyRes.json();
+
+            if (!shopifyData.order) {
+                console.error('[COD Order] ❌ Shopify order creation failed:', JSON.stringify(shopifyData.errors || shopifyData).substring(0, 500));
+                return Response.json({
+                    success: false,
+                    error: "Failed to create order. Please try again.",
+                }, { status: 500, headers: corsHeaders });
+            }
+        }
+
+        const shopifyOrderId = String(shopifyData.order.id);
+        const shopifyOrderName = shopifyData.order.name;
+
+        // ── 5. SAVE ORDER TO DB (with Shopify IDs) ──
+        const orderLog = await logOrderWithShopifyIds({
             shop_domain: body.shop,
             customer_name: customer.name,
             customer_phone: customer.phone,
@@ -370,38 +508,21 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             shipping_price: shippingPrice || undefined,
             currency: currencyCode,
             order_payload: body,
-        });
+        }, shopifyOrderId, shopifyOrderName);
 
-        // Create Shopify order — STRICT: customer only sees success when Shopify order exists.
-        // NO fallback, NO COD-xxxx, NO "success even if Shopify fails".
-        console.log("[COD Order] Creating Shopify order for", orderLog.id);
-        let syncResult: { success: boolean; shopifyOrderId?: string; shopifyOrderName?: string; error?: string };
-        try {
-            syncResult = await createShopifyOrderBackground(String(orderLog.id));
-        } catch (syncErr: any) {
-            console.error("[COD Order] ❌ Shopify order creation failed:", syncErr.message);
-            syncResult = { success: false, error: syncErr.message };
-        }
-
-        if (!syncResult.success || !syncResult.shopifyOrderName) {
-            // Shopify failed — return FAILURE to customer. No fallback.
-            console.error("[COD Order] ❌ Shopify order creation failed for order", orderLog.id, "— Error:", syncResult.error);
-            return Response.json({
-                success: false,
-                error: "Failed to create order. Please try again.",
-            }, { status: 500, headers: corsHeaders });
-        }
+        console.log("⏱ [COD Order] Total time:", Date.now() - start, "ms");
 
         return Response.json({
             success: true,
             orderId: orderLog.id,
-            shopifyOrderId: syncResult.shopifyOrderId || null,
-            orderName: syncResult.shopifyOrderName,
+            shopifyOrderId,
+            orderName: shopifyOrderName,
             message: "Order placed successfully!",
         }, { headers: corsHeaders });
 
     } catch (error: any) {
         console.error("[COD Order] Error:", error);
+        console.log("⏱ [COD Order] Failed at:", Date.now() - start, "ms");
 
         return Response.json({
             success: false,

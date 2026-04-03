@@ -356,6 +356,58 @@ export async function logOrder(order: OrderLogEntry) {
 }
 
 /**
+ * Log a new COD order with Shopify IDs already known (post-Shopify-success).
+ * Saves the order as already-synced in a single DB call — no separate update needed.
+ */
+export async function logOrderWithShopifyIds(
+    order: OrderLogEntry,
+    shopifyOrderId: string,
+    shopifyOrderName: string
+) {
+    const totalPrice = order.price ? parseFloat(String(order.price)) : 0;
+    const insertPayload: Record<string, unknown> = {
+        shop_domain: order.shop_domain,
+        customer_name: order.customer_name,
+        customer_phone: order.customer_phone,
+        customer_address: order.customer_address,
+        customer_email: order.customer_email ?? null,
+        customer_notes: order.notes ?? null,
+        product_id: order.product_id,
+        product_title: order.product_title,
+        variant_id: order.variant_id ?? null,
+        quantity: order.quantity,
+        total_price: totalPrice,
+        status: 'pending',
+        // Already synced — no need for a follow-up update
+        sync_status: 'synced',
+        sync_attempts: 0,
+        shopify_order_id: shopifyOrderId,
+        shopify_order_name: shopifyOrderName,
+        last_synced_at: new Date().toISOString(),
+    };
+    if (order.city != null) insertPayload.city = order.city;
+    if (order.state != null) insertPayload.state = order.state;
+    if (order.pincode != null) insertPayload.pincode = order.pincode;
+    if (order.shipping_label != null) insertPayload.shipping_label = order.shipping_label;
+    if (order.shipping_price != null) insertPayload.shipping_price = order.shipping_price;
+    if (order.currency != null) insertPayload.currency = order.currency;
+    if (order.order_payload != null) insertPayload.order_payload = order.order_payload;
+
+    const { data, error } = await supabase
+        .from('order_logs')
+        .insert(insertPayload)
+        .select()
+        .single();
+
+    if (error) {
+        console.error('Error logging order with Shopify IDs:', error);
+        throw error;
+    }
+
+    return { ...data, shopify_order_name: shopifyOrderName };
+}
+
+/**
  * Update order status after Shopify order creation
  */
 export async function updateOrderStatus(

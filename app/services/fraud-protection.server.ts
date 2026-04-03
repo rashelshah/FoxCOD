@@ -164,9 +164,23 @@ function normalizeEmail(email: string): string {
     return email.trim().toLowerCase();
 }
 
+/**
+ * Original function — loads settings from DB internally.
+ * Used by routes that don't pre-fetch fraud settings.
+ */
 export async function validateOrderAgainstFraudRules(orderData: OrderValidationData): Promise<FraudValidationResult> {
     const settings = await getFraudProtectionSettings(orderData.shopDomain);
+    return validateOrderAgainstFraudRulesWithSettings(orderData, settings);
+}
 
+/**
+ * Optimized variant — accepts pre-loaded settings to avoid redundant DB call.
+ * Use when fraud settings are already loaded (e.g. via Promise.all in proxy route).
+ */
+export async function validateOrderAgainstFraudRulesWithSettings(
+    orderData: OrderValidationData,
+    settings: FraudProtectionSettings
+): Promise<FraudValidationResult> {
     const blockedMessage = settings.blocked_message || 'Sorry, you are not allowed to place orders.';
 
     // 1. Check allowed IP override first — if IP is in allow list, skip all blocks
@@ -233,7 +247,7 @@ export async function validateOrderAgainstFraudRules(orderData: OrderValidationD
         }
     }
 
-    // 7. Check order frequency limit (requires DB query for recent orders)
+    // 7. Check order frequency limit (requires DB query — only runs if enabled)
     if (settings.limit_orders_enabled && settings.max_orders && settings.limit_hours) {
         const windowStart = new Date(Date.now() - settings.limit_hours * 60 * 60 * 1000).toISOString();
 
