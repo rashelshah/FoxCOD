@@ -412,29 +412,60 @@ query ProductCollections($ids: [ID!]!) {
 }`;
 
 async function fetchCodeDiscountNodeByCode(shop: string, couponCode: string) {
-    const { admin } = await unauthenticated.admin(shop);
+    let admin: any;
+    try {
+        const result = await unauthenticated.admin(shop);
+        admin = result.admin;
+    } catch (err: any) {
+        console.error("❌ [Coupons] Failed to get admin client for shop:", shop, err?.message);
+        throw new Error("DISCOUNT_FETCH_FAILED");
+    }
+
     const attempts = [
         { fieldName: "codeDiscountNodeByCode", query: SHOPIFY_CODE_DISCOUNT_QUERY, valueKey: "codeDiscount" },
         { fieldName: "discountCodeNodeByCode", query: SHOPIFY_LEGACY_CODE_DISCOUNT_QUERY, valueKey: "discountCode" },
     ];
+
+    let lastError: any = null;
 
     for (const attempt of attempts) {
         try {
             const response = await admin.graphql(attempt.query, { variables: { code: couponCode } });
             const payload = await response.json();
             if (payload?.errors?.length) {
-                throw new Error(payload.errors.map((error: any) => error.message).join("; "));
+                const errMsg = payload.errors.map((error: any) => error.message).join("; ");
+                console.error(`❌ [Coupons] GraphQL ${attempt.fieldName} errors:`, errMsg);
+                lastError = new Error(errMsg);
+                continue;
             }
             const node = payload?.data?.[attempt.fieldName];
             const discount = node?.[attempt.valueKey];
             if (node && discount) {
+                console.log(`🎟 [Coupons] Found discount via ${attempt.fieldName}:`, discount?.__typename, "status:", discount?.status);
                 return { node, discount };
             }
-        } catch (error) {
-            console.warn(`[Coupons] GraphQL ${attempt.fieldName} lookup failed:`, error);
+            // Node is null — code not found via this query, try next
+            console.log(`[Coupons] ${attempt.fieldName} returned null for code: ${couponCode}`);
+        } catch (error: any) {
+            const errorMessage = String(error?.message || "");
+            // If it's an access scope issue, log it loudly and throw
+            if (errorMessage.includes("access") || errorMessage.includes("scope") || errorMessage.includes("permission") || errorMessage.includes("denied")) {
+                console.error("❌ [Coupons] ACCESS DENIED — missing read_discounts scope?", { shop, code: couponCode, error: errorMessage });
+                throw new Error("DISCOUNT_FETCH_FAILED");
+            }
+            console.error(`❌ [Coupons] GraphQL ${attempt.fieldName} lookup failed:`, { shop, code: couponCode, error: errorMessage });
+            lastError = error;
         }
     }
 
+    // If we had errors (not just "not found"), propagate them
+    if (lastError) {
+        console.error("❌ [Coupons] All GraphQL lookups failed for code:", couponCode, lastError?.message);
+        throw new Error("DISCOUNT_FETCH_FAILED");
+    }
+
+    // No errors but code not found in either query
+    console.log(`[Coupons] Discount code '${couponCode}' not found via GraphQL`);
     return null;
 }
 
@@ -454,7 +485,7 @@ async function getProductCollectionMap(shop: string, productIds: Array<string | 
         const response = await admin.graphql(SHOPIFY_PRODUCT_COLLECTIONS_QUERY, {
             variables: { ids: normalizedIds },
         });
-        const payload = await response.json();
+        const payload: any = await response.json();
         if (payload?.errors?.length) {
             throw new Error(payload.errors.map((error: any) => error.message).join("; "));
         }
@@ -524,6 +555,16 @@ async function getShopifyGraphqlCoupon(
         const endsAt = discountNode?.endsAt ? new Date(discountNode.endsAt).getTime() : null;
         const status = String(discountNode?.status || "").toUpperCase();
 
+        console.log("🎟 [Coupons] Validating discount:", {
+            code: couponCode,
+            type: discountType,
+            status,
+            startsAt: discountNode?.startsAt,
+            endsAt: discountNode?.endsAt,
+            merchandiseTotal: pricing.merchandiseTotal,
+            originalTotal: pricing.originalTotal,
+        });
+
         if (status && status !== "ACTIVE") {
             return { valid: false, message: "Coupon is not active" };
         }
@@ -561,8 +602,10 @@ async function getShopifyGraphqlCoupon(
             };
         }
 
+        // ── Handle DiscountCodeFreeShipping ──
         if (discountType === "DiscountCodeFreeShipping") {
             const shippingDiscount = Math.min(roundCurrency(pricing.shippingPrice), roundCurrency(pricing.originalTotal));
+            console.log("🎟 [Coupons] Free shipping discount:", shippingDiscount);
             return {
                 valid: true,
                 coupon: {
@@ -581,7 +624,15 @@ async function getShopifyGraphqlCoupon(
             };
         }
 
+        // ── Handle DiscountCodeBxgy (Buy X Get Y) — not supported in COD ──
+        if (discountType === "DiscountCodeBxgy") {
+            console.log("🎟 [Coupons] BXGY discount not supported in COD:", couponCode);
+            return { valid: false, message: "Buy X Get Y discounts are not supported in COD form" };
+        }
+
+        // ── Handle DiscountCodeBasic (percentage / fixed amount off products) ──
         if (discountType !== "DiscountCodeBasic") {
+            console.warn("🎟 [Coupons] Unknown discount type:", discountType, "for code:", couponCode);
             return { valid: false, message: "This Shopify discount type is not supported in COD" };
         }
 
@@ -596,8 +647,18 @@ async function getShopifyGraphqlCoupon(
         );
         const eligibleQuantity = getOrderMerchandiseQuantity(eligibleItems);
 
+        console.log("🎟 [Coupons] Product eligibility:", {
+            allItems: selection.allItems,
+            productIds: selection.productIds.length,
+            variantIds: selection.variantIds.length,
+            collectionIds: selection.collectionIds.length,
+            cartItems: pricing.discountItems.length,
+            eligibleItems: eligibleItems.length,
+            eligibleSubtotal,
+        });
+
         if (!selection.allItems && eligibleSubtotal <= 0) {
-            return { valid: false, message: "This coupon does not apply to items in the cart" };
+            return { valid: false, message: "Coupon not applicable for these products" };
         }
 
         const valueNode = discountNode?.customerGets?.value;
@@ -605,8 +666,11 @@ async function getShopifyGraphqlCoupon(
         let resolvedCoupon: ResolvedCoupon | null = null;
 
         if (valueNode?.__typename === "DiscountPercentage") {
-            const percentage = Math.abs(Number(valueNode?.percentage || 0));
+            // Shopify returns percentage as a decimal: 0.1 = 10%, 0.5 = 50%
+            const rawPercentage = Math.abs(Number(valueNode?.percentage || 0));
+            const percentage = rawPercentage <= 1 ? rawPercentage * 100 : rawPercentage;
             discount = (eligibleSubtotal * percentage) / 100;
+            console.log("🎟 [Coupons] Percentage discount:", { rawPercentage, percentage, eligibleSubtotal, discount });
             resolvedCoupon = {
                 code: couponCode,
                 type: "percentage",
@@ -621,6 +685,7 @@ async function getShopifyGraphqlCoupon(
         } else if (valueNode?.__typename === "DiscountAmount") {
             const amount = Math.abs(Number(valueNode?.amount?.amount || 0));
             discount = valueNode?.appliesOnEachItem ? amount * eligibleQuantity : amount;
+            console.log("🎟 [Coupons] Fixed amount discount:", { amount, appliesOnEachItem: valueNode?.appliesOnEachItem, eligibleQuantity, discount });
             resolvedCoupon = {
                 code: couponCode,
                 type: "fixed",
@@ -635,10 +700,18 @@ async function getShopifyGraphqlCoupon(
         }
 
         if (!resolvedCoupon) {
+            console.warn("🎟 [Coupons] Unsupported value type:", valueNode?.__typename);
             return { valid: false, message: "This Shopify discount value is not supported in COD" };
         }
 
         discount = Math.min(roundCurrency(discount), eligibleSubtotal, roundCurrency(pricing.originalTotal));
+
+        console.log("🎟 [Coupons] ✅ Coupon validated:", {
+            code: couponCode,
+            discount,
+            originalTotal: roundCurrency(pricing.originalTotal),
+            finalTotal: roundCurrency(pricing.originalTotal - discount),
+        });
 
         return {
             valid: true,
@@ -648,8 +721,12 @@ async function getShopifyGraphqlCoupon(
             finalTotal: roundCurrency(pricing.originalTotal - discount),
             message: "Coupon applied",
         };
-    } catch (error) {
-        console.error("[Coupons] GraphQL discount lookup failed:", error);
+    } catch (error: any) {
+        // Propagate DISCOUNT_FETCH_FAILED so validateCouponForShop can distinguish it
+        if (error?.message === "DISCOUNT_FETCH_FAILED") {
+            throw error;
+        }
+        console.error("❌ [Coupons] GraphQL discount lookup failed:", error?.message, error);
         return null;
     }
 }
@@ -791,16 +868,36 @@ export async function validateCouponForShop(shop: string, couponCode: string, ca
 
     const pricing = calculateOrderPricing(orderContext || {});
 
-    const graphqlCoupon = await getShopifyGraphqlCoupon(
+    console.log("🎟 [Coupons] Starting validation:", {
         shop,
-        normalizedCode,
-        pricing,
-        orderContext,
-    );
-    if (graphqlCoupon) {
-        return graphqlCoupon;
+        code: normalizedCode,
+        cartTotal: normalizedCartTotal,
+        merchandiseTotal: pricing.merchandiseTotal,
+        originalTotal: pricing.originalTotal,
+        itemCount: pricing.discountItems.length,
+        items: pricing.discountItems.map(i => ({ productId: i.productId, variantId: i.variantId, price: i.price, qty: i.quantity })),
+    });
+
+    // ── Try GraphQL discount lookup (primary) ──
+    try {
+        const graphqlCoupon = await getShopifyGraphqlCoupon(
+            shop,
+            normalizedCode,
+            pricing,
+            orderContext,
+        );
+        if (graphqlCoupon) {
+            return graphqlCoupon;
+        }
+    } catch (error: any) {
+        if (error?.message === "DISCOUNT_FETCH_FAILED") {
+            console.error("❌ [Coupons] Discount fetch failed — possible missing read_discounts scope");
+            return { valid: false, message: "Coupon system temporarily unavailable. Please try again." };
+        }
+        console.error("❌ [Coupons] Unexpected error in GraphQL coupon lookup:", error?.message);
     }
 
+    // ── Try REST API fallback (legacy price rules) ──
     const shopifyCoupon = await getShopifyCoupon(
         shop,
         normalizedCode,
@@ -811,6 +908,7 @@ export async function validateCouponForShop(shop: string, couponCode: string, ca
         return shopifyCoupon;
     }
 
+    console.log("🎟 [Coupons] ❌ Coupon not found in any source:", normalizedCode);
     return { valid: false, message: "Invalid or expired coupon" };
 }
 
