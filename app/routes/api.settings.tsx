@@ -61,6 +61,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                     enabled: false,
                     button_text: "Buy with COD",
                     primary_color: "#667eea",
+                    button_style: "solid",
+                    button_size: "large",
+                    button_styles: {},
                     required_fields: ["name", "phone", "address"],
                     max_quantity: 10,
                 }
@@ -77,6 +80,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
                 enabled: settings.enabled,
                 button_text: settings.button_text,
                 primary_color: settings.primary_color,
+                button_style: settings.button_style,
+                button_size: settings.button_size,
+                button_styles: settings.button_styles,
                 required_fields: settings.required_fields,
                 max_quantity: settings.max_quantity,
             }

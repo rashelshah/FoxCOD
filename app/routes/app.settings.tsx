@@ -1418,7 +1418,7 @@ const PreviewDisplay = memo(({
                                                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5A2.5 2.5 0 0 1 5.5 7H9l1.2-1.9a1 1 0 0 1 .84-.46H18.5A2.5 2.5 0 0 1 21 7v3a2 2 0 0 0 0 4v3a2.5 2.5 0 0 1-2.5 2.5H11a1 1 0 0 1-.84-.46L9 17H5.5A2.5 2.5 0 0 1 3 14.5v-5Z" /><path d="M14 7v10" /><path d="M14 10h.01" /><path d="M14 14h.01" /></svg>
                                                             </div>
                                                             <div>
-                                                                <label style={{ ...getLabelStyle(), marginBottom: 2, fontSize: `${Math.max((formStyles?.labelFontSize || textSize), 15)}px` } as any}>Coupon Code</label>
+                                                                <label style={{ ...getLabelStyle(), marginBottom: 2, fontSize: `${Math.max((formStyles?.labelFontSize || formStyles?.textSize || 14), 15)}px` } as any}>Coupon Code</label>
                                                                 <div style={{ fontSize: '12px', lineHeight: 1.4, color: '#6b7280' }}>Apply your exclusive offer before placing the order</div>
                                                             </div>
                                                         </div>
@@ -1453,10 +1453,11 @@ const PreviewDisplay = memo(({
                                                                 color: formThemeColor,
                                                                 background: `linear-gradient(135deg, ${formThemeColor}18 0%, ${formThemeColor}10 100%)`,
                                                                 borderRadius: couponControlRadius,
-                                                                padding: '0 12px',
-                                                                minWidth: 92,
-                                                                fontSize: 12,
-                                                                fontWeight: 800,
+                                                                padding: '0 10px',
+                                                                minWidth: 76,
+                                                                height: 38,
+                                                                fontSize: 11,
+                                                                fontWeight: 700,
                                                                 letterSpacing: '0.02em',
                                                                 boxShadow: `0 10px 20px ${formThemeColor}1a`,
                                                                 whiteSpace: 'nowrap'
@@ -1464,20 +1465,6 @@ const PreviewDisplay = memo(({
                                                         >
                                                             Apply
                                                         </button>
-                                                    </div>
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', marginTop: '8px' }}>
-                                                        <div style={{ fontSize: '12px', lineHeight: 1.4, color: '#6b7280', maxWidth: '72%' }}>Valid code discounts appear instantly in the summary</div>
-                                                        <div style={{
-                                                            display: 'inline-flex',
-                                                            alignItems: 'center',
-                                                            justifyContent: 'center',
-                                                            padding: '6px 10px',
-                                                            borderRadius: '999px',
-                                                            fontSize: '12px',
-                                                            fontWeight: 700,
-                                                            color: formThemeColor,
-                                                            background: `${formThemeColor}14`
-                                                        }}>-₹100</div>
                                                     </div>
                                                 </div>
                                             );
@@ -2309,7 +2296,7 @@ export default function SettingsPage() {
             show_email_field: showEmailField, show_notes_field: showNotesField, email_required: emailRequired,
             name_placeholder: namePlaceholder, phone_placeholder: phonePlaceholder, address_placeholder: addressPlaceholder,
             notes_placeholder: notesPlaceholder, modal_style: modalStyle, animation_style: animationStyle, border_radius: borderRadius,
-            form_type: formType, fields, blocks, custom_fields: [], styles: formStyles, button_styles: { ...buttonStylesState, backgroundColor: primaryColor },
+            form_type: formType, fields, blocks, custom_fields: [], styles: formStyles, button_styles: { ...buttonStylesState, backgroundColor: primaryColor, buttonStyle, buttonSize },
             shipping_options: shippingOpts, partial_cod_enabled: partialCodEnabled, partial_cod_advance_amount: partialCodAdvanceAmount,
             partial_cod_commission: partialCodCommission, shipping_rates_enabled: shippingRatesEnabled,
             enable_coupon_field: couponFieldEnabled, coupon_field_position: couponFieldPosition,
@@ -2401,7 +2388,7 @@ export default function SettingsPage() {
                     show_email_field: showEmailField, show_notes_field: showNotesField, email_required: emailRequired,
                     name_placeholder: namePlaceholder, phone_placeholder: phonePlaceholder, address_placeholder: addressPlaceholder,
                     notes_placeholder: notesPlaceholder, modal_style: modalStyle, animation_style: animationStyle, border_radius: borderRadius,
-                    form_type: formType, fields, blocks, custom_fields: [], styles: formStyles, button_styles: { ...buttonStylesState, backgroundColor: primaryColor },
+                    form_type: formType, fields, blocks, custom_fields: [], styles: formStyles, button_styles: { ...buttonStylesState, backgroundColor: primaryColor, buttonStyle, buttonSize },
                     shipping_options: shippingOpts, partial_cod_enabled: partialCodEnabled, partial_cod_advance_amount: partialCodAdvanceAmount,
                     partial_cod_commission: partialCodCommission, shipping_rates_enabled: shippingRatesEnabled,
                     enable_coupon_field: couponFieldEnabled, coupon_field_position: couponFieldPosition,
@@ -2560,7 +2547,7 @@ export default function SettingsPage() {
         formData.append("blocks", JSON.stringify(blocks));
         formData.append("custom_fields", JSON.stringify([]));  // Legacy: cleared
         formData.append("styles", JSON.stringify(formStyles));
-        formData.append("button_styles", JSON.stringify({ ...buttonStylesState, backgroundColor: primaryColor }));
+        formData.append("button_styles", JSON.stringify({ ...buttonStylesState, backgroundColor: primaryColor, buttonStyle, buttonSize }));
         formData.append("shipping_options", JSON.stringify(shippingOpts));
         // Partial COD settings
         formData.append("partial_cod_enabled", partialCodEnabled.toString());

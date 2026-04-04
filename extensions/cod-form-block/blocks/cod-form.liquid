@@ -62,13 +62,19 @@
 {% comment %} Read COD settings from metafields (synced from app dashboard) {% endcomment %}
 {% assign cod_enabled = shop.metafields.fox_cod.enabled | default: 'false' %}
 {% assign cod_button_text = shop.metafields.fox_cod.button_text | default: 'Buy with COD' %}
-{% assign cod_primary_color = shop.metafields.fox_cod.primary_color | default: '#667eea' %}
+{% assign cod_primary_color = shop.metafields.fox_cod.primary_color.value | default: shop.metafields.fox_cod.primary_color | default: '#667eea' %}
 {% assign cod_app_url = shop.metafields.fox_cod.app_url | default: '' %}
 {% assign cod_max_quantity = shop.metafields.fox_cod.max_quantity | default: 10 %}
 {% assign cod_form_title = shop.metafields.fox_cod.form_title | default: 'Cash on Delivery' %}
 {% assign cod_form_subtitle = shop.metafields.fox_cod.form_subtitle | default: '' %}
-{% assign cod_button_style = shop.metafields.fox_cod.button_style | default: 'solid' %}
-{% assign cod_button_size = shop.metafields.fox_cod.button_size | default: 'large' %}
+{% assign cod_button_style = shop.metafields.fox_cod.button_style.value | default: shop.metafields.fox_cod.button_style | default: 'solid' | downcase | strip %}
+{% unless cod_button_style == 'solid' or cod_button_style == 'outline' or cod_button_style == 'gradient' %}
+  {% assign cod_button_style = 'solid' %}
+{% endunless %}
+{% assign cod_button_size = shop.metafields.fox_cod.button_size.value | default: shop.metafields.fox_cod.button_size | default: 'large' | downcase | strip %}
+{% unless cod_button_size == 'small' or cod_button_size == 'medium' or cod_button_size == 'large' %}
+  {% assign cod_button_size = 'large' %}
+{% endunless %}
 {% assign cod_border_radius = shop.metafields.fox_cod.border_radius | default: 12 %}
 {% assign cod_show_product_image = shop.metafields.fox_cod.show_product_image | default: 'true' %}
 {% assign cod_show_price = shop.metafields.fox_cod.show_price | default: 'true' %}
@@ -120,7 +126,15 @@
 {% assign form_background = edited_bg | default: '#ffffff' %}
 
 {% assign btn_styles_raw = shop.metafields.fox_cod.button_styles_json.value %}
-{% assign btn_styles = btn_styles_raw | parse_json %}
+{% assign btn_styles = btn_styles_raw %}
+{% assign resolved_button_style = btn_styles.buttonStyle | default: cod_button_style | downcase | strip %}
+{% unless resolved_button_style == 'solid' or resolved_button_style == 'outline' or resolved_button_style == 'gradient' %}
+  {% assign resolved_button_style = 'solid' %}
+{% endunless %}
+{% assign resolved_button_size = btn_styles.buttonSize | default: cod_button_size | downcase | strip %}
+{% unless resolved_button_size == 'small' or resolved_button_size == 'medium' or resolved_button_size == 'large' %}
+  {% assign resolved_button_size = 'large' %}
+{% endunless %}
 {% assign show_add_to_cart = btn_styles.showAddToCart | default: false %}
 {% assign cod_shipping_options = shop.metafields.fox_cod.shipping_options | default: '{}' %}
 
@@ -184,7 +198,47 @@
 
 <div id="fox-cod-root-{{ block.id }}" class="foxcod-block-root" data-fox-cod-root data-product-id="{{ product.id }}" {{ block.shopify_attributes }}>
   <div class="foxcod-block-shell" data-foxcod-shell>
-    <button type="button" class="foxcod-block-trigger" data-foxcod-trigger aria-busy="false" style="display:block !important; opacity:1 !important;">
+    <button
+      type="button"
+      class="foxcod-block-trigger cod-buy-btn"
+      data-foxcod-trigger
+      aria-busy="false"
+      style="
+        display:block !important;
+        width:100% !important;
+        margin:0 !important;
+        opacity:1 !important;
+        cursor:pointer !important;
+        box-sizing:border-box !important;
+        font-family:inherit !important;
+        transition:all 0.2s ease !important;
+        padding:{% if resolved_button_size == 'small' %}10px 16px{% elsif resolved_button_size == 'large' %}16px{% else %}13px 16px{% endif %} !important;
+        font-size:{{ btn_styles.textSize | default: 15 }}px !important;
+        font-weight:{% if btn_styles.fontStyle == 'bold' %}700{% else %}400{% endif %} !important;
+        font-style:{% if btn_styles.fontStyle == 'italic' %}italic{% else %}normal{% endif %} !important;
+        border-radius:{{ btn_styles.borderRadius | default: cod_border_radius }}px !important;
+        color:{{ btn_styles.textColor | default: '#ffffff' }} !important;
+        {% assign _btn_bg = btn_styles.backgroundColor | default: cod_primary_color %}
+        {% assign _btn_border_w = btn_styles.borderWidth | default: 0 %}
+        {% assign _btn_border_c = btn_styles.borderColor | default: _btn_bg %}
+        {% if resolved_button_style == 'outline' %}
+          background:transparent !important;
+          background-color:transparent !important;
+          border:{% if _btn_border_w > 0 %}{{ _btn_border_w }}px solid {{ _btn_bg }}{% else %}2px solid {{ _btn_bg }}{% endif %} !important;
+          color:{% if btn_styles.textColor == blank or btn_styles.textColor == '#ffffff' %}{{ _btn_bg }}{% else %}{{ btn_styles.textColor }}{% endif %} !important;
+          box-shadow:none !important;
+        {% elsif resolved_button_style == 'gradient' %}
+          background:linear-gradient(135deg, {{ _btn_bg }} 0%, rgba(0,0,0,0.25) 100%) !important;
+          border:{% if _btn_border_w > 0 %}{{ _btn_border_w }}px solid {{ _btn_border_c }}{% else %}none{% endif %} !important;
+          box-shadow:{% if btn_styles.shadow %}0 6px 12px rgba(0,0,0,0.2){% else %}none{% endif %} !important;
+        {% else %}
+          background:{{ _btn_bg }} !important;
+          background-color:{{ _btn_bg }} !important;
+          border:{% if _btn_border_w > 0 %}{{ _btn_border_w }}px solid {{ _btn_border_c }}{% else %}none{% endif %} !important;
+          box-shadow:{% if btn_styles.shadow %}0 4px 12px rgba(0,0,0,0.14){% else %}none{% endif %} !important;
+        {% endif %}
+      "
+    >
       {{ cod_button_text | default: 'Buy with COD' }}
     </button>
     <p class="foxcod-block-status" data-foxcod-status hidden></p>
@@ -224,6 +278,8 @@
      data-button-text-color="{{ btn_styles.textColor | default: '#ffffff' }}"
      data-button-border-color="{{ btn_styles.borderColor | default: cod_primary_color }}"
      data-button-border-width="{{ btn_styles.borderWidth | default: 0 }}"
+     data-button-style="{{ resolved_button_style }}"
+     data-button-size="{{ resolved_button_size }}"
      data-shipping-options="{{ cod_shipping_options | escape }}"
      data-shipping-rates-enabled="{{ cod_shipping_rates_enabled }}"
      data-shipping-rates="{{ cod_shipping_rates_json | escape }}"
@@ -1105,8 +1161,8 @@
       --cod-accent: {{ accent_color }};
       --cod-form-bg: {{ form_background }};
       --cod-radius: {{ cod_border_radius }}px;
-      --cod-btn-size: {% if cod_button_size == 'small' %}10px 20px{% elsif cod_button_size == 'large' %}16px 32px{% else %}14px 28px{% endif %};
-      --cod-btn-font: {% if cod_button_size == 'small' %}14px{% elsif cod_button_size == 'large' %}18px{% else %}16px{% endif %};
+      --cod-btn-size: {% if resolved_button_size == 'small' %}10px 20px{% elsif resolved_button_size == 'large' %}16px 32px{% else %}14px 28px{% endif %};
+      --cod-btn-font: {% if resolved_button_size == 'small' %}14px{% elsif resolved_button_size == 'large' %}18px{% else %}16px{% endif %};
       --cod-btn-text: {{ btn_styles.textColor | default: '#ffffff' }};
       --cod-btn-border-color: {{ btn_styles.borderColor | default: cod_primary_color }};
       --cod-btn-border-width: {{ btn_styles.borderWidth | default: 0 }}px;
@@ -1130,7 +1186,7 @@
   }
 
   /* Outline Style */
-  {% if cod_button_style == 'outline' %}
+  {% if resolved_button_style == 'outline' %}
   .cod-buy-btn {
       background-color: transparent !important;
       border: 2px solid var(--cod-btn-bg) !important;
@@ -1143,7 +1199,7 @@
   {% endif %}
 
   /* Gradient Style */
-  {% if cod_button_style == 'gradient' %}
+  {% if resolved_button_style == 'gradient' %}
   .cod-buy-btn {
       background-color: var(--cod-primary) !important;
       background-image: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(0,0,0,0.25) 100%) !important;
@@ -1632,6 +1688,13 @@
       }
       .template-cards .cod-ribbon-wrap {
           top: -4px !important;
+      }
+  }
+
+  /* Prevent iOS auto-zoom when focusing coupon input on mobile */
+  @media only screen and (max-width: 768px) {
+      .cod-coupon-field input[name="coupon"] {
+          font-size: 16px !important;
       }
   }
   

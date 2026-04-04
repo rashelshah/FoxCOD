@@ -407,26 +407,26 @@
     buttonEl.setAttribute('aria-busy', isLoading ? 'true' : 'false');
     buttonEl.setAttribute('aria-disabled', isDisabled ? 'true' : 'false');
 
-    applySubmitButtonStyles(buttonEl, config);
+    applySubmitButtonStyles(buttonEl, config, { forceProductButtonStyle: true });
 
     if (isDisabled) {
-      buttonEl.style.background = '#9ca3af';
-      buttonEl.style.backgroundColor = '#9ca3af';
-      buttonEl.style.backgroundImage = 'none';
-      buttonEl.style.border = 'none';
-      buttonEl.style.color = '#ffffff';
-      buttonEl.style.boxShadow = 'none';
-      buttonEl.style.opacity = '1';
-      buttonEl.style.cursor = 'not-allowed';
-      buttonEl.style.pointerEvents = 'none';
-      buttonEl.style.filter = 'grayscale(1)';
+      buttonEl.style.setProperty('background', '#9ca3af', 'important');
+      buttonEl.style.setProperty('background-color', '#9ca3af', 'important');
+      buttonEl.style.setProperty('background-image', 'none', 'important');
+      buttonEl.style.setProperty('border', 'none', 'important');
+      buttonEl.style.setProperty('color', '#ffffff', 'important');
+      buttonEl.style.setProperty('box-shadow', 'none', 'important');
+      buttonEl.style.setProperty('opacity', '1', 'important');
+      buttonEl.style.setProperty('cursor', 'not-allowed', 'important');
+      buttonEl.style.setProperty('pointer-events', 'none', 'important');
+      buttonEl.style.setProperty('filter', 'grayscale(1)', 'important');
       return;
     }
 
-    buttonEl.style.opacity = '1';
-    buttonEl.style.cursor = 'pointer';
-    buttonEl.style.pointerEvents = 'auto';
-    buttonEl.style.filter = 'none';
+    buttonEl.style.setProperty('opacity', '1', 'important');
+    buttonEl.style.setProperty('cursor', 'pointer', 'important');
+    buttonEl.style.setProperty('pointer-events', 'auto', 'important');
+    buttonEl.style.setProperty('filter', 'none', 'important');
   }
 
   function syncFoxCodButtons(config) {
@@ -853,7 +853,25 @@
         var settings = result && result.settings ? result.settings : {};
 
         if (settings.button_text) config.buttonText = settings.button_text;
-        if (settings.primary_color) config.primaryColor = settings.primary_color;
+        var needsButtonStylesHydration = !config.hasLiquidButtonStyles ||
+          !config.buttonStyles ||
+          (!config.buttonStyles.buttonStyle && !!settings.button_style) ||
+          (!config.buttonStyles.buttonSize && !!settings.button_size);
+        if (needsButtonStylesHydration && settings.button_styles && typeof settings.button_styles === 'object') {
+          config.buttonStyles = Object.assign({}, config.buttonStyles || {}, settings.button_styles);
+          if (settings.button_styles.backgroundColor) {
+            config.primaryColor = settings.button_styles.backgroundColor;
+          }
+        }
+        if (!config.hasLiquidPrimaryColor && settings.primary_color && !(config.buttonStyles && config.buttonStyles.backgroundColor)) {
+          config.primaryColor = settings.primary_color;
+        }
+        if (((!config.hasLiquidButtonStyle) || !(config.buttonStyles && config.buttonStyles.buttonStyle)) && settings.button_style) {
+          config.buttonStyle = settings.button_style;
+        }
+        if (((!config.hasLiquidButtonSize) || !(config.buttonStyles && config.buttonStyles.buttonSize)) && settings.button_size) {
+          config.buttonSize = settings.button_size;
+        }
         if (settings.max_quantity) config.maxQuantity = parseInt(settings.max_quantity, 10) || config.maxQuantity;
 
         mountBlockRoot(config.productId, config, { loading: false, disabled: !!config._isSoldOut });
@@ -992,6 +1010,12 @@
         // Legacy/Direct props
         modalStyle: dataContainer.dataset.modalStyle || 'modern',
         animStyle: dataContainer.dataset.animStyle || 'fade',
+        buttonStyle: dataContainer.dataset.buttonStyle || 'solid',
+        buttonSize: dataContainer.dataset.buttonSize || 'large',
+        hasLiquidPrimaryColor: !!dataContainer.dataset.primaryColor,
+        hasLiquidButtonStyle: !!dataContainer.dataset.buttonStyle,
+        hasLiquidButtonSize: !!dataContainer.dataset.buttonSize,
+        hasLiquidButtonStyles: !!(dataContainer.dataset.buttonStyles && dataContainer.dataset.buttonStyles !== '{}' && dataContainer.dataset.buttonStyles !== 'null'),
         borderRadius: parseInt(dataContainer.dataset.borderRadius) || 12,
         showImage: dataContainer.dataset.showImage === 'true',
         showPrice: dataContainer.dataset.showPrice === 'true',
@@ -1278,72 +1302,96 @@
   }
 
   /**
-   * Apply submit button styles — always called after form init/open.
-   * When useProductButtonStyle === false → uses formSubmitButton overrides.
-   * Otherwise → applies product button styles (size, radius, font, border, color).
+   * Apply button styles for both storefront trigger and modal submit button.
+   * For trigger usage, pass { forceProductButtonStyle: true } so submit-only
+   * customizations never override the product CTA.
    */
-  function applySubmitButtonStyles(btn, config) {
+  function applySubmitButtonStyles(btn, config, options) {
     if (!btn) return;
+    options = options || {};
+
+    var productBtnStyles = config.buttonStyles || {};
     var fsb = config.formSubmitButton || {};
-    var useCustom = fsb.useProductButtonStyle === false;
-    var src = useCustom ? fsb : (config.buttonStyles || {});
-    var btnColor = useCustom ? (fsb.backgroundColor || config.primaryColor) : config.primaryColor;
+    var forceProductButtonStyle = !!options.forceProductButtonStyle;
+    var useCustom = !forceProductButtonStyle && fsb.useProductButtonStyle === false;
+
+    var src = useCustom ? fsb : productBtnStyles;
+    var productBtnColor = productBtnStyles.backgroundColor || config.primaryColor || '#667eea';
+    var btnColor = useCustom ? (fsb.backgroundColor || '#6366f1') : productBtnColor;
     var borderCol = src.borderColor || btnColor;
     var borderW = src.borderWidth != null ? Number(src.borderWidth) : 0;
-    var btnSize = src.buttonSize || 'medium';
-    var btnStyle = src.buttonStyle || 'solid';
+    var btnSize = useCustom
+      ? (src.buttonSize || 'medium')
+      : (productBtnStyles.buttonSize || config.buttonSize || 'large');
+    var btnStyle = useCustom
+      ? (src.buttonStyle || 'solid')
+      : (productBtnStyles.buttonStyle || config.buttonStyle || 'solid');
     var textColor = src.textColor || '#ffffff';
-    var textSize = src.textSize || 15;
+    var textSize = src.textSize != null ? Number(src.textSize) : 15;
     var fontStyle = src.fontStyle || 'normal';
-    var radius = src.borderRadius != null ? Number(src.borderRadius) : 12;
+    var fallbackRadius = useCustom ? 12 : (productBtnStyles.borderRadius != null ? Number(productBtnStyles.borderRadius) : 12);
+    var radius = src.borderRadius != null
+      ? Number(src.borderRadius)
+      : fallbackRadius;
 
-    // Reset all styles first for clean slate
-    btn.style.cssText = '';
+    function setImportant(prop, value) {
+      if (value == null || value === '') return;
+      btn.style.setProperty(prop, String(value), 'important');
+    }
 
     // Base styles always applied
-    btn.style.width = '100%';
-    btn.style.cursor = 'pointer';
-    btn.style.transition = 'all 0.2s ease';
-    btn.style.fontFamily = 'inherit';
-    btn.style.display = 'block';
+    setImportant('width', '100%');
+    setImportant('cursor', 'pointer');
+    var disableTransitionForInitialPaint = !config._foxcodButtonStyleBootstrapped;
+    setImportant('transition', disableTransitionForInitialPaint ? 'none' : 'all 0.2s ease');
+    setImportant('font-family', 'inherit');
+    setImportant('display', 'block');
 
     // Size
-    btn.style.padding = btnSize === 'small' ? '10px 16px' : btnSize === 'large' ? '16px' : '13px 16px';
+    setImportant('padding', btnSize === 'small' ? '10px 16px' : btnSize === 'large' ? '16px' : '13px 16px');
 
     // Typography
-    btn.style.color = textColor;
-    btn.style.fontSize = textSize + 'px';
-    btn.style.fontWeight = fontStyle === 'bold' ? '700' : '600';
-    btn.style.fontStyle = fontStyle === 'italic' ? 'italic' : 'normal';
+    setImportant('color', textColor);
+    setImportant('font-size', textSize + 'px');
+    setImportant('font-weight', fontStyle === 'bold' ? '700' : '400');
+    setImportant('font-style', fontStyle === 'italic' ? 'italic' : 'normal');
 
     // Border radius
-    btn.style.borderRadius = radius + 'px';
+    setImportant('border-radius', radius + 'px');
 
     // Style: solid / outline / gradient
     if (btnStyle === 'outline') {
-      btn.style.backgroundColor = 'transparent';
-      btn.style.background = 'transparent';
-      btn.style.border = (borderW > 0 ? borderW : 2) + 'px solid ' + btnColor;
+      setImportant('background-color', 'transparent');
+      setImportant('background', 'transparent');
+      setImportant('border', (borderW > 0 ? borderW : 2) + 'px solid ' + btnColor);
       var isWhite = textColor.toLowerCase() === '#ffffff' || textColor.toLowerCase() === 'white';
-      btn.style.color = isWhite ? btnColor : textColor;
-      btn.style.boxShadow = 'none';
+      setImportant('color', isWhite ? btnColor : textColor);
+      setImportant('box-shadow', 'none');
     } else if (btnStyle === 'gradient') {
       var darkColor = darkenColor(btnColor, 25);
-      btn.style.background = 'linear-gradient(135deg, ' + btnColor + ' 0%, ' + darkColor + ' 100%)';
-      btn.style.border = borderW > 0 ? borderW + 'px solid ' + borderCol : 'none';
-      btn.style.boxShadow = src.shadow ? '0 6px 12px rgba(0,0,0,0.2)' : 'none';
+      setImportant('background', 'linear-gradient(135deg, ' + btnColor + ' 0%, ' + darkColor + ' 100%)');
+      setImportant('border', borderW > 0 ? borderW + 'px solid ' + borderCol : 'none');
+      setImportant('box-shadow', src.shadow ? '0 6px 12px rgba(0,0,0,0.2)' : 'none');
     } else {
       // Solid
-      btn.style.backgroundColor = btnColor;
-      btn.style.background = btnColor;
-      btn.style.border = borderW > 0 ? borderW + 'px solid ' + borderCol : 'none';
+      setImportant('background-color', btnColor);
+      setImportant('background', btnColor);
+      setImportant('border', borderW > 0 ? borderW + 'px solid ' + borderCol : 'none');
       if (src.shadow) {
         var intensity = src.shadowIntensity || 35;
         var opacity = 0.05 + (intensity / 100) * 0.25;
-        btn.style.boxShadow = '0 4px 12px rgba(0,0,0,' + opacity + ')';
+        setImportant('box-shadow', '0 4px 12px rgba(0,0,0,' + opacity + ')');
       } else {
-        btn.style.boxShadow = 'none';
+        setImportant('box-shadow', 'none');
       }
+    }
+
+    if (disableTransitionForInitialPaint) {
+      config._foxcodButtonStyleBootstrapped = true;
+      requestAnimationFrame(function() {
+        if (!btn || !btn.isConnected) return;
+        btn.style.setProperty('transition', 'all 0.2s ease', 'important');
+      });
     }
   }
 
@@ -2689,7 +2737,8 @@
             couponInput.style.padding = '12px 12px 12px 40px';
             couponInput.style.border = '1px solid ' + (hexToRgba(primaryThemeColor, 0.2) || borderColor);
             couponInput.style.borderRadius = Math.max(borderRadius + 1, 13) + 'px';
-            couponInput.style.fontSize = Math.max(textSize, 14) + 'px';
+            var minCouponFontSize = (window.matchMedia && window.matchMedia('(max-width: 768px)').matches) ? 16 : 14;
+            couponInput.style.fontSize = Math.max(textSize, minCouponFontSize) + 'px';
             couponInput.style.fontWeight = '700';
             couponInput.style.letterSpacing = '0.02em';
             couponInput.style.fontFamily = '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
