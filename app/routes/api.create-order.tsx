@@ -329,6 +329,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         let totalPrice = pricing.originalTotal;
         let couponDiscount = 0;
         let couponType: "percentage" | "fixed" | null = null;
+        let couponValue = 0;
         let couponCode: string | null = null;
         if (body.couponCode) {
             const couponResult = await validateCouponForShop(body.shop, body.couponCode, pricing.originalTotal, body);
@@ -341,7 +342,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             couponDiscount = couponResult.discount;
             totalPrice = couponResult.finalTotal;
             couponType = couponResult.coupon.type;
+            couponValue = couponResult.coupon.value;
             couponCode = normalizeCouponCode(body.couponCode);
+            console.log('🎟 [COD Order] Coupon validated:', { code: couponCode, type: couponType, value: couponValue, discount: couponDiscount, originalTotal: pricing.originalTotal, finalTotal: totalPrice });
         }
 
         // Build notes
@@ -368,7 +371,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
         if (couponCode && couponDiscount > 0) {
             orderNotes = orderNotes ? orderNotes + '\n' : '';
-            orderNotes += `COUPON: ${couponCode} (-${fmtPrice(couponDiscount)})`;
+            const couponDesc = couponType === 'percentage' ? `${couponValue}% off` : `${fmtPrice(couponValue)} off`;
+            orderNotes += `COUPON: ${couponCode} (${couponDesc} = -${fmtPrice(couponDiscount)})`;
         }
 
         // Build line items
@@ -399,6 +403,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         const formattedPhone = formatPhoneE164(customer.phone || '');
         const shippingLabel = body.shippingLabel || (shippingPrice > 0 ? 'Shipping' : 'Free Shipping');
 
+        // ── SAFETY: cap discount to never exceed the order total ──
+        couponDiscount = Math.min(couponDiscount, totalPrice);
+        totalPrice = Math.round((totalPrice + Number.EPSILON) * 100) / 100;
+
         const shopifyPayload: Record<string, any> = {
             order: {
                 line_items: lineItems,
@@ -419,19 +427,33 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     price: shippingPrice.toFixed(2),
                     code: 'COD_SHIPPING',
                 }],
-                total_discounts: couponDiscount.toFixed(2),
+                // IMPORTANT: Always use 'fixed_amount' for discount_codes.
+                // Shopify interprets 'percentage' type's amount as the % value (e.g. 60 = 60% off),
+                // NOT the dollar amount. We compute the exact dollar discount server-side.
+                ...(couponCode && couponDiscount > 0 ? {
+                    total_discounts: couponDiscount.toFixed(2),
+                    discount_codes: [{
+                        code: couponCode,
+                        amount: couponDiscount.toFixed(2),
+                        type: 'fixed_amount',
+                    }],
+                } : {}),
+                // note_attributes for merchant clarity and debugging
+                note_attributes: [
+                    { name: 'Order Source', value: 'FoxCOD' },
+                    ...(couponCode && couponDiscount > 0 ? [
+                        { name: 'Coupon Code', value: couponCode },
+                        { name: 'Coupon Type', value: couponType === 'percentage' ? `${couponValue}% off` : `Fixed ${fmtPrice(couponValue)}` },
+                        { name: 'Discount Applied', value: fmtPrice(couponDiscount) },
+                    ] : []),
+                    ...(discountPercent > 0 ? [
+                        { name: 'Bundle Discount', value: `${discountPercent}%` },
+                    ] : []),
+                    { name: 'Original Total', value: fmtPrice(pricing.originalTotal) },
+                    { name: 'Final Total', value: fmtPrice(totalPrice) },
+                ],
             },
         };
-
-        if (couponCode && couponType) {
-            shopifyPayload.order.discount_codes = [
-                {
-                    code: couponCode,
-                    amount: couponDiscount.toFixed(2),
-                    type: couponType === 'percentage' ? 'percentage' : 'fixed_amount',
-                },
-            ];
-        }
 
         if (customer.name || customer.address) {
             shopifyPayload.order.shipping_address = {
