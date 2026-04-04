@@ -681,6 +681,13 @@
     });
   }
 
+  function restoreTriggersAfterModal(config) {
+    if (!config) return;
+    restoreMainTriggerAfterModal(config);
+    restoreStickyButtonsAfterModal(config);
+    syncFoxCodButtons(config);
+  }
+
   function hideSuccessModal(config) {
     var modal = getModalContainer(config);
     var overlay = getModalOverlay(config);
@@ -5320,6 +5327,9 @@ function darkenColor(hex, percent) {
                                 // Update order summary to include downsell price
                                 updateOrderSummaryWithTickUpsells(form, config);
                             }, 200);
+                        } else {
+                            // Downsell was dismissed; make sure the trigger is restored.
+                            restoreTriggersAfterModal(config);
                         }
                     });
                 }, 350);
@@ -5352,8 +5362,7 @@ function darkenColor(hex, percent) {
     }
 
     // Re-evaluate sticky button visibility after closing the modal.
-    restoreMainTriggerAfterModal(config);
-    restoreStickyButtonsAfterModal(config);
+    restoreTriggersAfterModal(config);
   }
 
   // =============================================
@@ -5814,7 +5823,6 @@ function darkenColor(hex, percent) {
       modal.querySelector('.cod-upsell-decline').addEventListener('click', function() {
           if (overlay._timerInterval) clearInterval(overlay._timerInterval);
           overlay.remove();
-          restoreStickyButtonsAfterModal(config);
           onComplete(acceptedItems);
       });
   }
