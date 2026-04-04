@@ -2329,6 +2329,197 @@
       return result;
   }
 
+  function getCouponState(config) {
+      if (!config._couponState) {
+          config._couponState = {
+              applied: false,
+              validating: false,
+              code: '',
+              discount: 0,
+              originalTotal: 0,
+              finalTotal: 0,
+              message: '',
+              tone: '',
+          };
+      }
+      return config._couponState;
+  }
+
+  function getCouponUi(form) {
+      if (!form) {
+          return { wrapper: null, input: null, button: null, status: null, badge: null };
+      }
+      return {
+          wrapper: form.querySelector('.cod-coupon-field'),
+          input: form.querySelector('input[name="coupon"]'),
+          button: form.querySelector('.cod-coupon-apply'),
+          status: form.querySelector('.cod-coupon-status'),
+          badge: form.querySelector('.cod-coupon-badge')
+      };
+  }
+
+  function syncCouponUi(form, config) {
+      if (!form) return;
+      var couponState = getCouponState(config);
+      var ui = getCouponUi(form);
+      if (!ui.wrapper || !ui.input || !ui.button) return;
+
+      var accentColor = (config.styles && config.styles.borderColor) || config.formThemeColor || config.accentColor || '#111827';
+      var softBg = hexToRgba(accentColor, 0.1) || 'rgba(17,24,39,0.08)';
+      var deepBg = hexToRgba(accentColor, 0.18) || 'rgba(17,24,39,0.12)';
+      var statusTone = couponState.tone || (couponState.applied ? 'success' : '');
+      var statusColor = statusTone === 'error' ? '#dc2626' : statusTone === 'warning' ? '#b45309' : statusTone === 'success' ? '#059669' : '#6b7280';
+
+      ui.input.readOnly = !!couponState.applied;
+      if (couponState.applied) {
+          ui.input.value = couponState.code || ui.input.value;
+      }
+      ui.button.disabled = couponState.validating || couponState.applied || !String(ui.input.value || '').trim();
+      ui.button.textContent = couponState.validating ? 'Applying...' : couponState.applied ? 'Applied' : 'Apply';
+      ui.button.style.opacity = ui.button.disabled ? '0.75' : '1';
+      ui.button.style.cursor = ui.button.disabled ? 'not-allowed' : 'pointer';
+      ui.button.style.background = couponState.applied
+          ? 'linear-gradient(135deg, ' + accentColor + ' 0%, ' + ((config.formThemeColor && config.formThemeColor !== accentColor) ? config.formThemeColor : accentColor) + ' 100%)'
+          : 'linear-gradient(135deg, ' + deepBg + ' 0%, ' + softBg + ' 100%)';
+      ui.button.style.color = couponState.applied ? '#ffffff' : accentColor;
+      ui.button.style.borderColor = accentColor;
+      ui.button.style.boxShadow = couponState.applied
+          ? ('0 12px 26px ' + (hexToRgba(accentColor, 0.28) || 'rgba(17,24,39,0.24)'))
+          : 'none';
+
+      if (ui.status) {
+          ui.status.textContent = couponState.message || '';
+          ui.status.style.display = couponState.message ? 'block' : 'none';
+          ui.status.style.color = statusColor;
+      }
+
+      if (ui.badge) {
+          if (couponState.applied && couponState.discount > 0) {
+              ui.badge.textContent = '- ' + formatMoney(couponState.discount);
+              ui.badge.style.display = 'inline-flex';
+              ui.badge.style.background = softBg;
+              ui.badge.style.color = accentColor;
+          } else {
+              ui.badge.style.display = 'none';
+          }
+      }
+  }
+
+  function resetAppliedCoupon(form, config, options) {
+      if (!form) return;
+      var couponState = getCouponState(config);
+      var preserveCode = options && options.preserveCode;
+      var message = options && options.message ? options.message : '';
+      var tone = options && options.tone ? options.tone : '';
+      var ui = getCouponUi(form);
+
+      couponState.applied = false;
+      couponState.validating = false;
+      couponState.discount = 0;
+      couponState.originalTotal = 0;
+      couponState.finalTotal = 0;
+      couponState.message = message;
+      couponState.tone = tone;
+
+      if (ui.input && !preserveCode) {
+          ui.input.value = '';
+          couponState.code = '';
+      }
+
+      syncCouponUi(form, config);
+  }
+
+  function applyCouponCode(form, config) {
+      if (!form) return;
+      var ui = getCouponUi(form);
+      if (!ui.input || !ui.button) return;
+
+      var couponCode = String(ui.input.value || '').trim();
+      if (!couponCode) {
+          var emptyState = getCouponState(config);
+          emptyState.message = 'Enter a coupon code first';
+          emptyState.tone = 'error';
+          syncCouponUi(form, config);
+          return;
+      }
+
+      var couponState = getCouponState(config);
+      if (couponState.applied || couponState.validating) return;
+
+      var checkoutState = calculateCheckoutState(form, config);
+      var normalizedCustomer = collectNormalizedCustomerFromForm(form);
+      var preUpsellItems = [];
+      try { preUpsellItems = JSON.parse(form.getAttribute('data-pre-upsell-items') || '[]'); } catch (e) {}
+      var requestUpsells = getCheckedTickUpsells(form, config).concat(preUpsellItems);
+      var requestPrice = parseFloat(config.productPrice) || 0;
+      var requestQuantity = checkoutState.quantity;
+      var requestDiscountPercent = checkoutState.discountPercent || 0;
+
+      if (checkoutState.downsellItems && checkoutState.downsellItems.length > 0) {
+          requestPrice = parseFloat(checkoutState.downsellItems[0].price) || requestPrice;
+          requestQuantity = 1;
+          requestDiscountPercent = 0;
+      }
+
+      var requestBody = {
+          shop: config.shop,
+          couponCode: couponCode,
+          productId: config.productId,
+          variantId: config.variantId,
+          quantity: requestQuantity,
+          price: requestPrice,
+          shippingPrice: checkoutState.shipping || 0,
+          discountPercent: requestDiscountPercent,
+          cartTotal: checkoutState.totalBeforeCoupon || checkoutState.total || 0,
+          bundleVariants: window.FoxCod && window.FoxCod._selectedBundleVariants && window.FoxCod._selectedBundleVariants.length > 1
+              ? window.FoxCod._selectedBundleVariants.map(function(variant) {
+                  return { variantId: variant.variantId, title: variant.title, price: variant.price, quantity: 1 };
+              })
+              : undefined,
+          upsell_items: requestUpsells,
+          items: checkoutState.items || [],
+          customerName: normalizedCustomer.name || '',
+          customerPhone: normalizedCustomer.phone || '',
+          customerEmail: normalizedCustomer.email || ''
+      };
+
+      couponState.validating = true;
+      couponState.message = '';
+      couponState.tone = '';
+      syncCouponUi(form, config);
+
+      requestProxyJson(config, '/api/validate-coupon', {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(requestBody)
+      })
+      .then(function(result) {
+          couponState.validating = false;
+          if (result && result.valid) {
+              couponState.applied = true;
+              couponState.code = couponCode.toUpperCase();
+              couponState.discount = parseFloat(result.discount) || 0;
+              couponState.originalTotal = parseFloat(result.originalTotal) || requestBody.cartTotal || 0;
+              couponState.finalTotal = parseFloat(result.finalTotal) || 0;
+              couponState.message = result.message || 'Coupon applied';
+              couponState.tone = 'success';
+          } else {
+              couponState.message = (result && result.message) || 'Invalid or expired coupon';
+              couponState.tone = 'error';
+          }
+          renderOrderSummary(form, config, calculateCheckoutState(form, config));
+          syncCouponUi(form, config);
+      })
+      .catch(function(error) {
+          couponState.validating = false;
+          couponState.message = error && error.message ? error.message : 'Unable to validate coupon right now';
+          couponState.tone = 'error';
+          syncCouponUi(form, config);
+      });
+  }
+
   /**
    * Render dynamic fields
    */
@@ -2359,6 +2550,7 @@
     // Focus ring colors — always use accent color for consistency
     var primaryThemeColor = config.accentColor || '#111827';
     var focusGlowColor = hexToRgba(primaryThemeColor, 0.2) || 'rgba(17,24,39,0.2)';
+    var currentForm = container.closest('form');
     
     container.innerHTML = '';
     
@@ -2392,6 +2584,202 @@
         
         if (!field.visible) {
             console.log('[COD Form] Skipping invisible field:', field.id);
+            return;
+        }
+
+        if (field.id === 'coupon') {
+            var couponWrapper = document.createElement('div');
+            couponWrapper.className = 'cod-form-field cod-coupon-field';
+            couponWrapper.style.marginBottom = '12px';
+            couponWrapper.style.padding = '12px';
+            couponWrapper.style.borderRadius = Math.max(borderRadius + 3, 15) + 'px';
+            couponWrapper.style.background = 'linear-gradient(135deg, ' + (hexToRgba(primaryThemeColor, 0.14) || 'rgba(17,24,39,0.08)') + ' 0%, ' + (styles.fieldBackgroundColor || '#ffffff') + ' 58%, ' + (hexToRgba(config.formThemeColor || primaryThemeColor, 0.08) || 'rgba(17,24,39,0.04)') + ' 100%)';
+            couponWrapper.style.border = '1px solid ' + (hexToRgba(primaryThemeColor, 0.22) || 'rgba(17,24,39,0.14)');
+            couponWrapper.style.boxShadow = '0 10px 24px rgba(15,23,42,0.07), inset 0 1px 0 rgba(255,255,255,0.75)';
+            couponWrapper.style.position = 'relative';
+            couponWrapper.style.overflow = 'hidden';
+
+            var couponGlow = document.createElement('div');
+            couponGlow.style.position = 'absolute';
+            couponGlow.style.inset = '0';
+            couponGlow.style.background = 'radial-gradient(circle at top right, ' + (hexToRgba(config.formThemeColor || primaryThemeColor, 0.18) || 'rgba(17,24,39,0.12)') + ' 0%, transparent 42%)';
+            couponGlow.style.pointerEvents = 'none';
+            couponWrapper.appendChild(couponGlow);
+
+            var couponHeader = document.createElement('div');
+            couponHeader.style.display = 'flex';
+            couponHeader.style.alignItems = 'center';
+            couponHeader.style.gap = '10px';
+            couponHeader.style.marginBottom = '8px';
+
+            var couponHeaderLeft = document.createElement('div');
+            couponHeaderLeft.style.display = 'flex';
+            couponHeaderLeft.style.alignItems = 'center';
+            couponHeaderLeft.style.gap = '10px';
+
+            var couponIconBadge = document.createElement('div');
+            couponIconBadge.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5A2.5 2.5 0 0 1 5.5 7H9l1.2-1.9a1 1 0 0 1 .84-.46H18.5A2.5 2.5 0 0 1 21 7v3a2 2 0 0 0 0 4v3a2.5 2.5 0 0 1-2.5 2.5H11a1 1 0 0 1-.84-.46L9 17H5.5A2.5 2.5 0 0 1 3 14.5v-5Z"></path><path d="M14 7v10"></path><path d="M14 10h.01"></path><path d="M14 14h.01"></path></svg>';
+            couponIconBadge.style.width = '40px';
+            couponIconBadge.style.height = '40px';
+            couponIconBadge.style.display = 'flex';
+            couponIconBadge.style.alignItems = 'center';
+            couponIconBadge.style.justifyContent = 'center';
+            couponIconBadge.style.borderRadius = '12px';
+            couponIconBadge.style.color = primaryThemeColor;
+            couponIconBadge.style.background = 'linear-gradient(135deg, ' + (hexToRgba(primaryThemeColor, 0.16) || 'rgba(17,24,39,0.12)') + ' 0%, rgba(255,255,255,0.82) 100%)';
+            couponIconBadge.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.85)';
+            couponHeaderLeft.appendChild(couponIconBadge);
+
+            var couponTitleWrap = document.createElement('div');
+
+            var couponLabel = document.createElement('label');
+            couponLabel.style.display = 'block';
+            couponLabel.style.fontWeight = fontStyle === 'bold' ? '700' : '500';
+            couponLabel.style.fontStyle = fontStyle === 'italic' ? 'italic' : 'normal';
+            couponLabel.style.marginBottom = '2px';
+            couponLabel.style.fontSize = Math.max((styles.labelFontSize || textSize), 15) + 'px';
+            couponLabel.style.color = styles.labelColor || textColor;
+            couponLabel.style.textAlign = labelAlignment;
+            couponLabel.style.fontFamily = '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+            couponLabel.textContent = field.label || 'Coupon Code';
+            couponTitleWrap.appendChild(couponLabel);
+
+            var couponHint = document.createElement('div');
+            couponHint.textContent = 'Apply your exclusive offer before placing the order';
+            couponHint.style.fontSize = '12px';
+            couponHint.style.lineHeight = '1.4';
+            couponHint.style.color = '#6b7280';
+            couponTitleWrap.appendChild(couponHint);
+            couponHeaderLeft.appendChild(couponTitleWrap);
+            couponHeader.appendChild(couponHeaderLeft);
+            couponWrapper.appendChild(couponHeader);
+
+            var couponRow = document.createElement('div');
+            couponRow.style.display = 'grid';
+            couponRow.style.gridTemplateColumns = 'minmax(0, 1fr) auto';
+            couponRow.style.alignItems = 'stretch';
+            couponRow.style.gap = '8px';
+
+            var couponInputWrap = document.createElement('div');
+            couponInputWrap.style.position = 'relative';
+            couponInputWrap.style.flex = '1';
+            couponInputWrap.style.minWidth = '0';
+
+            var couponIcon = document.createElement('div');
+            couponIcon.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5A2.5 2.5 0 0 1 5.5 7H9l1.2-1.9a1 1 0 0 1 .84-.46H18.5A2.5 2.5 0 0 1 21 7v3a2 2 0 0 0 0 4v3a2.5 2.5 0 0 1-2.5 2.5H11a1 1 0 0 1-.84-.46L9 17H5.5A2.5 2.5 0 0 1 3 14.5v-5Z"></path><path d="M14 7v10"></path><path d="M14 10h.01"></path><path d="M14 14h.01"></path></svg>';
+            couponIcon.style.position = 'absolute';
+            couponIcon.style.left = '12px';
+            couponIcon.style.top = '50%';
+            couponIcon.style.transform = 'translateY(-50%)';
+            couponIcon.style.color = iconColor;
+            couponIcon.style.backgroundColor = iconBackground !== 'transparent' ? iconBackground : '';
+            couponIcon.style.borderRadius = '4px';
+            couponIcon.style.padding = '2px';
+            couponIcon.style.pointerEvents = 'none';
+            couponIcon.style.zIndex = '1';
+            couponInputWrap.appendChild(couponIcon);
+
+            var couponInput = document.createElement('input');
+            couponInput.type = 'text';
+            couponInput.name = 'coupon';
+            couponInput.id = 'cod-coupon';
+            couponInput.placeholder = field.placeholder || 'Enter Coupon Code';
+            couponInput.setAttribute('autocomplete', 'off');
+            couponInput.style.width = '100%';
+            couponInput.style.padding = '12px 12px 12px 40px';
+            couponInput.style.border = '1px solid ' + (hexToRgba(primaryThemeColor, 0.2) || borderColor);
+            couponInput.style.borderRadius = Math.max(borderRadius + 1, 13) + 'px';
+            couponInput.style.fontSize = Math.max(textSize, 14) + 'px';
+            couponInput.style.fontWeight = '700';
+            couponInput.style.letterSpacing = '0.02em';
+            couponInput.style.fontFamily = '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+            couponInput.style.color = textColor;
+            couponInput.style.background = 'rgba(255,255,255,0.94)';
+            couponInput.style.boxSizing = 'border-box';
+            couponInput.style.boxShadow = '0 6px 18px rgba(15,23,42,0.05)';
+            couponInput.style.transition = 'border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease, transform 0.15s ease';
+            couponInput.addEventListener('input', function() {
+                this.value = String(this.value || '').toUpperCase().replace(/\s+/g, '');
+                var couponState = getCouponState(config);
+                if (!couponState.applied) {
+                    couponState.message = '';
+                    couponState.tone = '';
+                    syncCouponUi(currentForm, config);
+                }
+            });
+            couponInput.addEventListener('focus', function() {
+                this.style.outline = 'none';
+                this.style.borderColor = primaryThemeColor;
+                this.style.transform = 'translateY(-1px)';
+                this.style.boxShadow = '0 0 0 1px ' + primaryThemeColor + ', 0 0 0 4px ' + focusGlowColor + ', 0 12px 22px rgba(15,23,42,0.07)';
+            });
+            couponInput.addEventListener('blur', function() {
+                this.style.transform = 'translateY(0)';
+                this.style.border = '1px solid ' + (hexToRgba(primaryThemeColor, 0.2) || borderColor);
+                this.style.boxShadow = '0 6px 18px rgba(15,23,42,0.05)';
+            });
+            couponInput.addEventListener('keydown', function(event) {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    applyCouponCode(currentForm, config);
+                }
+            });
+            couponInputWrap.appendChild(couponInput);
+
+            var couponButton = document.createElement('button');
+            couponButton.type = 'button';
+            couponButton.className = 'cod-coupon-apply';
+            couponButton.textContent = 'Apply';
+            couponButton.style.minWidth = '92px';
+            couponButton.style.borderRadius = Math.max(borderRadius + 1, 13) + 'px';
+            couponButton.style.border = '1px solid ' + primaryThemeColor;
+            couponButton.style.padding = '0 12px';
+            couponButton.style.fontSize = '12px';
+            couponButton.style.fontWeight = '800';
+            couponButton.style.letterSpacing = '0.02em';
+            couponButton.style.fontFamily = '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+            couponButton.style.transition = 'all 0.18s ease';
+            couponButton.style.position = 'relative';
+            couponButton.style.overflow = 'hidden';
+            couponButton.style.whiteSpace = 'nowrap';
+            couponButton.addEventListener('click', function() {
+                applyCouponCode(currentForm, config);
+            });
+
+            couponRow.appendChild(couponInputWrap);
+            couponRow.appendChild(couponButton);
+            couponWrapper.appendChild(couponRow);
+
+            var couponMeta = document.createElement('div');
+            couponMeta.style.display = 'flex';
+            couponMeta.style.alignItems = 'center';
+            couponMeta.style.justifyContent = 'space-between';
+            couponMeta.style.gap = '10px';
+            couponMeta.style.marginTop = '8px';
+
+            var couponStatus = document.createElement('div');
+            couponStatus.className = 'cod-coupon-status';
+            couponStatus.style.fontSize = '12px';
+            couponStatus.style.lineHeight = '1.4';
+            couponStatus.style.display = 'none';
+            couponStatus.style.maxWidth = '72%';
+            couponMeta.appendChild(couponStatus);
+
+            var couponBadge = document.createElement('div');
+            couponBadge.className = 'cod-coupon-badge';
+            couponBadge.style.display = 'none';
+            couponBadge.style.alignItems = 'center';
+            couponBadge.style.justifyContent = 'center';
+            couponBadge.style.padding = '6px 10px';
+            couponBadge.style.borderRadius = '999px';
+            couponBadge.style.fontSize = '12px';
+            couponBadge.style.fontWeight = '700';
+            couponMeta.appendChild(couponBadge);
+
+            couponWrapper.appendChild(couponMeta);
+            container.appendChild(couponWrapper);
+            setTimeout(function() { syncCouponUi(currentForm, config); }, 0);
+            console.log('[COD Form] Added coupon field to container');
             return;
         }
 
@@ -3178,6 +3566,7 @@ function darkenColor(hex, percent) {
         '</div>';
 
       form.insertBefore(card, form.querySelector('button[type="submit"]'));
+      renderOrderSummary(form, config, state);
   }
 
   /**
@@ -4145,7 +4534,11 @@ function darkenColor(hex, percent) {
       }
       state.displaySubtotal = displaySubtotal;
 
-      state.total = displaySubtotal - state.discount + state.shipping + state.tickUpsellTotal + state.preUpsellTotal;
+      state.totalBeforeCoupon = displaySubtotal - state.discount + state.shipping + state.tickUpsellTotal + state.preUpsellTotal;
+      var appliedCoupon = getCouponState(config);
+      var couponStillApplicable = appliedCoupon.applied && Math.abs((appliedCoupon.originalTotal || 0) - state.totalBeforeCoupon) < 0.01;
+      state.couponDiscount = couponStillApplicable ? Math.min(appliedCoupon.discount || 0, state.totalBeforeCoupon) : 0;
+      state.total = Math.max(0, state.totalBeforeCoupon - state.couponDiscount);
 
       console.log('[COD Form] calculateCheckoutState:', {
           quantity: state.quantity,
@@ -4158,6 +4551,7 @@ function darkenColor(hex, percent) {
           preUpsellTotal: state.preUpsellTotal,
           downsellTotal: state.downsellTotal,
           downsellSavings: state.downsellSavings,
+          couponDiscount: state.couponDiscount,
           total: state.total,
           bundleVariants: bundleVariants ? bundleVariants.length : 0
       });
@@ -4178,6 +4572,16 @@ function darkenColor(hex, percent) {
       if (!summaryEl) {
           console.log('[COD Form] No order summary element found');
           return;
+      }
+
+      var couponState = getCouponState(config);
+      if (couponState.applied && (!state.couponDiscount || Math.abs((couponState.originalTotal || 0) - (state.totalBeforeCoupon || 0)) >= 0.01)) {
+          resetAppliedCoupon(form, config, {
+              preserveCode: true,
+              message: 'Cart updated. Apply coupon again.',
+              tone: 'warning'
+          });
+          state = calculateCheckoutState(form, config);
       }
 
       var html = '<div style="font-weight:600; margin-bottom:8px; display:flex; align-items:center;">' +
@@ -4239,6 +4643,13 @@ function darkenColor(hex, percent) {
           '   <span id="cod-summary-shipping">' + (state.shipping === 0 ? 'FREE' : formatMoney(state.shipping)) + '</span>' +
           '</div>';
 
+      if (state.couponDiscount > 0) {
+          html += '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#059669;">' +
+              '   <span>Coupon (' + couponState.code + ')</span>' +
+              '   <span id="cod-summary-coupon">-' + formatMoney(state.couponDiscount) + '</span>' +
+              '</div>';
+      }
+
       // Total
       html += '<div style="display:flex; justify-content:space-between; margin-top:8px; padding-top:8px; border-top:1px dashed #d1d5db; font-weight:700; color:#111827;">' +
           '   <span>Total</span>' +
@@ -4255,6 +4666,7 @@ function darkenColor(hex, percent) {
 
       // Sync payment method amounts with updated total
       updatePaymentMethodAmounts(form, config);
+      syncCouponUi(form, config);
   }
 
   // =============================================
@@ -5671,7 +6083,7 @@ function darkenColor(hex, percent) {
 
       // Collect custom field values
       var customFieldData = [];
-      var knownFieldIds = ['name', 'phone', 'address', 'email', 'state', 'city', 'zip', 'zipcode', 'notes', 'quantity', 'shipping', 'order_summary', 'marketing', 'payment_mode'];
+      var knownFieldIds = ['name', 'phone', 'address', 'email', 'state', 'city', 'zip', 'zipcode', 'notes', 'quantity', 'shipping', 'order_summary', 'marketing', 'payment_mode', 'coupon'];
       (config.fields || []).forEach(function(field) {
           if (knownFieldIds.indexOf(field.id) !== -1) return; // skip known fields
           if (!field.visible) return;
@@ -5717,6 +6129,7 @@ function darkenColor(hex, percent) {
       payload.discountPercent = checkoutState.discountPercent;
       payload.finalTotal = checkoutState.total;
       payload.shippingPrice = checkoutState.shipping;
+      payload.couponCode = checkoutState.couponDiscount > 0 ? getCouponState(config).code : '';
 
       // Use engine-computed subtotal for price (respects bundle variants)
       if (window.FoxCod && window.FoxCod._selectedBundleVariants && window.FoxCod._selectedBundleVariants.length > 1) {
@@ -5798,7 +6211,7 @@ function darkenColor(hex, percent) {
               ...payload,
               paymentMethod: 'partial_cod',
               advanceAmount: config.partialCodAdvance,
-              remainingAmount: (payload.price * payload.quantity) + (payload.shippingPrice || 0) - config.partialCodAdvance
+              remainingAmount: Math.max((payload.finalTotal || 0) - config.partialCodAdvance, 0)
           };
 
           console.log('[COD Form] Partial COD checkout:', partialCodPayload);

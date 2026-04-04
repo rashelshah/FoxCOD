@@ -19,6 +19,16 @@ export interface FormField {
     iconType?: string; // Icon identifier for custom fields
 }
 
+export interface CouponConfig {
+    code: string;
+    type: 'percentage' | 'fixed';
+    value: number;
+    min_order_value?: number;
+    max_discount?: number;
+    usage_limit?: number;
+    enabled: boolean;
+}
+
 /**
  * Content blocks configuration
  */
@@ -145,6 +155,7 @@ export const DEFAULT_FIELDS: FormField[] = [
     { id: 'shipping', label: 'Shipping', type: 'text', visible: true, required: false, order: 10 },
     { id: 'order_summary', label: 'Order Summary', type: 'text', visible: true, required: false, order: 11 },
     { id: 'payment_mode', label: 'Payment Mode', type: 'text', visible: true, required: false, order: 12 },
+    { id: 'coupon', label: 'Coupon Code', type: 'text', visible: false, required: false, order: 13 },
 ];
 
 /**

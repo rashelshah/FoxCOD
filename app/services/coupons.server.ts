@@ -1,0 +1,866 @@
+import { getFormSettings, supabase } from "../config/supabase.server";
+import { getRestClient } from "../shopify/rest-client.server";
+import { unauthenticated } from "../shopify.server";
+
+export interface ResolvedCoupon {
+    code: string;
+    type: "percentage" | "fixed";
+    value: number;
+    min_order_value?: number;
+    max_discount?: number;
+    usage_limit?: number;
+    enabled: boolean;
+    source?: "shopify";
+    applies_to_entitled_items_only?: boolean;
+    eligible_subtotal?: number;
+    shopify_price_rule_id?: string;
+}
+
+export interface CouponValidationSuccess {
+    valid: true;
+    coupon: ResolvedCoupon;
+    discount: number;
+    finalTotal: number;
+    originalTotal: number;
+    message: string;
+}
+
+export interface CouponValidationFailure {
+    valid: false;
+    message: string;
+}
+
+export type CouponValidationResult = CouponValidationSuccess | CouponValidationFailure;
+
+export interface OrderDiscountItem {
+    productId?: string;
+    variantId?: string;
+    price: number;
+    quantity: number;
+}
+
+export interface OrderPricingSummary {
+    mainItemsSubtotal: number;
+    bundleDiscountAmount: number;
+    merchandiseTotal: number;
+    shippingPrice: number;
+    upsellTotal: number;
+    originalTotal: number;
+    discountItems: OrderDiscountItem[];
+}
+
+interface DiscountSelection {
+    allItems: boolean;
+    productIds: string[];
+    variantIds: string[];
+    collectionIds: string[];
+}
+
+interface DiscountRequirement {
+    minimumSubtotal?: number;
+    minimumQuantity?: number;
+}
+
+function roundCurrency(value: number) {
+    return Math.max(0, Math.round((value + Number.EPSILON) * 100) / 100);
+}
+
+export function normalizeCouponCode(code: string) {
+    return String(code || "").trim().toUpperCase();
+}
+
+function normalizeShopifyId(id: unknown) {
+    const value = String(id || "").trim();
+    return value ? value.split("/").pop() || value : "";
+}
+
+function idsMatch(a: unknown, b: unknown) {
+    const normalizedA = normalizeShopifyId(a);
+    const normalizedB = normalizeShopifyId(b);
+    return !!normalizedA && !!normalizedB && normalizedA === normalizedB;
+}
+
+function toShopifyGid(resource: "Product" | "ProductVariant", id: unknown) {
+    const raw = String(id || "").trim();
+    if (!raw) return "";
+    if (raw.startsWith("gid://")) return raw;
+    const normalized = normalizeShopifyId(raw);
+    return normalized ? `gid://shopify/${resource}/${normalized}` : "";
+}
+
+function getConnectionNodes(connection: any): any[] {
+    if (Array.isArray(connection?.nodes)) return connection.nodes;
+    if (Array.isArray(connection?.edges)) {
+        return connection.edges.map((edge: any) => edge?.node).filter(Boolean);
+    }
+    return [];
+}
+
+function getOrderMerchandiseQuantity(discountItems: OrderDiscountItem[]) {
+    return discountItems.reduce((sum, item) => sum + Math.max(0, Number(item.quantity) || 0), 0);
+}
+
+function getDiscountRequirement(requirementNode: any): DiscountRequirement {
+    if (!requirementNode) return {};
+
+    const minimumSubtotal = Number(
+        requirementNode?.greaterThanOrEqualToSubtotal?.amount ??
+        requirementNode?.greaterThanOrEqualToSubtotal ??
+        0
+    );
+    const minimumQuantity = Number(requirementNode?.greaterThanOrEqualToQuantity || 0);
+
+    return {
+        minimumSubtotal: minimumSubtotal > 0 ? roundCurrency(minimumSubtotal) : undefined,
+        minimumQuantity: minimumQuantity > 0 ? minimumQuantity : undefined,
+    };
+}
+
+function getDiscountSelection(selectionNode: any): DiscountSelection {
+    if (!selectionNode) {
+        return { allItems: true, productIds: [], variantIds: [], collectionIds: [] };
+    }
+
+    return {
+        allItems: Boolean(selectionNode?.allItems),
+        productIds: getConnectionNodes(selectionNode?.products).map((node) => String(node?.id || "")).filter(Boolean),
+        variantIds: getConnectionNodes(selectionNode?.productVariants).map((node) => String(node?.id || "")).filter(Boolean),
+        collectionIds: getConnectionNodes(selectionNode?.collections).map((node) => String(node?.id || "")).filter(Boolean),
+    };
+}
+
+function filterEligibleDiscountItems(
+    discountItems: OrderDiscountItem[],
+    selection: DiscountSelection,
+    productCollectionMap?: Map<string, string[]>,
+) {
+    if (selection.allItems || (
+        selection.productIds.length === 0 &&
+        selection.variantIds.length === 0 &&
+        selection.collectionIds.length === 0
+    )) {
+        return discountItems;
+    }
+
+    return discountItems.filter((item) => {
+        const matchesProduct = selection.productIds.some((id) => idsMatch(id, item.productId));
+        const matchesVariant = selection.variantIds.some((id) => idsMatch(id, item.variantId));
+        const itemProductId = normalizeShopifyId(item.productId);
+        const itemCollections = itemProductId ? (productCollectionMap?.get(itemProductId) || []) : [];
+        const matchesCollection = selection.collectionIds.some((id) =>
+            itemCollections.some((collectionId) => idsMatch(id, collectionId))
+        );
+
+        return matchesProduct || matchesVariant || matchesCollection;
+    });
+}
+
+export function getCouponFieldState(settings: { fields?: Array<{ id: string; visible?: boolean; order?: number }>; enable_coupon_field?: boolean | null; coupon_field_position?: number | null } | null | undefined) {
+    const couponField = Array.isArray(settings?.fields)
+        ? settings!.fields!.find((field) => field.id === "coupon")
+        : null;
+
+    return {
+        enabled: settings?.enable_coupon_field ?? couponField?.visible ?? false,
+        position: settings?.coupon_field_position ?? couponField?.order ?? 13,
+    };
+}
+
+function buildOrderDiscountItems(body: any): OrderDiscountItem[] {
+    const items: OrderDiscountItem[] = [];
+    const quantity = Math.max(1, parseInt(String(body?.quantity || 1), 10) || 1);
+    const discountMultiplier = Math.max(0, 1 - (Math.max(0, Number(body?.discountPercent) || 0) / 100));
+    const bundleVariants = Array.isArray(body?.bundleVariants) && body.bundleVariants.length > 1
+        ? body.bundleVariants
+        : null;
+
+    if (bundleVariants) {
+        bundleVariants.forEach((variant: any) => {
+            items.push({
+                productId: body?.productId,
+                variantId: variant?.variantId,
+                price: roundCurrency((Number(variant?.price) || 0) * discountMultiplier),
+                quantity: Math.max(1, parseInt(String(variant?.quantity || 1), 10) || 1),
+            });
+        });
+    } else {
+        items.push({
+            productId: body?.productId,
+            variantId: body?.variantId,
+            price: roundCurrency((Number(body?.price) || 0) * discountMultiplier),
+            quantity,
+        });
+    }
+
+    (Array.isArray(body?.upsell_items) ? body.upsell_items : []).forEach((item: any) => {
+        items.push({
+            productId: item?.product_id,
+            variantId: item?.variant_id,
+            price: roundCurrency(Number(item?.price) || 0),
+            quantity: Math.max(1, parseInt(String(item?.quantity || 1), 10) || 1),
+        });
+    });
+
+    return items;
+}
+
+function getEligibleSubtotalForShopifyRule(priceRule: any, discountItems: OrderDiscountItem[]) {
+    const entitledProductIds = Array.isArray(priceRule?.entitled_product_ids) ? priceRule.entitled_product_ids : [];
+    const entitledVariantIds = Array.isArray(priceRule?.entitled_variant_ids) ? priceRule.entitled_variant_ids : [];
+
+    if (entitledProductIds.length === 0 && entitledVariantIds.length === 0) {
+        return roundCurrency(discountItems.reduce((sum, item) => sum + (item.price * item.quantity), 0));
+    }
+
+    return roundCurrency(discountItems.reduce((sum, item) => {
+        const matchesProduct = entitledProductIds.some((id: unknown) => idsMatch(id, item.productId));
+        const matchesVariant = entitledVariantIds.some((id: unknown) => idsMatch(id, item.variantId));
+        return matchesProduct || matchesVariant ? sum + (item.price * item.quantity) : sum;
+    }, 0));
+}
+
+const SHOPIFY_CODE_DISCOUNT_QUERY = `#graphql
+query CodeDiscountNodeByCode($code: String!) {
+  codeDiscountNodeByCode(code: $code) {
+    id
+    codeDiscount {
+      __typename
+      ... on DiscountCodeBasic {
+        title
+        status
+        usageLimit
+        appliesOncePerCustomer
+        asyncUsageCount
+        startsAt
+        endsAt
+        customerGets {
+          value {
+            __typename
+            ... on DiscountPercentage {
+              percentage
+            }
+            ... on DiscountAmount {
+              amount {
+                amount
+              }
+              appliesOnEachItem
+            }
+          }
+          items {
+            __typename
+            ... on AllDiscountItems {
+              allItems
+            }
+            ... on DiscountProducts {
+              products(first: 100) {
+                nodes {
+                  id
+                }
+              }
+              productVariants(first: 100) {
+                nodes {
+                  id
+                }
+              }
+            }
+            ... on DiscountCollections {
+              collections(first: 100) {
+                nodes {
+                  id
+                }
+              }
+            }
+          }
+        }
+        minimumRequirement {
+          __typename
+          ... on DiscountMinimumSubtotal {
+            greaterThanOrEqualToSubtotal {
+              amount
+            }
+          }
+          ... on DiscountMinimumQuantity {
+            greaterThanOrEqualToQuantity
+          }
+        }
+      }
+      ... on DiscountCodeFreeShipping {
+        title
+        status
+        usageLimit
+        appliesOncePerCustomer
+        asyncUsageCount
+        startsAt
+        endsAt
+        minimumRequirement {
+          __typename
+          ... on DiscountMinimumSubtotal {
+            greaterThanOrEqualToSubtotal {
+              amount
+            }
+          }
+          ... on DiscountMinimumQuantity {
+            greaterThanOrEqualToQuantity
+          }
+        }
+      }
+    }
+  }
+}`;
+
+const SHOPIFY_LEGACY_CODE_DISCOUNT_QUERY = `#graphql
+query LegacyCodeDiscountNodeByCode($code: String!) {
+  discountCodeNodeByCode(code: $code) {
+    id
+    discountCode {
+      __typename
+      ... on DiscountCodeBasic {
+        title
+        status
+        usageLimit
+        appliesOncePerCustomer
+        asyncUsageCount
+        startsAt
+        endsAt
+        customerGets {
+          value {
+            __typename
+            ... on DiscountPercentage {
+              percentage
+            }
+            ... on DiscountAmount {
+              amount {
+                amount
+              }
+              appliesOnEachItem
+            }
+          }
+          items {
+            __typename
+            ... on AllDiscountItems {
+              allItems
+            }
+            ... on DiscountProducts {
+              products(first: 100) {
+                nodes {
+                  id
+                }
+              }
+              productVariants(first: 100) {
+                nodes {
+                  id
+                }
+              }
+            }
+            ... on DiscountCollections {
+              collections(first: 100) {
+                nodes {
+                  id
+                }
+              }
+            }
+          }
+        }
+        minimumRequirement {
+          __typename
+          ... on DiscountMinimumSubtotal {
+            greaterThanOrEqualToSubtotal {
+              amount
+            }
+          }
+          ... on DiscountMinimumQuantity {
+            greaterThanOrEqualToQuantity
+          }
+        }
+      }
+      ... on DiscountCodeFreeShipping {
+        title
+        status
+        usageLimit
+        appliesOncePerCustomer
+        asyncUsageCount
+        startsAt
+        endsAt
+        minimumRequirement {
+          __typename
+          ... on DiscountMinimumSubtotal {
+            greaterThanOrEqualToSubtotal {
+              amount
+            }
+          }
+          ... on DiscountMinimumQuantity {
+            greaterThanOrEqualToQuantity
+          }
+        }
+      }
+    }
+  }
+}`;
+
+const SHOPIFY_PRODUCT_COLLECTIONS_QUERY = `#graphql
+query ProductCollections($ids: [ID!]!) {
+  nodes(ids: $ids) {
+    ... on Product {
+      id
+      collections(first: 100) {
+        nodes {
+          id
+        }
+      }
+    }
+  }
+}`;
+
+async function fetchCodeDiscountNodeByCode(shop: string, couponCode: string) {
+    const { admin } = await unauthenticated.admin(shop);
+    const attempts = [
+        { fieldName: "codeDiscountNodeByCode", query: SHOPIFY_CODE_DISCOUNT_QUERY, valueKey: "codeDiscount" },
+        { fieldName: "discountCodeNodeByCode", query: SHOPIFY_LEGACY_CODE_DISCOUNT_QUERY, valueKey: "discountCode" },
+    ];
+
+    for (const attempt of attempts) {
+        try {
+            const response = await admin.graphql(attempt.query, { variables: { code: couponCode } });
+            const payload = await response.json();
+            if (payload?.errors?.length) {
+                throw new Error(payload.errors.map((error: any) => error.message).join("; "));
+            }
+            const node = payload?.data?.[attempt.fieldName];
+            const discount = node?.[attempt.valueKey];
+            if (node && discount) {
+                return { node, discount };
+            }
+        } catch (error) {
+            console.warn(`[Coupons] GraphQL ${attempt.fieldName} lookup failed:`, error);
+        }
+    }
+
+    return null;
+}
+
+async function getProductCollectionMap(shop: string, productIds: Array<string | undefined>) {
+    const normalizedIds = Array.from(new Set(
+        productIds
+            .map((id) => toShopifyGid("Product", id))
+            .filter(Boolean)
+    ));
+
+    if (normalizedIds.length === 0) {
+        return new Map<string, string[]>();
+    }
+
+    try {
+        const { admin } = await unauthenticated.admin(shop);
+        const response = await admin.graphql(SHOPIFY_PRODUCT_COLLECTIONS_QUERY, {
+            variables: { ids: normalizedIds },
+        });
+        const payload = await response.json();
+        if (payload?.errors?.length) {
+            throw new Error(payload.errors.map((error: any) => error.message).join("; "));
+        }
+
+        const result = new Map<string, string[]>();
+        (payload?.data?.nodes || []).forEach((node: any) => {
+            const productId = normalizeShopifyId(node?.id);
+            if (!productId) return;
+            result.set(
+                productId,
+                getConnectionNodes(node?.collections).map((collection: any) => String(collection?.id || "")).filter(Boolean),
+            );
+        });
+
+        return result;
+    } catch (error) {
+        console.error("[Coupons] Failed to load product collections:", error);
+        return new Map<string, string[]>();
+    }
+}
+
+async function countCustomerCouponUsage(shop: string, couponCode: string, orderContext?: any) {
+    const email = String(orderContext?.customerEmail || orderContext?.customer_email || "").trim();
+    const phone = String(orderContext?.customerPhone || orderContext?.customer_phone || "").trim();
+
+    if (!email && !phone) {
+        return 0;
+    }
+
+    let query = supabase
+        .from("order_logs")
+        .select("*", { count: "exact", head: true })
+        .eq("shop_domain", shop)
+        .eq("coupon_code", normalizeCouponCode(couponCode));
+
+    if (email) {
+        query = query.ilike("customer_email", email);
+    } else if (phone) {
+        query = query.eq("customer_phone", phone);
+    }
+
+    const { count, error } = await query;
+    if (error) {
+        console.error("[Coupons] Failed to count per-customer coupon usage:", error);
+        return 0;
+    }
+
+    return count || 0;
+}
+
+async function getShopifyGraphqlCoupon(
+    shop: string,
+    couponCode: string,
+    pricing: OrderPricingSummary,
+    orderContext?: any,
+): Promise<CouponValidationResult | null> {
+    try {
+        const payload = await fetchCodeDiscountNodeByCode(shop, couponCode);
+        if (!payload?.discount) {
+            return null;
+        }
+
+        const discountNode = payload.discount;
+        const discountType = String(discountNode?.__typename || "");
+        const now = Date.now();
+        const startsAt = discountNode?.startsAt ? new Date(discountNode.startsAt).getTime() : null;
+        const endsAt = discountNode?.endsAt ? new Date(discountNode.endsAt).getTime() : null;
+        const status = String(discountNode?.status || "").toUpperCase();
+
+        if (status && status !== "ACTIVE") {
+            return { valid: false, message: "Coupon is not active" };
+        }
+        if (startsAt && now < startsAt) {
+            return { valid: false, message: "Coupon is not active yet" };
+        }
+        if (endsAt && now > endsAt) {
+            return { valid: false, message: "Coupon has expired" };
+        }
+
+        const usageLimit = Number(discountNode?.usageLimit || 0);
+        const usageCount = Number(discountNode?.asyncUsageCount || 0);
+        if (usageLimit > 0 && usageCount >= usageLimit) {
+            return { valid: false, message: "Coupon usage limit reached" };
+        }
+
+        if (discountNode?.appliesOncePerCustomer) {
+            const customerUsageCount = await countCustomerCouponUsage(shop, couponCode, orderContext);
+            if (customerUsageCount > 0) {
+                return { valid: false, message: "Coupon already used by this customer" };
+            }
+        }
+
+        const requirement = getDiscountRequirement(discountNode?.minimumRequirement);
+        if (requirement.minimumSubtotal && pricing.merchandiseTotal < requirement.minimumSubtotal) {
+            return {
+                valid: false,
+                message: `Minimum order value is ${roundCurrency(requirement.minimumSubtotal).toFixed(2)}`,
+            };
+        }
+        if (requirement.minimumQuantity && getOrderMerchandiseQuantity(pricing.discountItems) < requirement.minimumQuantity) {
+            return {
+                valid: false,
+                message: `Minimum quantity is ${requirement.minimumQuantity}`,
+            };
+        }
+
+        if (discountType === "DiscountCodeFreeShipping") {
+            const shippingDiscount = Math.min(roundCurrency(pricing.shippingPrice), roundCurrency(pricing.originalTotal));
+            return {
+                valid: true,
+                coupon: {
+                    code: couponCode,
+                    type: "fixed",
+                    value: shippingDiscount,
+                    enabled: true,
+                    min_order_value: requirement.minimumSubtotal,
+                    usage_limit: usageLimit || undefined,
+                    source: "shopify",
+                },
+                discount: shippingDiscount,
+                originalTotal: roundCurrency(pricing.originalTotal),
+                finalTotal: roundCurrency(pricing.originalTotal - shippingDiscount),
+                message: shippingDiscount > 0 ? "Free shipping applied" : "Coupon applied",
+            };
+        }
+
+        if (discountType !== "DiscountCodeBasic") {
+            return { valid: false, message: "This Shopify discount type is not supported in COD" };
+        }
+
+        const selection = getDiscountSelection(discountNode?.customerGets?.items);
+        const requiresCollections = selection.collectionIds.length > 0;
+        const productCollectionMap = requiresCollections
+            ? await getProductCollectionMap(shop, pricing.discountItems.map((item) => item.productId))
+            : new Map<string, string[]>();
+        const eligibleItems = filterEligibleDiscountItems(pricing.discountItems, selection, productCollectionMap);
+        const eligibleSubtotal = roundCurrency(
+            eligibleItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+        );
+        const eligibleQuantity = getOrderMerchandiseQuantity(eligibleItems);
+
+        if (!selection.allItems && eligibleSubtotal <= 0) {
+            return { valid: false, message: "This coupon does not apply to items in the cart" };
+        }
+
+        const valueNode = discountNode?.customerGets?.value;
+        let discount = 0;
+        let resolvedCoupon: ResolvedCoupon | null = null;
+
+        if (valueNode?.__typename === "DiscountPercentage") {
+            const percentage = Math.abs(Number(valueNode?.percentage || 0));
+            discount = (eligibleSubtotal * percentage) / 100;
+            resolvedCoupon = {
+                code: couponCode,
+                type: "percentage",
+                value: percentage,
+                enabled: true,
+                min_order_value: requirement.minimumSubtotal,
+                usage_limit: usageLimit || undefined,
+                source: "shopify",
+                applies_to_entitled_items_only: !selection.allItems,
+                eligible_subtotal: eligibleSubtotal,
+            };
+        } else if (valueNode?.__typename === "DiscountAmount") {
+            const amount = Math.abs(Number(valueNode?.amount?.amount || 0));
+            discount = valueNode?.appliesOnEachItem ? amount * eligibleQuantity : amount;
+            resolvedCoupon = {
+                code: couponCode,
+                type: "fixed",
+                value: amount,
+                enabled: true,
+                min_order_value: requirement.minimumSubtotal,
+                usage_limit: usageLimit || undefined,
+                source: "shopify",
+                applies_to_entitled_items_only: !selection.allItems,
+                eligible_subtotal: eligibleSubtotal,
+            };
+        }
+
+        if (!resolvedCoupon) {
+            return { valid: false, message: "This Shopify discount value is not supported in COD" };
+        }
+
+        discount = Math.min(roundCurrency(discount), eligibleSubtotal, roundCurrency(pricing.originalTotal));
+
+        return {
+            valid: true,
+            coupon: resolvedCoupon,
+            discount,
+            originalTotal: roundCurrency(pricing.originalTotal),
+            finalTotal: roundCurrency(pricing.originalTotal - discount),
+            message: "Coupon applied",
+        };
+    } catch (error) {
+        console.error("[Coupons] GraphQL discount lookup failed:", error);
+        return null;
+    }
+}
+
+async function getShopifyCoupon(shop: string, couponCode: string, cartTotal: number, discountItems: OrderDiscountItem[]): Promise<CouponValidationResult | null> {
+    try {
+        const restClient = await getRestClient(shop);
+        const lookupResponse = await restClient.get({
+            path: "discount_codes/lookup",
+            query: { code: couponCode },
+        });
+
+        const discountCode = lookupResponse?.body?.discount_code;
+        if (!discountCode?.price_rule_id) {
+            return null;
+        }
+
+        const priceRuleResponse = await restClient.get({
+            path: `price_rules/${discountCode.price_rule_id}`,
+        });
+
+        const priceRule = priceRuleResponse?.body?.price_rule;
+        if (!priceRule) {
+            return null;
+        }
+
+        const now = Date.now();
+        const startsAt = priceRule.starts_at ? new Date(priceRule.starts_at).getTime() : null;
+        const endsAt = priceRule.ends_at ? new Date(priceRule.ends_at).getTime() : null;
+        if (startsAt && now < startsAt) {
+            return { valid: false, message: "Coupon is not active yet" };
+        }
+        if (endsAt && now > endsAt) {
+            return { valid: false, message: "Coupon has expired" };
+        }
+
+        if (priceRule.target_type && priceRule.target_type !== "line_item") {
+            return { valid: false, message: "This Shopify discount is not supported in COD" };
+        }
+
+        const normalizedCartTotal = roundCurrency(cartTotal);
+        const minOrderValue = Number(priceRule?.prerequisite_subtotal_range?.greater_than_or_equal_to || 0);
+        if (minOrderValue > 0 && normalizedCartTotal < minOrderValue) {
+            return {
+                valid: false,
+                message: `Minimum order value is ${roundCurrency(minOrderValue).toFixed(2)}`,
+            };
+        }
+
+        if (priceRule.usage_limit != null && Number(priceRule.usage_limit) >= 0) {
+            const usageCount = Number(discountCode.usage_count || 0);
+            if (usageCount >= Number(priceRule.usage_limit)) {
+                return { valid: false, message: "Coupon usage limit reached" };
+            }
+        }
+
+        const eligibleSubtotal = getEligibleSubtotalForShopifyRule(priceRule, discountItems);
+        if (eligibleSubtotal <= 0) {
+            return { valid: false, message: "This coupon does not apply to items in the cart" };
+        }
+
+        let discount = 0;
+        let resolvedCoupon: ResolvedCoupon;
+        if (priceRule.value_type === "percentage") {
+            const percentage = Math.abs(Number(priceRule.value || 0));
+            discount = (eligibleSubtotal * percentage) / 100;
+            resolvedCoupon = {
+                code: couponCode,
+                type: "percentage",
+                value: percentage,
+                enabled: true,
+                min_order_value: minOrderValue || undefined,
+                usage_limit: priceRule.usage_limit != null ? Number(priceRule.usage_limit) : undefined,
+                source: "shopify",
+                applies_to_entitled_items_only: true,
+                eligible_subtotal: eligibleSubtotal,
+                shopify_price_rule_id: String(priceRule.id),
+            };
+        } else if (priceRule.value_type === "fixed_amount") {
+            const amount = Math.abs(Number(priceRule.value || 0));
+            discount = amount;
+            resolvedCoupon = {
+                code: couponCode,
+                type: "fixed",
+                value: amount,
+                enabled: true,
+                min_order_value: minOrderValue || undefined,
+                usage_limit: priceRule.usage_limit != null ? Number(priceRule.usage_limit) : undefined,
+                source: "shopify",
+                applies_to_entitled_items_only: true,
+                eligible_subtotal: eligibleSubtotal,
+                shopify_price_rule_id: String(priceRule.id),
+            };
+        } else {
+            return { valid: false, message: "This Shopify discount type is not supported in COD" };
+        }
+
+        discount = Math.min(roundCurrency(discount), eligibleSubtotal, normalizedCartTotal);
+
+        return {
+            valid: true,
+            coupon: resolvedCoupon,
+            discount,
+            originalTotal: normalizedCartTotal,
+            finalTotal: roundCurrency(normalizedCartTotal - discount),
+            message: "Coupon applied",
+        };
+    } catch (error: any) {
+        const errorMessage = String(error?.message || "");
+        if (
+            errorMessage.includes("404") ||
+            errorMessage.includes("Not Found") ||
+            errorMessage.includes("discount_codes/lookup")
+        ) {
+            return null;
+        }
+
+        console.error("[Coupons] Shopify discount lookup failed:", error);
+        return null;
+    }
+}
+
+export async function validateCouponForShop(shop: string, couponCode: string, cartTotal: number, orderContext?: any): Promise<CouponValidationResult> {
+    const normalizedCode = normalizeCouponCode(couponCode);
+    if (!shop || !normalizedCode) {
+        return { valid: false, message: "Coupon code is required" };
+    }
+
+    const settings = await getFormSettings(shop);
+    const couponField = getCouponFieldState(settings);
+    if (!couponField.enabled) {
+        return { valid: false, message: "Coupons are not enabled for this shop" };
+    }
+
+    const normalizedCartTotal = roundCurrency(cartTotal);
+    if (normalizedCartTotal <= 0) {
+        return { valid: false, message: "Cart total must be greater than zero" };
+    }
+
+    const pricing = calculateOrderPricing(orderContext || {});
+
+    const graphqlCoupon = await getShopifyGraphqlCoupon(
+        shop,
+        normalizedCode,
+        pricing,
+        orderContext,
+    );
+    if (graphqlCoupon) {
+        return graphqlCoupon;
+    }
+
+    const shopifyCoupon = await getShopifyCoupon(
+        shop,
+        normalizedCode,
+        normalizedCartTotal,
+        pricing.discountItems,
+    );
+    if (shopifyCoupon) {
+        return shopifyCoupon;
+    }
+
+    return { valid: false, message: "Invalid or expired coupon" };
+}
+
+export function calculateOrderPricing(body: any): OrderPricingSummary {
+    const discountItems = buildOrderDiscountItems(body);
+    const shippingPrice = roundCurrency(Number(body?.shippingPrice) || 0);
+    const discountPercent = Math.max(0, Number(body?.discountPercent) || 0);
+    const quantity = Math.max(1, parseInt(String(body?.quantity || 1), 10) || 1);
+    const bundleVariants = Array.isArray(body?.bundleVariants) && body.bundleVariants.length > 1
+        ? body.bundleVariants
+        : null;
+
+    let mainItemsSubtotal = 0;
+    let bundleDiscountAmount = 0;
+
+    if (bundleVariants) {
+        bundleVariants.forEach((variant: any) => {
+            const variantQuantity = Math.max(1, parseInt(String(variant?.quantity || 1), 10) || 1);
+            const variantPrice = Number(variant?.price) || 0;
+            const rawLineTotal = variantPrice * variantQuantity;
+            mainItemsSubtotal += rawLineTotal;
+            bundleDiscountAmount += rawLineTotal * (discountPercent / 100);
+        });
+    } else {
+        const unitPrice = Number(body?.price) || 0;
+        mainItemsSubtotal = unitPrice * quantity;
+        bundleDiscountAmount = mainItemsSubtotal * (discountPercent / 100);
+    }
+
+    mainItemsSubtotal = roundCurrency(mainItemsSubtotal);
+    bundleDiscountAmount = roundCurrency(bundleDiscountAmount);
+
+    const upsellTotal = roundCurrency(
+        (Array.isArray(body?.upsell_items) ? body.upsell_items : []).reduce((sum: number, item: any) => {
+            const itemPrice = Number(item?.price) || 0;
+            const itemQuantity = Math.max(1, parseInt(String(item?.quantity || 1), 10) || 1);
+            return sum + (itemPrice * itemQuantity);
+        }, 0)
+    );
+
+    const merchandiseTotal = roundCurrency(mainItemsSubtotal - bundleDiscountAmount + upsellTotal);
+    const originalTotal = roundCurrency(merchandiseTotal + shippingPrice);
+
+    return {
+        mainItemsSubtotal,
+        bundleDiscountAmount,
+        merchandiseTotal,
+        shippingPrice,
+        upsellTotal,
+        originalTotal,
+        discountItems,
+    };
+}

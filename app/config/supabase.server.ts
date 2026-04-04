@@ -102,6 +102,7 @@ export async function markShopUninstalled(shopDomain: string) {
 // Import types and defaults from shared file for local use
 import {
     FormField,
+    CouponConfig,
     ContentBlocks,
     FormStyles,
     ButtonStyles,
@@ -117,7 +118,7 @@ import {
 } from './form-builder.types';
 
 // Re-export for other modules
-export type { FormField, ContentBlocks, FormStyles, ButtonStyles, ShippingOption, ShippingOptions, FormSubmitButtonStyles };
+export type { FormField, CouponConfig, ContentBlocks, FormStyles, ButtonStyles, ShippingOption, ShippingOptions, FormSubmitButtonStyles };
 export { DEFAULT_FIELDS, DEFAULT_BLOCKS, DEFAULT_STYLES, DEFAULT_BUTTON_STYLES, DEFAULT_SHIPPING_OPTIONS, DEFAULT_FORM_SUBMIT_BUTTON };
 
 export interface FormSettings {
@@ -164,6 +165,9 @@ export interface FormSettings {
     partial_cod_commission?: number;
     // Shipping rates settings
     shipping_rates_enabled?: boolean;
+    enable_coupon_field?: boolean;
+    coupon_field_position?: number;
+    coupons?: CouponConfig[];
     // Form submit button style overrides
     form_submit_button?: FormSubmitButtonStyles;
 }
@@ -237,6 +241,9 @@ export async function saveFormSettings(settings: FormSettings) {
                 partial_cod_commission: settings.partial_cod_commission ?? 0,
                 // Shipping rates settings
                 shipping_rates_enabled: settings.shipping_rates_enabled ?? false,
+                enable_coupon_field: settings.enable_coupon_field ?? false,
+                coupon_field_position: settings.coupon_field_position ?? 13,
+                coupons: settings.coupons || [],
                 // Form submit button style overrides
                 form_submit_button: settings.form_submit_button || DEFAULT_FORM_SUBMIT_BUTTON,
             },
@@ -278,6 +285,10 @@ export interface OrderLogEntry {
     shipping_label?: string;
     shipping_price?: number;
     currency?: string;
+    coupon_code?: string;
+    discount_amount?: number;
+    original_total?: number;
+    final_total?: number;
     created_at?: string;
     // Partial COD tracking
     is_partial_cod?: boolean;
@@ -337,6 +348,10 @@ export async function logOrder(order: OrderLogEntry) {
     if (order.shipping_label != null) insertPayload.shipping_label = order.shipping_label;
     if (order.shipping_price != null) insertPayload.shipping_price = order.shipping_price;
     if (order.currency != null) insertPayload.currency = order.currency;
+    if (order.coupon_code != null) insertPayload.coupon_code = order.coupon_code;
+    if (order.discount_amount != null) insertPayload.discount_amount = order.discount_amount;
+    if (order.original_total != null) insertPayload.original_total = order.original_total;
+    if (order.final_total != null) insertPayload.final_total = order.final_total;
     if (order.order_payload != null) insertPayload.order_payload = order.order_payload;
 
     const { data, error } = await supabase
@@ -391,6 +406,10 @@ export async function logOrderWithShopifyIds(
     if (order.shipping_label != null) insertPayload.shipping_label = order.shipping_label;
     if (order.shipping_price != null) insertPayload.shipping_price = order.shipping_price;
     if (order.currency != null) insertPayload.currency = order.currency;
+    if (order.coupon_code != null) insertPayload.coupon_code = order.coupon_code;
+    if (order.discount_amount != null) insertPayload.discount_amount = order.discount_amount;
+    if (order.original_total != null) insertPayload.original_total = order.original_total;
+    if (order.final_total != null) insertPayload.final_total = order.final_total;
     if (order.order_payload != null) insertPayload.order_payload = order.order_payload;
 
     const { data, error } = await supabase

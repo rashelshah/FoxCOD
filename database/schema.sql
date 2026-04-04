@@ -71,6 +71,9 @@ CREATE TABLE IF NOT EXISTS form_settings (
   modal_style VARCHAR(20) DEFAULT 'modern',
   animation_style VARCHAR(20) DEFAULT 'fade',
   border_radius INTEGER DEFAULT 12,
+  enable_coupon_field BOOLEAN DEFAULT false,
+  coupon_field_position INTEGER DEFAULT 13,
+  coupons JSONB DEFAULT '[]'::jsonb,
   
   -- Timestamps
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -112,6 +115,10 @@ CREATE TABLE IF NOT EXISTS order_logs (
   variant_id VARCHAR(255),
   quantity INTEGER DEFAULT 1,
   total_price DECIMAL(10, 2),
+  coupon_code VARCHAR(100),
+  discount_amount DECIMAL(10, 2) DEFAULT 0,
+  original_total DECIMAL(10, 2),
+  final_total DECIMAL(10, 2),
   currency VARCHAR(10) DEFAULT 'INR',
   
   -- Order status

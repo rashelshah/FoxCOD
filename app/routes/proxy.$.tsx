@@ -13,6 +13,7 @@ import { getFormSettings, logOrder, logOrderWithShopifyIds, supabase } from "../
 import { lookupCustomerByPhone } from "../services/customer-lookup.server";
 import { syncOrderToGoogleSheets } from "../services/google-sheets.server";
 import { getFraudProtectionSettings, validateOrderAgainstFraudRulesWithSettings } from "../services/fraud-protection.server";
+import { calculateOrderPricing, normalizeCouponCode, validateCouponForShop } from "../services/coupons.server";
 import {
     toNumericVariantId,
     formatPhoneE164,
@@ -120,6 +121,15 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
             }), { status: 400, headers: corsHeaders });
         }
 
+        if (path.includes("validate-coupon")) {
+            const pricing = calculateOrderPricing(data);
+            const result = await validateCouponForShop(data.shop, data.couponCode, pricing.originalTotal, data);
+            return new Response(JSON.stringify(result), {
+                status: result.valid ? 200 : 400,
+                headers: corsHeaders,
+            });
+        }
+
         // Route: Partial COD Checkout Creation
         // Check BOTH path and payload to catch all partial COD requests
         const isPartialCodPath = path.includes("partial-cod") || path.includes("create-checkout");
@@ -171,6 +181,7 @@ async function handlePartialCodCheckout(request: Request, data: any) {
             customerZipcode,
             shippingPrice,
             notes,
+            couponCode,
         } = data;
 
         // Validate required fields
@@ -183,7 +194,22 @@ async function handlePartialCodCheckout(request: Request, data: any) {
         }
 
         // Calculate amounts
-        const totalOrderValue = (parseFloat(price) * parseInt(quantity)) + (parseFloat(shippingPrice) || 0);
+        const pricing = calculateOrderPricing(data);
+        let totalOrderValue = pricing.originalTotal;
+        let couponDiscount = 0;
+        let normalizedCouponCode = '';
+        if (couponCode) {
+            const couponResult = await validateCouponForShop(shop, couponCode, pricing.originalTotal, data);
+            if (!couponResult.valid) {
+                return new Response(JSON.stringify({
+                    success: false,
+                    error: couponResult.message || "Invalid coupon"
+                }), { status: 400, headers: corsHeaders });
+            }
+            couponDiscount = couponResult.discount;
+            totalOrderValue = couponResult.finalTotal;
+            normalizedCouponCode = normalizeCouponCode(couponCode);
+        }
         const actualRemainingAmount = totalOrderValue - parseFloat(advanceAmount);
 
         console.log('[Proxy Partial COD] Amounts - Total:', totalOrderValue, 'Advance:', advanceAmount, 'Remaining:', actualRemainingAmount);
@@ -208,6 +234,10 @@ async function handlePartialCodCheckout(request: Request, data: any) {
                 quantity: parseInt(quantity) || 1,
                 price: String(price),
                 shipping_price: parseFloat(shippingPrice) || 0,
+                coupon_code: normalizedCouponCode || undefined,
+                discount_amount: couponDiscount || undefined,
+                original_total: pricing.originalTotal,
+                final_total: totalOrderValue,
                 notes: notes || '',
                 status: 'pending_advance_payment',
                 order_source: 'partial_cod',
@@ -215,6 +245,13 @@ async function handlePartialCodCheckout(request: Request, data: any) {
                 advance_amount: parseFloat(advanceAmount),
                 remaining_cod_amount: actualRemainingAmount,
                 order_reference: orderRef,
+                order_payload: {
+                    ...data,
+                    couponCode: normalizedCouponCode || '',
+                    discountAmount: couponDiscount,
+                    originalTotal: pricing.originalTotal,
+                    finalTotal: totalOrderValue,
+                },
             };
 
             console.log('[Proxy Partial COD] Logging order to database:', orderRef);
@@ -354,18 +391,25 @@ async function handleRegularOrder(request: Request, data: any) {
 
     // ── 3. BUILD SHOPIFY PAYLOAD (from request data — no DB round-trip) ──
     const upsellItems = data.upsell_items || [];
-    const upsellTotal = upsellItems.reduce((sum: number, item: any) => sum + (parseFloat(item.price) * (parseInt(item.quantity) || 1)), 0);
     const shippingPrice = parseFloat(data.shippingPrice) || 0;
     const discountPercent = parseFloat(data.discountPercent) || 0;
-
-    // Use finalTotal from storefront DOM (most accurate)
-    let totalPrice: number;
-    if (data.finalTotal && parseFloat(data.finalTotal) > 0) {
-        totalPrice = parseFloat(data.finalTotal);
-    } else {
-        const subtotal = parseFloat(data.price) * (parseInt(data.quantity) || 1);
-        const discount = subtotal * (discountPercent / 100);
-        totalPrice = subtotal - discount + shippingPrice + upsellTotal;
+    const pricing = calculateOrderPricing(data);
+    let totalPrice = pricing.originalTotal;
+    let couponDiscount = 0;
+    let couponType: "percentage" | "fixed" | null = null;
+    let couponCode: string | null = null;
+    if (data.couponCode) {
+        const couponResult = await validateCouponForShop(data.shop, data.couponCode, pricing.originalTotal, data);
+        if (!couponResult.valid) {
+            return new Response(JSON.stringify({
+                success: false,
+                error: couponResult.message || "Invalid coupon",
+            }), { status: 400, headers: corsHeaders });
+        }
+        couponDiscount = couponResult.discount;
+        totalPrice = couponResult.finalTotal;
+        couponType = couponResult.coupon.type;
+        couponCode = normalizeCouponCode(data.couponCode);
     }
 
     // Build notes
@@ -385,6 +429,10 @@ async function handleRegularOrder(request: Request, data: any) {
     if (discountPercent > 0) {
         orderNotes = orderNotes ? orderNotes + '\n' : '';
         orderNotes += `BUNDLE DISCOUNT: ${discountPercent}% off`;
+    }
+    if (couponCode && couponDiscount > 0) {
+        orderNotes = orderNotes ? orderNotes + '\n' : '';
+        orderNotes += `COUPON: ${couponCode} (-${fmtPrice(couponDiscount)})`;
     }
     if (data.customFieldData && Array.isArray(data.customFieldData) && data.customFieldData.length > 0) {
         const cfNotes = 'CUSTOM FIELDS:\n' + data.customFieldData.map((cf: any) => `  ${cf.label}: ${cf.value}`).join('\n');
@@ -469,8 +517,19 @@ async function handleRegularOrder(request: Request, data: any) {
                 price: shippingPrice.toFixed(2),
                 code: 'COD_SHIPPING',
             }],
+            total_discounts: couponDiscount.toFixed(2),
         },
     };
+
+    if (couponCode && couponType) {
+        shopifyPayload.order.discount_codes = [
+            {
+                code: couponCode,
+                amount: couponDiscount.toFixed(2),
+                type: couponType === 'percentage' ? 'percentage' : 'fixed_amount',
+            },
+        ];
+    }
 
     if (customerName || data.customerAddress) {
         shopifyPayload.order.shipping_address = {
@@ -554,8 +613,18 @@ async function handleRegularOrder(request: Request, data: any) {
             price: totalPrice.toString(),
             shipping_label: data.shippingLabel || '',
             shipping_price: shippingPrice,
+            coupon_code: couponCode || undefined,
+            discount_amount: couponDiscount || undefined,
+            original_total: pricing.originalTotal,
+            final_total: totalPrice,
             currency: currencyCode,
-            order_payload: data,
+            order_payload: {
+                ...data,
+                couponCode: couponCode || '',
+                discountAmount: couponDiscount,
+                originalTotal: pricing.originalTotal,
+                finalTotal: totalPrice,
+            },
         }, shopifyOrderId, shopifyOrderName);
         dbOrderId = result.id;
     } catch (dbErr: any) {

@@ -96,6 +96,8 @@ const defaultSettings: Omit<FormSettings, "shop_domain"> = {
     partial_cod_commission: 0,
     // New Shipping Rates settings
     shipping_rates_enabled: false,
+    enable_coupon_field: false,
+    coupon_field_position: 13,
     // Form submit button
     form_submit_button: DEFAULT_FORM_SUBMIT_BUTTON,
 };
@@ -165,6 +167,8 @@ async function ensureMetafieldDefinitions(admin: any) {
         // Shipping rates settings - must have storefront access for Liquid templates
         { key: "shipping_rates_enabled", type: "single_line_text_field" },
         { key: "shipping_rates_json", type: "json" },
+        { key: "enable_coupon_field", type: "single_line_text_field" },
+        { key: "coupon_field_position", type: "single_line_text_field" },
         // Upsells & Downsells
         { key: "upsells_downsells_json", type: "json" },
         // Pixel Tracking
@@ -511,6 +515,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         partial_cod_commission: parseFloat(formData.get("partial_cod_commission") as string) || defaultSettings.partial_cod_commission,
         // Shipping rates enabled setting
         shipping_rates_enabled: formData.get("shipping_rates_enabled") === "true",
+        enable_coupon_field: formData.get("enable_coupon_field") === "true",
+        coupon_field_position: parseInt(formData.get("coupon_field_position") as string) || defaultSettings.coupon_field_position,
         // Form submit button style overrides
         form_submit_button: JSON.parse(formData.get("form_submit_button") as string || JSON.stringify(defaultSettings.form_submit_button)),
     };
@@ -523,6 +529,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         // Check for missing column error
         if (dbError.message?.includes('shipping_rates_enabled')) {
             return { success: false, error: 'Database migration needed: Run migration_v9_add_shipping_rates_enabled.sql in Supabase' };
+        }
+        if (dbError.message?.includes('enable_coupon_field') || dbError.message?.includes('coupon_field_position') || dbError.message?.includes('coupons')) {
+            return { success: false, error: 'Database migration needed: Run migration_v16_coupons.sql in Supabase' };
         }
         return { success: false, error: dbError.message || 'Failed to save to database' };
     }
@@ -606,6 +615,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     { ownerId: shopGid, namespace: "fox_cod", key: "animation_style", value: settings.animation_style || "fade", type: "single_line_text_field" },
                     { ownerId: shopGid, namespace: "fox_cod", key: "border_radius", value: (settings.border_radius ?? 12).toString(), type: "single_line_text_field" },
                     { ownerId: shopGid, namespace: "fox_cod", key: "form_type", value: settings.form_type || "popup", type: "single_line_text_field" },
+                    { ownerId: shopGid, namespace: "fox_cod", key: "enable_coupon_field", value: String(settings.enable_coupon_field ?? false), type: "single_line_text_field" },
+                    { ownerId: shopGid, namespace: "fox_cod", key: "coupon_field_position", value: String(settings.coupon_field_position ?? 13), type: "single_line_text_field" },
                 ]
             }
         });
@@ -983,6 +994,7 @@ const PreviewDisplay = memo(({
             zip: <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="9" x2="20" y2="9" /><line x1="4" y1="15" x2="20" y2="15" /><line x1="10" y1="3" x2="8" y2="21" /><line x1="16" y1="3" x2="14" y2="21" /></svg>,
             state: <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>,
             city: <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>,
+            coupon: <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5A2.5 2.5 0 0 1 5.5 7H9l1.2-1.9a1 1 0 0 1 .84-.46H18.5A2.5 2.5 0 0 1 21 7v3a2 2 0 0 0 0 4v3a2.5 2.5 0 0 1-2.5 2.5H11a1 1 0 0 1-.84-.46L9 17H5.5A2.5 2.5 0 0 1 3 14.5v-5Z" /><path d="M14 7v10" /><path d="M14 10h.01" /><path d="M14 14h.01" /></svg>,
             marketing: <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg>,
             hash: <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="9" x2="20" y2="9" /><line x1="4" y1="15" x2="20" y2="15" /><line x1="10" y1="3" x2="8" y2="21" /><line x1="16" y1="3" x2="14" y2="21" /></svg>,
             user: <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>,
@@ -1366,6 +1378,107 @@ const PreviewDisplay = memo(({
                                                 <div key={field.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', fontSize: '10px', color: '#6b7280' }}>
                                                     <input type="checkbox" disabled style={{ width: '14px', height: '14px' }} />
                                                     <span>Keep me updated with offers & news</span>
+                                                </div>
+                                            );
+                                        }
+
+                                        if (field.id === 'coupon') {
+                                            const couponRadius = Math.max((formStyles?.borderRadius || 12) + 3, 15);
+                                            const couponControlRadius = Math.max((formStyles?.borderRadius || 12) + 1, 13);
+                                            return (
+                                                <div key={field.id} style={{
+                                                    marginBottom: '12px',
+                                                    padding: '12px',
+                                                    borderRadius: `${couponRadius}px`,
+                                                    background: `linear-gradient(135deg, ${formThemeColor}12 0%, ${formStyles?.fieldBackgroundColor || '#ffffff'} 58%, ${formThemeColor}08 100%)`,
+                                                    border: `1px solid ${formThemeColor}33`,
+                                                    boxShadow: '0 10px 24px rgba(15,23,42,0.07), inset 0 1px 0 rgba(255,255,255,0.75)',
+                                                    position: 'relative',
+                                                    overflow: 'hidden'
+                                                }}>
+                                                    <div style={{
+                                                        position: 'absolute',
+                                                        inset: 0,
+                                                        background: `radial-gradient(circle at top right, ${formThemeColor}1f 0%, transparent 42%)`,
+                                                        pointerEvents: 'none'
+                                                    }} />
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                            <div style={{
+                                                                width: '40px',
+                                                                height: '40px',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                borderRadius: '12px',
+                                                                color: formThemeColor,
+                                                                background: `linear-gradient(135deg, ${formThemeColor}29 0%, rgba(255,255,255,0.82) 100%)`,
+                                                                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.85)'
+                                                            }}>
+                                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5A2.5 2.5 0 0 1 5.5 7H9l1.2-1.9a1 1 0 0 1 .84-.46H18.5A2.5 2.5 0 0 1 21 7v3a2 2 0 0 0 0 4v3a2.5 2.5 0 0 1-2.5 2.5H11a1 1 0 0 1-.84-.46L9 17H5.5A2.5 2.5 0 0 1 3 14.5v-5Z" /><path d="M14 7v10" /><path d="M14 10h.01" /><path d="M14 14h.01" /></svg>
+                                                            </div>
+                                                            <div>
+                                                                <label style={{ ...getLabelStyle(), marginBottom: 2, fontSize: `${Math.max((formStyles?.labelFontSize || textSize), 15)}px` } as any}>Coupon Code</label>
+                                                                <div style={{ fontSize: '12px', lineHeight: 1.4, color: '#6b7280' }}>Apply your exclusive offer before placing the order</div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '8px', alignItems: 'stretch' }}>
+                                                        <div style={{ position: 'relative', minWidth: 0 }}>
+                                                            <FieldIconSvg field={field} />
+                                                            <input
+                                                                disabled
+                                                                value=""
+                                                                placeholder={field.placeholder || 'Enter Coupon Code'}
+                                                                style={{
+                                                                    ...getInputStyle(),
+                                                                    paddingLeft: 40,
+                                                                    paddingRight: 12,
+                                                                    height: '44px',
+                                                                    background: 'rgba(255,255,255,0.94)',
+                                                                    cursor: 'not-allowed',
+                                                                    opacity: 1,
+                                                                    letterSpacing: '0.02em',
+                                                                    fontWeight: 700,
+                                                                    boxShadow: '0 6px 18px rgba(15,23,42,0.05)',
+                                                                    border: `1px solid ${formThemeColor}33`,
+                                                                    borderRadius: `${couponControlRadius}px`,
+                                                                } as any}
+                                                            />
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            style={{
+                                                                border: `1px solid ${formThemeColor}`,
+                                                                color: formThemeColor,
+                                                                background: `linear-gradient(135deg, ${formThemeColor}18 0%, ${formThemeColor}10 100%)`,
+                                                                borderRadius: couponControlRadius,
+                                                                padding: '0 12px',
+                                                                minWidth: 92,
+                                                                fontSize: 12,
+                                                                fontWeight: 800,
+                                                                letterSpacing: '0.02em',
+                                                                boxShadow: `0 10px 20px ${formThemeColor}1a`,
+                                                                whiteSpace: 'nowrap'
+                                                            }}
+                                                        >
+                                                            Apply
+                                                        </button>
+                                                    </div>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', marginTop: '8px' }}>
+                                                        <div style={{ fontSize: '12px', lineHeight: 1.4, color: '#6b7280', maxWidth: '72%' }}>Valid code discounts appear instantly in the summary</div>
+                                                        <div style={{
+                                                            display: 'inline-flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            padding: '6px 10px',
+                                                            borderRadius: '999px',
+                                                            fontSize: '12px',
+                                                            fontWeight: 700,
+                                                            color: formThemeColor,
+                                                            background: `${formThemeColor}14`
+                                                        }}>-₹100</div>
+                                                    </div>
                                                 </div>
                                             );
                                         }
@@ -2062,6 +2175,10 @@ export default function SettingsPage() {
     const [iconPopoverActive, setIconPopoverActive] = useState(false);
     const [btnIconPopoverActive, setBtnIconPopoverActive] = useState(false);
 
+    const couponField = fields.find((field) => field.id === 'coupon');
+    const couponFieldEnabled = couponField?.visible ?? false;
+    const couponFieldPosition = couponField?.order ?? defaultSettings.coupon_field_position ?? 13;
+
 
     const DropdownIcon = ({ iconType }: { iconType: string }) => {
         const s: React.CSSProperties = { width: 18, height: 18, color: '#333' };
@@ -2195,6 +2312,7 @@ export default function SettingsPage() {
             form_type: formType, fields, blocks, custom_fields: [], styles: formStyles, button_styles: { ...buttonStylesState, backgroundColor: primaryColor },
             shipping_options: shippingOpts, partial_cod_enabled: partialCodEnabled, partial_cod_advance_amount: partialCodAdvanceAmount,
             partial_cod_commission: partialCodCommission, shipping_rates_enabled: shippingRatesEnabled,
+            enable_coupon_field: couponFieldEnabled, coupon_field_position: couponFieldPosition,
             form_submit_button: formSubmitButtonState
         };
 
@@ -2220,7 +2338,7 @@ export default function SettingsPage() {
         showEmailField, showNotesField, emailRequired, namePlaceholder, phonePlaceholder, addressPlaceholder,
         notesPlaceholder, modalStyle, animationStyle, borderRadius, formType, fields, blocks,
         formStyles, buttonStylesState, shippingOpts, partialCodEnabled, partialCodAdvanceAmount, partialCodCommission,
-        shippingRatesEnabled, savedSettingsString, pendingShippingOps, formSubmitButtonState
+        shippingRatesEnabled, couponFieldEnabled, couponFieldPosition, savedSettingsString, pendingShippingOps, formSubmitButtonState
     ]);
 
     // Discard handler - reset all fields to saved values
@@ -2286,6 +2404,7 @@ export default function SettingsPage() {
                     form_type: formType, fields, blocks, custom_fields: [], styles: formStyles, button_styles: { ...buttonStylesState, backgroundColor: primaryColor },
                     shipping_options: shippingOpts, partial_cod_enabled: partialCodEnabled, partial_cod_advance_amount: partialCodAdvanceAmount,
                     partial_cod_commission: partialCodCommission, shipping_rates_enabled: shippingRatesEnabled,
+                    enable_coupon_field: couponFieldEnabled, coupon_field_position: couponFieldPosition,
                     form_submit_button: formSubmitButtonState
                 };
                 setSavedSettingsString(JSON.stringify(currentSettings));
@@ -2304,7 +2423,7 @@ export default function SettingsPage() {
         formTitle, formSubtitle, successMessage, submitButtonText, showProductImage, showPrice, showQuantitySelector,
         showEmailField, showNotesField, emailRequired, namePlaceholder, phonePlaceholder, addressPlaceholder,
         notesPlaceholder, modalStyle, animationStyle, borderRadius, formType, fields, blocks,
-        formStyles, buttonStylesState, shippingOpts, partialCodEnabled, partialCodAdvanceAmount, partialCodCommission, shippingRatesEnabled, formSubmitButtonState, shopify]);
+        formStyles, buttonStylesState, shippingOpts, partialCodEnabled, partialCodAdvanceAmount, partialCodCommission, shippingRatesEnabled, couponFieldEnabled, couponFieldPosition, formSubmitButtonState, shopify]);
 
     // Hex validation helpers
     const isValidHex = (hex: string): boolean => {
@@ -2401,6 +2520,12 @@ export default function SettingsPage() {
         );
     }, []);
 
+    const setCouponFieldEnabled = useCallback((enabledValue: boolean) => {
+        setFields((prev) => prev.map((field) =>
+            field.id === 'coupon' ? { ...field, visible: enabledValue, required: false } : field
+        ));
+    }, []);
+
     // Handle save
     const handleSave = useCallback(() => {
         const formData = new FormData();
@@ -2443,6 +2568,8 @@ export default function SettingsPage() {
         formData.append("partial_cod_commission", partialCodCommission.toString());
         // Shipping rates enabled setting
         formData.append("shipping_rates_enabled", shippingRatesEnabled.toString());
+        formData.append("enable_coupon_field", couponFieldEnabled.toString());
+        formData.append("coupon_field_position", couponFieldPosition.toString());
         // Form submit button style overrides
         formData.append("form_submit_button", JSON.stringify(formSubmitButtonState));
 
@@ -4694,6 +4821,27 @@ export default function SettingsPage() {
                                         >
                                             Restore to Default
                                         </button>
+                                    </AccordionSection>
+
+                                    <AccordionSection id="coupon-settings" tab="form" title="Coupon Codes" helperText="Enable the coupon field and use Shopify Discounts as the source of truth" expandedSection={expandedSection} toggleSection={toggleSection}>
+                                        <div className="settings-card" style={{ display: 'grid', gap: '14px' }}>
+                                            <div className="toggle-option" onClick={() => setCouponFieldEnabled(!couponFieldEnabled)}>
+                                                <span className="toggle-option-label">Enable coupon code field in COD form</span>
+                                                <div className={`mini-toggle ${couponFieldEnabled ? 'on' : 'off'}`} />
+                                            </div>
+                                            <p className="setting-helper" style={{ margin: 0 }}>
+                                                Drag the Coupon Code field in Field Management to change its position. Customers can apply only active codes created in Shopify Admin under Discounts.
+                                            </p>
+                                            <div style={{ padding: '10px 12px', borderRadius: 12, background: '#f6f7fb', border: '1px solid #e5e7eb', fontSize: 13, color: '#4b5563' }}>
+                                                Current position: <strong>{couponFieldPosition}</strong>
+                                            </div>
+                                            <div style={{ padding: '14px 16px', borderRadius: 14, border: '1px solid #dbe4f0', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)' }}>
+                                                <div style={{ fontSize: 14, fontWeight: 600, color: '#111827' }}>Source of coupon codes</div>
+                                                <div style={{ fontSize: 12, lineHeight: 1.55, color: '#6b7280', marginTop: 4 }}>
+                                                    This app reads eligible discount codes directly from Shopify Discounts and revalidates them on the backend before order creation.
+                                                </div>
+                                            </div>
+                                        </div>
                                     </AccordionSection>
 
                                     {/* Partial Cash on Delivery */}

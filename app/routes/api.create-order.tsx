@@ -20,6 +20,7 @@ import {
     sanitizeVariantPricedLineItems,
 } from "../services/shopify-sync.server";
 import { getRestClient } from "../shopify/rest-client.server";
+import { calculateOrderPricing, normalizeCouponCode, validateCouponForShop } from "../services/coupons.server";
 
 // CORS headers for storefront requests
 const corsHeaders = {
@@ -62,6 +63,7 @@ interface OrderRequestBody {
         label?: string;
         value?: string | number | null;
     }>;
+    couponCode?: string;
     [key: string]: any;
 }
 
@@ -321,17 +323,25 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         console.log("⏱ [COD Order] Fraud checks done:", Date.now() - start, "ms");
 
         // ── 3. BUILD SHOPIFY PAYLOAD ──
-        const upsellTotal = (body.upsell_items || []).reduce((sum, item) => sum + (item.price * item.quantity), 0);
         const shippingPrice = body.shippingPrice || 0;
         const discountPercent = body.discountPercent || 0;
-
-        let totalPrice: number;
-        if (body.finalTotal && body.finalTotal > 0) {
-            totalPrice = body.finalTotal;
-        } else {
-            const subtotal = body.price * body.quantity;
-            const discount = subtotal * (discountPercent / 100);
-            totalPrice = subtotal - discount + shippingPrice + upsellTotal;
+        const pricing = calculateOrderPricing(body);
+        let totalPrice = pricing.originalTotal;
+        let couponDiscount = 0;
+        let couponType: "percentage" | "fixed" | null = null;
+        let couponCode: string | null = null;
+        if (body.couponCode) {
+            const couponResult = await validateCouponForShop(body.shop, body.couponCode, pricing.originalTotal, body);
+            if (!couponResult.valid) {
+                return Response.json(
+                    { success: false, error: couponResult.message || "Invalid coupon" },
+                    { status: 400, headers: corsHeaders }
+                );
+            }
+            couponDiscount = couponResult.discount;
+            totalPrice = couponResult.finalTotal;
+            couponType = couponResult.coupon.type;
+            couponCode = normalizeCouponCode(body.couponCode);
         }
 
         // Build notes
@@ -355,6 +365,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         if (discountPercent > 0) {
             orderNotes = orderNotes ? orderNotes + '\n' : '';
             orderNotes += `BUNDLE DISCOUNT: ${discountPercent}% off`;
+        }
+        if (couponCode && couponDiscount > 0) {
+            orderNotes = orderNotes ? orderNotes + '\n' : '';
+            orderNotes += `COUPON: ${couponCode} (-${fmtPrice(couponDiscount)})`;
         }
 
         // Build line items
@@ -405,8 +419,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     price: shippingPrice.toFixed(2),
                     code: 'COD_SHIPPING',
                 }],
+                total_discounts: couponDiscount.toFixed(2),
             },
         };
+
+        if (couponCode && couponType) {
+            shopifyPayload.order.discount_codes = [
+                {
+                    code: couponCode,
+                    amount: couponDiscount.toFixed(2),
+                    type: couponType === 'percentage' ? 'percentage' : 'fixed_amount',
+                },
+            ];
+        }
 
         if (customer.name || customer.address) {
             shopifyPayload.order.shipping_address = {
@@ -484,8 +509,18 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             pincode: customer.zipcode || undefined,
             shipping_label: body.shippingLabel || undefined,
             shipping_price: shippingPrice || undefined,
+            coupon_code: couponCode || undefined,
+            discount_amount: couponDiscount || undefined,
+            original_total: pricing.originalTotal,
+            final_total: totalPrice,
             currency: currencyCode,
-            order_payload: body,
+            order_payload: {
+                ...body,
+                couponCode: couponCode || '',
+                discountAmount: couponDiscount,
+                originalTotal: pricing.originalTotal,
+                finalTotal: totalPrice,
+            },
         }, shopifyOrderId, shopifyOrderName);
 
         console.log("⏱ [COD Order] Total time:", Date.now() - start, "ms");
