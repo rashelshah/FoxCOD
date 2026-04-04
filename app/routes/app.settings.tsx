@@ -2107,6 +2107,35 @@ export default function SettingsPage() {
     const customColorPickerRef = useRef<HTMLDivElement>(null);
     const customColorPopoverRef = useRef<HTMLDivElement>(null);
 
+    // Draggable Presets Scroll Container State
+    const presetsScrollRef = useRef<HTMLDivElement>(null);
+    const isDraggingPresets = useRef(false);
+    const startXPresets = useRef(0);
+    const scrollLeftPresets = useRef(0);
+
+    const onMouseDownPresets = useCallback((e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
+        isDraggingPresets.current = true;
+        if (!presetsScrollRef.current) return;
+        presetsScrollRef.current.classList.add('dragging');
+        startXPresets.current = e.pageX - presetsScrollRef.current.offsetLeft;
+        scrollLeftPresets.current = presetsScrollRef.current.scrollLeft;
+    }, []);
+
+    const onMouseLeaveOrUpPresets = useCallback(() => {
+        isDraggingPresets.current = false;
+        if (presetsScrollRef.current) {
+            presetsScrollRef.current.classList.remove('dragging');
+        }
+    }, []);
+
+    const onMouseMovePresets = useCallback((e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
+        if (!isDraggingPresets.current || !presetsScrollRef.current) return;
+        e.preventDefault();
+        const x = e.pageX - presetsScrollRef.current.offsetLeft;
+        const walk = (x - startXPresets.current) * 2; // scroll-fast
+        presetsScrollRef.current.scrollLeft = scrollLeftPresets.current - walk;
+    }, []);
+
     useEffect(() => {
         if (!showCustomPickerPopover) return;
 
@@ -2502,6 +2531,30 @@ export default function SettingsPage() {
             {isMounted && (
                 <style dangerouslySetInnerHTML={{
                     __html: `
+                /* Presets scroll container scrollbar */
+                .presets-scroll-container {
+                    cursor: grab;
+                }
+                .presets-scroll-container.dragging {
+                    cursor: grabbing !important;
+                    scroll-snap-type: none !important;
+                    user-select: none;
+                }
+                .presets-scroll-container::-webkit-scrollbar {
+                    height: 8px;
+                }
+                .presets-scroll-container::-webkit-scrollbar-track {
+                    background: #f1f5f9;
+                    border-radius: 4px;
+                }
+                .presets-scroll-container::-webkit-scrollbar-thumb {
+                    background: #cbd5e1;
+                    border-radius: 4px;
+                }
+                .presets-scroll-container::-webkit-scrollbar-thumb:hover {
+                    background: #94a3b8;
+                }
+
                 /* Prevent horizontal scrolling globally */
                 html, body { overflow-x: clip !important; max-width: 100vw !important; }
                 
@@ -4357,14 +4410,19 @@ export default function SettingsPage() {
                                                         </div>
 
                                                         {/* Scrollable preset cards */}
-                                                        <div style={{
+                                                        <div 
+                                                            className="presets-scroll-container" 
+                                                            ref={presetsScrollRef}
+                                                            onMouseDown={onMouseDownPresets}
+                                                            onMouseLeave={onMouseLeaveOrUpPresets}
+                                                            onMouseUp={onMouseLeaveOrUpPresets}
+                                                            onMouseMove={onMouseMovePresets}
+                                                            style={{
                                                             display: 'flex',
                                                             gap: 10,
                                                             overflowX: 'auto',
-                                                            padding: '4px 2px 12px',
+                                                            padding: '4px 2px 16px',
                                                             scrollSnapType: 'x mandatory',
-                                                            msOverflowStyle: 'none',
-                                                            scrollbarWidth: 'none',
                                                         } as React.CSSProperties}>
                                                             {visiblePresets.map(preset => {
                                                                 const isSelected = selectedPreset === preset.key;
