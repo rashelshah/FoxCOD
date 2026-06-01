@@ -839,6 +839,26 @@
       .then(function(result) {
         var settings = result && result.settings ? result.settings : {};
 
+        if (settings.enabled === false) {
+          console.log('[COD Form] COD is disabled globally. Hiding block and restoring original checkout buttons.');
+          config.rootElement.style.setProperty('display', 'none', 'important');
+          config.rootElement.querySelectorAll('.cod-buy-btn.sticky-mobile').forEach(function(btn) {
+            btn.style.setProperty('display', 'none', 'important');
+          });
+          var productSection = config.rootElement.closest('section, product-info, .product, .product__info');
+          if (productSection) {
+            var selectors = ['.shopify-payment-button', '.shopify-payment-button__button', 'button[name="add"]', '.product-form__submit'];
+            selectors.forEach(function(selector) {
+              productSection.querySelectorAll(selector).forEach(function(element) {
+                element.style.removeProperty('display');
+                element.style.removeProperty('visibility');
+                element.style.removeProperty('opacity');
+              });
+            });
+          }
+          return;
+        }
+
         if (settings.button_text) config.buttonText = settings.button_text;
         var needsButtonStylesHydration = !config.hasLiquidButtonStyles ||
           !config.buttonStyles ||

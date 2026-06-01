@@ -706,6 +706,7 @@ export const ButtonIconSvg = ({ iconType, color = 'currentColor', size = 18 }: {
 
 // Memoized Preview Component
 const PreviewDisplay = memo(({
+    enabled,
     showProductImage, showPrice, buttonText, formTitle, formSubtitle,
     namePlaceholder, phonePlaceholder, addressPlaceholder,
     notesPlaceholder, submitButtonText,
@@ -1043,13 +1044,35 @@ const PreviewDisplay = memo(({
             </div>
             <div className="preview-content">
                 <div className="preview-phone">
-                    <div className={`preview-phone-screen ${activeTab === 'button' ? 'preview-compact' : ''}`}>
-                        <div className="preview-product" style={activeTab === 'button' ? { padding: '24px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' } : {
-                            padding: '16px',
-                            background: formStyles?.background || formStyles?.backgroundImage || formStyles?.backgroundColor || 'transparent',
-                            borderRadius: (formStyles?.borderRadius || borderRadius) + 'px',
-                            ...(modalStyle === 'glassmorphism' ? { backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.3)', boxShadow: formStyles?.shadow ? '0 8px 32px rgba(0,0,0,0.1)' : 'none' } : modalStyle === 'minimal' ? { border: '1px solid #e5e7eb', boxShadow: 'none' } : { boxShadow: formStyles?.shadow ? '0 10px 25px rgba(0,0,0,0.1)' : 'none' }),
-                        }}>
+                    <div className={`preview-phone-screen ${activeTab === 'button' && enabled ? 'preview-compact' : ''}`}>
+                        {!enabled ? (
+                            <div style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                height: '100%',
+                                minHeight: activeTab === 'button' ? '120px' : '380px',
+                                padding: '24px',
+                                textAlign: 'center',
+                                color: '#6b7280',
+                                background: '#f9fafb',
+                                borderRadius: '24px'
+                            }}>
+                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '12px' }}>
+                                    <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+                                    <line x1="12" y1="2" x2="12" y2="12"></line>
+                                </svg>
+                                <div style={{ fontWeight: 700, fontSize: '13px', color: '#374151', marginBottom: '4px' }}>COD Form is Disabled</div>
+                                <div style={{ fontSize: '11px', color: '#6b7280', lineHeight: 1.4 }}>Enable the "COD Form Status" toggle above to preview your button & checkout form.</div>
+                            </div>
+                        ) : (
+                            <div className="preview-product" style={activeTab === 'button' ? { padding: '24px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' } : {
+                                padding: '16px',
+                                background: formStyles?.background || formStyles?.backgroundImage || formStyles?.backgroundColor || 'transparent',
+                                borderRadius: (formStyles?.borderRadius || borderRadius) + 'px',
+                                ...(modalStyle === 'glassmorphism' ? { backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.3)', boxShadow: formStyles?.shadow ? '0 8px 32px rgba(0,0,0,0.1)' : 'none' } : modalStyle === 'minimal' ? { border: '1px solid #e5e7eb', boxShadow: 'none' } : { boxShadow: formStyles?.shadow ? '0 10px 25px rgba(0,0,0,0.1)' : 'none' }),
+                            }}>
                             {/* Product Info - horizontal layout matching storefront mobile */}
                             {activeTab !== 'button' && (
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingBottom: '12px', borderBottom: '1px solid rgba(0,0,0,0.08)', marginBottom: '8px', position: 'relative' }}>
@@ -1638,7 +1661,8 @@ const PreviewDisplay = memo(({
                                     </button>
                                 </div>
                             )}
-                        </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -5551,6 +5575,7 @@ export default function SettingsPage() {
                         {/* Preview Panel - Hidden on Shipping tab */}
                         <div className="builder-right" style={activeTab === 'shipping' ? { display: 'none' } : undefined}>
                             <PreviewDisplay
+                                enabled={enabled}
                                 showProductImage={showProductImage}
                                 showPrice={showPrice}
                                 buttonText={buttonText}

@@ -169,7 +169,8 @@
 
 {% comment %} Only render COD functionality if enabled in the app {% endcomment %}
 {% assign is_enabled = false %}
-{% if cod_enabled == 'true' or cod_enabled == true or shop.metafields.fox_cod.enabled.value == 'true' or shop.metafields.fox_cod.enabled.value == true %}
+{% assign cod_enabled_str = cod_enabled | downcase | strip %}
+{% if cod_enabled_str == 'true' or shop.metafields.fox_cod.enabled.value == 'true' or shop.metafields.fox_cod.enabled.value == true %}
   {% assign is_enabled = true %}
 {% endif %}
 
