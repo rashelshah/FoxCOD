@@ -2819,9 +2819,24 @@
             return;
         }
 
+        var isCityVisible = config.fields.some(function(f) { return f.id === 'city' && f.visible !== false; });
+        var isZipVisible = config.fields.some(function(f) { return (f.id === 'zip' || f.id === 'zipcode') && f.visible !== false; });
+        var isSideBySide = (field.id === 'city' || field.id === 'zip' || field.id === 'zipcode') && isCityVisible && isZipVisible;
+
         var wrapper = document.createElement('div');
         wrapper.className = 'cod-form-field';
-        wrapper.style.marginBottom = '6px';
+        if (isSideBySide) {
+            wrapper.style.display = 'inline-block';
+            wrapper.style.width = 'calc(50% - 6px)';
+            wrapper.style.verticalAlign = 'top';
+            wrapper.style.marginRight = field.id === 'city' ? '12px' : '0px';
+            wrapper.style.boxSizing = 'border-box';
+            wrapper.style.marginBottom = '6px';
+        } else {
+            wrapper.style.marginBottom = '6px';
+            wrapper.style.display = 'block';
+            wrapper.style.width = '100%';
+        }
 
         var label = document.createElement('label');
         label.style.display = 'block';

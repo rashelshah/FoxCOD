@@ -1568,8 +1568,19 @@ const PreviewDisplay = memo(({
                                         }
 
                                         // Regular form fields
+                                        const isCityVisible = visibleFields.some((f: FormField) => f.id === 'city');
+                                        const isZipVisible = visibleFields.some((f: FormField) => f.id === 'zip' || f.id === 'zipcode');
+                                        const isSideBySide = (field.id === 'city' || field.id === 'zip' || field.id === 'zipcode') && isCityVisible && isZipVisible;
+
                                         return (
-                                            <div key={field.id} style={{ marginBottom: '8px' }}>
+                                            <div key={field.id} style={{
+                                                marginBottom: '8px',
+                                                display: isSideBySide ? 'inline-block' : 'block',
+                                                width: isSideBySide ? 'calc(50% - 6px)' : '100%',
+                                                verticalAlign: 'top',
+                                                marginRight: isSideBySide && field.id === 'city' ? '12px' : '0px',
+                                                boxSizing: 'border-box'
+                                            }}>
                                                 <label style={getLabelStyle() as any}>
                                                     {field.label} {field.required && <span style={{ color: '#ef4444' }}>*</span>}
                                                 </label>

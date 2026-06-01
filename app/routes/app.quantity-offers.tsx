@@ -1765,8 +1765,19 @@ export default function QuantityOffersPage() {
                                                             const icon = (field.isCustom && field.iconType && fieldIcons[field.iconType]) ? fieldIcons[field.iconType] : (fieldIcons[field.id] || fieldIcons.text);
                                                             const isTextarea = field.type === 'textarea';
 
+                                                            const isCityVisible = (mergedFields as any[]).some((f: any) => f.id === 'city' && f.visible);
+                                                            const isZipVisible = (mergedFields as any[]).some((f: any) => (f.id === 'zip' || f.id === 'zipcode') && f.visible);
+                                                            const isSideBySide = (field.id === 'city' || field.id === 'zip' || field.id === 'zipcode') && isCityVisible && isZipVisible;
+
                                                             return (
-                                                                <div key={field.id} style={{ marginBottom: '10px' }}>
+                                                                <div key={field.id} style={{
+                                                                    marginBottom: '10px',
+                                                                    display: isSideBySide ? 'inline-block' : 'block',
+                                                                    width: isSideBySide ? 'calc(50% - 6px)' : '100%',
+                                                                    verticalAlign: 'top',
+                                                                    marginRight: isSideBySide && field.id === 'city' ? '12px' : '0px',
+                                                                    boxSizing: 'border-box'
+                                                                }}>
                                                                     <label style={{
                                                                         display: 'block',
                                                                         fontSize: (styles.labelFontSize ?? textSize) + 'px',
