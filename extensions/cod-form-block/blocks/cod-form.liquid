@@ -440,6 +440,21 @@
   <div class="cod-form-headers" style="text-align: center; margin-bottom: 16px; font-family: '{{ cod_styles_parsed.fontFamily | default: 'Inter' }}', sans-serif;">
       {% if cod_form_title != blank %}<h2 style="margin: 0; font-size: 20px; font-weight: 600; color: {{ cod_styles_parsed.textColor | default: '#111' }}; font-family: inherit;">{{ cod_form_title }}</h2>{% endif %}
       {% if cod_form_subtitle != blank %}<p style="margin: 6px 0 0; color: #6b7280; font-size: 14px; line-height: 1.4; font-family: inherit;">{{ cod_form_subtitle }}</p>{% endif %}
+      
+      <div class="cod-trust-badge-band" style="display: flex; align-items: center; justify-content: space-around; flex-wrap: nowrap; background-color: #EBF8EE; border-radius: 8px; padding: 6px 4px; margin: 12px 0 16px 0; gap: 3px; font-family: inherit; font-size: clamp(8.2px, 2.2vw, 11px); font-weight: 600; color: #000000; border: 1px solid #d1fae5; white-space: nowrap; overflow: hidden; box-sizing: border-box; letter-spacing: -0.3px;">
+        <div style="display: flex; align-items: center; gap: 2px; white-space: nowrap;">
+          <svg width="10.5" height="10.5" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 11 2 2 4-4"></path></svg>
+          <span style="color: #000000;">100% Secure Order</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 2px; white-space: nowrap;">
+          <svg width="10.5" height="10.5" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+          <span style="color: #000000;">Instant Confirmation</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 2px; white-space: nowrap;">
+          <svg width="10.5" height="10.5" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+          <span style="color: #000000;">Free Shipping</span>
+        </div>
+      </div>
   </div>
 
   {% comment %} COD Form - Dynamic Content Rendered by JS {% endcomment %}

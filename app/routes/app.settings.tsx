@@ -1141,6 +1141,39 @@ const PreviewDisplay = memo(({
                                     }}>
                                         {formSubtitle || 'Fill in your details to place a COD order'}
                                     </div>
+                                    <div className="cod-trust-badge-band" style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        flexWrap: 'nowrap',
+                                        backgroundColor: '#EBF8EE',
+                                        borderRadius: '8px',
+                                        padding: '6px 8px',
+                                        margin: '12px 0 16px 0',
+                                        gap: '4px',
+                                        fontFamily: formStyles?.fontFamily || 'Inter',
+                                        fontSize: 'clamp(5.8px, 1.4vw, 7.8px)',
+                                        fontWeight: 600,
+                                        color: '#000000',
+                                        border: '1px solid #d1fae5',
+                                        whiteSpace: 'nowrap',
+                                        overflow: 'hidden',
+                                        boxSizing: 'border-box',
+                                        letterSpacing: '-0.1px'
+                                    }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '2px', whiteSpace: 'nowrap' }}>
+                                            <svg width="8.5" height="8.5" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 11 2 2 4-4"></path></svg>
+                                            <span style={{ color: '#000000', marginLeft: '2px' }}>100% Secure Order</span>
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '2px', whiteSpace: 'nowrap' }}>
+                                            <svg width="8.5" height="8.5" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                                            <span style={{ color: '#000000', marginLeft: '2px' }}>Instant Confirmation</span>
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '2px', whiteSpace: 'nowrap' }}>
+                                            <svg width="8.5" height="8.5" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+                                            <span style={{ color: '#000000', marginLeft: '2px' }}>Free Shipping</span>
+                                        </div>
+                                    </div>
 
                                     {/* Dynamic Fields based on visibility and drag-drop order */}
                                     {visibleFields.map((field: FormField) => {
@@ -1321,57 +1354,51 @@ const PreviewDisplay = memo(({
                                             const showPartial = partialCodEnabled;
                                             const remainingCod = Math.max(0, total - (partialCodAdvanceAmount || 0));
                                             
-                                            // Simulated prepaid discount for visual purposes
-                                            const fakePrepaidDiscount = total > 0 ? Math.max(1, Math.round(total * 0.05)) : 40;
-                                            const fakePrepaidTotal = Math.max(0, total - fakePrepaidDiscount);
-                                            
                                             return (
                                                 <div key={field.id} style={{ marginBottom: '16px' }}>
                                                     {/* Header */}
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                                                        <div style={{ fontSize: '13px', fontWeight: 700, color: '#1f2937' }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                                        <div style={{ fontSize: '11px', fontWeight: 700, color: '#1f2937' }}>
                                                             Choose Payment Option
                                                         </div>
-                                                        <div style={{ background: '#dcfce7', color: '#166534', fontSize: '10px', fontWeight: 600, padding: '4px 8px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                        <div style={{ background: '#dcfce7', color: '#166534', fontSize: '8.5px', fontWeight: 600, padding: '3px 6px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '3px' }}>
                                                             🔥 Save more on prepaid!
                                                         </div>
                                                     </div>
 
-                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                                         {/* 1. Full Prepaid (Visual Only) */}
                                                         {showFullPrepaid && (
                                                             <label style={{
-                                                                display: 'flex', flexDirection: 'column', background: '#f0fdf4', borderRadius: '12px',
+                                                                display: 'flex', flexDirection: 'column', background: '#f0fdf4', borderRadius: '10px',
                                                                 border: '2px solid #22c55e', cursor: 'pointer', position: 'relative', overflow: 'visible',
-                                                                padding: '16px 12px 12px 12px', opacity: 1
+                                                                padding: '18px 10px 8px 10px', opacity: 1
                                                             }}>
                                                                 {/* Most Popular Badge */}
                                                                 <div style={{
-                                                                    position: 'absolute', top: '-10px', left: '16px', background: '#22c55e', color: 'white',
-                                                                    fontSize: '9px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', letterSpacing: '0.05em',
-                                                                    display: 'flex', alignItems: 'center', gap: '4px', textTransform: 'uppercase'
+                                                                    position: 'absolute', top: '-10px', left: '12px', background: '#22c55e', color: 'white',
+                                                                    fontSize: '7.5px', fontWeight: 700, padding: '2px 5px', borderRadius: '4px', letterSpacing: '0.05em',
+                                                                    display: 'flex', alignItems: 'center', gap: '3px', textTransform: 'uppercase'
                                                                 }}>
                                                                     ★ MOST POPULAR
                                                                 </div>
 
-                                                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                                     {/* Icon */}
-                                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '32px', height: '32px', borderRadius: '8px', color: '#16a34a', backgroundColor: '#dcfce7' }}>
-                                                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4" /><path d="M4 6v12c0 1.1.9 2 2 2h14v-4" /><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z" /></svg>
+                                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '24px', height: '24px', borderRadius: '6px', color: '#16a34a', backgroundColor: '#dcfce7' }}>
+                                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4" /><path d="M4 6v12c0 1.1.9 2 2 2h14v-4" /><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z" /></svg>
                                                                     </div>
                                                                     
                                                                     {/* Center text */}
-                                                                    <div style={{ flex: 1, minWidth: 0, paddingTop: '2px' }}>
-                                                                        <div style={{ fontWeight: 700, fontSize: '14px', color: '#166534', lineHeight: 1.2 }}>Full Prepaid</div>
-                                                                        <div style={{ color: '#4ade80', fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>Pay now & get fastest delivery</div>
+                                                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                                                        <div style={{ fontWeight: 700, fontSize: '11px', color: '#166534', lineHeight: 1.1 }}>Full Prepaid</div>
+                                                                        <div style={{ color: '#4ade80', fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>Pay now & get fastest delivery</div>
                                                                     </div>
                                                                     
                                                                     {/* Right side pricing */}
-                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
-                                                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
-                                                                            <span style={{ fontWeight: 800, fontSize: '15px', color: '#166534' }}>{fmtCurrency(total)}</span>
-                                                                        </div>
-                                                                        <input type="radio" name="preview-payment" checked readOnly style={{ width: '18px', height: '18px', accentColor: '#22c55e', margin: 0, cursor: 'pointer' }} />
+                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                                                                        <span style={{ fontWeight: 800, fontSize: '12px', color: '#166534' }}>{fmtCurrency(total)}</span>
+                                                                        <input type="radio" name="preview-payment" checked readOnly style={{ width: '14px', height: '14px', accentColor: '#22c55e', margin: 0, cursor: 'pointer' }} />
                                                                     </div>
                                                                 </div>
                                                             </label>
@@ -1380,67 +1407,63 @@ const PreviewDisplay = memo(({
                                                         {/* 2. Partial Payment */}
                                                         {showPartial && (
                                                             <label style={{
-                                                                display: 'flex', flexDirection: 'column', background: '#eff6ff', borderRadius: '12px',
+                                                                display: 'flex', flexDirection: 'column', background: '#eff6ff', borderRadius: '10px',
                                                                 border: '2px solid #bfdbfe', cursor: 'default', position: 'relative'
                                                             }}>
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px' }}>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px' }}>
                                                                     {/* Icon */}
-                                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '32px', height: '32px', borderRadius: '8px', color: '#2563eb', backgroundColor: '#dbeafe' }}>
-                                                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>
+                                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '24px', height: '24px', borderRadius: '6px', color: '#2563eb', backgroundColor: '#dbeafe' }}>
+                                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>
                                                                     </div>
                                                                     
                                                                     {/* Center text */}
                                                                     <div style={{ flex: 1, minWidth: 0 }}>
-                                                                        <div style={{ fontWeight: 700, fontSize: '14px', color: '#1e3a8a', lineHeight: 1.2, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                                        <div style={{ fontWeight: 700, fontSize: '11px', color: '#1e3a8a', lineHeight: 1.1, display: 'flex', alignItems: 'center', gap: '3px' }}>
                                                                             Partial Payment
-                                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="#2563eb" stroke="#eff6ff" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/></svg>
+                                                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="#2563eb" stroke="#eff6ff" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/></svg>
                                                                         </div>
-                                                                        <div style={{ color: '#60a5fa', fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>Pay {fmtCurrency(partialCodAdvanceAmount || 0)} now • Rest on delivery</div>
+                                                                        <div style={{ color: '#60a5fa', fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>Pay {fmtCurrency(partialCodAdvanceAmount || 0)} now • Rest on delivery</div>
                                                                     </div>
                                                                     
                                                                     {/* Right side pricing */}
-                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
-                                                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
-                                                                            <span style={{ fontWeight: 800, fontSize: '15px', color: '#1e3a8a' }}>{fmtCurrency(partialCodAdvanceAmount || 0)}</span>
-                                                                        </div>
-                                                                        <input type="radio" name="preview-payment" disabled style={{ width: '18px', height: '18px', margin: 0 }} />
+                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                                                                        <span style={{ fontWeight: 800, fontSize: '12px', color: '#1e3a8a' }}>{fmtCurrency(partialCodAdvanceAmount || 0)}</span>
+                                                                        <input type="radio" name="preview-payment" disabled style={{ width: '14px', height: '14px', margin: 0 }} />
                                                                     </div>
                                                                 </div>
                                                                 {/* Info Bar */}
-                                                                <div style={{ background: '#dbeafe', padding: '8px 12px', borderBottomLeftRadius: '10px', borderBottomRightRadius: '10px', fontSize: '10px', color: '#1e40af', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500 }}>
-                                                                    🛡️ Secure your order • Priority dispatch • Avoid fake cancellations
+                                                                <div style={{ background: '#dbeafe', padding: '5px 8px', borderBottomLeftRadius: '8px', borderBottomRightRadius: '8px', fontSize: '8.5px', color: '#1e40af', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500 }}>
+                                                                    🛡️ Secure your order • Priority dispatch
                                                                 </div>
                                                             </label>
                                                         )}
 
                                                         {/* 3. Cash on Delivery */}
                                                         <label style={{
-                                                            display: 'flex', flexDirection: 'column', background: '#fff7ed', borderRadius: '12px',
+                                                            display: 'flex', flexDirection: 'column', background: '#fff7ed', borderRadius: '10px',
                                                             border: '2px solid #fed7aa', cursor: 'default', position: 'relative'
                                                         }}>
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px' }}>
                                                                 {/* Icon */}
-                                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '32px', height: '32px', borderRadius: '8px', color: '#ea580c', backgroundColor: '#ffedd5' }}>
-                                                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1" ry="1" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
+                                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '24px', height: '24px', borderRadius: '6px', color: '#ea580c', backgroundColor: '#ffedd5' }}>
+                                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1" ry="1" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
                                                                 </div>
                                                                 
                                                                 {/* Center text */}
                                                                 <div style={{ flex: 1, minWidth: 0 }}>
-                                                                    <div style={{ fontWeight: 700, fontSize: '14px', color: '#9a3412', lineHeight: 1.2 }}>Cash on Delivery</div>
-                                                                    <div style={{ color: '#fb923c', fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>Pay when you receive</div>
+                                                                    <div style={{ fontWeight: 700, fontSize: '11px', color: '#9a3412', lineHeight: 1.1 }}>Cash on Delivery</div>
+                                                                    <div style={{ color: '#fb923c', fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>Pay when you receive</div>
                                                                 </div>
                                                                 
                                                                 {/* Right side pricing */}
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
-                                                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
-                                                                        <span style={{ fontWeight: 800, fontSize: '15px', color: '#9a3412' }}>{fmtCurrency(total)}</span>
-                                                                    </div>
-                                                                    <input type="radio" name="preview-payment" disabled style={{ width: '18px', height: '18px', margin: 0 }} />
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                                                                    <span style={{ fontWeight: 800, fontSize: '12px', color: '#9a3412' }}>{fmtCurrency(total)}</span>
+                                                                    <input type="radio" name="preview-payment" disabled style={{ width: '14px', height: '14px', margin: 0 }} />
                                                                 </div>
                                                             </div>
                                                             {/* Info Bar */}
-                                                            <div style={{ background: '#ffedd5', padding: '8px 12px', borderBottomLeftRadius: '10px', borderBottomRightRadius: '10px', fontSize: '10px', color: '#9a3412', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500 }}>
-                                                                <span style={{ marginRight: '4px' }}>ℹ️</span> Higher return risk • Slightly slower processing
+                                                            <div style={{ background: '#ffedd5', padding: '5px 8px', borderBottomLeftRadius: '8px', borderBottomRightRadius: '8px', fontSize: '8.5px', color: '#9a3412', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500 }}>
+                                                                ⚠️ Higher return risk • Slower processing
                                                             </div>
                                                         </label>
                                                     </div>
@@ -4516,10 +4539,9 @@ export default function SettingsPage() {
                                     <AccordionSection id="field-styling" tab="form" title="Field Styling" helperText="Changes the styling of the form fields" expandedSection={expandedSection} toggleSection={toggleSection}>
                                         {/* ── Style Preset Gallery ── */}
                                         {(() => {
-                                            // Preset data — keys, names, colors, categories (UI only, no logic change)
                                             const presetList = [
                                                 { key: 'custom', name: 'Custom', bg: '#f9fafb', fieldBg: '#ffffff', btnColor: '#6b7280', category: 'all' },
-                                                { key: 'default', name: 'Default', bg: '#ECFDF5', fieldBg: '#FFFFFF', btnColor: '#16A34A', category: 'green' },
+                                                { key: 'default', name: 'Default', bg: '#FFFFFF', fieldBg: '#FFFFFF', btnColor: '#333333', category: 'clean' },
                                                 { key: 'modern_slate', name: 'Modern Coral', bg: '#fff7ed', fieldBg: '#fff7ed', btnColor: '#ea580c', category: 'clean' },
                                                 { key: 'dark_mode', name: 'Dark Mode', bg: '#1f2a3a', fieldBg: '#0f172a', btnColor: '#6366f1', category: 'dark' },
                                                 { key: 'eastern_gold', name: 'Eastern Gold', bg: '#fffbeb', fieldBg: '#fef9c3', btnColor: '#b45309', category: 'clean' },
@@ -4535,7 +4557,7 @@ export default function SettingsPage() {
                                             ];
 
                                             const presetMap: Record<string, any> = {
-                                                default: { styles: { themeKey: 'default', textColor: '#333333', textSize: 14, fontStyle: 'normal' as const, borderColor: '#065F46', borderWidth: 1, background: 'linear-gradient(135deg, #D1FAE5 0%, #ECFDF5 40%, #FFFFFF 100%)', backgroundColor: '#ffffff', labelAlignment: 'left' as const, iconColor: '#6b7280', iconBackground: '#F0FDF4', borderRadius: 5, shadow: true, fieldBackgroundColor: '#FFFFFF', labelColor: '#065F46', labelFontSize: 14, priceColor: '#065F46' }, buttonColor: '#16A34A' },
+                                                default: { styles: { themeKey: 'default', textColor: '#333333', textSize: 14, fontStyle: 'normal' as const, borderColor: '#333333', borderWidth: 1, background: '#ffffff', backgroundColor: '#ffffff', labelAlignment: 'left' as const, iconColor: '#333333', iconBackground: '#ffffff', borderRadius: 5, shadow: true, fieldBackgroundColor: '#FFFFFF', labelColor: '#333333', labelFontSize: 14, priceColor: '#333333' }, buttonColor: '#000000' },
                                                 modern_slate: { styles: { themeKey: 'modern_slate', textColor: '#1e293b', textSize: 14, fontStyle: 'normal' as const, borderColor: '#f97316', borderWidth: 2, backgroundColor: '#fff7ed', labelAlignment: 'left' as const, iconColor: '#ea580c', iconBackground: '#fed7aa', borderRadius: 16, shadow: true, fieldBackgroundColor: '#fff7ed', labelColor: '#9a3412', labelFontSize: 14, priceColor: '#ea580c' }, buttonColor: '#ea580c' },
                                                 dark_mode: { styles: { themeKey: 'dark_mode', textColor: '#f8fafc', textSize: 14, fontStyle: 'normal' as const, borderColor: '#475569', borderWidth: 1, backgroundColor: '#1f2a3a', labelAlignment: 'left' as const, iconColor: '#cbd5f5', iconBackground: '#1f2a3a', borderRadius: 12, shadow: true, fieldBackgroundColor: '#0f172a', labelColor: '#f8fafc', labelFontSize: 14, priceColor: '#f8fafc' }, buttonColor: '#6366f1' },
                                                 eastern_gold: { styles: { themeKey: 'eastern_gold', textColor: '#78350f', textSize: 14, fontStyle: 'normal' as const, borderColor: '#d4a574', borderWidth: 1, backgroundColor: '#fffbeb', labelAlignment: 'left' as const, iconColor: '#b45309', iconBackground: '#fef3c7', borderRadius: 10, shadow: true, fieldBackgroundColor: '#fef9c3', labelColor: '#713f12', labelFontSize: 14, priceColor: '#b45309' }, buttonColor: '#b45309' },

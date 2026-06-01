@@ -720,7 +720,7 @@ export default function OrdersPage() {
                             variant={!statusFilter ? 'primary' : undefined}
                             onClick={() => navigate('/app/orders')}
                         >
-                            All Orders ({totalCount})
+                            {`All Orders (${totalCount})`}
                         </Button>
                         {ORDER_STATUSES.map((status) => (
                             <Button

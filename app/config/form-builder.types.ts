@@ -178,11 +178,11 @@ export const DEFAULT_STYLES: FormStyles = {
     fontStyle: 'normal',
     borderColor: '#E5E7EB',
     borderWidth: 1,
-    background: 'linear-gradient(135deg, #E6F4EA 0%, #FFFFFF 100%)',
+    background: '#ffffff',
     backgroundColor: '#ffffff',
     labelAlignment: 'left',
-    iconColor: '#6b7280',
-    iconBackground: '#F0FDF4',
+    iconColor: '#000000',
+    iconBackground: '#ffffff',
     borderRadius: 16,
     shadow: true,
     shadowIntensity: 35,
@@ -190,7 +190,7 @@ export const DEFAULT_STYLES: FormStyles = {
     fieldBackgroundColor: '#FFFFFF',
     labelColor: '#065F46',
     labelFontSize: 14,
-    priceColor: '#065F46',
+    priceColor: '#000000',
     fontFamily: 'Inter',
 };
 
