@@ -9,17 +9,39 @@ import { useLoaderData, Link, useNavigate } from "react-router";
 import { Button, InlineStack } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import { getFormSettings, saveShop } from "../config/supabase.server";
-import { ORDER_STATUSES } from "../config/constants";
-
-// ─── Shopify Orders fetch via SDK RestClient with pagination ────────────
-// Uses getRestClient(shop) which gets session from unauthenticated.admin(shop)
-// — guarantees a fresh token via SDK auto-refresh.
 import { getRestClient } from "../shopify/rest-client.server";
 
-async function fetchShopifyOrderStats(restClient: any) {
+const FOX_COD_APP_CLIENT_ID = "7c386161d2e35b3ec0a4fcbe0a8f4045";
+const FOX_COD_BLOCK_HANDLE = "cod-form";
+
+type ShopifyOrder = {
+  created_at: string;
+  total_price: string;
+  financial_status: string;
+  cancelled_at: string | null;
+};
+
+type ShopifyOrderStatsResponse = {
+  body?: { orders?: ShopifyOrder[] };
+  headers?: {
+    get?: (name: string) => string | null;
+    link?: string;
+  };
+};
+
+type ShopifyRestClient = {
+  get: (args: { path: string; query: Record<string, string> }) => Promise<ShopifyOrderStatsResponse>;
+};
+
+function getCodThemeEditorUrl(shop: string) {
+  const appBlockId = `${encodeURIComponent(process.env.SHOPIFY_API_KEY || FOX_COD_APP_CLIENT_ID)}/${encodeURIComponent(FOX_COD_BLOCK_HANDLE)}`;
+
+  return `https://${shop}/admin/themes/current/editor?template=product&addAppBlockId=${appBlockId}&target=mainSection`;
+}
+
+async function fetchShopifyOrderStats(restClient: ShopifyRestClient) {
   const fields = "id,created_at,total_price,financial_status,cancelled_at";
 
-  type ShopifyOrder = { created_at: string; total_price: string; financial_status: string; cancelled_at: string | null };
   const allOrders: ShopifyOrder[] = [];
 
   // First page via SDK RestClient
@@ -84,7 +106,7 @@ async function fetchShopifyOrderStats(restClient: any) {
     weekOrders,
     pendingOrders,
     todayRevenue: 0,
-    recentOrders: [] as any[],
+    recentOrders: [] as unknown[],
     ordersByStatus: {} as Record<string, number>,
   };
 }
@@ -127,7 +149,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     pendingOrders: 0,
     totalRevenue: 0,
     todayRevenue: 0,
-    recentOrders: [] as any[],
+    recentOrders: [] as unknown[],
     todayOrders: 0,
     weekOrders: 0,
     ordersByStatus: {} as Record<string, number>,
@@ -142,6 +164,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   return {
     shop: shopDomain,
+    themeEditorUrl: getCodThemeEditorUrl(shopDomain),
     enabled: settings?.enabled || false,
     settings,
     stats,
@@ -153,7 +176,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
  * Dashboard Component - Premium Design
  */
 export default function Index() {
-  const { shop, enabled, stats, shopCurrency } = useLoaderData<typeof loader>();
+  const { themeEditorUrl, enabled, stats, shopCurrency } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
 
   // Format currency
@@ -164,21 +187,6 @@ export default function Index() {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount);
-  };
-
-  // Format date
-  const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString("en-IN", {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
-  // Get status info
-  const getStatusInfo = (status: string) => {
-    return ORDER_STATUSES.find(s => s.value === status) || { label: 'Pending', color: '#f59e0b' };
   };
 
   // Calculate setup progress
@@ -758,7 +766,7 @@ export default function Index() {
               </Link>
               <button
                 className="welcome-btn welcome-btn-secondary"
-                onClick={() => window.open(`https://${shop}/admin/themes/current/editor?context=apps`, '_blank')}
+                onClick={() => window.open(themeEditorUrl, '_blank', 'noopener,noreferrer')}
               >
                 Add to Theme
               </button>
