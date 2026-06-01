@@ -72,6 +72,7 @@ export interface FormStyles {
     labelFontSize: number;         // Separate control for labels
     priceColor: string;            // Price display color (product price, total price, offer prices)
     fontFamily: 'Inter' | 'Poppins' | 'DM Sans' | 'Outfit' | 'Playfair Display' | 'Cormorant Garamond' | 'Abril Fatface' | 'Syne' | 'Space Grotesk';  // Font family for form title and description
+    fullPrepaidEnabled?: boolean; // Added for static full prepaid button
 }
 
 /**

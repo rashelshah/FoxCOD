@@ -4052,223 +4052,136 @@ function darkenColor(hex, percent) {
   }
 
   /**
-   * Render Payment Method Selection (Full COD vs Partial COD)
+   * Render Payment Method Selection (Full Prepaid, Partial COD, Full COD)
    */
   function renderPaymentMethodOptions(form, config) {
       var container = document.createElement('div');
       container.className = 'cod-payment-method-options';
       container.style.marginBottom = '20px';
-      container.style.padding = '16px';
 
-      // Neutral / theme-aware background – no fixed blue gradient
-      var styles = config.styles || {};
-      var primaryTheme = config.accentColor;
-      var isPlainWhiteBg = !styles.backgroundColor || styles.backgroundColor === '#ffffff' || styles.backgroundColor === '#fff';
-      var baseBg = isPlainWhiteBg ? '#f9fafb' : (hexToRgba(primaryTheme, 0.03) || '#f9fafb');
-      var borderColor = hexToRgba(primaryTheme, 0.35) || '#e5e7eb';
-      // Field background from form styling (used when a payment option is selected)
-      var fieldBg = styles.fieldBackgroundColor || '#f3f4f6';
-      // Icon colors – match the same variables used by form field icons
-      var iconColor = styles.iconColor || '#6b7280';
-      var iconBackground = styles.iconBackground || 'transparent';
-
-      container.style.background = baseBg;
-      container.style.borderRadius = '12px';
-      container.style.border = '1px solid ' + borderColor;
-
-      var title = document.createElement('div');
-      title.textContent = 'Payment Method';
-      title.style.fontWeight = '600';
-      title.style.marginBottom = '12px';
-      title.style.color = '#1f2937';
-      title.style.fontSize = '14px';
-      container.appendChild(title);
-
-      var optionsWrapper = document.createElement('div');
-      optionsWrapper.style.display = 'flex';
-      optionsWrapper.style.flexDirection = 'column';
-      optionsWrapper.style.gap = '10px';
-
-      // Calculate order total for display — read from the order summary total if available
+      // Calculate order total
       var orderTotal = config.productPrice || 0;
       var summaryTotalEl = form.querySelector('#cod-summary-total');
       if (summaryTotalEl) {
           var totalText = summaryTotalEl.textContent;
           var parsedTotal = parseFloat(totalText.replace(/[^0-9.]/g, '')) || 0;
-          if (parsedTotal > 0) {
-              orderTotal = parsedTotal;
-          }
+          if (parsedTotal > 0) orderTotal = parsedTotal;
       }
-      var remainingAmount = orderTotal - config.partialCodAdvance;
-      if (remainingAmount < 0) remainingAmount = 0;
+      var partialAdvance = config.partialCodAdvance || 0;
+      var remainingAmount = Math.max(0, orderTotal - partialAdvance);
 
-      // SVG icons for each payment mode — match form field icon style
-      var paymentIcons = {
-          full_cod: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>',
-          partial_cod: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/></svg>'
-      };
+      var showFullPrepaid = config.styles && config.styles.fullPrepaidEnabled;
+      var showPartial = config.partialCodEnabled;
 
-      var paymentOptions = [
-          {
-              id: 'full_cod',
-              label: 'Cash On Delivery',
-              description: 'Pay ' + formatMoney(orderTotal) + ' on delivery',
-              amount: orderTotal,
-              checked: false
-          },
-          {
-              id: 'partial_cod',
-              label: 'Partial COD',
-              description: 'Pay ' + formatMoney(config.partialCodAdvance) + ' now, ' + formatMoney(remainingAmount) + ' on delivery',
-              amount: config.partialCodAdvance,
-              checked: false
-          }
-      ];
+      var html = '<div style="margin-bottom: 16px;">';
+      html += '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">';
+      html += '<div style="font-size: 13px; font-weight: 700; color: #1f2937;">Choose Payment Option</div>';
+      html += '<div style="background: #dcfce7; color: #166534; font-size: 10px; font-weight: 600; padding: 4px 8px; border-radius: 12px; display: flex; align-items: center; gap: 4px;">🔥 Save more on prepaid!</div>';
+      html += '</div>';
+
+      html += '<div style="display: flex; flex-direction: column; gap: 10px;">';
+
+      if (showFullPrepaid) {
+          html += '<label class="pm-row pm-prepaid" style="display: flex; flex-direction: column; background: #f0fdf4; border-radius: 12px; border: 2px solid #22c55e; cursor: pointer; position: relative; overflow: visible; padding: 16px 12px 12px 12px; opacity: 1;">';
+          html += '<input type="radio" name="payment_method" value="full_prepaid" checked style="position:absolute; opacity:0; pointer-events:none;">';
+          html += '<div style="position: absolute; top: -10px; left: 16px; background: #22c55e; color: white; font-size: 9px; font-weight: 700; padding: 3px 8px; border-radius: 6px; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px; text-transform: uppercase;">★ MOST POPULAR</div>';
+          html += '<div style="display: flex; align-items: flex-start; gap: 12px;">';
+          html += '<div style="display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px; color: #16a34a; background-color: #dcfce7;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4" /><path d="M4 6v12c0 1.1.9 2 2 2h14v-4" /><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z" /></svg></div>';
+          html += '<div style="flex: 1; min-width: 0; padding-top: 2px;">';
+          html += '<div style="font-weight: 700; font-size: 14px; color: #166534; line-height: 1.2;">Full Prepaid</div>';
+          html += '<div style="color: #4ade80; font-size: 11px; margin-top: 4px; line-height: 1.3;">Pay now & get fastest delivery</div>';
+          html += '</div>';
+          html += '<div style="display: flex; align-items: center; gap: 12px; flex-shrink: 0;">';
+          html += '<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">';
+          html += '<span class="pm-amt-prepaid" style="font-weight: 800; font-size: 15px; color: #166534;">' + formatMoney(orderTotal) + '</span>';
+          html += '</div>';
+          html += '<input type="radio" name="payment_method_visual" class="pm-pill" checked style="width: 18px; height: 18px; accent-color: #22c55e; margin: 0; pointer-events: none;">';
+          html += '</div></div></label>';
+      }
+
+      if (showPartial) {
+          html += '<label class="pm-row pm-partial" style="display: flex; flex-direction: column; background: #eff6ff; border-radius: 12px; border: 2px solid ' + (showFullPrepaid ? '#bfdbfe' : '#2563eb') + '; cursor: pointer; position: relative;">';
+          html += '<input type="radio" name="payment_method" value="partial_cod" ' + (!showFullPrepaid ? 'checked' : '') + ' style="position:absolute; opacity:0; pointer-events:none;">';
+          html += '<div style="display: flex; align-items: center; gap: 12px; padding: 12px;">';
+          html += '<div style="display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px; color: #2563eb; background-color: #dbeafe;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg></div>';
+          html += '<div style="flex: 1; min-width: 0;">';
+          html += '<div style="font-weight: 700; font-size: 14px; color: #1e3a8a; line-height: 1.2; display: flex; align-items: center; gap: 4px;">Partial Payment <svg width="14" height="14" viewBox="0 0 24 24" fill="#2563eb" stroke="#eff6ff" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/></svg></div>';
+          html += '<div class="pm-desc-partial" style="color: #60a5fa; font-size: 11px; margin-top: 4px; line-height: 1.3;">Pay ' + formatMoney(partialAdvance) + ' now • Rest on delivery</div>';
+          html += '</div>';
+          html += '<div style="display: flex; align-items: center; gap: 12px; flex-shrink: 0;">';
+          html += '<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">';
+          html += '<span class="pm-amt-partial" style="font-weight: 800; font-size: 15px; color: #1e3a8a;">' + formatMoney(partialAdvance) + '</span>';
+          html += '</div>';
+          html += '<input type="radio" name="payment_method_visual" class="pm-pill" ' + (!showFullPrepaid ? 'checked' : '') + ' style="width: 18px; height: 18px; accent-color: #2563eb; margin: 0; pointer-events: none;">';
+          html += '</div></div>';
+          html += '<div style="background: #dbeafe; padding: 8px 12px; border-bottom-left-radius: 10px; border-bottom-right-radius: 10px; font-size: 10px; color: #1e40af; display: flex; justify-content: center; align-items: center; font-weight: 500;">🛡️ Secure your order • Priority dispatch • Avoid fake cancellations</div>';
+          html += '</label>';
+      }
+
+      html += '<label class="pm-row pm-cod" style="display: flex; flex-direction: column; background: #fff7ed; border-radius: 12px; border: 2px solid ' + (!showFullPrepaid && !showPartial ? '#ea580c' : '#fed7aa') + '; cursor: pointer; position: relative;">';
+      html += '<input type="radio" name="payment_method" value="full_cod" ' + (!showFullPrepaid && !showPartial ? 'checked' : '') + ' style="position:absolute; opacity:0; pointer-events:none;">';
+      html += '<div style="display: flex; align-items: center; gap: 12px; padding: 12px;">';
+      html += '<div style="display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px; color: #ea580c; background-color: #ffedd5;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="1" ry="1" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg></div>';
+      html += '<div style="flex: 1; min-width: 0;">';
+      html += '<div style="font-weight: 700; font-size: 14px; color: #9a3412; line-height: 1.2;">Cash on Delivery</div>';
+      html += '<div style="color: #fb923c; font-size: 11px; margin-top: 4px; line-height: 1.3;">Pay when you receive</div>';
+      html += '</div>';
+      html += '<div style="display: flex; align-items: center; gap: 12px; flex-shrink: 0;">';
+      html += '<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">';
+      html += '<span class="pm-amt-cod" style="font-weight: 800; font-size: 15px; color: #9a3412;">' + formatMoney(orderTotal) + '</span>';
+      html += '</div>';
+      html += '<input type="radio" name="payment_method_visual" class="pm-pill" ' + (!showFullPrepaid && !showPartial ? 'checked' : '') + ' style="width: 18px; height: 18px; accent-color: #ea580c; margin: 0; pointer-events: none;">';
+      html += '</div></div>';
+      html += '<div style="background: #ffedd5; padding: 8px 12px; border-bottom-left-radius: 10px; border-bottom-right-radius: 10px; font-size: 10px; color: #9a3412; display: flex; justify-content: center; align-items: center; font-weight: 500;"><span style="margin-right: 4px;">ℹ️</span> Higher return risk • Slightly slower processing</div>';
+      html += '</label>';
+
+      html += '</div></div>';
+      container.innerHTML = html;
 
       var submitBtn = form.querySelector('button[type="submit"]');
       var originalButtonText = submitBtn ? submitBtn.textContent : 'Place Order';
 
-      paymentOptions.forEach(function(opt) {
-          // Hidden native radio (keeps form value submission working)
-          var radio = document.createElement('input');
-          radio.type = 'radio';
-          radio.name = 'payment_method';
-          radio.value = opt.id;
-          radio.checked = opt.checked;
-          radio.style.position = 'absolute';
-          radio.style.opacity = '0';
-          radio.style.width = '0';
-          radio.style.height = '0';
-          radio.style.pointerEvents = 'none';
-
-          var row = document.createElement('label');
-          row.style.display = 'flex';
-          row.style.alignItems = 'center';
-          row.style.gap = '12px';
-          row.style.padding = '12px 14px';
-          row.style.background = opt.checked ? fieldBg : '#fff';
-          row.style.borderRadius = '10px';
-          row.style.border = '2px solid ' + (opt.checked ? config.accentColor : '#e5e7eb');
-          row.style.boxShadow = opt.checked ? ('0 0 0 1px ' + config.accentColor + ', 0 0 0 4px ' + (hexToRgba(config.accentColor, 0.2) || 'transparent')) : 'none';
-          row.style.cursor = 'pointer';
-          row.style.transition = 'all 0.2s ease';
-          row.style.position = 'relative';
-
-          row.appendChild(radio);
-
-          // ── Left: icon pill (matches form field icon style) ──
-          var iconPill = document.createElement('div');
-          iconPill.innerHTML = paymentIcons[opt.id] || paymentIcons['full_cod'];
-          iconPill.style.display = 'flex';
-          iconPill.style.alignItems = 'center';
-          iconPill.style.justifyContent = 'center';
-          iconPill.style.flexShrink = '0';
-          iconPill.style.width = '36px';
-          iconPill.style.height = '36px';
-          iconPill.style.borderRadius = '8px';
-          iconPill.style.color = iconColor;
-          iconPill.style.backgroundColor = iconBackground !== 'transparent' ? iconBackground : (hexToRgba(primaryTheme, 0.08) || '#f3f4f6');
-          iconPill.style.transition = 'background-color 0.2s ease, color 0.2s ease';
-
-          // ── Center: label + description ──
-          var textContainer = document.createElement('div');
-          textContainer.style.flex = '1';
-          textContainer.style.minWidth = '0';
-
-          var labelText = document.createElement('div');
-          labelText.textContent = opt.label;
-          labelText.style.fontWeight = '600';
-          labelText.style.color = '#1f2937';
-          labelText.style.fontSize = '14px';
-          labelText.style.lineHeight = '1.3';
-
-          var descText = document.createElement('div');
-          descText.textContent = opt.description;
-          descText.setAttribute('data-payment-desc', opt.id);
-          descText.style.color = '#6b7280';
-          descText.style.fontSize = '12px';
-          descText.style.marginTop = '2px';
-          descText.style.lineHeight = '1.4';
-
-          textContainer.appendChild(labelText);
-          textContainer.appendChild(descText);
-
-          // ── Right: amount + radio pill (same line, matches shipping section logic) ──
-          var rightSection = document.createElement('div');
-          rightSection.style.display = 'flex';
-          rightSection.style.flexDirection = 'row';
-          rightSection.style.alignItems = 'center';
-          rightSection.style.gap = '10px';
-          rightSection.style.flexShrink = '0';
-
-          var amountEl = document.createElement('div');
-          amountEl.setAttribute('data-payment-amount', opt.id);
-          amountEl.textContent = formatMoney(opt.amount);
-          amountEl.style.fontWeight = '700';
-          amountEl.style.fontSize = '15px';
-          amountEl.style.color = '#1f2937';
-          amountEl.style.lineHeight = '1';
-
-          // Native radio pill — matches shipping section (accent-color driven)
-          var pill = document.createElement('input');
-          pill.type = 'radio';
-          pill.name = 'payment_method_visual';
-          pill.className = 'cod-pm-pill';
-          pill.tabIndex = -1;
-          pill.style.cssText = 'accent-color:' + config.accentColor + ';width:18px;height:18px;flex-shrink:0;cursor:pointer;margin:0;pointer-events:none;';
-          pill.checked = opt.checked;
-
-          rightSection.appendChild(amountEl);
-          rightSection.appendChild(pill);
-
-          row.appendChild(iconPill);
-          row.appendChild(textContainer);
-          row.appendChild(rightSection);
-          optionsWrapper.appendChild(row);
-
-          // Mouse events for hover
-          row.addEventListener('mouseenter', function() {
-              if (!radio.checked) {
-                  row.style.borderColor = borderColor;
-                  row.style.background = '#f3f4f6';
+      // Attach event listeners
+      var allRows = container.querySelectorAll('.pm-row');
+      allRows.forEach(function(row) {
+          row.addEventListener('click', function(e) {
+              if(e.target.tagName === 'INPUT') return;
+              var radio = row.querySelector('input[type="radio"][name="payment_method"]');
+              if (radio) {
+                  // Make it completely static per user request - if Full Prepaid, we can still visually select it
+                  // but we want the normal behavior.
+                  radio.checked = true;
+                  radio.dispatchEvent(new Event('change', { bubbles: true }));
               }
           });
-          row.addEventListener('mouseleave', function() {
-              if (!radio.checked) {
-                  row.style.borderColor = '#e5e7eb';
-                  row.style.background = '#fff';
-              }
-          });
+      });
 
-          // Click on the row triggers radio check
-          row.addEventListener('click', function() {
-              radio.checked = true;
-              radio.dispatchEvent(new Event('change', { bubbles: true }));
-          });
-
-          // Change event: update row styles + native radio pills (matches shipping section logic)
+      var radios = container.querySelectorAll('input[name="payment_method"]');
+      radios.forEach(function(radio) {
           radio.addEventListener('change', function() {
-              var allRows = optionsWrapper.querySelectorAll('label');
-              allRows.forEach(function(r) {
-                  var rInput = r.querySelector('input[type="radio"][name="payment_method"]');
-                  if (!rInput) return;
-                  var isSelected = rInput.checked;
-                  r.style.borderColor = isSelected ? config.accentColor : '#e5e7eb';
-                  r.style.background = isSelected ? fieldBg : '#fff';
-                  r.style.boxShadow = isSelected ? ('0 0 0 1px ' + config.accentColor + ', 0 0 0 4px ' + (hexToRgba(config.accentColor, 0.2) || 'transparent')) : 'none';
+              // Update visual checked state
+              allRows.forEach(function(row) {
+                  var rInput = row.querySelector('input[type="radio"][name="payment_method"]');
+                  var rPill = row.querySelector('.pm-pill');
+                  var isChecked = rInput && rInput.checked;
+                  if (rPill) rPill.checked = isChecked;
 
-                  // Sync the visual native radio pill
-                  var rPill = r.querySelector('.cod-pm-pill');
-                  if (rPill) {
-                      rPill.checked = isSelected;
+                  // Update borders based on selection
+                  if (row.classList.contains('pm-prepaid')) {
+                      row.style.borderColor = isChecked ? '#22c55e' : '#bbf7d0';
+                  } else if (row.classList.contains('pm-partial')) {
+                      row.style.borderColor = isChecked ? '#2563eb' : '#bfdbfe';
+                  } else if (row.classList.contains('pm-cod')) {
+                      row.style.borderColor = isChecked ? '#ea580c' : '#fed7aa';
                   }
               });
 
-              // Update submit button text and styling
               if (submitBtn) {
                   applySubmitButtonStyles(submitBtn, config);
-                  if (opt.id === 'partial_cod') {
+                  if (radio.value === 'partial_cod') {
                       submitBtn.textContent = 'Pay ' + formatMoney(config.partialCodAdvance) + ' Now';
+                  } else if (radio.value === 'full_prepaid') {
+                      submitBtn.textContent = 'Proceed to Payment';
                   } else {
                       submitBtn.textContent = originalButtonText;
                   }
@@ -4276,22 +4189,21 @@ function darkenColor(hex, percent) {
           });
       });
 
-      container.appendChild(optionsWrapper);
-
-      // Insert into the form — the section marker/move logic in initForm will
-      // reposition this element into the correct drag-drop position.
-      // If no marker exists, fall back to inserting before the submit button.
+      // Insert into the form
       var marker = form.querySelector('.cod-section-marker[data-section="payment_mode"]');
       if (marker) {
           form.appendChild(container);
       } else {
-          var submitBtn2 = form.querySelector('button[type="submit"]');
-          if (submitBtn2) {
-              form.insertBefore(container, submitBtn2);
+          if (submitBtn) {
+              form.insertBefore(container, submitBtn);
           } else {
               form.appendChild(container);
           }
       }
+      
+      // trigger initial change to set button text
+      var initialRadio = container.querySelector('input[name="payment_method"]:checked');
+      if(initialRadio) initialRadio.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
   function renderMarketingCheckbox(form, config) {
@@ -4353,37 +4265,29 @@ function darkenColor(hex, percent) {
       // Find the payment method options container
       var paymentContainer = form.querySelector('.cod-payment-method-options');
       if (!paymentContainer) return;
-      
-      // Update Full COD description and right-side amount
-      var fullCodRadio = paymentContainer.querySelector('input[name="payment_method"][value="full_cod"]');
-      if (fullCodRadio) {
-          var fullCodRow = fullCodRadio.closest('label');
-          if (fullCodRow) {
-              var descEl = fullCodRow.querySelector('[data-payment-desc]');
-              if (descEl) {
-                  descEl.textContent = 'Pay ' + formatMoney(orderTotal) + ' on delivery';
-              }
-              var amountEl = fullCodRow.querySelector('[data-payment-amount="full_cod"]');
-              if (amountEl) {
-                  amountEl.textContent = formatMoney(orderTotal);
-              }
-          }
+
+      // Update Full Prepaid
+      var pmPrepaid = paymentContainer.querySelector('.pm-prepaid');
+      if (pmPrepaid) {
+          var amtEl = pmPrepaid.querySelector('.pm-amt-prepaid');
+          if (amtEl) amtEl.textContent = formatMoney(orderTotal);
       }
-      
-      // Update Partial COD description and right-side amount
-      var partialCodRadio = paymentContainer.querySelector('input[name="payment_method"][value="partial_cod"]');
-      if (partialCodRadio) {
-          var partialRow = partialCodRadio.closest('label');
-          if (partialRow) {
-              var descEl = partialRow.querySelector('[data-payment-desc]');
-              if (descEl) {
-                  descEl.textContent = 'Pay ' + formatMoney(partialAdvance) + ' now, ' + formatMoney(remainingAmount) + ' on delivery';
-              }
-              var amountEl = partialRow.querySelector('[data-payment-amount="partial_cod"]');
-              if (amountEl) {
-                  amountEl.textContent = formatMoney(partialAdvance);
-              }
-          }
+
+      // Update Partial COD
+      var pmPartial = paymentContainer.querySelector('.pm-partial');
+      if (pmPartial) {
+          var descEl = pmPartial.querySelector('.pm-desc-partial');
+          if (descEl) descEl.textContent = 'Pay ' + formatMoney(partialAdvance) + ' now • Rest on delivery';
+          
+          var amtPartialEl = pmPartial.querySelector('.pm-amt-partial');
+          if (amtPartialEl) amtPartialEl.textContent = formatMoney(partialAdvance);
+      }
+
+      // Update Full COD
+      var pmCod = paymentContainer.querySelector('.pm-cod');
+      if (pmCod) {
+          var amtCodEl = pmCod.querySelector('.pm-amt-cod');
+          if (amtCodEl) amtCodEl.textContent = formatMoney(orderTotal);
       }
   }
 
@@ -6056,6 +5960,12 @@ function darkenColor(hex, percent) {
               firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
           }
           return; // stop submission
+      }
+
+      var selectedPaymentInput = form.querySelector('input[name="payment_method"]:checked');
+      if (selectedPaymentInput && selectedPaymentInput.value === 'full_prepaid') {
+          console.log('[COD Form] Full Prepaid selected (visual only). Doing nothing.');
+          return; // stop submission, do absolutely nothing per user request
       }
 
       console.log('[COD Form] Validation passed');

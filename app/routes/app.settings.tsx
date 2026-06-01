@@ -711,7 +711,7 @@ const PreviewDisplay = memo(({
     notesPlaceholder, submitButtonText,
     primaryColor, buttonStyle, buttonSize, borderRadius, modalStyle, animationStyle,
     fields, formStyles, buttonStylesState, blocks, shippingOpts, shippingRates, shippingRatesEnabled, activeTab,
-    fmtCurrency, currencySymbol, formSubmitButtonState
+    fmtCurrency, currencySymbol, formSubmitButtonState, partialCodEnabled, partialCodAdvanceAmount
 }: any) => {
 
     // Calculate button styles - sync with storefront
@@ -1317,59 +1317,133 @@ const PreviewDisplay = memo(({
 
                                         // Payment Mode section field
                                         if (field.id === 'payment_mode') {
+                                            const showFullPrepaid = formStyles?.fullPrepaidEnabled;
+                                            const showPartial = partialCodEnabled;
+                                            const remainingCod = Math.max(0, total - (partialCodAdvanceAmount || 0));
+                                            
+                                            // Simulated prepaid discount for visual purposes
+                                            const fakePrepaidDiscount = total > 0 ? Math.max(1, Math.round(total * 0.05)) : 40;
+                                            const fakePrepaidTotal = Math.max(0, total - fakePrepaidDiscount);
+                                            
                                             return (
-                                                <div key={field.id} style={{
-                                                    marginBottom: '12px', padding: '14px',
-                                                    background: formStyles?.fieldBackgroundColor || '#f9fafb',
-                                                    borderRadius: '12px',
-                                                    border: `1px solid ${formThemeColor}59`,
-                                                }}>
-                                                    <div style={{ fontSize: '12px', fontWeight: 600, color: '#1f2937', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>
-                                                        Payment Method
+                                                <div key={field.id} style={{ marginBottom: '16px' }}>
+                                                    {/* Header */}
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                                                        <div style={{ fontSize: '13px', fontWeight: 700, color: '#1f2937' }}>
+                                                            Choose Payment Option
+                                                        </div>
+                                                        <div style={{ background: '#dcfce7', color: '#166534', fontSize: '10px', fontWeight: 600, padding: '4px 8px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                            🔥 Save more on prepaid!
+                                                        </div>
                                                     </div>
-                                                    {/* Full COD option */}
-                                                    <label style={{
-                                                        display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px',
-                                                        background: '#fff', borderRadius: '10px', border: '2px solid #e5e7eb',
-                                                        marginBottom: '6px', cursor: 'default', position: 'relative',
-                                                    }}>
-                                                        {/* Icon pill */}
-                                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '30px', height: '30px', borderRadius: '7px', color: (formStyles as any)?.iconColor || '#6b7280', backgroundColor: `${formThemeColor}14` }}>
-                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2" /><line x1="2" y1="10" x2="22" y2="10" /></svg>
-                                                        </div>
-                                                        {/* Center: label + description */}
-                                                        <div style={{ flex: 1, minWidth: 0 }}>
-                                                            <div style={{ fontWeight: 600, fontSize: '12px', color: '#1f2937', lineHeight: 1.3 }}>Cash On Delivery</div>
-                                                            <div style={{ color: '#6b7280', fontSize: '10px', marginTop: '2px', lineHeight: 1.4 }}>Pay {fmtCurrency(total)} on delivery</div>
-                                                        </div>
-                                                        {/* Right: amount + radio pill */}
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                                                            <span style={{ fontWeight: 700, fontSize: '12px', color: '#1f2937' }}>{fmtCurrency(total)}</span>
-                                                            <input type="radio" name="preview-payment" disabled style={{ width: '14px', height: '14px', accentColor: formThemeColor, flexShrink: 0, margin: 0 }} />
-                                                        </div>
-                                                    </label>
-                                                    {/* Partial COD option */}
-                                                    <label style={{
-                                                        display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px',
-                                                        background: '#fff', borderRadius: '10px', border: '2px solid #e5e7eb',
-                                                        cursor: 'default', position: 'relative',
-                                                    }}>
-                                                        {/* Icon pill */}
-                                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '30px', height: '30px', borderRadius: '7px', color: (formStyles as any)?.iconColor || '#6b7280', backgroundColor: `${formThemeColor}14` }}>
-                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2" /><line x1="2" y1="10" x2="22" y2="10" /><line x1="6" y1="15" x2="10" y2="15" /></svg>
-                                                        </div>
-                                                        {/* Center: label + description */}
-                                                        <div style={{ flex: 1, minWidth: 0 }}>
-                                                            <div style={{ fontWeight: 600, fontSize: '12px', color: '#1f2937', lineHeight: 1.3 }}>Partial COD</div>
-                                                            <div style={{ color: '#6b7280', fontSize: '10px', marginTop: '2px', lineHeight: 1.4 }}>Pay advance, rest on delivery</div>
-                                                        </div>
-                                                        {/* Right: amount + radio pill */}
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                                                            <span style={{ fontWeight: 700, fontSize: '12px', color: '#1f2937' }}>{fmtCurrency(total)}</span>
-                                                            <input type="radio" name="preview-payment" disabled style={{ width: '14px', height: '14px', accentColor: formThemeColor, flexShrink: 0, margin: 0 }} />
-                                                        </div>
-                                                    </label>
+
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                                        {/* 1. Full Prepaid (Visual Only) */}
+                                                        {showFullPrepaid && (
+                                                            <label style={{
+                                                                display: 'flex', flexDirection: 'column', background: '#f0fdf4', borderRadius: '12px',
+                                                                border: '2px solid #22c55e', cursor: 'pointer', position: 'relative', overflow: 'visible',
+                                                                padding: '16px 12px 12px 12px', opacity: 1
+                                                            }}>
+                                                                {/* Most Popular Badge */}
+                                                                <div style={{
+                                                                    position: 'absolute', top: '-10px', left: '16px', background: '#22c55e', color: 'white',
+                                                                    fontSize: '9px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', letterSpacing: '0.05em',
+                                                                    display: 'flex', alignItems: 'center', gap: '4px', textTransform: 'uppercase'
+                                                                }}>
+                                                                    ★ MOST POPULAR
+                                                                </div>
+
+                                                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                                                                    {/* Icon */}
+                                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '32px', height: '32px', borderRadius: '8px', color: '#16a34a', backgroundColor: '#dcfce7' }}>
+                                                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4" /><path d="M4 6v12c0 1.1.9 2 2 2h14v-4" /><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z" /></svg>
+                                                                    </div>
+                                                                    
+                                                                    {/* Center text */}
+                                                                    <div style={{ flex: 1, minWidth: 0, paddingTop: '2px' }}>
+                                                                        <div style={{ fontWeight: 700, fontSize: '14px', color: '#166534', lineHeight: 1.2 }}>Full Prepaid</div>
+                                                                        <div style={{ color: '#4ade80', fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>Pay now & get fastest delivery</div>
+                                                                    </div>
+                                                                    
+                                                                    {/* Right side pricing */}
+                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+                                                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
+                                                                            <span style={{ fontWeight: 800, fontSize: '15px', color: '#166534' }}>{fmtCurrency(total)}</span>
+                                                                        </div>
+                                                                        <input type="radio" name="preview-payment" checked readOnly style={{ width: '18px', height: '18px', accentColor: '#22c55e', margin: 0, cursor: 'pointer' }} />
+                                                                    </div>
+                                                                </div>
+                                                            </label>
+                                                        )}
+
+                                                        {/* 2. Partial Payment */}
+                                                        {showPartial && (
+                                                            <label style={{
+                                                                display: 'flex', flexDirection: 'column', background: '#eff6ff', borderRadius: '12px',
+                                                                border: '2px solid #bfdbfe', cursor: 'default', position: 'relative'
+                                                            }}>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px' }}>
+                                                                    {/* Icon */}
+                                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '32px', height: '32px', borderRadius: '8px', color: '#2563eb', backgroundColor: '#dbeafe' }}>
+                                                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>
+                                                                    </div>
+                                                                    
+                                                                    {/* Center text */}
+                                                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                                                        <div style={{ fontWeight: 700, fontSize: '14px', color: '#1e3a8a', lineHeight: 1.2, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                                            Partial Payment
+                                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="#2563eb" stroke="#eff6ff" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/></svg>
+                                                                        </div>
+                                                                        <div style={{ color: '#60a5fa', fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>Pay {fmtCurrency(partialCodAdvanceAmount || 0)} now • Rest on delivery</div>
+                                                                    </div>
+                                                                    
+                                                                    {/* Right side pricing */}
+                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+                                                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
+                                                                            <span style={{ fontWeight: 800, fontSize: '15px', color: '#1e3a8a' }}>{fmtCurrency(partialCodAdvanceAmount || 0)}</span>
+                                                                        </div>
+                                                                        <input type="radio" name="preview-payment" disabled style={{ width: '18px', height: '18px', margin: 0 }} />
+                                                                    </div>
+                                                                </div>
+                                                                {/* Info Bar */}
+                                                                <div style={{ background: '#dbeafe', padding: '8px 12px', borderBottomLeftRadius: '10px', borderBottomRightRadius: '10px', fontSize: '10px', color: '#1e40af', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500 }}>
+                                                                    🛡️ Secure your order • Priority dispatch • Avoid fake cancellations
+                                                                </div>
+                                                            </label>
+                                                        )}
+
+                                                        {/* 3. Cash on Delivery */}
+                                                        <label style={{
+                                                            display: 'flex', flexDirection: 'column', background: '#fff7ed', borderRadius: '12px',
+                                                            border: '2px solid #fed7aa', cursor: 'default', position: 'relative'
+                                                        }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px' }}>
+                                                                {/* Icon */}
+                                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '32px', height: '32px', borderRadius: '8px', color: '#ea580c', backgroundColor: '#ffedd5' }}>
+                                                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1" ry="1" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
+                                                                </div>
+                                                                
+                                                                {/* Center text */}
+                                                                <div style={{ flex: 1, minWidth: 0 }}>
+                                                                    <div style={{ fontWeight: 700, fontSize: '14px', color: '#9a3412', lineHeight: 1.2 }}>Cash on Delivery</div>
+                                                                    <div style={{ color: '#fb923c', fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>Pay when you receive</div>
+                                                                </div>
+                                                                
+                                                                {/* Right side pricing */}
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+                                                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
+                                                                        <span style={{ fontWeight: 800, fontSize: '15px', color: '#9a3412' }}>{fmtCurrency(total)}</span>
+                                                                    </div>
+                                                                    <input type="radio" name="preview-payment" disabled style={{ width: '18px', height: '18px', margin: 0 }} />
+                                                                </div>
+                                                            </div>
+                                                            {/* Info Bar */}
+                                                            <div style={{ background: '#ffedd5', padding: '8px 12px', borderBottomLeftRadius: '10px', borderBottomRightRadius: '10px', fontSize: '10px', color: '#9a3412', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500 }}>
+                                                                <span style={{ marginRight: '4px' }}>ℹ️</span> Higher return risk • Slightly slower processing
+                                                            </div>
+                                                        </label>
+                                                    </div>
                                                 </div>
                                             );
                                         }
@@ -4831,6 +4905,17 @@ export default function SettingsPage() {
                                         </div>
                                     </AccordionSection>
 
+                                    {/* Full Prepaid */}
+                                    <AccordionSection id="full-prepaid" tab="form" title="Full Prepaid (Visual Only)" helperText="Show a static Full Prepaid option in the form" expandedSection={expandedSection} toggleSection={toggleSection}>
+                                        <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '16px' }}>
+                                            Displays a static "Full Prepaid" button above the COD options. This button is visual only and does not process actual payments.
+                                        </p>
+                                        <div className="toggle-option" onClick={() => setFormStyles(s => ({ ...s, fullPrepaidEnabled: !s.fullPrepaidEnabled }))}>
+                                            <span className="toggle-option-label">Enable Full Prepaid</span>
+                                            <div className={`mini-toggle ${formStyles.fullPrepaidEnabled ? 'on' : 'off'}`} />
+                                        </div>
+                                    </AccordionSection>
+
                                     {/* Partial Cash on Delivery */}
                                     <AccordionSection id="partial-cod" tab="form" title="Partial Cash on Delivery" helperText="Enables the partial cash on delivery settings" expandedSection={expandedSection} toggleSection={toggleSection}>
                                         <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '16px' }}>
@@ -5460,6 +5545,8 @@ export default function SettingsPage() {
                                 fmtCurrency={fmtCurrency}
                                 currencySymbol={currencySymbol}
                                 formSubmitButtonState={formSubmitButtonState}
+                                partialCodEnabled={partialCodEnabled}
+                                partialCodAdvanceAmount={partialCodAdvanceAmount}
                             />
                         </div>
 
