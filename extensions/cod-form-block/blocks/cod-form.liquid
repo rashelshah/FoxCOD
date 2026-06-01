@@ -143,7 +143,7 @@
 {% assign cod_partial_advance = shop.metafields.fox_cod.partial_cod_advance_amount | default: '100' %}
 
 {% comment %} Shipping Rates Settings {% endcomment %}
-{% assign cod_shipping_rates_enabled = shop.metafields.fox_cod.shipping_rates_enabled | default: 'false' %}
+{% assign cod_shipping_rates_enabled = shop.metafields.fox_cod.shipping_rates_enabled.value | default: shop.metafields.fox_cod.shipping_rates_enabled | default: 'false' %}
 {% assign cod_shipping_rates_json = shop.metafields.fox_cod.shipping_rates_json | default: '[]' %}
 {% assign cod_quantity_offers = shop.metafields.fox_cod.quantity_offers_json.value | default: '[]' %}
 {% assign cod_upsell_offers = shop.metafields.fox_cod.upsells_downsells_json | default: '{}' %}

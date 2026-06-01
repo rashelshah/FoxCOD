@@ -2001,7 +2001,7 @@
                   shippingSection.remove();
               }
               var hasNewShippingRates = config.shippingRatesEnabled && config.shippingRates && config.shippingRates.length > 0;
-              var hasOldShippingOptions = config.shippingOptions && config.shippingOptions.enabled;
+              var hasOldShippingOptions = config.shippingRatesEnabled && config.shippingOptions && config.shippingOptions.enabled;
               var shippingFieldVisible = (config.fields || []).some(function(f) { return f.id === 'shipping' && f.visible !== false; });
               var shippingEnabled2 = (config.blocks && config.blocks.shipping_options) || shippingFieldVisible;
               if (shippingEnabled2 && (hasNewShippingRates || hasOldShippingOptions)) {
@@ -2151,7 +2151,7 @@
     var sectionFieldIds = ['shipping', 'order_summary', 'marketing', 'payment_mode'];
     var sortedFields = (config.fields || []).slice().sort(function(a, b) { return a.order - b.order; });
     var hasNewShippingRates = config.shippingRatesEnabled && config.shippingRates && config.shippingRates.length > 0;
-    var hasOldShippingOptions = config.shippingOptions && config.shippingOptions.enabled;
+    var hasOldShippingOptions = config.shippingRatesEnabled && config.shippingOptions && config.shippingOptions.enabled;
 
     // Check which section fields exist in the fields array
     var hasSectionInFields = {};
@@ -5037,7 +5037,7 @@ function darkenColor(hex, percent) {
                         shippingSection.remove();
                     }
                     var hasNewShippingRates = config.shippingRatesEnabled && config.shippingRates && config.shippingRates.length > 0;
-                    var hasOldShippingOptions = config.shippingOptions && config.shippingOptions.enabled;
+                    var hasOldShippingOptions = config.shippingRatesEnabled && config.shippingOptions && config.shippingOptions.enabled;
                     var shippingFieldVisible = (config.fields || []).some(function(f) { return f.id === 'shipping' && f.visible !== false; });
                     var shippingEnabled3 = (config.blocks && config.blocks.shipping_options) || shippingFieldVisible;
                     if (shippingEnabled3 && (hasNewShippingRates || hasOldShippingOptions)) {
