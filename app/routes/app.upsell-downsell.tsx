@@ -1007,7 +1007,7 @@ export default function UpsellDownsellPage() {
                                                                         const total = unitPrice + shippingCost + tickUpsellPrice;
 
                                                                         return (
-                                                                            <div key={field.id} style={{ marginBottom: '16px' }}>
+                                                                            <div key={field.id} style={{ marginBottom: '16px', marginTop: '16px' }}>
                                                                                 {/* Header */}
                                                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                                                                                     <div style={{ fontSize: '11px', fontWeight: 700, color: '#1f2937' }}>

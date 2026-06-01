@@ -4073,6 +4073,7 @@ function darkenColor(hex, percent) {
       var container = document.createElement('div');
       container.className = 'cod-payment-method-options';
       container.style.marginBottom = '20px';
+      container.style.marginTop = '16px';
 
       // Calculate order total
       var orderTotal = config.productPrice || 0;
