@@ -22,6 +22,33 @@ import {
 } from "../services/shopify-sync.server";
 import { getRestClient } from "../shopify/rest-client.server";
 
+// ── In-process caches to avoid repeated DB/session round-trips ──
+// REST clients and fraud settings are stable per shop for minutes at a time.
+// Caching them eliminates 200-400ms of cold-start latency on every order.
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+interface CacheEntry<T> { value: T; expiresAt: number; }
+const _restClientCache = new Map<string, CacheEntry<any>>();
+const _fraudSettingsCache = new Map<string, CacheEntry<any>>();
+
+async function getCachedRestClient(shop: string) {
+    const now = Date.now();
+    const cached = _restClientCache.get(shop);
+    if (cached && cached.expiresAt > now) return cached.value;
+    const client = await getRestClient(shop);
+    _restClientCache.set(shop, { value: client, expiresAt: now + CACHE_TTL_MS });
+    return client;
+}
+
+async function getCachedFraudSettings(shop: string) {
+    const now = Date.now();
+    const cached = _fraudSettingsCache.get(shop);
+    if (cached && cached.expiresAt > now) return cached.value;
+    const settings = await getFraudProtectionSettings(shop);
+    _fraudSettingsCache.set(shop, { value: settings, expiresAt: now + CACHE_TTL_MS });
+    return settings;
+}
+
 const corsHeaders = {
     "Content-Type": "application/json",
     "Access-Control-Allow-Origin": "*",
@@ -358,13 +385,13 @@ async function handleRegularOrder(request: Request, data: any) {
         }), { status: 400, headers: corsHeaders });
     }
 
-    // ── 1. PARALLEL: Load Shopify SDK REST client + fraud settings ──
-    // SDK handles session loading, token expiry check, and refresh automatically.
+    // ── 1. PARALLEL: Load Shopify SDK REST client + fraud settings (cached) ──
+    // Cache eliminates 200-400ms of DB/session round-trips on warm requests.
     const [restClient, fraudSettings] = await Promise.all([
-        getRestClient(data.shop),
-        getFraudProtectionSettings(data.shop),
+        getCachedRestClient(data.shop),
+        getCachedFraudSettings(data.shop),
     ]);
-    console.log('⏱ [Proxy] SDK REST client + fraud settings loaded:', Date.now() - start, 'ms');
+    console.log('⏱ [Proxy] REST client + fraud settings ready:', Date.now() - start, 'ms');
 
     // ── 2. FRAUD CHECKS ──
     const clientIp =
@@ -642,12 +669,13 @@ async function handleRegularOrder(request: Request, data: any) {
 
     console.log('[COD] Shopify Order Created:', shopifyOrderName);
     console.log('[COD] Order Status URL:', orderStatusUrl);
-    console.log('⏱ [Proxy] Shopify order created:', shopifyOrderName, '— saving to DB...');
+    console.log('⏱ [Proxy] Shopify order created in:', Date.now() - start, 'ms — returning to frontend now');
 
-    // ── 5. SAVE ORDER TO DB — single call with Shopify IDs (already synced) ──
-    let dbOrderId: any = null;
-    try {
-        const result = await logOrderWithShopifyIds({
+    // ── 5. FIRE-AND-FORGET: Save order to DB ──
+    // We already have the Shopify order confirmed — don't block the frontend
+    // redirect on a DB write. Log asynchronously; the order is safe in Shopify.
+    Promise.resolve(
+        logOrderWithShopifyIds({
             shop_domain: data.shop,
             customer_name: customerName,
             customer_phone: data.customerPhone || '',
@@ -676,13 +704,13 @@ async function handleRegularOrder(request: Request, data: any) {
                 originalTotal: pricing.originalTotal,
                 finalTotal: totalPrice,
             },
-        }, shopifyOrderId, shopifyOrderName);
-        dbOrderId = result.id;
-    } catch (dbErr: any) {
-        // Shopify order already created — DB failure is non-fatal, log and continue
-        console.error('[Proxy] ⚠️ DB save failed (Shopify order exists):', dbErr.message);
-    }
-    console.log('⏱ [Proxy] DB save done:', Date.now() - start, 'ms');
+        }, shopifyOrderId, shopifyOrderName)
+    ).then(() => {
+        console.log('⏱ [Proxy] DB save done (async):', Date.now() - start, 'ms');
+    }).catch((dbErr: any) => {
+        // Shopify order already created — DB failure is non-fatal
+        console.error('[Proxy] ⚠️ DB save failed (Shopify order exists, order is safe):', dbErr.message);
+    });
 
     // ── 6. NON-BLOCKING: Customer upsert + Google Sheets sync ──
     // Fire-and-forget — do NOT await
@@ -705,7 +733,7 @@ async function handleRegularOrder(request: Request, data: any) {
     }
 
     syncOrderToGoogleSheets(data.shop, {
-        orderId: shopifyOrderId || dbOrderId,
+        orderId: shopifyOrderId,
         orderName: shopifyOrderName,
         customerName: data.customerName || '',
         phone: data.customerPhone || '',
@@ -722,11 +750,10 @@ async function handleRegularOrder(request: Request, data: any) {
         console.error('[Proxy] Google Sheets sync error (non-blocking):', err.message);
     });
 
-    console.log('⏱ [Proxy] Total time:', Date.now() - start, 'ms');
+    console.log('⏱ [Proxy] Total time to response:', Date.now() - start, 'ms');
 
     return new Response(JSON.stringify({
         success: true,
-        orderId: dbOrderId,
         shopifyOrderId,
         shopifyOrderName,
         orderName: shopifyOrderName,

@@ -6065,7 +6065,8 @@ function darkenColor(hex, percent) {
       config._isSubmitting = true;
       
       submitBtn.disabled = true;
-      submitBtn.textContent = 'Processing...';
+      submitBtn.textContent = 'Placing Order...';
+      submitBtn.style.setProperty('opacity', '0.85', 'important');
       
       // Collect form data
       var formData = new FormData(form);
@@ -6322,9 +6323,9 @@ function darkenColor(hex, percent) {
           console.log('[COD Form] Order response:', result);
           
           if (result.success) {
-              // Save customer data to LocalStorage for future auto-fill
-              saveCustomerToLocalStorage(form);
-              localStorage.removeItem('foxcod_checkout_state');
+              // ── Immediately show redirect feedback on the button ──
+              submitBtn.textContent = 'Redirecting...';
+              submitBtn.style.setProperty('opacity', '1', 'important');
 
               // ── Pixel Tracking: Purchase ──
               // Use payload.finalTotal which includes upsells, or read from DOM, or compute fallback
@@ -6341,6 +6342,10 @@ function darkenColor(hex, percent) {
               }
               console.log('[FoxCod Pixels] Correct Purchase total:', purchaseValue);
               foxCodTrackEvent('Purchase', { value: purchaseValue, currency: (FoxCod.currencyConfig && FoxCod.currencyConfig.code) || 'USD' });
+
+              // ── Save customer data + redirect ──
+              saveCustomerToLocalStorage(form);
+              localStorage.removeItem('foxcod_checkout_state');
               handleOrderSuccess(config, form, submitBtn, originalBtnText, result);
           } else {
               throw new Error(result.error || result.message || 'Order failed');
