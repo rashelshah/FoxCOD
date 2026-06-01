@@ -37,6 +37,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         .single();
 
     if (error || !order) {
+        console.error("Error fetching order:", error);
         throw redirect("/app/orders");
     }
 
@@ -116,37 +117,50 @@ export default function OrderDetailPage() {
     return (
         <>
             <style>{`
+                /* Prevent horizontal scrolling globally */
+                html, body {
+                    overflow-x: hidden;
+                    max-width: 100vw;
+                }
+                
                 .order-detail-page {
                     max-width: 900px;
                     margin: 0 auto;
                     padding: 24px;
+                    box-sizing: border-box;
+                    overflow-x: hidden;
                 }
 
                 .page-header {
                     display: flex;
-                    align-items: center;
+                    align-items: flex-start;
                     justify-content: space-between;
-                    margin-bottom: 32px;
+                    margin-bottom: 24px;
+                    gap: 16px;
+                    flex-wrap: wrap;
                 }
 
                 .page-header-left {
                     display: flex;
                     align-items: center;
-                    gap: 16px;
+                    gap: 12px;
+                    flex: 1;
+                    min-width: 0;
                 }
 
                 .back-btn {
-                    width: 44px;
-                    height: 44px;
+                    width: 40px;
+                    height: 40px;
+                    min-width: 40px;
                     display: flex;
                     align-items: center;
                     justify-content: center;
                     border: 1px solid #e5e7eb;
-                    border-radius: 12px;
+                    border-radius: 10px;
                     background: white;
                     text-decoration: none;
                     color: #374151;
-                    font-size: 18px;
+                    font-size: 16px;
                     transition: all 0.2s ease;
                 }
 
@@ -155,15 +169,23 @@ export default function OrderDetailPage() {
                     border-color: #d1d5db;
                 }
 
+                .page-title {
+                    min-width: 0;
+                    overflow: hidden;
+                }
+
                 .page-title h1 {
-                    font-size: 24px;
+                    font-size: 22px;
                     font-weight: 700;
                     color: #111827;
                     margin: 0 0 4px 0;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
                 }
 
                 .page-title p {
-                    font-size: 14px;
+                    font-size: 13px;
                     color: #6b7280;
                     margin: 0;
                 }
@@ -173,49 +195,44 @@ export default function OrderDetailPage() {
                     border: 1px solid #e5e7eb;
                     border-radius: 16px;
                     overflow: hidden;
-                    margin-bottom: 24px;
+                    margin-bottom: 20px;
                 }
 
                 .order-card-header {
-                    padding: 24px;
+                    padding: 20px;
                     border-bottom: 1px solid #f3f4f6;
                     background: #f9fafb;
                 }
 
                 .order-card-header h2 {
-                    font-size: 16px;
+                    font-size: 15px;
                     font-weight: 600;
                     color: #374151;
                     margin: 0;
                     display: flex;
                     align-items: center;
-                    gap: 10px;
+                    gap: 8px;
                 }
 
                 .order-card-body {
-                    padding: 24px;
+                    padding: 20px;
                 }
 
                 .detail-grid {
                     display: grid;
                     grid-template-columns: repeat(2, 1fr);
-                    gap: 20px;
-                }
-
-                @media (max-width: 600px) {
-                    .detail-grid {
-                        grid-template-columns: 1fr;
-                    }
+                    gap: 16px;
                 }
 
                 .detail-item {
-                    padding: 16px;
+                    padding: 14px;
                     background: #f9fafb;
                     border-radius: 10px;
+                    overflow: hidden;
                 }
 
                 .detail-item-label {
-                    font-size: 12px;
+                    font-size: 11px;
                     font-weight: 600;
                     color: #6b7280;
                     text-transform: uppercase;
@@ -224,33 +241,21 @@ export default function OrderDetailPage() {
                 }
 
                 .detail-item-value {
-                    font-size: 15px;
+                    font-size: 14px;
                     font-weight: 500;
                     color: #111827;
                     line-height: 1.5;
-                }
-
-                .status-section {
-                    margin-top: 24px;
-                    padding-top: 24px;
-                    border-top: 1px solid #f3f4f6;
-                }
-
-                .status-section h3 {
-                    font-size: 14px;
-                    font-weight: 600;
-                    color: #374151;
-                    margin: 0 0 16px 0;
+                    word-break: break-word;
                 }
 
                 .status-options {
                     display: flex;
                     flex-wrap: wrap;
-                    gap: 10px;
+                    gap: 8px;
                 }
 
                 .status-option {
-                    padding: 10px 18px;
+                    padding: 10px 16px;
                     border-radius: 10px;
                     font-size: 13px;
                     font-weight: 600;
@@ -261,7 +266,7 @@ export default function OrderDetailPage() {
                     color: #6b7280;
                 }
 
-                .status-option:hover {
+                .status-option:hover:not(:disabled) {
                     transform: scale(1.02);
                 }
 
@@ -276,19 +281,20 @@ export default function OrderDetailPage() {
                 }
 
                 .amount-display {
-                    font-size: 32px;
+                    font-size: 28px;
                     font-weight: 800;
                     color: #111827;
                 }
 
                 .current-status {
-                    padding: 12px 24px;
-                    border-radius: 12px;
-                    font-size: 14px;
+                    padding: 10px 18px;
+                    border-radius: 10px;
+                    font-size: 13px;
                     font-weight: 700;
                     display: inline-flex;
                     align-items: center;
-                    gap: 8px;
+                    gap: 6px;
+                    flex-shrink: 0;
                 }
 
                 .address-text {
@@ -296,42 +302,94 @@ export default function OrderDetailPage() {
                     word-break: break-word;
                 }
 
-                .timeline {
-                    margin-top: 24px;
+                .notes-text {
+                    white-space: pre-wrap;
+                    word-break: break-word;
+                    font-style: italic;
                 }
 
-                .timeline-item {
-                    display: flex;
-                    gap: 16px;
-                    padding: 12px 0;
-                    border-bottom: 1px solid #f3f4f6;
+                /* ==================== RESPONSIVE DESIGN ==================== */
+
+                @media (max-width: 768px) {
+                    .order-detail-page {
+                        padding: 16px;
+                    }
+
+                    .page-header {
+                        flex-direction: column;
+                        align-items: stretch;
+                    }
+
+                    .page-header-left {
+                        width: 100%;
+                    }
+
+                    .current-status {
+                        align-self: flex-start;
+                    }
+
+                    .page-title h1 {
+                        font-size: 18px;
+                    }
+
+                    .detail-grid {
+                        grid-template-columns: 1fr;
+                        gap: 12px;
+                    }
+
+                    .order-card {
+                        border-radius: 12px;
+                    }
+
+                    .order-card-header,
+                    .order-card-body {
+                        padding: 16px;
+                    }
+
+                    .status-options {
+                        gap: 6px;
+                    }
+
+                    .status-option {
+                        padding: 8px 14px;
+                        font-size: 12px;
+                        flex: 1;
+                        min-width: calc(50% - 6px);
+                        text-align: center;
+                        justify-content: center;
+                    }
+
+                    .amount-display {
+                        font-size: 24px;
+                    }
                 }
 
-                .timeline-item:last-child {
-                    border-bottom: none;
-                }
+                @media (max-width: 480px) {
+                    .order-detail-page {
+                        padding: 12px;
+                    }
 
-                .timeline-dot {
-                    width: 10px;
-                    height: 10px;
-                    border-radius: 50%;
-                    margin-top: 5px;
-                    flex-shrink: 0;
-                }
+                    .back-btn {
+                        width: 36px;
+                        height: 36px;
+                        min-width: 36px;
+                    }
 
-                .timeline-content {
-                    flex: 1;
-                }
+                    .page-title h1 {
+                        font-size: 16px;
+                    }
 
-                .timeline-content strong {
-                    display: block;
-                    font-size: 14px;
-                    margin-bottom: 2px;
-                }
+                    .order-card-header h2 {
+                        font-size: 14px;
+                    }
 
-                .timeline-content span {
-                    font-size: 12px;
-                    color: #6b7280;
+                    .detail-item {
+                        padding: 12px;
+                    }
+
+                    .status-option {
+                        min-width: 100%;
+                    }
                 }
             `}</style>
 
@@ -371,11 +429,25 @@ export default function OrderDetailPage() {
                                     <div className="detail-item-label">Phone Number</div>
                                     <div className="detail-item-value">{order.customer_phone}</div>
                                 </div>
+                                {/* Show email only if provided */}
+                                {order.customer_email && (
+                                    <div className="detail-item">
+                                        <div className="detail-item-label">Email</div>
+                                        <div className="detail-item-value">{order.customer_email}</div>
+                                    </div>
+                                )}
                             </div>
-                            <div className="detail-item" style={{ marginTop: '16px' }}>
+                            <div className="detail-item" style={{ marginTop: '12px' }}>
                                 <div className="detail-item-label">Delivery Address</div>
                                 <div className="detail-item-value address-text">{order.customer_address}</div>
                             </div>
+                            {/* Show notes only if provided */}
+                            {order.customer_notes && (
+                                <div className="detail-item" style={{ marginTop: '12px' }}>
+                                    <div className="detail-item-label">📝 Order Notes</div>
+                                    <div className="detail-item-value notes-text">{order.customer_notes}</div>
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -418,15 +490,35 @@ export default function OrderDetailPage() {
                             <div style={{ marginTop: '16px', padding: '16px', background: '#f9fafb', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
                                 <div style={{ fontSize: '13px', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' as const, letterSpacing: '0.5px', marginBottom: '12px' }}>Price Breakdown</div>
 
+                                {/* Parse notes for breakdown */}
                                 {(() => {
                                     const notes = order.customer_notes || '';
+                                    const hasDiscount = notes.includes('BUNDLE DISCOUNT:');
+                                    const hasShipping = notes.includes('SHIPPING:');
                                     const discountMatch = notes.match(/BUNDLE DISCOUNT:\s*([\d.]+)% off/);
                                     const shippingMatch = notes.match(/SHIPPING:\s*(.+?)\s*\(([^)]+)\)/);
                                     const downsellMatch = notes.match(/DOWNSELL APPLIED:\s*(.+?)\s*\(([^)]+)\)/);
                                     const upsellLines = notes.split('\n').filter((l: string) => l.trim().startsWith('-'));
 
+                                    // Parse bundle variant lines
+                                    const bundleVariantLines = notes.includes('BUNDLE VARIANTS:')
+                                        ? notes.split('\n').filter((l: string) => l.trim().startsWith('- Item'))
+                                        : [];
+
                                     return (
                                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                            {/* Bundle variant line items */}
+                                            {bundleVariantLines.map((line: string, idx: number) => {
+                                                const m = line.match(/-\s*Item\s*(\d+):\s*(.+?)\s*\(([^)]+)\)/);
+                                                if (!m) return null;
+                                                return (
+                                                    <div key={'bv-' + idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#374151' }}>
+                                                        <span>Item {m[1]}: {m[2]}</span>
+                                                        <span>{m[3]}</span>
+                                                    </div>
+                                                );
+                                            })}
+
                                             {downsellMatch ? (
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#374151' }}>
                                                     <span>Downsell: {downsellMatch[1]}</span>
@@ -434,7 +526,7 @@ export default function OrderDetailPage() {
                                                 </div>
                                             ) : null}
 
-                                            {discountMatch ? (
+                                            {hasDiscount && discountMatch ? (
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#059669' }}>
                                                     <span>Bundle Discount</span>
                                                     <span>-{discountMatch[1]}%</span>
@@ -452,7 +544,7 @@ export default function OrderDetailPage() {
                                                 );
                                             })}
 
-                                            {shippingMatch ? (
+                                            {hasShipping && shippingMatch ? (
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#374151' }}>
                                                     <span>Shipping: {shippingMatch[1]}</span>
                                                     <span>{formatCurrency(parsePrice(shippingMatch[2]))}</span>
@@ -469,6 +561,87 @@ export default function OrderDetailPage() {
                             </div>
                         </div>
                     </div>
+
+                    {/* Bundle Variants */}
+                    {order.customer_notes && order.customer_notes.includes('BUNDLE VARIANTS:') && (
+                        <div className="order-card">
+                            <div className="order-card-header">
+                                <h2>🎨 Bundle Variant Selections</h2>
+                            </div>
+                            <div className="order-card-body">
+                                {order.customer_notes
+                                    .split('\n')
+                                    .filter((line: string) => {
+                                        // Only include lines after "BUNDLE VARIANTS:" and before next section
+                                        const idx = order.customer_notes.indexOf('BUNDLE VARIANTS:');
+                                        const lineIdx = order.customer_notes.indexOf(line);
+                                        if (lineIdx <= idx) return false;
+                                        // Stop at next section marker (UPSELL, SHIPPING, BUNDLE DISCOUNT, DOWNSELL)
+                                        const nextSection = order.customer_notes.substring(idx + 17).search(/\n(?:UPSELL|SHIPPING|BUNDLE DISCOUNT|DOWNSELL)/);
+                                        if (nextSection !== -1 && lineIdx > idx + 17 + nextSection) return false;
+                                        return line.trim().startsWith('- Item');
+                                    })
+                                    .map((line: string, idx: number) => {
+                                        const match = line.match(/-\s*Item\s*(\d+):\s*(.+?)\s*\(([^)]+)\)/);
+                                        if (!match) return null;
+                                        const [, itemNum, variantTitle, price] = match;
+                                        return (
+                                            <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: '10px', background: '#f0f9ff', marginBottom: '8px', border: '1px solid #bae6fd' }}>
+                                                <div>
+                                                    <div style={{ fontWeight: 600, fontSize: '14px', color: '#111827' }}>Item {itemNum}</div>
+                                                    <div style={{ fontSize: '13px', color: '#6b7280', marginTop: '2px' }}>{variantTitle}</div>
+                                                </div>
+                                                <div style={{ fontWeight: 700, fontSize: '14px', color: '#0369a1' }}>{price}</div>
+                                            </div>
+                                        );
+                                    })}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Upsell & Downsell Items */}
+                    {order.customer_notes && (order.customer_notes.includes('UPSELL ITEMS') || order.customer_notes.includes('DOWNSELL APPLIED')) && (
+                        <div className="order-card">
+                            <div className="order-card-header">
+                                <h2>🎯 Upsell & Downsell Items</h2>
+                            </div>
+                            <div className="order-card-body">
+                                {/* Downsell items */}
+                                {order.customer_notes.includes('DOWNSELL APPLIED') && (() => {
+                                    const dsMatch = order.customer_notes.match(/DOWNSELL APPLIED:\s*(.+?)\s*\(([^)]+)\)/);
+                                    if (!dsMatch) return null;
+                                    return (
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: '10px', background: '#fffbeb', marginBottom: '8px', border: '1px solid #fde68a' }}>
+                                            <div>
+                                                <div style={{ fontWeight: 600, fontSize: '14px', color: '#111827' }}>{dsMatch[1]}</div>
+                                                <span style={{ display: 'inline-block', marginTop: '4px', padding: '2px 8px', borderRadius: '6px', background: '#fef3c7', color: '#92400e', fontSize: '11px', fontWeight: 600 }}>Downsell</span>
+                                            </div>
+                                            <div style={{ fontWeight: 700, fontSize: '16px', color: '#b45309' }}>{dsMatch[2]}</div>
+                                        </div>
+                                    );
+                                })()}
+
+                                {/* Upsell items */}
+                                {order.customer_notes.includes('UPSELL ITEMS') && order.customer_notes.split('\n').filter((line: string) => line.trim().startsWith('-')).map((line: string, idx: number) => {
+                                    const match = line.match(/-\s*(.+?)\s*\(([^)]+)\)\s*x(\d+)\s*\[(.+?)\]/);
+                                    if (!match) return null;
+                                    const [, title, price, qty, type] = match;
+                                    return (
+                                        <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: '10px', background: '#f0fdf4', marginBottom: '8px', border: '1px solid #d1fae5' }}>
+                                            <div>
+                                                <div style={{ fontWeight: 600, fontSize: '14px', color: '#111827' }}>{title}</div>
+                                                <span style={{ display: 'inline-block', marginTop: '4px', padding: '2px 8px', borderRadius: '6px', background: type === 'click_upsell' ? '#dbeafe' : type === 'downsell' ? '#fef3c7' : '#e0e7ff', color: type === 'click_upsell' ? '#1d4ed8' : type === 'downsell' ? '#92400e' : '#4338ca', fontSize: '11px', fontWeight: 600 }}>{type === 'click_upsell' ? '1-Click Upsell' : type === 'downsell' ? 'Downsell' : 'Tick Upsell'}</span>
+                                            </div>
+                                            <div style={{ textAlign: 'right' }}>
+                                                <div style={{ fontWeight: 700, fontSize: '16px', color: '#059669' }}>{formatCurrency(parseFloat(price))}</div>
+                                                <div style={{ fontSize: '12px', color: '#6b7280' }}>x{qty}</div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
 
                     {/* Update Status */}
                     <div className="order-card">
