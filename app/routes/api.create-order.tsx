@@ -512,6 +512,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
         const shopifyOrderId = String(shopifyOrder.id);
         const shopifyOrderName = shopifyOrder.name;
+        const orderStatusUrl: string | null = shopifyOrder.order_status_url || null;
+
+        console.log("[COD] Shopify Order Created:", shopifyOrderName);
+        console.log("[COD] Order Status URL:", orderStatusUrl);
 
         // ── 5. SAVE ORDER TO DB (with Shopify IDs) ──
         const orderLog = await logOrderWithShopifyIds({
@@ -551,8 +555,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             success: true,
             orderId: orderLog.id,
             shopifyOrderId,
+            shopifyOrderName,
             orderName: shopifyOrderName,
-            message: "Order placed successfully!",
+            orderStatusUrl,
         }, { headers: corsHeaders });
 
     } catch (error: any) {

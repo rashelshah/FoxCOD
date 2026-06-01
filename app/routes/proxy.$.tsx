@@ -619,6 +619,29 @@ async function handleRegularOrder(request: Request, data: any) {
 
     const shopifyOrderId = String(shopifyOrder.id);
     const shopifyOrderName = shopifyOrder.name;
+    const shopifyOrderToken = shopifyOrder.token || '';
+
+    // Build the order status URL.
+    // Shopify's order_status_url for Admin-created orders routes through shop.app
+    // authentication which requires the customer to be logged in — unusable for
+    // guest COD shoppers. Instead we construct the legacy direct URL using the
+    // order token, which bypasses shop.app and works without a customer account.
+    let orderStatusUrl: string | null = null;
+    const rawStatusUrl: string | null = shopifyOrder.order_status_url || null;
+
+    if (rawStatusUrl && !rawStatusUrl.includes('shop.app')) {
+        // Use Shopify's URL directly when it doesn't require shop.app auth
+        orderStatusUrl = rawStatusUrl;
+    } else if (shopifyOrderToken && data.shop) {
+        // Build the direct legacy order status URL (works for guest checkouts)
+        orderStatusUrl = `https://${data.shop}/orders/${shopifyOrderToken}/authenticate?key=${shopifyOrderToken}`;
+    } else if (rawStatusUrl) {
+        // Fallback: use Shopify's URL even if it goes through shop.app
+        orderStatusUrl = rawStatusUrl;
+    }
+
+    console.log('[COD] Shopify Order Created:', shopifyOrderName);
+    console.log('[COD] Order Status URL:', orderStatusUrl);
     console.log('⏱ [Proxy] Shopify order created:', shopifyOrderName, '— saving to DB...');
 
     // ── 5. SAVE ORDER TO DB — single call with Shopify IDs (already synced) ──
@@ -705,6 +728,8 @@ async function handleRegularOrder(request: Request, data: any) {
         success: true,
         orderId: dbOrderId,
         shopifyOrderId,
+        shopifyOrderName,
         orderName: shopifyOrderName,
+        orderStatusUrl,
     }), { headers: corsHeaders });
 }

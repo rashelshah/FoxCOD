@@ -764,60 +764,40 @@
     config._orderPlaced = true;
     config._isSubmitting = false;
 
-    var modal = getModalContainer(config);
-    var overlay = getModalOverlay(config);
-    var orderId = result && (result.orderName || result.orderId || result.id) ? (result.orderName || result.orderId || result.id) : 'Placed';
-
-    if (config.triggerElement) {
-      config.triggerElement.disabled = true;
-      config.triggerElement.textContent = 'Order Placed';
-      config.triggerElement.setAttribute('aria-busy', 'false');
-    }
-
-    if (submitBtn) {
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Order Placed';
-    }
-
     try { localStorage.removeItem('foxcod_checkout_state'); } catch (e) {}
 
-    if (modal) {
-      modal.innerHTML = [
-        '<div class="cod-success">',
-        '  <div class="cod-success-icon" aria-hidden="true">✓</div>',
-        '  <h2>Order Placed Successfully</h2>',
-        '  <p>Your Order ID: <strong data-foxcod-success-order-id>' + orderId + '</strong></p>',
-        '  <p>Redirecting...</p>',
-        '</div>'
-      ].join('');
-      modal.style.display = 'block';
-      modal.classList.add('visible');
+    // ── Disable buttons immediately to prevent double-submission ──
+    if (config.triggerElement) {
+      config.triggerElement.disabled = true;
+      config.triggerElement.setAttribute('aria-busy', 'false');
+    }
+    if (submitBtn) {
+      submitBtn.disabled = true;
     }
 
-    if (overlay) {
-      overlay.style.display = 'flex';
+    // ── Redirect to Shopify native Order Status page ──
+    var orderStatusUrl = result && result.orderStatusUrl;
+
+    if (orderStatusUrl) {
+      // Primary path: use Shopify-provided order_status_url
+      window.location.replace(orderStatusUrl);
+      return;
     }
 
-    document.body.style.overflow = 'hidden';
+    // ── Fallback: build a Shopify order status URL from available data ──
+    var shopifyOrderId = result && (result.shopifyOrderId || result.orderId);
+    var shopDomain = (config && config.shop) || (window.Shopify && window.Shopify.shop);
 
-    var needsPolling = !result || !result.orderName || /^COD-/i.test(String(result.orderName));
-
-    if (needsPolling && result && result.orderId && modal) {
-      pollForFinalOrderName(config, result.orderId, orderId, function(resolvedOrderId) {
-        var orderIdEl = modal.querySelector('[data-foxcod-success-order-id]');
-        if (orderIdEl && resolvedOrderId) {
-          orderIdEl.textContent = resolvedOrderId;
-        }
-      });
+    if (shopifyOrderId && shopDomain) {
+      var fallbackUrl = 'https://' + shopDomain + '/account/orders/' + shopifyOrderId;
+      console.warn('[COD] No order_status_url from Shopify. Using fallback:', fallbackUrl);
+      window.location.replace(fallbackUrl);
+      return;
     }
 
-    if (config._successReloadTimer) {
-      clearTimeout(config._successReloadTimer);
-    }
-
-    config._successReloadTimer = setTimeout(function() {
-      window.location.reload();
-    }, 2000);
+    // ── Last resort fallback: redirect to homepage so customer is never stuck ──
+    console.warn('[COD] No order status URL available. Redirecting to homepage.');
+    window.location.replace('/');
   }
 
   function mountBlockRoot(productId, config, state) {
