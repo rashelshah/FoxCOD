@@ -21,6 +21,7 @@ import {
     sanitizeVariantPricedLineItems,
 } from "../services/shopify-sync.server";
 import { getRestClient } from "../shopify/rest-client.server";
+import { createPartialPaymentCheckout } from "../services/shopify-partial-payment.server";
 
 // ── In-process caches to avoid repeated DB/session round-trips ──
 // REST clients and fraud settings are stable per shop for minutes at a time.
@@ -191,12 +192,15 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     }
 };
 
-// Handle Partial COD Checkout
-// Uses Cart Permalink approach - no Draft Orders required (avoids protected customer data restrictions)
+// ─── Handle Partial COD Checkout v2 ───────────────────────────────────────────
+// Releaseit-style: temporary Shopify discount code + Storefront API checkout.
+// Customer always pays through real Shopify Checkout → real Thank You page.
+// NO cart permalinks. NO draft orders. NO fake products.
 async function handlePartialCodCheckout(request: Request, data: any) {
-    try {
-        console.log('[Proxy Partial COD] Starting checkout creation (Cart Permalink approach)');
+    const start = Date.now();
+    console.log('[Proxy Partial COD v2] Starting Storefront checkout flow');
 
+    try {
         const {
             shop,
             productId,
@@ -212,152 +216,267 @@ async function handlePartialCodCheckout(request: Request, data: any) {
             customerCity,
             customerState,
             customerZipcode,
+            customerCountry,
             shippingPrice,
             notes,
             couponCode,
+            upsell_items,
+            bundleVariants,
+            discountPercent,
+            currency,
         } = data;
 
-        // Validate required fields
+        // ── Validate required fields ────────────────────────────────────────
         if (!shop || !variantId || !advanceAmount) {
-            console.log('[Proxy Partial COD] Missing required fields');
             return new Response(JSON.stringify({
                 success: false,
-                error: "Missing required fields: shop, variantId, advanceAmount"
+                error: 'Missing required fields: shop, variantId, advanceAmount',
             }), { status: 400, headers: corsHeaders });
         }
 
-        // Calculate amounts
+        const parsedAdvance = parseFloat(advanceAmount);
+        if (isNaN(parsedAdvance) || parsedAdvance <= 0) {
+            return new Response(JSON.stringify({
+                success: false,
+                error: 'Invalid advance amount',
+            }), { status: 400, headers: corsHeaders });
+        }
+
+        // ── Fraud Protection (was missing in v1) ────────────────────────────
+        const clientIp =
+            request.headers.get('x-shopify-client-ip')
+            || request.headers.get('cf-connecting-ip')
+            || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+            || request.headers.get('x-real-ip')
+            || 'unknown';
+
+        const [fraudSettings] = await Promise.all([
+            getCachedFraudSettings(shop),
+        ]);
+
+        try {
+            const fraudResult = await validateOrderAgainstFraudRulesWithSettings({
+                phone: customerPhone,
+                email: customerEmail,
+                ip: clientIp,
+                zipcode: customerZipcode,
+                quantity: parseInt(quantity) || 1,
+                shopDomain: shop,
+            }, fraudSettings);
+
+            if (!fraudResult.allowed) {
+                console.warn('[Proxy Partial COD v2] Blocked by fraud protection:', fraudResult.message);
+                return new Response(JSON.stringify({
+                    success: false,
+                    error: fraudResult.message,
+                }), { status: 403, headers: corsHeaders });
+            }
+        } catch (fraudErr: any) {
+            console.error('[Proxy Partial COD v2] Fraud check error (allowing order):', fraudErr.message);
+        }
+        console.log('⏱ [Proxy Partial COD v2] Fraud checks done:', Date.now() - start, 'ms');
+
+        // ── Pricing: base subtotal ──────────────────────────────────────────
         const pricing = calculateOrderPricing(data);
         let totalOrderValue = pricing.originalTotal;
         let couponDiscount = 0;
         let normalizedCouponCode = '';
+        const currencyCode = currency || 'INR';
+
+        // ── Coupon validation ───────────────────────────────────────────────
         if (couponCode) {
             const couponResult = await validateCouponForShop(shop, couponCode, pricing.originalTotal, data);
             if (!couponResult.valid) {
                 return new Response(JSON.stringify({
                     success: false,
-                    error: couponResult.message || "Invalid coupon"
+                    error: couponResult.message || 'Invalid coupon',
                 }), { status: 400, headers: corsHeaders });
             }
             couponDiscount = couponResult.discount;
             totalOrderValue = couponResult.finalTotal;
             normalizedCouponCode = normalizeCouponCode(couponCode);
+            console.log('[Proxy Partial COD v2] Coupon applied:', normalizedCouponCode, 'discount:', couponDiscount);
         }
-        const actualRemainingAmount = totalOrderValue - parseFloat(advanceAmount);
 
-        console.log('[Proxy Partial COD] Amounts - Total:', totalOrderValue, 'Advance:', advanceAmount, 'Remaining:', actualRemainingAmount);
+        // Safety: advance must not exceed total
+        const safeAdvance = Math.min(parsedAdvance, totalOrderValue);
+        const remainingAmount = Math.max(totalOrderValue - safeAdvance, 0);
 
-        // Generate a unique order reference
-        const orderRef = 'PCOD-' + Date.now().toString(36).toUpperCase();
+        console.log(
+            '[Proxy Partial COD v2] Pricing — total:', totalOrderValue,
+            'advance:', safeAdvance, 'remaining:', remainingAmount
+        );
 
-        // Log the partial COD order to our database
-        try {
-            const orderLogEntry = {
+        // ── Normalize customer name ─────────────────────────────────────────
+        const nameStr = (customerName || 'Customer').trim();
+        const nameParts = nameStr.split(/\s+/);
+        const firstName = nameParts[0] || 'Customer';
+        const lastName = nameParts.slice(1).join(' ') || '';
+        const formattedPhone = formatPhoneE164(customerPhone || '');
+
+        // ── Build line items (main + upsells + bundle variants) ────────────
+        const discountMult = 1 - ((parseFloat(discountPercent) || 0) / 100);
+        const mainVariantId = toNumericVariantId(variantId);
+        const storefrontLineItems: Array<{ variantId: string; quantity: number }> = [];
+
+        const hasBundleVariants = Array.isArray(bundleVariants) && bundleVariants.length > 1;
+        if (hasBundleVariants) {
+            bundleVariants.forEach((bv: any) => {
+                const bvId = toNumericVariantId(bv?.variantId ?? bv?.variant_id ?? bv?.id ?? variantId);
+                storefrontLineItems.push({ variantId: bvId, quantity: bv.quantity || 1 });
+            });
+        } else {
+            storefrontLineItems.push({ variantId: mainVariantId, quantity: parseInt(quantity) || 1 });
+        }
+
+        if (Array.isArray(upsell_items)) {
+            upsell_items.forEach((item: any) => {
+                const uvId = toNumericVariantId(item.variant_id);
+                if (uvId) {
+                    storefrontLineItems.push({ variantId: uvId, quantity: item.quantity || 1 });
+                }
+            });
+        }
+
+        // ── Generate unique partial payment reference ───────────────────────
+        const partialRef = 'PCOD-' + Date.now().toString(36).toUpperCase() + randomHex(4);
+
+        // ── Build notes ────────────────────────────────────────────────────
+        const fmtAmt = (amt: number) => {
+            try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: currencyCode }).format(amt); }
+            catch { return `${currencyCode} ${amt.toFixed(2)}`; }
+        };
+        let orderNotes = [
+            notes || '',
+            `PARTIAL COD [${partialRef}]`,
+            `Advance: ${fmtAmt(safeAdvance)}`,
+            `Remaining (COD): ${fmtAmt(remainingAmount)}`,
+            normalizedCouponCode ? `Coupon: ${normalizedCouponCode} (-${fmtAmt(couponDiscount)})` : '',
+        ].filter(Boolean).join('\n');
+
+        // ── Create Shopify Checkout via Storefront API ─────────────────────
+        console.log('[Proxy Partial COD v2] Calling createPartialPaymentCheckout, ref:', partialRef);
+
+        const checkoutResult = await createPartialPaymentCheckout({
+            shop,
+            customer: {
+                firstName,
+                lastName,
+                email: customerEmail || '',
+                phone: formattedPhone || customerPhone || '',
+                address1: customerAddress || '',
+                city: customerCity || '',
+                province: customerState || '',
+                country: customerCountry || '',
+                zip: customerZipcode || '',
+            },
+            lineItems: storefrontLineItems,
+            advanceAmount: safeAdvance,
+            totalOrderValue,
+            remainingAmount,
+            partialPaymentReference: partialRef,
+            currency: currencyCode,
+            notes: orderNotes,
+            couponCode: normalizedCouponCode || undefined,
+            shippingPrice: pricing.shippingPrice,
+        });
+
+        console.log('⏱ [Proxy Partial COD v2] Checkout created:', Date.now() - start, 'ms');
+
+        // ── Non-blocking DB log ────────────────────────────────────────────
+        Promise.resolve(
+            logOrder({
                 shop_domain: shop,
-                customer_name: customerName || '',
+                customer_name: nameStr,
                 customer_phone: customerPhone || '',
                 customer_address: customerAddress || '',
                 customer_email: customerEmail || '',
-                customer_city: customerCity || '',
-                customer_state: customerState || '',
-                customer_zipcode: customerZipcode || '',
-                product_id: productId,
+                notes: orderNotes,
+                city: customerCity || '',
+                state: customerState || '',
+                pincode: customerZipcode || '',
+                product_id: productId || variantId,
+                product_title: productTitle || 'Product',
                 variant_id: variantId,
-                product_title: productTitle,
                 quantity: parseInt(quantity) || 1,
                 price: String(price),
+                shipping_label: data.shippingLabel || '',
                 shipping_price: parseFloat(shippingPrice) || 0,
                 coupon_code: normalizedCouponCode || undefined,
                 discount_amount: couponDiscount || undefined,
                 original_total: pricing.originalTotal,
                 final_total: totalOrderValue,
-                notes: notes || '',
-                status: 'pending_advance_payment',
-                order_source: 'partial_cod',
+                currency: currencyCode,
                 is_partial_cod: true,
-                advance_amount: parseFloat(advanceAmount),
-                remaining_cod_amount: actualRemainingAmount,
-                order_reference: orderRef,
+                advance_amount: safeAdvance,
+                remaining_cod_amount: remainingAmount,
                 order_payload: {
                     ...data,
+                    partial_payment_reference: partialRef,
+                    checkout_id: checkoutResult.checkoutId,
+                    checkout_url: checkoutResult.checkoutUrl,
+                    discount_code: checkoutResult.discountCode,
+                    discount_expiry: checkoutResult.discountExpiresAt,
                     couponCode: normalizedCouponCode || '',
                     discountAmount: couponDiscount,
                     originalTotal: pricing.originalTotal,
                     finalTotal: totalOrderValue,
                 },
-            };
+            })
+        ).then(() => {
+            console.log('⏱ [Proxy Partial COD v2] DB log done (async):', Date.now() - start, 'ms');
+        }).catch((dbErr: any) => {
+            console.error('[Proxy Partial COD v2] DB log failed (non-fatal):', dbErr.message);
+        });
 
-            console.log('[Proxy Partial COD] Logging order to database:', orderRef);
-            await logOrder(orderLogEntry);
-            console.log('[Proxy Partial COD] Order logged successfully');
+        // ── Non-blocking Google Sheets sync ────────────────────────────────
+        syncOrderToGoogleSheets(shop, {
+            orderId: partialRef,
+            orderName: partialRef,
+            customerName: nameStr,
+            phone: customerPhone || '',
+            email: customerEmail || '',
+            address: customerAddress || '',
+            city: customerCity || '',
+            state: customerState || '',
+            pincode: customerZipcode || '',
+            product: productTitle || 'Product',
+            quantity: parseInt(quantity) || 1,
+            totalPrice: totalOrderValue.toString(),
+            paymentMethod: 'partial_cod',
+            status: 'partial_checkout_pending',
+        }).catch((err: any) => {
+            console.error('[Proxy Partial COD v2] Google Sheets sync error (non-blocking):', err.message);
+        });
 
-            // Non-blocking Google Sheets sync for partial COD
-            syncOrderToGoogleSheets(shop, {
-                orderId: orderRef,
-                orderName: orderRef,
-                customerName: customerName || '',
-                phone: customerPhone || '',
-                email: customerEmail || '',
-                address: customerAddress || '',
-                city: customerCity || '',
-                state: customerState || '',
-                pincode: customerZipcode || '',
-                product: productTitle || 'Product',
-                quantity: parseInt(quantity) || 1,
-                totalPrice: totalOrderValue.toString(),
-                paymentMethod: 'partial_cod',
-                status: 'pending_advance_payment',
-            }).catch(err => {
-                console.error('[Proxy Partial COD] Google Sheets sync error (non-blocking):', err.message);
-            });
-        } catch (dbError: any) {
-            console.error('[Proxy Partial COD] Database error (non-blocking):', dbError.message);
-            // Continue even if DB logging fails
-        }
-
-        // Create a Shopify cart checkout URL with notes about partial COD
-        // Format: https://store.myshopify.com/cart/VARIANT_ID:QUANTITY?checkout[note]=NOTE&attributes[key]=value
-        const currencyCode = data.currency || 'USD';
-        const fmtAmt = (amt: number) => { try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: currencyCode }).format(amt); } catch { return `${currencyCode} ${amt.toFixed(2)}`; } };
-
-        const encodedNote = encodeURIComponent(
-            `PARTIAL COD ORDER [${orderRef}]\n` +
-            `Advance Payment: ${fmtAmt(parseFloat(advanceAmount))}\n` +
-            `Remaining (Pay on Delivery): ${fmtAmt(actualRemainingAmount)}\n` +
-            `Customer: ${customerName} | ${customerPhone}`
-        );
-
-        // Build cart attributes for tracking
-        const attributes = [
-            `attributes[partial_cod]=true`,
-            `attributes[order_ref]=${orderRef}`,
-            `attributes[advance_amount]=${advanceAmount}`,
-            `attributes[remaining_amount]=${actualRemainingAmount.toFixed(2)}`,
-            `attributes[customer_name]=${encodeURIComponent(customerName || '')}`,
-            `attributes[customer_phone]=${encodeURIComponent(customerPhone || '')}`,
-            `attributes[customer_address]=${encodeURIComponent(customerAddress || '')}`,
-        ].join('&');
-
-        // Build the cart permalink URL
-        // This adds the product to cart and redirects to checkout
-        const checkoutUrl = `https://${shop}/cart/${variantId}:${quantity}?checkout[note]=${encodedNote}&${attributes}`;
-
-        console.log('[Proxy Partial COD] Generated checkout URL:', checkoutUrl);
+        console.log('⏱ [Proxy Partial COD v2] Total time to response:', Date.now() - start, 'ms');
 
         return new Response(JSON.stringify({
             success: true,
-            checkoutUrl: checkoutUrl,
-            orderReference: orderRef,
-            message: `Partial COD order created. Reference: ${orderRef}. Advance: ${fmtAmt(parseFloat(advanceAmount))}, Remaining: ${fmtAmt(actualRemainingAmount)}`,
+            checkoutUrl: checkoutResult.checkoutUrl,
+            partialPaymentReference: partialRef,
+            discountCode: checkoutResult.discountCode,
+            discountExpiresAt: checkoutResult.discountExpiresAt,
         }), { headers: corsHeaders });
 
     } catch (error: any) {
-        console.error('[Proxy Partial COD] Unexpected error:', error);
+        console.error('[Proxy Partial COD v2] ❌ Unexpected error:', error?.message);
+        console.error('[Proxy Partial COD v2] Stack:', error?.stack);
+        try {
+            require('fs').appendFileSync('debug-error.log', new Date().toISOString() + '\n' + error?.message + '\n' + error?.stack + '\n\n');
+        } catch (e) {}
+        // Return the real error message so browser console shows what failed
         return new Response(JSON.stringify({
             success: false,
-            error: error.message || "Failed to create checkout"
+            error: error.message || 'Unable to create checkout. Please try again.',
+            _debug: process.env.NODE_ENV !== 'production' ? error?.stack?.slice(0, 500) : undefined,
         }), { status: 500, headers: corsHeaders });
     }
+}
+
+// Tiny helper for random hex suffix
+function randomHex(bytes: number): string {
+    return Math.random().toString(16).slice(2, 2 + bytes * 2).toUpperCase();
 }
 
 // ─── Optimized Regular COD Order Flow ─────────────────────────────────────────

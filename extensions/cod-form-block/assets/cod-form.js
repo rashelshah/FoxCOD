@@ -6337,61 +6337,253 @@ function darkenColor(hex, percent) {
           return (c.upsell_mode !== 'pre_purchase') && shouldShowUpsell(c, config);
       }) : [];
 
-      if (applicableUpsells.length > 0 && !isPartialCod) {
-          // Show upsell modal FIRST, then submit the order with accepted items
+      if (applicableUpsells.length > 0) {
+          // Show upsell modal FIRST (for both full COD and partial COD),
+          // then proceed to the appropriate order flow with accepted items.
           showClickUpsellModal(form, config, productId, function(acceptedUpsellItems) {
-              // Merge accepted click upsell items into the payload
               payload.upsell_items = (payload.upsell_items || []).concat(acceptedUpsellItems);
-              console.log('[COD Form] Upsell flow complete. Accepted items:', acceptedUpsellItems.length, 'Submitting order...');
-              submitFullCodOrder(form, config, productId, payload, submitBtn, originalBtnText);
-          });
-          return; // STOP HERE - do NOT fall through to submitFullCodOrder
-      } else if (isPartialCod && config.partialCodEnabled) {
-          // Partial COD: Call create-checkout endpoint and redirect to Shopify checkout  
-          var partialCodPayload = {
-              ...payload,
-              paymentMethod: 'partial_cod',
-              advanceAmount: config.partialCodAdvance,
-              remainingAmount: Math.max((payload.finalTotal || 0) - config.partialCodAdvance, 0)
-          };
+              console.log('[COD Form] Upsell flow complete. Accepted items:', acceptedUpsellItems.length);
 
-          console.log('[COD Form] Partial COD checkout:', partialCodPayload);
+              // Re-read payment method (user could have changed their mind)
+              var pmRadioAfter = form.querySelector('input[name="payment_method"]:checked');
+              var pmAfter = pmRadioAfter ? pmRadioAfter.value : 'full_cod';
 
-          requestProxyJson(config, '/api/partial-cod/create-checkout', {
-              method: 'POST',
-              headers: {
-                  'Content-Type': 'application/json'
-              },
-              body: JSON.stringify(partialCodPayload)
-          })
-          .then(function(result) {
-              console.log('[COD Form] Partial COD response:', result);
-              
-	              if (result.success && result.checkoutUrl) {
-	                  // Redirect to Shopify checkout
-	                  window.location.href = result.checkoutUrl;
-	              } else {
-	                  config._isSubmitting = false;
-	                  submitBtn.disabled = false;
-	                  submitBtn.textContent = originalBtnText;
-	                  setFormMessage(form, 'error', result.error || 'Unable to create checkout right now. Please try again.');
-                  setBlockStatus(config, 'Checkout could not be started. The form is still available to try again.', 'warning');
+              if (pmAfter === 'partial_cod' && config.partialCodEnabled) {
+                  showPartialCodModal(form, config, payload, submitBtn, originalBtnText);
+              } else {
+                  submitFullCodOrder(form, config, productId, payload, submitBtn, originalBtnText);
               }
-          })
-	          .catch(function(err) {
-	              console.error('[COD Form] Partial COD error:', err);
-	              config._isSubmitting = false;
-	              submitBtn.disabled = false;
-	              submitBtn.textContent = originalBtnText;
-	              setFormMessage(form, 'error', err.message || 'Network error. Please try again.');
-              setBlockStatus(config, 'Live checkout request failed. The form stays visible so the customer can retry.', 'warning');
           });
-
-          return; // Exit - partial COD handling complete
+          return; // STOP HERE — do NOT fall through
+      } else if (isPartialCod && config.partialCodEnabled) {
+          // No upsells to show — go straight to partial COD modal
+          showPartialCodModal(form, config, payload, submitBtn, originalBtnText);
+          return; // Exit — partial COD handling complete
       }
 
       // Full COD with no upsells: Submit directly
       submitFullCodOrder(form, config, productId, payload, submitBtn, originalBtnText);
+  }
+
+  /**
+   * Show Releaseit-style Partial Payment Confirmation Modal
+   *
+   * Displays:
+   *   Product Total / Advance Amount / Remaining COD Amount
+   *   "Continue to Payment" button
+   *   15-minute expiry note
+   *
+   * On confirm → showPartialCodLoader → submitPartialCodCheckout
+   */
+  function showPartialCodModal(form, config, payload, submitBtn, originalBtnText) {
+      var finalTotal = payload.finalTotal || 0;
+      var advanceAmount = config.partialCodAdvance || 0;
+      var remainingAmount = Math.max(finalTotal - advanceAmount, 0);
+
+      // Build modal HTML
+      var overlay = document.createElement('div');
+      overlay.id = 'foxcod-partial-modal-overlay';
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483646;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:flex;align-items:flex-end;justify-content:center;padding:0;animation:foxcodPartialFadeIn 0.25s ease;';
+
+      var panel = document.createElement('div');
+      panel.style.cssText = 'background:#fff;border-radius:24px 24px 0 0;width:100%;max-width:540px;padding:28px 24px 32px;font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;box-shadow:0 -20px 60px rgba(0,0,0,0.18);animation:foxcodPartialSlideUp 0.3s cubic-bezier(0.34,1.56,0.64,1);';
+
+      // Inject animation CSS once
+      if (!document.getElementById('foxcod-partial-modal-css')) {
+          var css = document.createElement('style');
+          css.id = 'foxcod-partial-modal-css';
+          css.textContent = '@keyframes foxcodPartialFadeIn{from{opacity:0}to{opacity:1}}@keyframes foxcodPartialSlideUp{from{opacity:0;transform:translateY(100%)}to{opacity:1;transform:translateY(0)}}@keyframes foxcodPartialSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}';
+          document.head.appendChild(css);
+      }
+
+      var accentColor = (config.primaryColor || config.accentColor || '#2563eb');
+
+      panel.innerHTML = [
+          // Drag handle
+          '<div style="width:40px;height:4px;background:#e5e7eb;border-radius:99px;margin:0 auto 20px;"></div>',
+
+          // Header: lock icon + title
+          '<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">',
+              '<div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#eff6ff,#dbeafe);display:flex;align-items:center;justify-content:center;flex-shrink:0;">',
+                  '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="' + accentColor + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
+              '</div>',
+              '<div>',
+                  '<div style="font-size:18px;font-weight:700;color:#111827;line-height:1.2;">Partial Payment</div>',
+                  '<div style="font-size:13px;color:#6b7280;margin-top:1px;">Pay a small amount now, rest on delivery</div>',
+              '</div>',
+          '</div>',
+
+          // Divider
+          '<hr style="border:none;border-top:1px solid #f3f4f6;margin:16px 0;"/>',
+
+          // Price breakdown cards
+          '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:20px;">',
+
+              // Card 1 — Order Total
+              '<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:14px;padding:12px 10px;text-align:center;">',
+                  '<div style="font-size:11px;font-weight:600;color:#9ca3af;letter-spacing:0.03em;text-transform:uppercase;margin-bottom:4px;">Order Total</div>',
+                  '<div style="font-size:15px;font-weight:700;color:#374151;">' + formatMoney(finalTotal) + '</div>',
+              '</div>',
+
+              // Card 2 — Pay Now (highlighted)
+              '<div style="background:linear-gradient(135deg,' + accentColor + ',#1d4ed8);border-radius:14px;padding:12px 10px;text-align:center;box-shadow:0 4px 16px rgba(37,99,235,0.3);">',
+                  '<div style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.75);letter-spacing:0.03em;text-transform:uppercase;margin-bottom:4px;">Pay Now</div>',
+                  '<div style="font-size:15px;font-weight:800;color:#ffffff;">' + formatMoney(advanceAmount) + '</div>',
+              '</div>',
+
+              // Card 3 — Remaining COD
+              '<div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:14px;padding:12px 10px;text-align:center;">',
+                  '<div style="font-size:11px;font-weight:600;color:#9a3412;letter-spacing:0.03em;text-transform:uppercase;margin-bottom:4px;">Pay on Delivery</div>',
+                  '<div style="font-size:15px;font-weight:700;color:#9a3412;">' + formatMoney(remainingAmount) + '</div>',
+              '</div>',
+
+          '</div>',
+
+          // Trust line
+          '<div style="display:flex;align-items:center;gap:6px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:9px 12px;margin-bottom:20px;">',
+              '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 11 2 2 4-4"/></svg>',
+              '<span style="font-size:13px;color:#166534;font-weight:500;">Your checkout is secured by Shopify · Link expires in 15 min</span>',
+          '</div>',
+
+          // CTA button
+          '<button id="foxcod-partial-confirm-btn" style="display:block;width:100%;padding:15px;background:linear-gradient(135deg,' + accentColor + ',#1d4ed8);color:#fff;font-size:16px;font-weight:700;border:none;border-radius:14px;cursor:pointer;font-family:inherit;box-shadow:0 4px 20px rgba(37,99,235,0.35);transition:opacity 0.2s;">',
+              'Continue to Payment — ' + formatMoney(advanceAmount),
+          '</button>',
+
+          // Cancel link
+          '<button id="foxcod-partial-cancel-btn" style="display:block;width:100%;padding:12px;background:transparent;color:#9ca3af;font-size:14px;font-weight:500;border:none;cursor:pointer;font-family:inherit;margin-top:8px;">',
+              'Go back',
+          '</button>',
+      ].join('');
+
+      overlay.appendChild(panel);
+      document.body.appendChild(overlay);
+
+      // Confirm button
+      document.getElementById('foxcod-partial-confirm-btn').addEventListener('click', function() {
+          overlay.remove();
+          submitPartialCodCheckout(form, config, payload, submitBtn, originalBtnText, advanceAmount, remainingAmount);
+      });
+
+      // Cancel button — restore form state
+      document.getElementById('foxcod-partial-cancel-btn').addEventListener('click', function() {
+          overlay.remove();
+          config._isSubmitting = false;
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalBtnText;
+          submitBtn.style.removeProperty('opacity');
+      });
+
+      // Click backdrop to cancel
+      overlay.addEventListener('click', function(e) {
+          if (e.target === overlay) {
+              overlay.remove();
+              config._isSubmitting = false;
+              submitBtn.disabled = false;
+              submitBtn.textContent = originalBtnText;
+              submitBtn.style.removeProperty('opacity');
+          }
+      });
+  }
+
+  /**
+   * Show fullscreen loader while Shopify checkout is being created.
+   * Returns the overlay element so it can be hidden on error.
+   */
+  function showPartialCodLoader() {
+      var existing = document.getElementById('foxcod-partial-loader');
+      if (existing) existing.remove();
+
+      var overlay = document.createElement('div');
+      overlay.id = 'foxcod-partial-loader';
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:rgba(255,255,255,0.96);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;animation:foxcodPartialFadeIn 0.2s ease;';
+
+      overlay.innerHTML = [
+          // Animated lock icon with spinner ring
+          '<div style="position:relative;width:72px;height:72px;">',
+              '<svg style="position:absolute;inset:0;width:72px;height:72px;animation:foxcodPartialSpin 1.1s linear infinite;" viewBox="0 0 72 72" fill="none">',
+                  '<circle cx="36" cy="36" r="32" stroke="#e0e7ff" stroke-width="4"/>',
+                  '<path d="M4 36 A32 32 0 0 1 36 4" stroke="#2563eb" stroke-width="4" stroke-linecap="round"/>',
+              '</svg>',
+              '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">',
+                  '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
+              '</div>',
+          '</div>',
+
+          // Text
+          '<div style="text-align:center;">',
+              '<div style="font-size:20px;font-weight:700;color:#111827;margin-bottom:6px;">Redirecting to secure checkout</div>',
+              '<div style="font-size:14px;color:#6b7280;line-height:1.6;">Please wait while we prepare your Shopify checkout...<br>Do not close or refresh this page.</div>',
+          '</div>',
+
+          // Shopify badge
+          '<div style="display:flex;align-items:center;gap:6px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:99px;padding:8px 14px;">',
+              '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 11 2 2 4-4"/></svg>',
+              '<span style="font-size:12px;font-weight:600;color:#166534;">Secured by Shopify</span>',
+          '</div>',
+      ].join('');
+
+      document.body.appendChild(overlay);
+      return overlay;
+  }
+
+  /**
+   * Remove the partial COD loader overlay.
+   */
+  function hidePartialCodLoader() {
+      var overlay = document.getElementById('foxcod-partial-loader');
+      if (overlay) overlay.remove();
+  }
+
+  /**
+   * Submit Partial COD Checkout to backend, show loader, then redirect.
+   * Called after the confirmation modal is accepted.
+   */
+  function submitPartialCodCheckout(form, config, payload, submitBtn, originalBtnText, advanceAmount, remainingAmount) {
+      var partialCodPayload = Object.assign({}, payload, {
+          paymentMethod: 'partial_cod',
+          advanceAmount: advanceAmount,
+          remainingAmount: remainingAmount,
+      });
+
+      console.log('[COD Form] Partial COD v2 checkout payload:', partialCodPayload);
+
+      // Show fullscreen loader immediately
+      showPartialCodLoader();
+
+      requestProxyJson(config, '/api/partial-cod/create-checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(partialCodPayload)
+      })
+      .then(function(result) {
+          console.log('[COD Form] Partial COD v2 response:', result);
+
+          if (result && result.success && result.checkoutUrl) {
+              // Keep loader visible during redirect
+              window.location.href = result.checkoutUrl;
+          } else {
+              // Error — hide loader and restore form
+              hidePartialCodLoader();
+              config._isSubmitting = false;
+              submitBtn.disabled = false;
+              submitBtn.textContent = originalBtnText;
+              submitBtn.style.removeProperty('opacity');
+              var errMsg = (result && result.error) || 'Unable to start checkout. Please try again.';
+              setFormMessage(form, 'error', errMsg);
+              setBlockStatus(config, 'Checkout could not be started. Please try again.', 'warning');
+          }
+      })
+      .catch(function(err) {
+          console.error('[COD Form] Partial COD v2 error:', err);
+          hidePartialCodLoader();
+          config._isSubmitting = false;
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalBtnText;
+          submitBtn.style.removeProperty('opacity');
+          setFormMessage(form, 'error', err.message || 'Network error. Please try again.');
+          setBlockStatus(config, 'Checkout request failed. The form is still available to try again.', 'warning');
+      });
   }
 
   /**
