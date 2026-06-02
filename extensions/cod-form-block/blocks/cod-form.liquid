@@ -565,7 +565,7 @@
     right: 0;
     bottom: 0;
     background: rgba(0, 0, 0, 0.5);
-    z-index: 99998;
+    z-index: 2147483640 !important;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -588,7 +588,7 @@
   /* Modal Container - prevent horizontal swipe */
   .cod-form-container.cod-modal {
     position: relative;
-    z-index: 99999;
+    z-index: 2147483647 !important;
     touch-action: pan-y;
     overscroll-behavior-x: none;
     animation: slideUp 0.3s ease;

@@ -341,17 +341,23 @@
   }
 
   function getModalContainer(config) {
+    var id = getScopedDomId('cod-form', config);
+    var el = document.getElementById(id);
+    if (el) return el;
     if (config && config.rootElement) {
       return config.rootElement.querySelector('.cod-form-container.cod-modal');
     }
-    return document.getElementById(getScopedDomId('cod-form', config));
+    return null;
   }
 
   function getModalOverlay(config) {
+    var id = getScopedDomId('cod-modal-overlay', config);
+    var el = document.getElementById(id);
+    if (el) return el;
     if (config && config.rootElement) {
       return config.rootElement.querySelector('.cod-modal-overlay');
     }
-    return document.getElementById(getScopedDomId('cod-modal-overlay', config));
+    return null;
   }
 
   function getOrderFormElement(config) {
@@ -4118,10 +4124,10 @@ function darkenColor(hex, percent) {
       html += '<div style="display: flex; flex-direction: column; gap: 10px;">';
 
       if (showFullPrepaid) {
-          html += '<label class="pm-row pm-prepaid" style="display: flex; flex-direction: column; background: #f0fdf4; border-radius: 12px; border: 2px solid #22c55e; cursor: pointer; position: relative; overflow: visible; padding: 16px 12px 12px 12px; opacity: 1;">';
-          html += '<input type="radio" name="payment_method" value="full_prepaid" checked style="position:absolute; opacity:0; pointer-events:none;">';
+          html += '<label class="pm-row pm-prepaid" style="display: flex; flex-direction: column; background: #f0fdf4; border-radius: 12px; border: 2px solid #22c55e; cursor: pointer; position: relative; overflow: visible; padding: 0 !important; margin: 0 !important; box-sizing: border-box; opacity: 1;">';
+          html += '<input type="radio" name="payment_method" value="full_prepaid" checked style="position:absolute; opacity:0; pointer-events:none; margin:0; padding:0;">';
           html += '<div style="position: absolute; top: -10px; left: 16px; background: #22c55e; color: white; font-size: 9px; font-weight: 700; padding: 3px 8px; border-radius: 6px; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px; text-transform: uppercase;">★ MOST POPULAR</div>';
-          html += '<div style="display: flex; align-items: flex-start; gap: 12px;">';
+          html += '<div style="display: flex; align-items: flex-start; gap: 12px; padding: 16px 12px 12px 12px; box-sizing: border-box; width: 100%; margin: 0;">';
           html += '<div style="display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px; color: #16a34a; background-color: #dcfce7;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4" /><path d="M4 6v12c0 1.1.9 2 2 2h14v-4" /><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z" /></svg></div>';
           html += '<div style="flex: 1; min-width: 0; padding-top: 2px;">';
           html += '<div style="font-weight: 700; font-size: 14px; color: #166534; line-height: 1.2;">Full Prepaid</div>';
@@ -4136,11 +4142,11 @@ function darkenColor(hex, percent) {
       }
 
       if (showPartial) {
-          html += '<label class="pm-row pm-partial" style="display: flex; flex-direction: column; background: #eff6ff; border-radius: 12px; border: 2px solid ' + (showFullPrepaid ? '#bfdbfe' : '#2563eb') + '; cursor: pointer; position: relative;">';
-          html += '<input type="radio" name="payment_method" value="partial_cod" ' + (!showFullPrepaid ? 'checked' : '') + ' style="position:absolute; opacity:0; pointer-events:none;">';
-          html += '<div style="display: flex; align-items: center; gap: 12px; padding: 12px;">';
+          html += '<label class="pm-row pm-partial" style="display: flex; flex-direction: column; background: #eff6ff; border-radius: 12px; border: 2px solid ' + (showFullPrepaid ? '#bfdbfe' : '#2563eb') + '; cursor: pointer; position: relative; padding: 0 !important; margin: 0 !important; box-sizing: border-box; overflow: hidden !important;">';
+          html += '<input type="radio" name="payment_method" value="partial_cod" ' + (!showFullPrepaid ? 'checked' : '') + ' style="position:absolute; opacity:0; pointer-events:none; margin:0; padding:0;">';
+          html += '<div style="display: flex; align-items: flex-start; gap: 12px; padding: 16px 12px 12px 12px; box-sizing: border-box; width: 100%; margin: 0;">';
           html += '<div style="display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px; color: #2563eb; background-color: #dbeafe;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg></div>';
-          html += '<div style="flex: 1; min-width: 0;">';
+          html += '<div style="flex: 1; min-width: 0; padding-top: 2px;">';
           html += '<div style="font-weight: 700; font-size: 14px; color: #1e3a8a; line-height: 1.2; display: flex; align-items: center; gap: 4px;">Partial Payment <svg width="14" height="14" viewBox="0 0 24 24" fill="#2563eb" stroke="#eff6ff" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/></svg></div>';
           html += '<div class="pm-desc-partial" style="color: #60a5fa; font-size: 11px; margin-top: 4px; line-height: 1.3;">Pay ' + formatMoney(partialAdvance) + ' now • Rest on delivery</div>';
           html += '</div>';
@@ -4150,15 +4156,15 @@ function darkenColor(hex, percent) {
           html += '</div>';
           html += '<input type="radio" name="payment_method_visual" class="pm-pill" ' + (!showFullPrepaid ? 'checked' : '') + ' style="width: 18px; height: 18px; accent-color: #2563eb; margin: 0; pointer-events: none;">';
           html += '</div></div>';
-          html += '<div style="background: #dbeafe; padding: 8px 12px; border-bottom-left-radius: 10px; border-bottom-right-radius: 10px; font-size: 10px; color: #1e40af; display: flex; justify-content: center; align-items: center; font-weight: 500;">🛡️ Secure your order • Priority dispatch • Avoid fake cancellations</div>';
+          html += '<div style="background: #dbeafe; padding: 10px 12px; font-size: 10px; color: #1e40af; display: flex; justify-content: center; align-items: center; font-weight: 500; width: 100%; box-sizing: border-box; margin: 0;">🛡️ Secure your order • Priority dispatch • Avoid fake cancellations</div>';
           html += '</label>';
       }
 
-      html += '<label class="pm-row pm-cod" style="display: flex; flex-direction: column; background: #fff7ed; border-radius: 12px; border: 2px solid ' + (!showFullPrepaid && !showPartial ? '#ea580c' : '#fed7aa') + '; cursor: pointer; position: relative;">';
-      html += '<input type="radio" name="payment_method" value="full_cod" ' + (!showFullPrepaid && !showPartial ? 'checked' : '') + ' style="position:absolute; opacity:0; pointer-events:none;">';
-      html += '<div style="display: flex; align-items: center; gap: 12px; padding: 12px;">';
+      html += '<label class="pm-row pm-cod" style="display: flex; flex-direction: column; background: #fff7ed; border-radius: 12px; border: 2px solid ' + (!showFullPrepaid && !showPartial ? '#ea580c' : '#fed7aa') + '; cursor: pointer; position: relative; padding: 0 !important; margin: 0 !important; box-sizing: border-box; overflow: hidden !important;">';
+      html += '<input type="radio" name="payment_method" value="full_cod" ' + (!showFullPrepaid && !showPartial ? 'checked' : '') + ' style="position:absolute; opacity:0; pointer-events:none; margin:0; padding:0;">';
+      html += '<div style="display: flex; align-items: flex-start; gap: 12px; padding: 16px 12px 12px 12px; box-sizing: border-box; width: 100%; margin: 0;">';
       html += '<div style="display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px; color: #ea580c; background-color: #ffedd5;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="1" ry="1" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg></div>';
-      html += '<div style="flex: 1; min-width: 0;">';
+      html += '<div style="flex: 1; min-width: 0; padding-top: 2px;">';
       html += '<div style="font-weight: 700; font-size: 14px; color: #9a3412; line-height: 1.2;">Cash on Delivery</div>';
       html += '<div style="color: #fb923c; font-size: 11px; margin-top: 4px; line-height: 1.3;">Pay when you receive</div>';
       html += '</div>';
@@ -4168,7 +4174,7 @@ function darkenColor(hex, percent) {
       html += '</div>';
       html += '<input type="radio" name="payment_method_visual" class="pm-pill" ' + (!showFullPrepaid && !showPartial ? 'checked' : '') + ' style="width: 18px; height: 18px; accent-color: #ea580c; margin: 0; pointer-events: none;">';
       html += '</div></div>';
-      html += '<div style="background: #ffedd5; padding: 8px 12px; border-bottom-left-radius: 10px; border-bottom-right-radius: 10px; font-size: 10px; color: #9a3412; display: flex; justify-content: center; align-items: center; font-weight: 500;"><span style="margin-right: 4px;">ℹ️</span> Higher return risk • Slightly slower processing</div>';
+      html += '<div style="background: #ffedd5; padding: 10px 12px; font-size: 10px; color: #9a3412; display: flex; justify-content: center; align-items: center; font-weight: 500; width: 100%; box-sizing: border-box; margin: 0;"><span style="margin-right: 4px;">ℹ️</span> Higher return risk • Slightly slower processing</div>';
       html += '</label>';
 
       html += '</div></div>';
@@ -4818,11 +4824,16 @@ function darkenColor(hex, percent) {
     var form = getOrderFormElement(config);
     var hasBundleOffersActive = !!getProductPageOffersForConfig(config);
     
+    if (overlay) {
+        if (overlay.parentNode !== document.body) {
+            document.body.appendChild(overlay);
+        }
+        overlay.style.display = 'flex';
+    }
     if (modal) {
         modal.style.display = 'block';
         setTimeout(() => modal.classList.add('visible'), 10);
     }
-    if (overlay) overlay.style.display = 'flex';
     document.body.style.overflow = 'hidden';
 
     if (config && !config._foxcodModalPopHandler) {
@@ -5573,7 +5584,7 @@ function darkenColor(hex, percent) {
 
       // Show popup instantly — bg images use embedded data URIs
       var overlay = document.createElement('div');
-      overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100000; display: flex; align-items: center; justify-content: center; padding: 16px;';
+      overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2147483640; display: flex; align-items: center; justify-content: center; padding: 16px;';
       var modal = document.createElement('div');
       var isMobileUpsell = window.innerWidth <= 480;
       modal.style.cssText = 'background: #fff; border-radius: 24px; max-width: ' + (isMobileUpsell ? '340px' : '420px') + '; width: 100%; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.2); max-height: ' + (isMobileUpsell ? '85vh' : '90vh') + '; overflow-y: auto;';
@@ -5719,7 +5730,7 @@ function darkenColor(hex, percent) {
 
       // Show popup instantly — bg images use embedded data URIs
       var overlay = document.createElement('div');
-      overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100000; display: flex; align-items: center; justify-content: center; padding: 16px;';
+      overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2147483640; display: flex; align-items: center; justify-content: center; padding: 16px;';
       var modal = document.createElement('div');
       var isMobileDs = window.innerWidth <= 480;
       modal.style.cssText = 'background: #fff; border-radius: 24px; max-width: ' + (isMobileDs ? '340px' : '420px') + '; width: 100%; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.2); max-height: ' + (isMobileDs ? '85vh' : '90vh') + '; overflow-y: auto;';
@@ -5762,7 +5773,7 @@ function darkenColor(hex, percent) {
 
       var overlay = document.createElement('div');
       overlay.id = 'cod-fraud-popup-overlay';
-      overlay.style.cssText = 'position: fixed; inset: 0; z-index: 999999; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(0,0,0,0.45); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); animation: codFraudFadeIn 0.25s ease;';
+      overlay.style.cssText = 'position: fixed; inset: 0; z-index: 2147483647; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(0,0,0,0.45); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); animation: codFraudFadeIn 0.25s ease;';
 
       var popup = document.createElement('div');
       popup.style.cssText = 'background: #fff; border-radius: 20px; max-width: 400px; width: 100%; padding: 36px 28px 28px; text-align: center; box-shadow: 0 25px 60px rgba(0,0,0,0.2), 0 0 0 1px rgba(0,0,0,0.05); animation: codFraudSlideUp 0.3s ease; font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;';
