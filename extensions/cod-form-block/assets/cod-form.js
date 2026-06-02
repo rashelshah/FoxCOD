@@ -361,10 +361,13 @@
   }
 
   function getOrderFormElement(config) {
+    var id = getScopedDomId('cod-order-form', config);
+    var el = document.getElementById(id);
+    if (el) return el;
     if (config && config.rootElement) {
       return config.rootElement.querySelector('.cod-order-form');
     }
-    return document.getElementById(getScopedDomId('cod-order-form', config));
+    return document.querySelector('.cod-order-form');
   }
 
   function setBlockStatus(config, message, tone) {
@@ -3861,9 +3864,13 @@ function darkenColor(hex, percent) {
    * Priority: bundle offer selection > quantity input > default 1
    */
   function getProductPageOffersForConfig(config) {
-      var all = (config && config.rootElement)
-        ? config.rootElement.querySelectorAll('.cod-product-page-offers')
-        : document.querySelectorAll('.cod-product-page-offers');
+      var all;
+      if (config && config.rootElement) {
+          var container = config.rootElement._foxcodInjectedWrapper ? config.rootElement._foxcodInjectedWrapper : config.rootElement;
+          all = container.querySelectorAll('.cod-product-page-offers');
+      } else {
+          all = document.querySelectorAll('.cod-product-page-offers');
+      }
       if (!all || !all.length) return null;
       if (!config || !config.productId) return all[0];
       var target = String(config.productId).replace('gid://shopify/Product/', '');
@@ -4948,10 +4955,7 @@ function darkenColor(hex, percent) {
   }
 
   function openModal(productId, config) {
-    if (isShopifyEditor) {
-        console.log('FoxCOD: Skipping modal open in Theme Editor safe mode');
-        return;
-    }
+    console.log('[COD Form] openModal called for product:', productId);
 
     if (config && config._orderPlaced) {
         return;
@@ -4963,12 +4967,14 @@ function darkenColor(hex, percent) {
     var hasBundleOffersActive = !!getProductPageOffersForConfig(config);
     
     if (overlay) {
+        console.log('[COD Form] Found overlay element:', overlay);
         if (overlay.parentNode !== document.body) {
             document.body.appendChild(overlay);
         }
         overlay.style.display = 'flex';
     }
     if (modal) {
+        console.log('[COD Form] Found modal element:', modal);
         modal.style.display = 'block';
         setTimeout(() => modal.classList.add('visible'), 10);
     }
@@ -5305,10 +5311,12 @@ function darkenColor(hex, percent) {
                             if (ppOffersPreHide) ppOffersPreHide.style.setProperty('display', 'none', 'important');
                             
                             // Re-open the form
+                            console.log('[COD Form] Re-opening modal from downsell accept...');
                             openModal(productId, config);
                             // Modify the existing .cod-product-info section to show downsell pricing
                             setTimeout(function() {
                                 var container = form.closest('.cod-modal') || form.parentElement;
+                                console.log('[COD Form] Downsell DOM manipulation container:', container);
 
                                 // ── Hide bundle offers (only one offer at a time) ──
                                 var bundleOffers = container.querySelector('.cod-quantity-offers');

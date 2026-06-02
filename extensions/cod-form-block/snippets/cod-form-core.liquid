@@ -93,7 +93,7 @@
 {% assign cod_shipping_rates_enabled = shop.metafields.fox_cod.shipping_rates_enabled.value | default: shop.metafields.fox_cod.shipping_rates_enabled | default: 'false' %}
 {% assign cod_shipping_rates_json = shop.metafields.fox_cod.shipping_rates_json | default: '[]' %}
 {% assign cod_quantity_offers = shop.metafields.fox_cod.quantity_offers_json.value | default: '[]' %}
-{% assign cod_upsell_offers = shop.metafields.fox_cod.upsells_downsells_json | default: '{}' %}
+{% assign cod_upsell_offers = shop.metafields.fox_cod.upsells_downsells_json.value | default: '{}' %}
 {% comment %} For Shopify `json` type metafields, `.value` already returns parsed object — use directly {% endcomment %}
 {% assign cod_form_submit_btn = shop.metafields.fox_cod.form_submit_button_json.value %}
 
@@ -266,6 +266,9 @@
   try {
     // Metafield .value outputs Ruby hash syntax (=>), use | json to convert to JS
     var offersData = {{ shop.metafields.fox_cod.quantity_offers_json.value | json }};
+    if (typeof offersData === 'string') {
+        try { offersData = JSON.parse(offersData); } catch(e) {}
+    }
     window.FoxCod.quantityOffers = Array.isArray(offersData) ? offersData : (offersData ? [offersData] : []);
     window.FoxCod.productId = '{{ product.id }}';
     
@@ -286,6 +289,9 @@
     
     // Shipping rates
     var shippingRatesData = {{ shop.metafields.fox_cod.shipping_rates_json.value | json }};
+    if (typeof shippingRatesData === 'string') {
+        try { shippingRatesData = JSON.parse(shippingRatesData); } catch(e) {}
+    }
     window.FoxCod.shippingRates = Array.isArray(shippingRatesData) ? shippingRatesData : (shippingRatesData ? [shippingRatesData] : []);
     window.FoxCod.shippingRatesEnabled = {{ shop.metafields.fox_cod.shipping_rates_enabled.value | default: 'false' | json }};
     
@@ -295,6 +301,9 @@
     
     // Upsell offers
     var upsellData = {{ shop.metafields.fox_cod.upsells_downsells_json.value | json }};
+    if (typeof upsellData === 'string') {
+        try { upsellData = JSON.parse(upsellData); } catch(e) {}
+    }
     window.FoxCod.upsellOffers = upsellData || { tick_upsells: [], click_upsells: [], downsells: [] };
     console.log('[FoxCod] Upsell offers injected:', window.FoxCod.upsellOffers);
     

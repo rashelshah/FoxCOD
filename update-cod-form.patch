@@ -1,0 +1,27 @@
+--- extensions/cod-form-block/assets/cod-form.js
++++ extensions/cod-form-block/assets/cod-form.js
+@@ -4954,4 +4954,5 @@
+   function openModal(productId, config) {
++    console.log('[COD Form] openModal called for product:', productId);
+ 
+     if (config && config._orderPlaced) {
+         return;
+@@ -4962,8 +4963,10 @@
+     if (overlay) {
++        console.log('[COD Form] Found overlay element:', overlay);
+         if (overlay.parentNode !== document.body) {
+             document.body.appendChild(overlay);
+         }
+         overlay.style.display = 'flex';
+     }
+     if (modal) {
++        console.log('[COD Form] Found modal element:', modal);
+         modal.style.display = 'block';
+@@ -5310,2 +5313,3 @@
+                             // Re-open the form
++                            console.log('[COD Form] Re-opening modal from downsell accept...');
+                             openModal(productId, config);
+@@ -5315,2 +5319,3 @@
+                                 var container = form.closest('.cod-modal') || form.parentElement;
++                                console.log('[COD Form] Downsell DOM manipulation container:', container);
+ 
