@@ -624,7 +624,11 @@
   function hideNativeBuyButtons(root, config) {
     if (!root || !root.closest) return;
 
-    var productSection = root.closest('section, product-info, .product, .product__info');
+    // Search broadly — buy buttons may be in a different DOM branch than our root
+    var productSection = document.querySelector('product-info') ||
+                         root.closest('.shopify-section') ||
+                         root.closest('section, product-info, .product, .product__info') ||
+                         document;
     if (!productSection) return;
 
     var showAddToCart = !!(config && config.buttonStyles && config.buttonStyles.showAddToCart);
@@ -851,7 +855,14 @@
           config.rootElement.querySelectorAll('.cod-buy-btn.sticky-mobile').forEach(function(btn) {
             btn.style.setProperty('display', 'none', 'important');
           });
-          var productSection = config.rootElement.closest('section, product-info, .product, .product__info');
+          // Also hide the injected wrapper if button was moved
+          if (config.rootElement._foxcodInjectedWrapper) {
+            config.rootElement._foxcodInjectedWrapper.style.setProperty('display', 'none', 'important');
+          }
+          var productSection = document.querySelector('product-info') ||
+                               config.rootElement.closest('.shopify-section') ||
+                               config.rootElement.closest('section, product-info, .product, .product__info') ||
+                               document;
           if (productSection) {
             var selectors = ['.shopify-payment-button', '.shopify-payment-button__button', 'button[name="add"]', '.product-form__submit'];
             selectors.forEach(function(selector) {
@@ -897,6 +908,121 @@
       });
   }
 
+  /**
+   * Inject the COD trigger button directly at the buy buttons position.
+   * Searches the ENTIRE document (not scoped to a section) because in many
+   * Shopify themes (like Horizon), the buy buttons are inside a nested
+   * "Details" block group while our COD block is at the section level —
+   * completely different DOM branches.
+   */
+  function injectCodButtonAtBuyPosition(rootElement) {
+    if (!rootElement || !rootElement.isConnected) return;
+    if (rootElement.dataset.foxcodInjected === 'true') return;
+
+    var buyTarget = null;
+
+    // ── Strategy 1: <product-form> custom element (Dawn, Horizon, most OS2 themes) ──
+    var productForms = document.querySelectorAll('product-form');
+    for (var i = 0; i < productForms.length; i++) {
+      if (!productForms[i].closest('[data-fox-cod-root]')) {
+        buyTarget = productForms[i];
+        break;
+      }
+    }
+
+    // ── Strategy 2: .product-form__buttons wrapper ──
+    if (!buyTarget) {
+      var formBtns = document.querySelectorAll('.product-form__buttons');
+      for (var i = 0; i < formBtns.length; i++) {
+        if (!formBtns[i].closest('[data-fox-cod-root]')) {
+          buyTarget = formBtns[i];
+          break;
+        }
+      }
+    }
+
+    // ── Strategy 3: form[action="/cart/add"] ──
+    if (!buyTarget) {
+      var cartForms = document.querySelectorAll('form[action="/cart/add"], form[action*="/cart/add"]');
+      for (var i = 0; i < cartForms.length; i++) {
+        if (!cartForms[i].closest('[data-fox-cod-root]')) {
+          buyTarget = cartForms[i];
+          break;
+        }
+      }
+    }
+
+    // ── Strategy 4: button[name="add"] or .product-form__submit — use its parent ──
+    if (!buyTarget) {
+      var addBtns = document.querySelectorAll('button[name="add"], .product-form__submit');
+      for (var i = 0; i < addBtns.length; i++) {
+        if (!addBtns[i].closest('[data-fox-cod-root]')) {
+          buyTarget = addBtns[i].closest('form') || addBtns[i].closest('.product-form__buttons') || addBtns[i].parentElement;
+          break;
+        }
+      }
+    }
+
+    // ── Strategy 5: .shopify-payment-button parent ──
+    if (!buyTarget) {
+      var payBtns = document.querySelectorAll('.shopify-payment-button');
+      for (var i = 0; i < payBtns.length; i++) {
+        if (!payBtns[i].closest('[data-fox-cod-root]')) {
+          buyTarget = payBtns[i].closest('form') || payBtns[i].parentElement;
+          break;
+        }
+      }
+    }
+
+    // ── Strategy 6: Text-based search for any "Add to cart" / "Buy" button ──
+    if (!buyTarget) {
+      var allBtns = document.querySelectorAll('button, input[type="submit"]');
+      for (var i = 0; i < allBtns.length; i++) {
+        var txt = (allBtns[i].textContent || allBtns[i].value || '').toLowerCase().trim();
+        if ((txt.indexOf('add to cart') !== -1 || txt === 'buy it now' || txt === 'buy now') &&
+            !allBtns[i].closest('[data-fox-cod-root]')) {
+          buyTarget = allBtns[i].closest('form') || allBtns[i].parentElement;
+          break;
+        }
+      }
+    }
+
+    if (!buyTarget) {
+      console.warn('[FoxCOD] Could not find buy buttons anywhere on the page. COD button stays at block position.');
+      return;
+    }
+
+    console.log('[FoxCOD] Found buy buttons target:', buyTarget.tagName, buyTarget.className || '');
+
+    // Get the shell element (contains trigger button + status text)
+    var shell = rootElement.querySelector('[data-foxcod-shell]');
+    if (!shell) return;
+
+    // Create wrapper for the injected button
+    var wrapper = document.createElement('div');
+    wrapper.className = 'foxcod-injected-wrapper';
+    wrapper.setAttribute('data-foxcod-injected-for', rootElement.id || 'cod-root');
+    wrapper.style.cssText = 'width:100%;margin-top:10px;box-sizing:border-box;';
+
+    // Move the shell into the wrapper
+    wrapper.appendChild(shell);
+
+    // Insert right after the buy buttons target
+    if (buyTarget.nextSibling) {
+      buyTarget.parentNode.insertBefore(wrapper, buyTarget.nextSibling);
+    } else {
+      buyTarget.parentNode.appendChild(wrapper);
+    }
+
+    // Hide the original block root completely
+    rootElement.style.cssText += ';display:none!important;height:0!important;overflow:hidden!important;margin:0!important;padding:0!important;border:none!important;visibility:hidden!important;position:absolute!important;pointer-events:none!important;';
+
+    // Store reference so rest of the code can find the shell/trigger
+    rootElement._foxcodInjectedWrapper = wrapper;
+    rootElement.dataset.foxcodInjected = 'true';
+    console.log('[FoxCOD] ✅ COD button injected at buy buttons position successfully.');
+  }
+
   function initFoxCodSafe() {
     ensureValidationStyles();
 
@@ -917,7 +1043,19 @@
 
       hasStableRoot = true;
 
-      var trigger = rootElement.querySelector('[data-foxcod-trigger]');
+      // ALWAYS inject COD button at the buy buttons position
+      // This works in both theme editor and live storefront
+      injectCodButtonAtBuyPosition(rootElement);
+
+      // Find trigger — check injected wrapper first (shell was moved there)
+      var trigger = null;
+      if (rootElement._foxcodInjectedWrapper) {
+        trigger = rootElement._foxcodInjectedWrapper.querySelector('[data-foxcod-trigger]');
+      }
+      // Fallback: check original root (in case injection didn't run)
+      if (!trigger) {
+        trigger = rootElement.querySelector('[data-foxcod-trigger]');
+      }
       if (!trigger) return;
 
       var dataContainer = rootElement.querySelector('.cod-form-data');
@@ -1061,9 +1199,9 @@
         upsellOffers: (window.FoxCod && window.FoxCod.upsellOffers) || safeJSONParse(dataContainer.dataset.upsellOffers, { tick_upsells: [], click_upsells: [], downsells: [] }),
         appUrl: dataContainer.dataset.appUrl || '',
         rootElement: rootElement,
-        shellElement: rootElement ? rootElement.querySelector('[data-foxcod-shell]') : null,
+        shellElement: rootElement.querySelector('[data-foxcod-shell]') || (rootElement._foxcodInjectedWrapper ? rootElement._foxcodInjectedWrapper.querySelector('[data-foxcod-shell]') : null),
         triggerElement: trigger,
-        statusElement: rootElement ? rootElement.querySelector('[data-foxcod-status]') : null,
+        statusElement: rootElement.querySelector('[data-foxcod-status]') || (rootElement._foxcodInjectedWrapper ? rootElement._foxcodInjectedWrapper.querySelector('[data-foxcod-status]') : null),
         // Form submit button style overrides
         formSubmitButton: (function() {
           var attrStyles = safeJSONParse(dataContainer.dataset.formSubmitButton, {});

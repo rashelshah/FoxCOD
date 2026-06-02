@@ -50,13 +50,17 @@ function getShopFromRequest(request: Request) {
 }
 
 function getFallbackThemeEditorUrl(shop: string) {
-  const appBlockId = `${encodeURIComponent(process.env.SHOPIFY_API_KEY || FOX_COD_APP_CLIENT_ID)}/${encodeURIComponent(FOX_COD_BLOCK_HANDLE)}`;
+  const extensionId = encodeURIComponent(process.env.SHOPIFY_API_KEY || FOX_COD_APP_CLIENT_ID);
+  const handle = "cod-form-embed";
 
-  return `https://${shop}/admin/themes/current/editor?template=product&addAppBlockId=${appBlockId}&target=mainSection`;
+  return `https://${shop}/admin/themes/current/editor?context=apps&template=product&activateAppEmbed=${extensionId}/${handle}`;
 }
 
 function getThemeEditorUrl(shop: string, themeId: number) {
-  return `https://${shop}/admin/themes/${themeId}/editor?template=product`;
+  const extensionId = encodeURIComponent(process.env.SHOPIFY_API_KEY || FOX_COD_APP_CLIENT_ID);
+  const handle = "cod-form-embed";
+
+  return `https://${shop}/admin/themes/${themeId}/editor?context=apps&template=product&activateAppEmbed=${extensionId}/${handle}`;
 }
 
 async function adminRestJson<T>(

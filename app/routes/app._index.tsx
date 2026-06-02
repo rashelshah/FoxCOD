@@ -11,8 +11,8 @@ import { authenticate } from "../shopify.server";
 import { getFormSettings, saveShop } from "../config/supabase.server";
 import { getRestClient } from "../shopify/rest-client.server";
 
-const FOX_COD_APP_CLIENT_ID = "7c386161d2e35b3ec0a4fcbe0a8f4045";
-const FOX_COD_BLOCK_HANDLE = "cod-form";
+const FOX_COD_EXTENSION_UID = "87e0c6dc-4f49-e6ce-990c-7f93eadc93f862473f7f";
+const FOX_COD_EMBED_HANDLE = "cod-form-embed";
 
 type ShopifyOrder = {
   created_at: string;
@@ -33,10 +33,22 @@ type ShopifyRestClient = {
   get: (args: { path: string; query: Record<string, string> }) => Promise<ShopifyOrderStatsResponse>;
 };
 
+/**
+ * Returns the theme editor URL using the App Embed approach.
+ * App Embeds (target=body) work on ALL Shopify themes — both classic
+ * themes (Debut, Vintage, Brooklyn, Narrative) AND modern OS2 themes
+ * (Dawn, Horizon, Craft, etc.).
+ *
+ * The merchant simply toggles the embed ON in Theme Settings > App Embeds.
+ * No manual block placement needed.
+ */
 function getCodThemeEditorUrl(shop: string) {
-  const appBlockId = `${encodeURIComponent(process.env.SHOPIFY_API_KEY || FOX_COD_APP_CLIENT_ID)}/${encodeURIComponent(FOX_COD_BLOCK_HANDLE)}`;
+  // Use the App's Client ID (API Key) as some older Shopify apps use it as the extension UUID
+  const extensionId = encodeURIComponent(process.env.SHOPIFY_API_KEY || FOX_COD_APP_CLIENT_ID);
+  const handle = encodeURIComponent(FOX_COD_EMBED_HANDLE);
 
-  return `https://${shop}/admin/themes/current/editor?template=product&addAppBlockId=${appBlockId}&target=mainSection`;
+  // App Embed URL — opens on product template and activates the embed block
+  return `https://${shop}/admin/themes/current/editor?context=apps&template=product&activateAppEmbed=${extensionId}/${handle}`;
 }
 
 async function fetchShopifyOrderStats(restClient: ShopifyRestClient) {

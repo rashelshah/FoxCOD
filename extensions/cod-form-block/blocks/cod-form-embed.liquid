@@ -1,0 +1,19 @@
+{% comment %}
+  COD Form Embed - Cash on Delivery Order Form
+  App Embed block: works on ALL themes (classic + OS2)
+  Automatically injects COD button after buy buttons on product pages
+{% endcomment %}
+
+{% schema %}
+{
+  "name": "COD Form Embed",
+  "target": "body",
+  "settings": []
+}
+{% endschema %}
+
+{% comment %} Only render on product pages {% endcomment %}
+{% if request.page_type == 'product' %}
+  {% assign embed_id = 'embed' | append: product.id %}
+  {% render 'cod-form-core', instance_id: embed_id, shopify_attributes: '', is_embed: true, section_id: '' %}
+{% endif %}

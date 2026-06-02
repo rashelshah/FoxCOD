@@ -9,3 +9,7 @@ handle = "cod-form-block"
 [[extensions.targeting]]
 module = "./blocks/cod-form.liquid"
 target = "block"
+
+[[extensions.targeting]]
+module = "./blocks/cod-form-embed.liquid"
+target = "body"
