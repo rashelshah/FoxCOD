@@ -214,18 +214,23 @@ export default function Index() {
           overflow-x: hidden;
         }
         
-        /* Welcome Banner - Premium Dark Theme */
+        /* Welcome Banner - Premium Orange Theme */
+        @import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Playfair+Display:wght@700&display=swap');
+        
         .welcome-banner {
-          background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+          background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
           border-radius: 20px;
-          padding: 32px 36px;
+          padding: 24px 32px;
           color: white;
-          margin-bottom: 28px;
+          margin-bottom: 24px;
           position: relative;
           overflow: hidden;
-          box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+          box-shadow: 0 15px 30px rgba(239, 68, 68, 0.15);
           will-change: transform;
           transform: translateZ(0);
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
         }
         
         .welcome-banner::before {
@@ -235,7 +240,7 @@ export default function Index() {
           right: -100px;
           width: 300px;
           height: 300px;
-          background: radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, transparent 70%);
+          background: radial-gradient(circle, rgba(255, 255, 255, 0.15) 0%, transparent 70%);
           border-radius: 50%;
         }
 
@@ -243,71 +248,129 @@ export default function Index() {
           content: '';
           position: absolute;
           bottom: -50px;
-          left: 50%;
+          left: 30%;
           width: 200px;
           height: 200px;
-          background: radial-gradient(circle, rgba(16, 185, 129, 0.1) 0%, transparent 70%);
+          background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
           border-radius: 50%;
         }
         
-        .welcome-banner h1 {
-          font-size: 28px;
+        .welcome-content {
+          position: relative;
+          z-index: 2;
+          max-width: 500px;
+        }
+        
+        .welcome-script {
+          font-family: 'Dancing Script', cursive;
+          font-size: 24px;
+          color: #fcd34d;
+          margin: 0 0 -3px 0;
           font-weight: 700;
-          margin: 0 0 8px 0;
+        }
+
+        .welcome-title-row {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          margin-bottom: 8px;
+        }
+        
+        .welcome-banner h1 {
+          font-family: 'Playfair Display', serif;
+          font-size: 38px;
+          font-weight: 700;
+          margin: 0;
           letter-spacing: -0.5px;
+          line-height: 1.1;
+        }
+        
+        .welcome-fox-icon {
+          width: 36px;
+          height: 36px;
+          background: rgba(255, 255, 255, 0.2);
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        
+        .welcome-fox-icon svg {
+          width: 20px;
+          height: 20px;
         }
         
         .welcome-banner p {
-          font-size: 15px;
-          opacity: 0.75;
+          font-size: 14px;
+          opacity: 0.95;
           margin: 0;
+          line-height: 1.4;
         }
         
         .welcome-actions {
           display: flex;
           gap: 12px;
-          margin-top: 24px;
+          margin-top: 20px;
           position: relative;
-          z-index: 1;
+          z-index: 2;
         }
         
         .welcome-btn {
-          padding: 12px 24px;
-          border-radius: 10px;
+          padding: 10px 20px;
+          border-radius: 8px;
           font-weight: 600;
-          font-size: 14px;
+          font-size: 13px;
           cursor: pointer;
           transition: all 0.2s ease;
           text-decoration: none;
           display: inline-flex;
           align-items: center;
-          gap: 8px;
+          gap: 6px;
           border: none;
         }
         
         .welcome-btn-primary {
-          background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-          color: white;
+          background: #ffffff;
+          color: #ef4444;
+          box-shadow: 0 4px 10px rgba(0,0,0,0.08);
         }
         
         .welcome-btn-primary:hover {
           transform: translateY(-2px);
-          box-shadow: 0 8px 20px rgba(99, 102, 241, 0.4);
+          box-shadow: 0 6px 15px rgba(0,0,0,0.12);
         }
         
         .welcome-btn-secondary {
-          background: rgba(255,255,255,0.1);
+          background: transparent;
           color: white;
-          border: 1px solid rgba(255,255,255,0.2);
-          backdrop-filter: blur(10px);
+          border: 1px solid rgba(255,255,255,0.4);
         }
         
         .welcome-btn-secondary:hover {
-          background: rgba(255,255,255,0.15);
-          border-color: rgba(255,255,255,0.3);
+          background: rgba(255,255,255,0.1);
+          border-color: white;
+        }
+        
+        .welcome-illustration {
+          position: relative;
+          z-index: 1;
+          height: 150px;
+          margin-right: 20px;
+        }
+        
+        .welcome-illustration img {
+          height: 100%;
+          object-fit: contain;
         }
         
         /* Status Pill */
+        .status-pill-container {
+          position: absolute;
+          top: 24px;
+          right: 32px;
+          z-index: 10;
+        }
+        
         .status-pill {
           display: inline-flex;
           align-items: center;
@@ -315,20 +378,18 @@ export default function Index() {
           padding: 8px 16px;
           border-radius: 24px;
           font-size: 13px;
-          font-weight: 600;
-          backdrop-filter: blur(10px);
+          font-weight: 700;
+          background: white;
         }
         
         .status-active {
-          background: rgba(16, 185, 129, 0.2);
-          color: #34d399;
-          border: 1px solid rgba(16, 185, 129, 0.3);
+          color: #22c55e;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
         
         .status-inactive {
-          background: rgba(239, 68, 68, 0.2);
           color: #f87171;
-          border: 1px solid rgba(239, 68, 68, 0.3);
+          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
         
         .status-dot {
@@ -339,7 +400,7 @@ export default function Index() {
         }
         
         .status-active .status-dot {
-          background: #34d399;
+          background: #22c55e;
         }
         
         .status-inactive .status-dot {
@@ -349,6 +410,23 @@ export default function Index() {
         @keyframes pulse {
           0%, 100% { opacity: 1; transform: scale(1); }
           50% { opacity: 0.6; transform: scale(0.9); }
+        }
+        
+        @media (max-width: 768px) {
+          .welcome-banner {
+            flex-direction: column;
+            padding: 24px;
+            align-items: flex-start;
+          }
+          .welcome-illustration {
+            display: none;
+          }
+          .status-pill-container {
+            position: relative;
+            top: auto;
+            right: auto;
+            margin-bottom: 20px;
+          }
         }
         
         /* Stats Grid */
@@ -750,26 +828,41 @@ export default function Index() {
         <div className="fox-dashboard">
           {/* Welcome Banner with Status */}
           <div className="welcome-banner">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', position: 'relative', zIndex: 1 }}>
-              <div>
-                <h1>Welcome to Fox COD</h1>
-                <p>Manage your Cash on Delivery orders efficiently</p>
-              </div>
+            <div className="status-pill-container">
               <span className={`status-pill ${enabled ? 'status-active' : 'status-inactive'}`}>
                 <span className="status-dot" />
                 {enabled ? 'COD Active' : 'COD Inactive'}
               </span>
             </div>
-            <div className="welcome-actions">
-              <Link to="/app/settings" className="welcome-btn welcome-btn-primary">
-                Form Builder
-              </Link>
-              <button
-                className="welcome-btn welcome-btn-secondary"
-                onClick={() => window.open(themeEditorUrl, '_blank', 'noopener,noreferrer')}
-              >
-                Add to Theme
-              </button>
+            
+            <div className="welcome-content">
+              <div className="welcome-script">Welcome to</div>
+              <div className="welcome-title-row">
+                <h1>Fox COD</h1>
+                <div className="welcome-fox-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 12c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2s10 4.477 10 10z"/>
+                    <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
+                    <line x1="9" y1="9" x2="9.01" y2="9"/>
+                    <line x1="15" y1="9" x2="15.01" y2="9"/>
+                  </svg>
+                </div>
+              </div>
+              <p>Manage your Cash on Delivery orders efficiently<br/>and grow your business.</p>
+              
+              <div className="welcome-actions">
+                <Link to="/app/settings" className="welcome-btn welcome-btn-primary">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                  Form Builder
+                </Link>
+                <button
+                  className="welcome-btn welcome-btn-secondary"
+                  onClick={() => window.open(themeEditorUrl, '_blank', 'noopener,noreferrer')}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+                  Add to Theme
+                </button>
+              </div>
             </div>
           </div>
 
