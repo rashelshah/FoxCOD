@@ -1,5 +1,5 @@
 import type { ActionFunctionArgs } from "react-router";
-import { authenticate } from "../shopify.server";
+import { authenticate, unauthenticated } from "../shopify.server";
 import { logOrder, type OrderLogEntry } from "../config/supabase.server";
 
 /**
@@ -9,7 +9,12 @@ import { logOrder, type OrderLogEntry } from "../config/supabase.server";
  * We use it to detect Partial COD orders (via custom attributes) and log them.
  */
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { topic, shop, payload } = await authenticate.webhook(request);
+  try {
+    const fs = require('fs');
+    fs.appendFileSync('/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/webhook-debug.log', `[${new Date().toISOString()}] Webhook triggered for orders/create\n`);
+  } catch (e) {}
+
+  const { topic, shop, payload, admin } = await authenticate.webhook(request);
 
   console.log(`[Webhook] Received ${topic} for ${shop}`);
   console.log(
@@ -20,7 +25,18 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   try {
     const noteAttributes = payload.note_attributes || [];
     const partialCodAttr = noteAttributes.find((attr: any) => attr.name === "partial_cod");
-    const isPartialCod = partialCodAttr?.value === "true";
+    const discountCodes = payload.discount_codes || [];
+    const discountApps = payload.discount_applications || [];
+    
+    try {
+      const fs = require('fs');
+      fs.appendFileSync('/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/webhook-debug.log', `[${new Date().toISOString()}] Payload ID: ${payload.id}, Discount Codes: ${JSON.stringify(discountCodes)}, Discount Apps: ${JSON.stringify(discountApps)}, Note Attrs: ${JSON.stringify(noteAttributes)}\n`);
+    } catch (e) {}
+    
+    const pcodCode = discountCodes.find((dc: any) => dc.code?.startsWith("FOX-PCOD-"));
+    const pcodApp = discountApps.find((da: any) => da.code?.startsWith("FOX-PCOD-") || da.title?.startsWith("FoxCOD Partial Payment"));
+    
+    const isPartialCod = partialCodAttr?.value === "true" || !!pcodCode || !!pcodApp;
 
     if (!isPartialCod) {
       console.log("[Webhook] Not a partial COD order, skipping");
@@ -34,8 +50,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       return attr?.value || "";
     };
 
-    const advanceAmount = parseFloat(getAttrValue("advance_amount")) || 0;
-    const remainingAmount = parseFloat(getAttrValue("remaining_amount")) || 0;
+    let advanceAmount = parseFloat(getAttrValue("advance_amount")) || 0;
+    let remainingAmount = parseFloat(getAttrValue("remaining_amount")) || 0;
+    
+    if ((pcodCode || pcodApp) && remainingAmount === 0) {
+      // If note_attributes were stripped by Shop Pay / Accelerated Checkout, recover values
+      const discountValue = pcodCode ? parseFloat(pcodCode.amount) : parseFloat(pcodApp.value);
+      remainingAmount = discountValue || 0;
+      advanceAmount = parseFloat(payload.total_price) || 0;
+    }
+
     const originalProductId = getAttrValue("original_product_id");
     const originalVariantId = getAttrValue("original_variant_id");
     const originalQuantity = parseInt(getAttrValue("original_quantity")) || 1;
@@ -75,11 +99,139 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       is_partial_cod: true,
       advance_amount: advanceAmount,
       remaining_cod_amount: remainingAmount,
+      currency: payload.currency || "USD"
     };
 
     console.log("[Webhook] Logging partial COD order:", orderLogEntry);
     await logOrder(orderLogEntry);
     console.log("[Webhook] Partial COD order logged successfully:", payload.name);
+
+    // ── Apply Order Edit to Fix Order Total and Payment Status ──
+    let graphqlAdmin = admin;
+    if (!graphqlAdmin) {
+      console.log(`[Webhook] 'admin' context missing, falling back to unauthenticated.admin...`);
+      const unauth = await unauthenticated.admin(shop);
+      graphqlAdmin = unauth.admin;
+    }
+
+    if (graphqlAdmin) {
+      try {
+        console.log(`[Webhook] Updating tags for order ${payload.id}...`);
+        
+        try {
+          const fs = require('fs');
+          fs.appendFileSync('/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/webhook-debug.log', `[${new Date().toISOString()}] Executing tagsAdd and Order Edit for ${payload.id}\n`);
+        } catch (e) {}
+        
+        // 0. Add tags
+        await graphqlAdmin.graphql(
+          `mutation tagsAdd($id: ID!, $tags: [String!]!) {
+            tagsAdd(id: $id, tags: $tags) {
+              userErrors {
+                message
+              }
+            }
+          }`,
+          {
+            variables: { 
+              id: `gid://shopify/Order/${payload.id}`,
+              tags: ["FoxCOD", "Partial COD", "Pending Advance"]
+            },
+          }
+        );
+
+        if (remainingAmount > 0) {
+          console.log(`[Webhook] Starting Order Edit for order ${payload.id} to add remaining balance...`);
+          // 1. Begin Order Edit
+          const beginRes = await graphqlAdmin.graphql(
+            `mutation orderEditBegin($id: ID!) {
+              orderEditBegin(id: $id) {
+                calculatedOrder {
+                  id
+                }
+                userErrors {
+                  field
+                  message
+                }
+              }
+            }`,
+            {
+              variables: { id: `gid://shopify/Order/${payload.id}` },
+            }
+          );
+          
+          const beginData = await beginRes.json();
+          const calculatedOrderId = beginData.data?.orderEditBegin?.calculatedOrder?.id;
+          
+          if (calculatedOrderId) {
+            // 2. Add Custom Item for Remaining Balance
+            const addRes = await graphqlAdmin.graphql(
+              `mutation orderEditAddCustomItem($id: ID!, $price: MoneyInput!, $quantity: Int!, $title: String!) {
+                orderEditAddCustomItem(id: $id, price: $price, quantity: $quantity, title: $title) {
+                  calculatedOrder {
+                    id
+                  }
+                  userErrors {
+                    field
+                    message
+                  }
+                }
+              }`,
+              {
+                variables: {
+                  id: calculatedOrderId,
+                  title: "Pending Cash on Delivery Balance",
+                  price: {
+                    amount: remainingAmount.toFixed(2),
+                    currencyCode: payload.currency || "USD"
+                  },
+                  quantity: 1
+                }
+              }
+            );
+            
+            const addData = await addRes.json();
+            const addErrors = addData.data?.orderEditAddCustomItem?.userErrors || [];
+            
+            if (addErrors.length === 0) {
+              // 3. Commit Order Edit
+              await graphqlAdmin.graphql(
+                `mutation orderEditCommit($id: ID!) {
+                  orderEditCommit(id: $id, notifyCustomer: false, staffNote: "Added Pending COD Balance") {
+                    order {
+                      id
+                    }
+                    userErrors {
+                      field
+                      message
+                    }
+                  }
+                }`,
+                {
+                  variables: { id: calculatedOrderId }
+                }
+              );
+              console.log(`[Webhook] Order ${payload.id} successfully updated with pending COD balance.`);
+            } else {
+              console.error(`[Webhook] Error adding custom item during order edit:`, addErrors);
+            }
+          } else {
+            console.error(`[Webhook] Error beginning order edit:`, beginData.data?.orderEditBegin?.userErrors);
+          }
+        }
+      } catch (editError: any) {
+        try {
+          const fs = require('fs');
+          fs.appendFileSync('/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/webhook-debug.log', `[${new Date().toISOString()}] Order Edit Error: ${editError.message}\n`);
+        } catch (e) {}
+        console.error(`[Webhook] Failed to apply Order Edit API or Tags for Partial COD:`, editError);
+      }
+    } else {
+      try {
+        const fs = require('fs');
+        fs.appendFileSync('/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/webhook-debug.log', `[${new Date().toISOString()}] graphqlAdmin is null\n`);
+      } catch (e) {}
+    }
 
     return new Response(null, { status: 200 });
   } catch (error) {

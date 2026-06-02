@@ -1,47 +1,32 @@
+import { PrismaClient } from '@prisma/client';
 async function run() {
-  const shop = 'fox-cod-dev.myshopify.com';
-  const token = process.env.SHOPIFY_TOKEN || '';
+  const prisma = new PrismaClient();
+  const session = await prisma.session.findFirst({
+    where: { shop: 'fox-cod-dev.myshopify.com' }
+  });
   
-  const query = `
-    mutation draftOrderCreate($input: DraftOrderInput!) {
-      draftOrderCreate(input: $input) {
-        draftOrder {
-          id
-          invoiceUrl
+  if (!session?.accessToken) return;
+  
+  const payload = {
+    draft_order: {
+      line_items: [
+        {
+          variant_id: 44225448017943, // The Collection Snowboard: Liquid
+          quantity: 1,
+          price: "674.96",
+          title: "The Collection Snowboard: Liquid"
         }
-        userErrors {
-          field
-          message
-        }
-      }
+      ]
     }
-  `;
+  };
   
-  const res = await fetch(`https://${shop}/admin/api/2024-01/graphql.json`, {
+  const res = await fetch(`https://fox-cod-dev.myshopify.com/admin/api/2024-01/draft_orders.json`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Shopify-Access-Token': token
+      'X-Shopify-Access-Token': session.accessToken
     },
-    body: JSON.stringify({
-      query,
-      variables: {
-        input: {
-          lineItems: [
-            {
-              title: "Custom Downsell Product",
-              originalUnitPrice: "674.96",
-              quantity: 1
-            }
-          ],
-          appliedDiscount: {
-            title: "Partial Payment Remaining",
-            value: 574.96,
-            valueType: "FIXED_AMOUNT"
-          }
-        }
-      }
-    })
+    body: JSON.stringify(payload)
   });
   
   const data = await res.json();

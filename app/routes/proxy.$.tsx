@@ -314,32 +314,27 @@ async function handlePartialCodCheckout(request: Request, data: any) {
         const lastName = nameParts.slice(1).join(' ') || '';
         const formattedPhone = formatPhoneE164(customerPhone || '');
 
-        // ── Build line items (main + upsells + bundle variants) ────────────
-        const discountMult = 1 - ((parseFloat(discountPercent) || 0) / 100);
-        const mainVariantId = toNumericVariantId(variantId);
-        const storefrontLineItems: Array<{ variantId: string; quantity: number }> = [];
-
-        const hasBundleVariants = Array.isArray(bundleVariants) && bundleVariants.length > 1;
-        if (hasBundleVariants) {
-            bundleVariants.forEach((bv: any) => {
-                const bvId = toNumericVariantId(bv?.variantId ?? bv?.variant_id ?? bv?.id ?? variantId);
-                storefrontLineItems.push({ variantId: bvId, quantity: bv.quantity || 1 });
-            });
-        } else {
-            storefrontLineItems.push({ variantId: mainVariantId, quantity: parseInt(quantity) || 1 });
-        }
-
-        if (Array.isArray(upsell_items)) {
-            upsell_items.forEach((item: any) => {
-                const uvId = toNumericVariantId(item.variant_id);
-                if (uvId) {
-                    storefrontLineItems.push({ variantId: uvId, quantity: item.quantity || 1 });
-                }
-            });
-        }
-
         // ── Generate unique partial payment reference ───────────────────────
         const partialRef = 'PCOD-' + Date.now().toString(36).toUpperCase() + randomHex(4);
+
+        // ── Build line items with accurate pricing (main + upsells + bundle variants)
+        const discountMult = 1 - ((parseFloat(discountPercent) || 0) / 100);
+        const storefrontLineItems = pricing.discountItems.map((item: any) => {
+            let title = data.productTitle || 'Product';
+            // Attempt to find specific titles if it's an upsell
+            const upsellMatch = Array.isArray(upsell_items) && upsell_items.find((u: any) => toNumericVariantId(u.variant_id) === toNumericVariantId(item.variantId));
+            if (upsellMatch && upsellMatch.title) {
+                title = upsellMatch.title;
+            }
+            
+            return {
+                variantId: item.variantId,
+                productId: item.productId,
+                quantity: item.quantity,
+                price: item.price,
+                title,
+            };
+        });
 
         // ── Build notes ────────────────────────────────────────────────────
         const fmtAmt = (amt: number) => {

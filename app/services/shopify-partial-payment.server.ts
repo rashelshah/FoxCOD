@@ -1,48 +1,27 @@
-/**
- * Shopify Partial Payment Service — Cart API Edition
- *
- * Creates a Releaseit-style partial payment flow using:
- *   1. A temporary Shopify discount code (FOX-PCOD-XXXXXX) via Admin API that reduces
- *      the cart total by `remainingAmount`, leaving only `advanceAmount` due.
- *   2. A Storefront API Cart session using cartCreate + cartBuyerIdentityUpdate.
- *      Returns cart.checkoutUrl for redirect to Shopify's hosted checkout.
- *
- * ⚠️  checkoutCreate / checkoutDiscountCodeApplyV2 were removed April 1, 2025.
- *      This file uses the Cart API (2025-10) exclusively.
- *
- * NO cart permalinks. NO draft orders. NO fake products. NO custom thank-you pages.
- */
-
 import { unauthenticated } from '../shopify.server';
 
-// ── In-process Storefront token cache ──────────────────────────────────────
-const _storefrontTokenCache = new Map<string, string>();
-
-// ── Shopify Storefront API version ─────────────────────────────────────────
-const STOREFRONT_API_VERSION = '2025-10';
-
-// ── Discount code prefix & TTL ─────────────────────────────────────────────
 const DISCOUNT_PREFIX = 'FOX-PCOD-';
-const DISCOUNT_TTL_MINUTES = 15;
-
-// ── Types ──────────────────────────────────────────────────────────────────
+const DISCOUNT_TTL_MINUTES = 60; 
 
 export interface CustomerFields {
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  address1: string;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  address1?: string;
   address2?: string;
-  city: string;
-  province: string;
-  country: string;
-  zip: string;
+  city?: string;
+  province?: string;
+  zip?: string;
+  country?: string;
+  phone?: string;
 }
 
 export interface LineItemInput {
-  variantId: string; // numeric Shopify variant ID
+  variantId: string | number;
+  productId?: string | number;
   quantity: number;
+  price: number; 
+  title?: string;
 }
 
 export interface PartialPaymentCheckoutParams {
@@ -62,9 +41,10 @@ export interface PartialPaymentCheckoutParams {
 export interface PartialPaymentCheckoutResult {
   checkoutId: string;
   checkoutUrl: string;
-  discountCode: string;
-  discountExpiresAt: string;
+  discountCode?: string;
+  discountExpiresAt?: string;
   partialPaymentReference: string;
+  checkoutType: 'cart_permalink' | 'draft_order';
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -78,180 +58,15 @@ async function getAdminGraphql(shop: string) {
   return admin.graphql.bind(admin);
 }
 
-// ── Get or create Storefront Access Token ─────────────────────────────────
-
-async function getStorefrontToken(shop: string): Promise<string> {
-  const cached = _storefrontTokenCache.get(shop);
-  if (cached) return cached;
-
-  const { admin, session } = await unauthenticated.admin(shop);
-
-  // 1. Try to find an existing token using the REST API (GraphQL query was removed)
-  try {
-    const url = `https://${shop}/admin/api/${STOREFRONT_API_VERSION}/storefront_access_tokens.json`;
-    const listRes = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Shopify-Access-Token': session.accessToken,
-      }
-    });
-
-    if (listRes.ok) {
-      const listData = await listRes.json();
-      const tokens: any[] = listData?.storefront_access_tokens || [];
-      const existing = tokens.find((t: any) => t.title === 'FoxCOD Checkout');
-
-      if (existing?.access_token) {
-        const token = existing.access_token;
-        _storefrontTokenCache.set(shop, token);
-        console.log('[PartialPayment] Using existing Storefront token for:', shop);
-        return token;
-      }
-    } else {
-      console.warn('[PartialPayment] Failed to list tokens via REST (non-fatal):', await listRes.text());
-    }
-  } catch (err: any) {
-    console.warn('[PartialPayment] Error listing tokens via REST (non-fatal):', err.message);
-  }
-
-  // 2. Create a new token via GraphQL if none found
-  const graphql = admin.graphql.bind(admin);
-  const createRes = await graphql(`
-    mutation storefrontAccessTokenCreate($input: StorefrontAccessTokenInput!) {
-      storefrontAccessTokenCreate(input: $input) {
-        storefrontAccessToken { accessToken title }
-        userErrors { field message }
-      }
-    }
-  `, { variables: { input: { title: 'FoxCOD Checkout' } } });
-
-  const createData = await createRes.json();
-  const newToken = createData?.data?.storefrontAccessTokenCreate?.storefrontAccessToken?.accessToken;
-
-  if (!newToken) {
-    const errs = createData?.data?.storefrontAccessTokenCreate?.userErrors || [];
-    throw new Error(`Failed to create Storefront token: ${errs.map((e: any) => e.message).join(', ')}`);
-  }
-
-  _storefrontTokenCache.set(shop, newToken);
-  console.log('[PartialPayment] Created new Storefront token for:', shop);
-  return newToken;
-}
-
-// ── Storefront API fetch helper ────────────────────────────────────────────
-
-async function storefrontFetch(
-  shop: string,
-  token: string,
-  query: string,
-  variables?: Record<string, any>
-): Promise<any> {
-  const url = `https://${shop}/api/${STOREFRONT_API_VERSION}/graphql.json`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Shopify-Storefront-Access-Token': token,
-    },
-    body: JSON.stringify({ query, variables }),
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Storefront API HTTP ${res.status}: ${text.slice(0, 400)}`);
-  }
-
-  const json = await res.json();
-
-  // Surface GraphQL-level errors immediately
-  if (json?.errors && json.errors.length > 0) {
-    const msg = json.errors.map((e: any) => e.message).join('; ');
-    throw new Error(`Storefront GraphQL error: ${msg}`);
-  }
-
-  return json;
-}
-
-// ── Step 1: Create temporary discount code via Admin API ──────────────────
-
-async function createTemporaryDiscount(
-  shop: string,
-  discountAmount: number,
-  partialRef: string,
-  currency: string
-): Promise<{ code: string; expiresAt: string; discountId: string }> {
-  const graphql = await getAdminGraphql(shop);
-  const code = `${DISCOUNT_PREFIX}${randomSuffix(8)}`;
-  const expiresAt = new Date(Date.now() + DISCOUNT_TTL_MINUTES * 60 * 1000).toISOString();
-
-  console.log(`[PartialPayment] Creating discount "${code}" for ${currency} ${discountAmount.toFixed(2)}, ref: ${partialRef}`);
-
-  const res = await graphql(`
-    mutation discountCodeBasicCreate($basicCodeDiscount: DiscountCodeBasicInput!) {
-      discountCodeBasicCreate(basicCodeDiscount: $basicCodeDiscount) {
-        codeDiscountNode {
-          id
-          codeDiscount {
-            ... on DiscountCodeBasic {
-              title
-              codes(first: 1) { edges { node { code } } }
-              status
-            }
-          }
-        }
-        userErrors { field code message }
-      }
-    }
-  `, {
-    variables: {
-      basicCodeDiscount: {
-        title: `FoxCOD Partial Payment — ${partialRef}`,
-        code,
-        startsAt: new Date().toISOString(),
-        endsAt: expiresAt,
-        customerGets: {
-          value: {
-            discountAmount: {
-              amount: discountAmount.toFixed(2),
-              appliesOnEachItem: false,
-            },
-          },
-          items: { all: true },
-        },
-        customerSelection: { all: true },
-        usageLimit: 1,
-        appliesOncePerCustomer: false,
-      },
-    },
-  });
-
-  const data = await res.json();
-  console.log('[PartialPayment] discountCodeBasicCreate raw response:', JSON.stringify(data).slice(0, 500));
-
-  const errors = data?.data?.discountCodeBasicCreate?.userErrors || [];
-  if (errors.length > 0) {
-    throw new Error(`Discount creation failed: ${errors.map((e: any) => e.message).join(', ')}`);
-  }
-
-  const discountId = data?.data?.discountCodeBasicCreate?.codeDiscountNode?.id || '';
-  console.log(`[PartialPayment] Discount "${code}" created, id: ${discountId}`);
-
-  return { code, expiresAt, discountId };
-}
+// ── Decision Engine ────────────────────────────────────────────────────────
 
 export async function createPartialPaymentCheckout(
   params: PartialPaymentCheckoutParams
 ): Promise<PartialPaymentCheckoutResult> {
-  const { shop, advanceAmount, totalOrderValue, partialPaymentReference, currency, customer, lineItems, notes, shippingPrice = 0 } = params;
-  const remainingAmount = totalOrderValue - advanceAmount;
+  const { shop, lineItems } = params;
 
-  console.log(
-    `[PartialPayment] ▶ Starting (Cart Permalink): ref=${partialPaymentReference} shop=${shop}`,
-    `total=${totalOrderValue} advance=${advanceAmount} remaining=${remainingAmount} shipping=${shippingPrice}`
-  );
-
-  // 1. Fetch native Storefront Cart Total
-  console.log('[PartialPayment] Step 0: Fetching native variant prices...');
+  // Step 0: Fetch native variant prices to determine if we have custom pricing
+  console.log('[PartialPayment] Step 0: Fetching native variant prices for decision engine...');
   const graphql = await getAdminGraphql(shop);
   
   const variantGids = lineItems.map(item => `"gid://shopify/ProductVariant/${String(item.variantId).replace(/[^0-9]/g, '')}"`);
@@ -266,28 +81,61 @@ export async function createPartialPaymentCheckout(
     }
   `;
   
-  const priceRes = await graphql(query);
-  const priceData = await priceRes.json();
-  
+  let hasCustomPricing = false;
   let nativeCartTotal = 0;
-  if (priceData?.data?.nodes) {
-    priceData.data.nodes.forEach((node: any) => {
-      if (node && node.id && node.price) {
-        const numericId = node.id.replace(/[^0-9]/g, '');
-        const lineItem = lineItems.find(item => String(item.variantId) === numericId);
-        if (lineItem) {
-          nativeCartTotal += parseFloat(node.price) * lineItem.quantity;
+  const nativePrices: Record<string, number> = {};
+
+  try {
+    const priceRes = await graphql(query);
+    const priceData = await priceRes.json();
+    
+    if (priceData?.data?.nodes) {
+      priceData.data.nodes.forEach((node: any) => {
+        if (node && node.id && node.price) {
+          const numericId = node.id.replace(/[^0-9]/g, '');
+          const lineItem = lineItems.find(item => String(item.variantId) === numericId);
+          if (lineItem) {
+            const nativePrice = parseFloat(node.price);
+            nativePrices[numericId] = nativePrice;
+            nativeCartTotal += nativePrice * lineItem.quantity;
+            
+            // Compare native price with Fox COD's passed price
+            if (Math.abs(nativePrice - lineItem.price) > 0.01) {
+              hasCustomPricing = true;
+            }
+          }
         }
-      }
-    });
+      });
+    }
+  } catch (error) {
+    console.warn('[PartialPayment] Failed to fetch native prices for decision engine.', error);
+    // Safe fallback to Draft Order if we can't verify native prices
+    hasCustomPricing = true;
   }
 
+  if (hasCustomPricing) {
+    console.log(`[PartialPayment] Path B: Custom pricing detected. Creating Draft Order Checkout...`);
+    return createDraftOrderCheckout(params, nativePrices);
+  } else {
+    console.log(`[PartialPayment] Path A: Native pricing. Creating Cart Permalink Checkout...`);
+    // Pass nativeCartTotal down to avoid refetching
+    return createCartPermalinkCheckout(params, nativeCartTotal);
+  }
+}
+
+// ── Path A: Cart Permalink Checkout ────────────────────────────────────────
+
+async function createCartPermalinkCheckout(
+  params: PartialPaymentCheckoutParams,
+  nativeCartTotal: number
+): Promise<PartialPaymentCheckoutResult> {
+  const { shop, advanceAmount, totalOrderValue, partialPaymentReference, currency, customer, lineItems, notes, shippingPrice = 0 } = params;
+  const remainingAmount = totalOrderValue - advanceAmount;
+
   if (nativeCartTotal <= 0) {
-    console.warn('[PartialPayment] Failed to fetch native prices, falling back to Fox COD total.');
     nativeCartTotal = totalOrderValue;
   }
 
-  // The discount needed to make NativeCartTotal + Shipping - Discount = AdvanceAmount
   const requiredDiscount = Math.max(nativeCartTotal + shippingPrice - advanceAmount, 0);
 
   // 2. Create temporary discount code (Admin API)
@@ -295,34 +143,64 @@ export async function createPartialPaymentCheckout(
   let discountExpiresAt = '';
 
   if (requiredDiscount > 0.01) {
-    console.log(`[PartialPayment] Step 1: Creating temporary discount for ${requiredDiscount.toFixed(2)} (Native Total: ${nativeCartTotal}, Advance: ${advanceAmount})`);
-    const discountResult = await createTemporaryDiscount(shop, requiredDiscount, partialPaymentReference, currency);
-    discountCode = discountResult.code;
-    discountExpiresAt = discountResult.expiresAt;
-    console.log(`[PartialPayment] Step 1: ✅ Discount created: ${discountCode}`);
+    const code = `${DISCOUNT_PREFIX}${randomSuffix(8)}`;
+    const expiresAt = new Date(Date.now() + DISCOUNT_TTL_MINUTES * 60 * 1000).toISOString();
+
+    const graphql = await getAdminGraphql(shop);
+    const res = await graphql(`
+      mutation discountCodeBasicCreate($basicCodeDiscount: DiscountCodeBasicInput!) {
+        discountCodeBasicCreate(basicCodeDiscount: $basicCodeDiscount) {
+          codeDiscountNode { id }
+          userErrors { message }
+        }
+      }
+    `, {
+      variables: {
+        basicCodeDiscount: {
+          title: `FoxCOD Partial Payment — ${partialPaymentReference}`,
+          code,
+          startsAt: new Date().toISOString(),
+          endsAt: expiresAt,
+          customerGets: {
+            value: {
+              discountAmount: { amount: requiredDiscount.toFixed(2), appliesOnEachItem: false }
+            },
+            items: { all: true }
+          },
+          customerSelection: { all: true },
+          usageLimit: 1,
+          appliesOncePerCustomer: false,
+        }
+      }
+    });
+
+    const data = await res.json();
+    const errors = data?.data?.discountCodeBasicCreate?.userErrors || [];
+    if (errors.length > 0) {
+      throw new Error(`Discount creation failed: ${errors.map((e: any) => e.message).join(', ')}`);
+    }
+
+    discountCode = code;
+    discountExpiresAt = expiresAt;
   }
 
-  // 2. Build the Cart Permalink URL
-  console.log('[PartialPayment] Step 2: Building Cart Permalink...');
-  
-  // Format: /cart/variantId:quantity,variantId:quantity
+  // 3. Build the Cart Permalink URL
   const cartItemsStr = lineItems.map(item => `${String(item.variantId).replace(/[^0-9]/g, '')}:${item.quantity}`).join(',');
   const permalinkBase = `https://${shop}/cart/${cartItemsStr}`;
   
   const queryParams = new URLSearchParams();
   
-  // Apply the discount
   if (discountCode) {
     queryParams.append('discount', discountCode);
   }
 
-  // Cart Attributes for merchant tracking
   queryParams.append('attributes[partial_cod]', 'true');
   queryParams.append('attributes[advance_amount]', advanceAmount.toFixed(2));
   queryParams.append('attributes[remaining_amount]', remainingAmount.toFixed(2));
   queryParams.append('attributes[original_total]', totalOrderValue.toFixed(2));
   queryParams.append('attributes[partial_payment_reference]', partialPaymentReference);
   queryParams.append('attributes[order_source]', 'FoxCOD');
+  queryParams.append('attributes[checkout_type]', 'cart_permalink');
   
   const cartNote = [
     `PARTIAL COD ORDER [${partialPaymentReference}]`,
@@ -332,7 +210,6 @@ export async function createPartialPaymentCheckout(
   ].filter(Boolean).join('\n');
   queryParams.append('note', cartNote);
 
-  // Prefill Customer Information natively
   if (customer.email) queryParams.append('checkout[email]', customer.email);
   if (customer.firstName) queryParams.append('checkout[shipping_address][first_name]', customer.firstName);
   if (customer.lastName) queryParams.append('checkout[shipping_address][last_name]', customer.lastName);
@@ -342,14 +219,12 @@ export async function createPartialPaymentCheckout(
   if (customer.province) queryParams.append('checkout[shipping_address][province]', customer.province);
   if (customer.zip) queryParams.append('checkout[shipping_address][zip]', customer.zip);
   if (customer.phone) queryParams.append('checkout[shipping_address][phone]', customer.phone);
-  
   if (customer.country) {
     const countryCode = customer.country.toUpperCase().slice(0, 2);
     queryParams.append('checkout[shipping_address][country]', countryCode);
   }
 
   const checkoutUrl = `${permalinkBase}?${queryParams.toString()}`;
-  console.log(`[PartialPayment] Step 2: ✅ Permalink created, redirecting to: ${checkoutUrl}`);
 
   return {
     checkoutId: 'permalink-' + partialPaymentReference,
@@ -357,6 +232,138 @@ export async function createPartialPaymentCheckout(
     discountCode,
     discountExpiresAt,
     partialPaymentReference,
+    checkoutType: 'cart_permalink',
+  };
+}
+
+// ── Path B: Draft Order Invoice Checkout ───────────────────────────────────
+
+async function createDraftOrderCheckout(
+  params: PartialPaymentCheckoutParams,
+  nativePrices: Record<string, number>
+): Promise<PartialPaymentCheckoutResult> {
+  const { shop, advanceAmount, totalOrderValue, partialPaymentReference, currency, customer, lineItems, notes, shippingPrice = 0 } = params;
+  const remainingAmount = totalOrderValue - advanceAmount;
+
+  const { session } = await unauthenticated.admin(shop);
+
+  const draftLineItems = lineItems.map(item => {
+    const numericId = String(item.variantId).replace(/[^0-9]/g, '');
+    const nativePrice = nativePrices[numericId] || item.price;
+    
+    let applied_discount = undefined;
+    if (nativePrice > item.price + 0.01) {
+      const unitDiscount = nativePrice - item.price;
+      const totalDiscount = (unitDiscount * item.quantity).toFixed(2);
+      applied_discount = {
+        title: "Fox COD Offer",
+        value: unitDiscount.toFixed(2),
+        value_type: "fixed_amount",
+        amount: totalDiscount
+      };
+    }
+
+    return {
+      variant_id: Number(numericId),
+      quantity: item.quantity,
+      price: nativePrice.toFixed(2), // We MUST pass native price, Shopify ignores price overrides
+      applied_discount
+    };
+  });
+
+  const shippingLine = shippingPrice > 0 ? {
+    title: "Shipping",
+    price: shippingPrice.toFixed(2),
+    custom: true
+  } : {
+    title: "Free Shipping",
+    price: "0.00",
+    custom: true
+  };
+
+  const cartNote = [
+    `PARTIAL COD ORDER [${partialPaymentReference}]`,
+    `Advance: ${params.currency} ${advanceAmount.toFixed(2)}`,
+    `Remaining (COD): ${params.currency} ${remainingAmount.toFixed(2)}`,
+    notes ? notes : '',
+  ].filter(Boolean).join('\n');
+
+  const customAttributes = [
+    { name: 'partial_cod', value: 'true' },
+    { name: 'advance_amount', value: advanceAmount.toFixed(2) },
+    { name: 'remaining_amount', value: remainingAmount.toFixed(2) },
+    { name: 'original_total', value: totalOrderValue.toFixed(2) },
+    { name: 'partial_payment_reference', value: partialPaymentReference },
+    { name: 'order_source', value: 'FoxCOD' },
+    { name: 'checkout_type', value: 'draft_order' }
+  ];
+
+  let appliedDiscount = undefined;
+  if (remainingAmount > 0.01) {
+    appliedDiscount = {
+      title: "Partial Payment Remaining",
+      description: "Remaining amount to be collected on delivery.",
+      value: remainingAmount.toFixed(2),
+      value_type: "fixed_amount"
+    };
+  }
+
+  const addressInput = {
+    first_name: customer.firstName || undefined,
+    last_name: customer.lastName || undefined,
+    address1: customer.address1 || undefined,
+    address2: customer.address2 || undefined,
+    city: customer.city || undefined,
+    province: customer.province || undefined,
+    zip: customer.zip || undefined,
+    country_code: customer.country ? customer.country.toUpperCase().slice(0, 2) : undefined,
+    phone: customer.phone || undefined
+  };
+
+  const draftOrderPayload: any = {
+    line_items: draftLineItems,
+    shipping_line: shippingLine,
+    applied_discount: appliedDiscount,
+    note: cartNote,
+    note_attributes: customAttributes,
+    tags: "FoxCOD, Partial COD, Pending Advance",
+  };
+
+  if (Object.keys(addressInput).length > 0) {
+    draftOrderPayload.shipping_address = addressInput;
+    draftOrderPayload.billing_address = addressInput;
+  }
+
+  if (customer.email) {
+    draftOrderPayload.email = customer.email;
+  }
+
+  const url = `https://${shop}/admin/api/2024-01/draft_orders.json`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Shopify-Access-Token': session.accessToken as string,
+    },
+    body: JSON.stringify({ draft_order: draftOrderPayload }),
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    throw new Error(`Draft Order creation failed: ${JSON.stringify(data.errors)}`);
+  }
+
+  const draftOrder = data.draft_order;
+  if (!draftOrder || !draftOrder.invoice_url) {
+    throw new Error(`Draft Order created but no invoice_url returned.`);
+  }
+
+  return {
+    checkoutId: String(draftOrder.id),
+    checkoutUrl: draftOrder.invoice_url,
+    partialPaymentReference,
+    checkoutType: 'draft_order',
   };
 }
 
