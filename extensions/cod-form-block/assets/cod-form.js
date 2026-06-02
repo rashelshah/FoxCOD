@@ -5648,7 +5648,7 @@ function darkenColor(hex, percent) {
       }
 
       if (offer.upsell_product_image) {
-          html += '<div style="position: relative; margin: 0 0 12px;"><img src="' + offer.upsell_product_image + '" style="max-width: 200px; max-height: 200px; object-fit: contain;" /></div>';
+          html += '<div style="position: relative; margin: 0 0 12px; text-align: center; display: flex; justify-content: center;"><img src="' + offer.upsell_product_image + '" style="max-width: 200px; max-height: 200px; object-fit: contain; margin: 0 auto;" /></div>';
       }
       html += '<div style="font-size: 14px; margin-bottom: 8px;">' + (offer.upsell_product_title || 'Product') + '</div>';
 
