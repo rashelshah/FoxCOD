@@ -353,6 +353,9 @@ export async function logOrder(order: OrderLogEntry) {
     if (order.original_total != null) insertPayload.original_total = order.original_total;
     if (order.final_total != null) insertPayload.final_total = order.final_total;
     if (order.order_payload != null) insertPayload.order_payload = order.order_payload;
+    if (order.is_partial_cod != null) insertPayload.is_partial_cod = order.is_partial_cod;
+    if (order.advance_amount != null) insertPayload.advance_amount = order.advance_amount;
+    if (order.remaining_cod_amount != null) insertPayload.remaining_cod_amount = order.remaining_cod_amount;
 
     const { data, error } = await supabase
         .from('order_logs')
@@ -411,6 +414,9 @@ export async function logOrderWithShopifyIds(
     if (order.original_total != null) insertPayload.original_total = order.original_total;
     if (order.final_total != null) insertPayload.final_total = order.final_total;
     if (order.order_payload != null) insertPayload.order_payload = order.order_payload;
+    if (order.is_partial_cod != null) insertPayload.is_partial_cod = order.is_partial_cod;
+    if (order.advance_amount != null) insertPayload.advance_amount = order.advance_amount;
+    if (order.remaining_cod_amount != null) insertPayload.remaining_cod_amount = order.remaining_cod_amount;
 
     const { data, error } = await supabase
         .from('order_logs')

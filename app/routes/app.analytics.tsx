@@ -36,6 +36,8 @@ interface ShopifyOrder {
     financial_status: string;
     fulfillment_status: string | null;
     cancelled_at: string | null;
+    tags?: string;
+    note_attributes?: { name: string; value: string }[];
 }
 
 interface AnalyticsData {
@@ -52,6 +54,9 @@ interface AnalyticsData {
     paidOrders: number;
     todayRevenue: number;
     pendingRevenue: number;
+    partialOrdersCount: number;
+    advanceCollected: number;
+    remainingCodValue: number;
 }
 
 // ─── Fetch ALL orders from Shopify via SDK RestClient with pagination ──
@@ -63,7 +68,7 @@ async function fetchAllShopifyOrders(
     restClient: any,
     createdAtMin?: string,
 ): Promise<ShopifyOrder[]> {
-    const fields = "id,created_at,total_price,financial_status,fulfillment_status,cancelled_at";
+    const fields = "id,created_at,total_price,financial_status,fulfillment_status,cancelled_at,tags,note_attributes";
 
     const query: Record<string, string> = {
         status: "any",
@@ -131,6 +136,9 @@ function computeMetrics(orders: ShopifyOrder[]): AnalyticsData {
     let partiallyRefundedOrders = 0;
     let paidOrders = 0;
     let pendingRevenue = 0;
+    let partialOrdersCount = 0;
+    let advanceCollected = 0;
+    let remainingCodValue = 0;
 
     for (const order of orders) {
         const createdAt = new Date(order.created_at);
@@ -171,6 +179,16 @@ function computeMetrics(orders: ShopifyOrder[]): AnalyticsData {
         if (!isCancelled && order.fulfillment_status === "fulfilled") {
             fulfilledOrders++;
         }
+
+        // Partial COD calculations
+        const isPartial = order.tags?.includes("Partial COD") || order.note_attributes?.some(attr => attr.name === "partial_cod" && attr.value === "true");
+        if (isPartial) {
+            partialOrdersCount++;
+            const advanceAttr = order.note_attributes?.find(a => a.name === "advance_amount");
+            const remainingAttr = order.note_attributes?.find(a => a.name === "remaining_amount");
+            if (advanceAttr) advanceCollected += parseFloat(advanceAttr.value) || 0;
+            if (remainingAttr) remainingCodValue += parseFloat(remainingAttr.value) || 0;
+        }
     }
 
     const totalOrders = orders.length;
@@ -190,6 +208,9 @@ function computeMetrics(orders: ShopifyOrder[]): AnalyticsData {
         paidOrders,
         todayRevenue,
         pendingRevenue,
+        partialOrdersCount,
+        advanceCollected,
+        remainingCodValue,
     };
 }
 
@@ -248,31 +269,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             paidOrders: 0,
             todayRevenue: 0,
             pendingRevenue: 0,
+            partialOrdersCount: 0,
+            advanceCollected: 0,
+            remainingCodValue: 0,
         };
     }
 
-    // ── Partial Payment Analytics (from Supabase order_logs) ──
-    let partialOrdersCount = 0;
-    let advanceCollected = 0;
-    let remainingCodValue = 0;
-    try {
-        let partialQuery = supabase
-            .from('order_logs')
-            .select('advance_amount, remaining_cod_amount')
-            .eq('shop_domain', shop)
-            .eq('is_partial_cod', true);
-        if (createdAtMin) {
-            partialQuery = partialQuery.gte('created_at', createdAtMin);
-        }
-        const { data: partialData } = await partialQuery;
-        if (partialData) {
-            partialOrdersCount = partialData.length;
-            advanceCollected = partialData.reduce((sum, r) => sum + (r.advance_amount || 0), 0);
-            remainingCodValue = partialData.reduce((sum, r) => sum + (r.remaining_cod_amount || 0), 0);
-        }
-    } catch (e) {
-        console.error('[Analytics] Error fetching partial payment stats:', e);
-    }
+    // Partial metrics are now calculated in computeMetrics
+    const { partialOrdersCount, advanceCollected, remainingCodValue } = metrics;
 
     return { ...metrics, shopCurrency, selectedDays, partialOrdersCount, advanceCollected, remainingCodValue };
 };
