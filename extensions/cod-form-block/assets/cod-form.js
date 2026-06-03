@@ -2357,7 +2357,10 @@
     // Must render BEFORE section move logic so the element exists when we try to move it
     var paymentModeField = (config.fields || []).find(function(f) { return f.id === 'payment_mode'; });
     var paymentModeVisible = paymentModeField ? paymentModeField.visible !== false : true;
-    if (config.partialCodEnabled && paymentModeVisible) {
+    var ppSettings = config.partialPaymentSettings;
+    var partialEnabled = (ppSettings && typeof ppSettings.enabled !== 'undefined') ? !!ppSettings.enabled : config.partialCodEnabled;
+    var prepaidEnabled = !!(config.styles && config.styles.fullPrepaidEnabled);
+    if ((partialEnabled || prepaidEnabled) && paymentModeVisible) {
         try { renderPaymentMethodOptions(form, config); } catch(e) { console.error('[COD Form] Error rendering payment options:', e); }
     }
 
@@ -4266,29 +4269,33 @@ function darkenColor(hex, percent) {
       // ── Partial Payment eligibility check (v2) ────────────────────────────
       var ppSettings = config.partialPaymentSettings;
       var showPartial = false;
-      if (ppSettings && ppSettings.enabled) {
-          var ppEligible = true;
-          // Min/Max order total
-          if (ppSettings.minimum_order_total > 0 && orderTotal < ppSettings.minimum_order_total) ppEligible = false;
-          if (ppSettings.maximum_order_total > 0 && orderTotal > ppSettings.maximum_order_total) ppEligible = false;
-          // Product restrictions
-          var hasProdFilter = ppSettings.allowed_product_ids && ppSettings.allowed_product_ids.length > 0;
-          var hasCollFilter = ppSettings.allowed_collection_ids && ppSettings.allowed_collection_ids.length > 0;
-          if ((hasProdFilter || hasCollFilter) && ppEligible) {
-              var productId = String(config.productId || '');
-              var productAllowed = false;
-              if (hasProdFilter) {
-                  productAllowed = ppSettings.allowed_product_ids.some(function(id) { return String(id) === productId; });
+      if (ppSettings && typeof ppSettings.enabled !== 'undefined') {
+          if (ppSettings.enabled) {
+              var ppEligible = true;
+              // Min/Max order total
+              if (ppSettings.minimum_order_total > 0 && orderTotal < ppSettings.minimum_order_total) ppEligible = false;
+              if (ppSettings.maximum_order_total > 0 && orderTotal > ppSettings.maximum_order_total) ppEligible = false;
+              // Product restrictions
+              var hasProdFilter = ppSettings.allowed_product_ids && ppSettings.allowed_product_ids.length > 0;
+              var hasCollFilter = ppSettings.allowed_collection_ids && ppSettings.allowed_collection_ids.length > 0;
+              if ((hasProdFilter || hasCollFilter) && ppEligible) {
+                  var productId = String(config.productId || '');
+                  var productAllowed = false;
+                  if (hasProdFilter) {
+                      productAllowed = ppSettings.allowed_product_ids.some(function(id) { return String(id) === productId; });
+                  }
+                  if (!productAllowed && hasCollFilter) {
+                      var collIds = (config.productCollectionIds || []).map(String);
+                      productAllowed = collIds.some(function(cid) {
+                          return ppSettings.allowed_collection_ids.some(function(aid) { return String(aid) === cid; });
+                      });
+                  }
+                  if (!productAllowed) ppEligible = false;
               }
-              if (!productAllowed && hasCollFilter) {
-                  var collIds = (config.productCollectionIds || []).map(String);
-                  productAllowed = collIds.some(function(cid) {
-                      return ppSettings.allowed_collection_ids.some(function(aid) { return String(aid) === cid; });
-                  });
-              }
-              if (!productAllowed) ppEligible = false;
+              showPartial = ppEligible;
+          } else {
+              showPartial = false;
           }
-          showPartial = ppEligible;
       } else {
           // Legacy fallback
           showPartial = config.partialCodEnabled;

@@ -959,7 +959,7 @@ export default function Index() {
               <Button variant="primary" size="large" onClick={() => navigate('/app/settings')}>Form Builder</Button>
               <Button variant="primary" size="large" onClick={() => navigate('/app/quantity-offers')}>Bundle Offers</Button>
               <Button variant="primary" size="large" onClick={() => navigate('/app/upsell-downsell')}>Upsells & Downsells</Button>
-              <Button variant="primary" size="large" onClick={() => navigate('/app/orders')}>Orders</Button>
+              <Button variant="primary" size="large" onClick={() => navigate('/app/partial-payments')}>Partial Payment</Button>
               <Button variant="primary" size="large" onClick={() => navigate('/app/analytics')}>Analytics</Button>
               <Button variant="primary" size="large" onClick={() => navigate('/app/app-settings?tab=pixels')}>Pixel Tracking</Button>
               <Button variant="primary" size="large" onClick={() => navigate('/app/app-settings?tab=fraud')}>Fraud Protection</Button>

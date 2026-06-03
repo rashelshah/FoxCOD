@@ -316,7 +316,7 @@
     if (typeof ppRaw === 'string') {
       try { ppRaw = JSON.parse(ppRaw); } catch (e) {}
     }
-    window.FoxCod.partialPaymentSettings = (ppRaw && typeof ppRaw === 'object') ? ppRaw : { enabled: false };
+    window.FoxCod.partialPaymentSettings = (ppRaw && typeof ppRaw === 'object') ? ppRaw : null;
     console.log('[FoxCod] Partial payment settings injected:', window.FoxCod.partialPaymentSettings?.enabled);
     
     // Form submit button style overrides
