@@ -87,6 +87,4 @@ export const DEFAULT_MODULE_FLAGS: ModuleFlags = {
 
 export const DEFAULT_PAYMENT_OPTIONS: PaymentOption[] = [
   { id: 'opt_10pct', label: 'Pay 10% Now', type: 'percentage', value: 10 },
-  { id: 'opt_20pct', label: 'Pay 20% Now', type: 'percentage', value: 20 },
-  { id: 'opt_30pct', label: 'Pay 30% Now', type: 'percentage', value: 30 },
 ];

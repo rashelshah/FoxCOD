@@ -224,6 +224,7 @@ async function handlePartialCodCheckout(request: Request, data: any) {
             bundleVariants,
             discountPercent,
             currency,
+            partialCodFeeAmount,
         } = data;
 
         // ── Validate required fields ────────────────────────────────────────
@@ -374,6 +375,7 @@ async function handlePartialCodCheckout(request: Request, data: any) {
             notes: orderNotes,
             couponCode: normalizedCouponCode || undefined,
             shippingPrice: pricing.shippingPrice,
+            codFeeAmount: parseFloat(partialCodFeeAmount) || 0,
         });
 
         console.log('⏱ [Proxy Partial COD v2] Checkout created:', Date.now() - start, 'ms');

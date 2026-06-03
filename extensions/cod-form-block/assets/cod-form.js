@@ -4329,11 +4329,10 @@ function darkenColor(hex, percent) {
           html += '<div style="display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px; color: #2563eb; background-color: #dbeafe;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg></div>';
           html += '<div style="flex: 1; min-width: 0; padding-top: 2px;">';
           html += '<div style="font-weight: 700; font-size: 14px; color: #1e3a8a; line-height: 1.2; display: flex; align-items: center; gap: 4px;">Partial Payment <svg width="14" height="14" viewBox="0 0 24 24" fill="#2563eb" stroke="#eff6ff" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/></svg></div>';
-          html += '<div class="pm-desc-partial" style="color: #60a5fa; font-size: 11px; margin-top: 4px; line-height: 1.3;">Pay ' + formatMoney(partialAdvance) + ' now • Rest on delivery</div>';
+          html += '<div class="pm-desc-partial" style="color: #60a5fa; font-size: 11px; margin-top: 4px; line-height: 1.3;">Pay a small amount now • Rest on delivery</div>';
           html += '</div>';
           html += '<div style="display: flex; align-items: center; gap: 12px; flex-shrink: 0;">';
           html += '<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">';
-          html += '<span class="pm-amt-partial" style="font-weight: 800; font-size: 15px; color: #1e3a8a;">' + formatMoney(partialAdvance) + '</span>';
           html += '</div>';
           html += '<input type="radio" name="payment_method_visual" class="pm-pill" ' + (!showFullPrepaid ? 'checked' : '') + ' style="width: 18px; height: 18px; accent-color: #2563eb; margin: 0; pointer-events: none;">';
           html += '</div></div>';
@@ -4402,7 +4401,7 @@ function darkenColor(hex, percent) {
               if (submitBtn) {
                   applySubmitButtonStyles(submitBtn, config);
                   if (radio.value === 'partial_cod') {
-                      submitBtn.textContent = 'Pay ' + formatMoney(config.partialCodAdvance) + ' Now';
+                      submitBtn.textContent = 'Continue with Partial Payment';
                   } else if (radio.value === 'full_prepaid') {
                       submitBtn.textContent = 'Proceed to Payment';
                   } else {
@@ -4500,10 +4499,7 @@ function darkenColor(hex, percent) {
       var pmPartial = paymentContainer.querySelector('.pm-partial');
       if (pmPartial) {
           var descEl = pmPartial.querySelector('.pm-desc-partial');
-          if (descEl) descEl.textContent = 'Pay ' + formatMoney(partialAdvance) + ' now • Rest on delivery';
-          
-          var amtPartialEl = pmPartial.querySelector('.pm-amt-partial');
-          if (amtPartialEl) amtPartialEl.textContent = formatMoney(partialAdvance);
+          if (descEl) descEl.textContent = 'Pay a small amount now • Rest on delivery';
       }
 
       // Update Full COD
@@ -6485,32 +6481,49 @@ function darkenColor(hex, percent) {
       function buildOptionHTML(opt, idx) {
           var dep = calcDeposit(opt);
           var fee = calcCodFee(dep);
-          var payNow = dep + fee;
-          var remaining = Math.max(finalTotal - dep, 0);
+          var payNow = dep;
+          var remaining = Math.max(finalTotal - dep, 0) + fee;
           var isSelected = idx === selectedIdx;
           
           var optLabel = opt.type === 'percentage' || opt.type === 'remaining_percentage' ? opt.value + '%' : formatMoney(dep);
           var subText = 'Total: ' + formatMoney(finalTotal) + '. Pay now ' + optLabel + ' (' + formatMoney(payNow) + '), ' + formatMoney(remaining) + ' remaining on delivery';
           
+          var optCardContent = [
+              '<div style="display:flex;align-items:flex-start;justify-content:space-between;width:100%;">',
+                  '<div style="display:flex;align-items:flex-start;gap:16px;">',
+                      '<div style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;color:' + btnBg + ';flex-shrink:0;margin-top:2px;">',
+                          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/><path d="M6 15h2"/><circle cx="14" cy="15" r="1.5"/></svg>',
+                      '</div>',
+                      '<div style="display:flex;flex-direction:column;gap:4px;">',
+                          '<span style="font-size:15px;font-weight:600;color:#1f2937;">' + opt.label + '</span>',
+                          '<span style="font-size:12px;color:#6b7280;line-height:1.4;">' + subText + '</span>',
+                      '</div>',
+                  '</div>',
+                  '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;margin-left:16px;">',
+                      '<span style="font-size:16px;font-weight:700;color:#1f2937;">' + formatMoney(payNow) + '</span>',
+                      '<span style="font-size:10px;color:#9ca3af;">Taxes computed later</span>',
+                      (isSelected ? '<div style="width:20px;height:20px;border-radius:50%;background:' + btnBg + ';color:' + btnColor + ';display:flex;align-items:center;justify-content:center;margin-top:8px;"><svg viewBox="0 0 20 20" fill="currentColor" style="width:12px;height:12px;"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg></div>' : ''),
+                  '</div>',
+              '</div>'
+          ].join('');
+
+          var feeCard = (isSelected && fee > 0) ? [
+              '<div style="border:1px dashed #34d399;background:#ecfdf5;color:#059669;padding:12px 16px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;margin-top:16px;font-weight:600;font-size:14px;font-family:Inter,-apple-system,sans-serif;width:100%;box-sizing:border-box;">',
+                  '<div style="display:flex;align-items:center;gap:8px;">',
+                      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><rect x="3" y="5" width="18" height="14" rx="2" ry="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="7" y1="15" x2="11" y2="15"/></svg>',
+                      '<span>COD Fee</span>',
+                  '</div>',
+                  '<span>' + formatMoney(fee) + '</span>',
+              '</div>'
+          ].join('') : '';
+
           return [
               '<div class="foxcod-pp-opt' + (isSelected ? ' selected' : '') + '"',
               ' data-idx="' + idx + '"',
-              ' style="border:1px solid ' + (isSelected ? btnBg : rightBorder) + ';border-radius:12px;padding:16px;display:flex;align-items:flex-start;justify-content:space-between;cursor:pointer;transition:all 0.2s ease;background:' + (isSelected ? btnBg+'06' : '#ffffff') + ';margin-bottom:0;border-width:' + (isSelected ? '2px' : '1px') + ';font-family:Inter,-apple-system,sans-serif;">',
-              '<div style="display:flex;align-items:flex-start;gap:16px;">',
-                  '<div style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;color:' + btnBg + ';flex-shrink:0;margin-top:2px;">',
-                      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/><path d="M6 15h2"/><circle cx="14" cy="15" r="1.5"/></svg>',
-                  '</div>',
-                  '<div style="display:flex;flex-direction:column;gap:4px;">',
-                      '<span style="font-size:15px;font-weight:600;color:#1f2937;">' + opt.label + '</span>',
-                      '<span style="font-size:12px;color:#6b7280;line-height:1.4;">' + subText + '</span>',
-                  '</div>',
-              '</div>',
-              '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;margin-left:16px;">',
-                  '<span style="font-size:16px;font-weight:700;color:#1f2937;">' + formatMoney(payNow) + '</span>',
-                  '<span style="font-size:10px;color:#9ca3af;">Taxes computed later</span>',
-                  (isSelected ? '<div style="width:20px;height:20px;border-radius:50%;background:' + btnBg + ';color:' + btnColor + ';display:flex;align-items:center;justify-content:center;margin-top:8px;"><svg viewBox="0 0 20 20" fill="currentColor" style="width:12px;height:12px;"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg></div>' : ''),
-              '</div>',
-              '</div>',
+              ' style="border:1px solid ' + (isSelected ? btnBg : rightBorder) + ';border-radius:12px;padding:16px;display:flex;flex-direction:column;align-items:flex-start;cursor:pointer;transition:all 0.2s ease;background:' + (isSelected ? btnBg+'06' : '#ffffff') + ';margin-bottom:0;border-width:' + (isSelected ? '2px' : '1px') + ';font-family:Inter,-apple-system,sans-serif;">',
+              optCardContent,
+              feeCard,
+              '</div>'
           ].join('');
       }
 
@@ -6622,8 +6635,8 @@ function darkenColor(hex, percent) {
           var selOpt = paymentOptions[selectedIdx];
           var advanceAmount = calcDeposit(selOpt);
           var codFeeAmount = calcCodFee(advanceAmount);
-          var payNow = advanceAmount + codFeeAmount;
-          var remainingAmount = Math.max(finalTotal - advanceAmount, 0);
+          var payNow = advanceAmount;
+          var remainingAmount = Math.max(finalTotal - advanceAmount, 0) + codFeeAmount;
           overlay.remove();
           submitPartialCodCheckout(form, config, payload, submitBtn, originalBtnText, payNow, remainingAmount, {
               optionLabel: selOpt.label,

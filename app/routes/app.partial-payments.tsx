@@ -1156,6 +1156,7 @@ export default function PartialPaymentsPage() {
                 onChange={(v) => upd('enabled', v)}
               />
 
+              {/*
               <Divider />
 
               <Text as="h3" variant="headingSm">Module Compatibility</Text>
@@ -1181,6 +1182,7 @@ export default function PartialPaymentsPage() {
                 checked={settings.module_flags?.apply_upsells_to_partial ?? true}
                 onChange={(v) => updFlag('apply_upsells_to_partial', v)}
               />
+              */}
             </BlockStack>
           </Card>
 

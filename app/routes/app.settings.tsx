@@ -4973,56 +4973,7 @@ export default function SettingsPage() {
                                         </div>
                                     </AccordionSection>
 
-                                    {/* Partial Cash on Delivery */}
-                                    <AccordionSection id="partial-cod" tab="form" title="Partial Cash on Delivery" helperText="Enables the partial cash on delivery settings" expandedSection={expandedSection} toggleSection={toggleSection}>
-                                        <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '16px' }}>
-                                            Allow customers to pay a portion of the order online and the rest on delivery.
-                                        </p>
-                                        <div className="toggle-option" onClick={() => setPartialCodEnabled(!partialCodEnabled)}>
-                                            <span className="toggle-option-label">Enable Partial COD</span>
-                                            <div className={`mini-toggle ${partialCodEnabled ? 'on' : 'off'}`} />
-                                        </div>
-                                        {partialCodEnabled && (
-                                            <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                                <div className="input-group">
-                                                    <label className="input-label">Advance Amount ({currencySymbol})</label>
-                                                    <input
-                                                        type="number"
-                                                        className="text-input"
-                                                        value={partialCodAdvanceAmount}
-                                                        onChange={(e) => setPartialCodAdvanceAmount(parseInt(e.target.value) || 0)}
-                                                        min="1"
-                                                        placeholder="Enter advance amount"
-                                                        style={{ padding: '12px', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '14px' }}
-                                                    />
-                                                    <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '6px' }}>
-                                                        This amount will be collected online via Shopify checkout.
-                                                    </p>
-                                                </div>
-                                                <div className="input-group">
-                                                    <label className="input-label">Commission per Order ({currencySymbol})</label>
-                                                    <input
-                                                        type="number"
-                                                        className="text-input"
-                                                        value={partialCodCommission}
-                                                        onChange={(e) => setPartialCodCommission(parseFloat(e.target.value) || 0)}
-                                                        min="0"
-                                                        step="0.01"
-                                                        placeholder="Enter commission amount"
-                                                        style={{ padding: '12px', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '14px' }}
-                                                    />
-                                                    <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '6px' }}>
-                                                        Commission charged per partial COD order (for billing).
-                                                    </p>
-                                                </div>
-                                                <div style={{ padding: '12px', background: 'rgba(59, 130, 246, 0.1)', borderRadius: '8px', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
-                                                    <p style={{ fontSize: '13px', color: '#1d4ed8', margin: 0 }}>
-                                                        <strong>ⓘ How it works:</strong> When enabled, customers will see an option to pay {fmtCurrency(partialCodAdvanceAmount)} online now, with the remaining balance due on delivery.
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </AccordionSection>
+
 
                                     {/* Form Content */}
                                     <AccordionSection id="form-content" tab="form" title="Form Header and Submit button" helperText="Customize the form title, description, and the submit button text and style shown in the COD form." expandedSection={expandedSection} toggleSection={toggleSection}>

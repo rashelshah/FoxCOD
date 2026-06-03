@@ -36,6 +36,7 @@ export interface PartialPaymentCheckoutParams {
   notes?: string;
   couponCode?: string;
   shippingPrice?: number;
+  codFeeAmount?: number;
 }
 
 export interface PartialPaymentCheckoutResult {
@@ -113,6 +114,11 @@ export async function createPartialPaymentCheckout(
     hasCustomPricing = true;
   }
 
+  if (params.codFeeAmount && params.codFeeAmount > 0) {
+    hasCustomPricing = true;
+    console.log('[PartialPayment] Forcing Draft Order because COD Fee is present.');
+  }
+
   if (hasCustomPricing) {
     console.log(`[PartialPayment] Path B: Custom pricing detected. Creating Draft Order Checkout...`);
     return createDraftOrderCheckout(params, nativePrices);
@@ -129,13 +135,15 @@ async function createCartPermalinkCheckout(
   params: PartialPaymentCheckoutParams,
   nativeCartTotal: number
 ): Promise<PartialPaymentCheckoutResult> {
-  const { shop, advanceAmount, totalOrderValue, partialPaymentReference, currency, customer, lineItems, notes, shippingPrice = 0 } = params;
-  const remainingAmount = totalOrderValue - advanceAmount;
+  const { shop, advanceAmount, totalOrderValue, partialPaymentReference, currency, customer, lineItems, notes, shippingPrice = 0, codFeeAmount = 0 } = params;
+  const remainingAmount = totalOrderValue - advanceAmount + codFeeAmount;
 
   if (nativeCartTotal <= 0) {
     nativeCartTotal = totalOrderValue;
   }
 
+  // Cart permalink cannot add custom line items.
+  // The required discount is still based on bringing the cart total down to the advanceAmount.
   const requiredDiscount = Math.max(nativeCartTotal + shippingPrice - advanceAmount, 0);
 
   // 2. Create temporary discount code (Admin API)
@@ -206,6 +214,7 @@ async function createCartPermalinkCheckout(
     `PARTIAL COD ORDER [${partialPaymentReference}]`,
     `Advance: ${params.currency} ${advanceAmount.toFixed(2)}`,
     `Remaining (COD): ${params.currency} ${remainingAmount.toFixed(2)}`,
+    codFeeAmount > 0 ? `Includes COD Fee: ${params.currency} ${codFeeAmount.toFixed(2)}` : '',
     notes ? notes : '',
   ].filter(Boolean).join('\n');
   queryParams.append('note', cartNote);
@@ -242,8 +251,8 @@ async function createDraftOrderCheckout(
   params: PartialPaymentCheckoutParams,
   nativePrices: Record<string, number>
 ): Promise<PartialPaymentCheckoutResult> {
-  const { shop, advanceAmount, totalOrderValue, partialPaymentReference, currency, customer, lineItems, notes, shippingPrice = 0 } = params;
-  const remainingAmount = totalOrderValue - advanceAmount;
+  const { shop, advanceAmount, totalOrderValue, partialPaymentReference, currency, customer, lineItems, notes, shippingPrice = 0, codFeeAmount = 0 } = params;
+  const remainingAmount = totalOrderValue - advanceAmount + codFeeAmount;
 
   const { session } = await unauthenticated.admin(shop);
 
@@ -281,10 +290,22 @@ async function createDraftOrderCheckout(
     custom: true
   };
 
+  // Add COD Fee as a custom line item so it formally appears in the draft order
+  if (codFeeAmount > 0) {
+    draftLineItems.push({
+      variant_id: undefined,
+      quantity: 1,
+      price: codFeeAmount.toFixed(2),
+      title: "COD Fee",
+      custom: true
+    } as any);
+  }
+
   const cartNote = [
     `PARTIAL COD ORDER [${partialPaymentReference}]`,
     `Advance: ${params.currency} ${advanceAmount.toFixed(2)}`,
     `Remaining (COD): ${params.currency} ${remainingAmount.toFixed(2)}`,
+    codFeeAmount > 0 ? `Includes COD Fee: ${params.currency} ${codFeeAmount.toFixed(2)}` : '',
     notes ? notes : '',
   ].filter(Boolean).join('\n');
 
