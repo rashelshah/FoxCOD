@@ -134,6 +134,32 @@ export async function createPartialPaymentCheckout(
     console.log('[PartialPayment] Forcing Draft Order because COD Fee is present.');
   }
 
+  // Always use Draft Order when paid shipping is involved.
+  if (params.shippingPrice && params.shippingPrice > 0) {
+    hasCustomPricing = true;
+    console.log('[PartialPayment] Forcing Draft Order because paid shipping is selected.');
+  }
+
+  const totalSubtotalForDiscountCheck = nativeCartTotal || lineItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const requiredDiscountForCheck = Math.max(totalSubtotalForDiscountCheck + (params.shippingPrice || 0) - params.advanceAmount, 0);
+
+  if (requiredDiscountForCheck > totalSubtotalForDiscountCheck) {
+    hasCustomPricing = true;
+    console.log('[PartialPayment] Forcing Draft Order because required discount exceeds subtotal.');
+  }
+
+  // ALWAYS use Draft Order when a discount is needed.
+  // The Cart Permalink approach passes the discount as ?discount=CODE in the URL.
+  // When the checkout URL is opened from a modal (new window/tab), Shopify frequently does
+  // NOT auto-apply the code — the customer lands on full-price checkout with no discount.
+  // Draft orders apply the discount server-side (applied_discount field), which is 100%
+  // reliable and always shows the correct advance amount to the customer.
+  if (requiredDiscountForCheck > 0.01) {
+    hasCustomPricing = true;
+    console.log('[PartialPayment] Forcing Draft Order because a discount is needed (cart permalink discount codes are unreliable from modal).');
+  }
+
+
   if (hasCustomPricing) {
     console.log(`[PartialPayment] Path B: Custom pricing detected. Creating Draft Order Checkout...`);
     return createDraftOrderCheckout(params, nativePrices);
@@ -271,11 +297,15 @@ async function createDraftOrderCheckout(
 
   const { session } = await unauthenticated.admin(shop);
 
+  let actualDiscountableSubtotal = 0;
+
   const draftLineItems = lineItems.map(item => {
     const numericId = String(item.variantId || '').replace(/[^0-9]/g, '');
     const nativePrice = numericId ? (nativePrices[numericId] || item.price) : item.price;
     
     let applied_discount = undefined;
+    let effectivePrice = nativePrice;
+    
     if (nativePrice > item.price + 0.01) {
       const unitDiscount = nativePrice - item.price;
       const totalDiscount = (unitDiscount * item.quantity).toFixed(2);
@@ -285,7 +315,10 @@ async function createDraftOrderCheckout(
         value_type: "fixed_amount",
         amount: totalDiscount
       };
+      effectivePrice = item.price;
     }
+
+    actualDiscountableSubtotal += effectivePrice * item.quantity;
 
     if (numericId) {
       return {
@@ -304,15 +337,6 @@ async function createDraftOrderCheckout(
     }
   });
 
-  const shippingLine = shippingPrice > 0 ? {
-    title: "Shipping",
-    price: shippingPrice.toFixed(2),
-    custom: true
-  } : {
-    title: "Free Shipping",
-    price: "0.00",
-    custom: true
-  };
 
   // Add COD Fee as a custom line item so it formally appears in the draft order
   if (codFeeAmount > 0) {
@@ -323,7 +347,40 @@ async function createDraftOrderCheckout(
       title: "COD Fee",
       custom: true
     } as any);
+    actualDiscountableSubtotal += codFeeAmount;
   }
+
+  const discountableSubtotal = actualDiscountableSubtotal;
+  const totalBeforeOrderDiscount = discountableSubtotal + shippingPrice;
+  const neededDiscount = Math.max(0, totalBeforeOrderDiscount - advanceAmount);
+
+  let appliedDiscountValue = neededDiscount;
+  let finalShippingPrice = shippingPrice;
+
+  // If the needed discount is greater than the subtotal, Shopify will cap the discount,
+  // preventing the grand total from reaching the advance amount. 
+  // To fix this without destroying the original order total (so it shows correctly in checkout),
+  // we move the shipping cost into a line item, which increases the subtotal and allows the full discount.
+  if (neededDiscount > discountableSubtotal && shippingPrice > 0) {
+    draftLineItems.push({
+      variant_id: undefined,
+      quantity: 1,
+      price: shippingPrice.toFixed(2),
+      title: "Shipping Cost",
+      custom: true
+    } as any);
+    finalShippingPrice = 0;
+  }
+
+  const finalShippingLine = finalShippingPrice > 0 ? {
+    title: "Shipping",
+    price: finalShippingPrice.toFixed(2),
+    custom: true
+  } : {
+    title: "Free Shipping",
+    price: "0.00",
+    custom: true
+  };
 
   const cartNote = [
     `PARTIAL COD ORDER [${partialPaymentReference}]`,
@@ -343,12 +400,19 @@ async function createDraftOrderCheckout(
     { name: 'checkout_type', value: 'draft_order' }
   ];
 
+  // Recompute the discount based on final line items + final shipping line,
+  // so the checkout grand total is exactly advanceAmount regardless of how
+  // the shipping was handled above.
+  const finalSubtotalForDiscount = actualDiscountableSubtotal +
+    (neededDiscount > discountableSubtotal && shippingPrice > 0 ? shippingPrice : 0);
+  const finalAppliedDiscountValue = Math.max(0, finalSubtotalForDiscount + finalShippingPrice - advanceAmount);
+
   let appliedDiscount = undefined;
-  if (remainingAmount > 0.01) {
+  if (finalAppliedDiscountValue > 0.01) {
     appliedDiscount = {
       title: "Partial Payment Remaining",
       description: "Remaining amount to be collected on delivery.",
-      value: remainingAmount.toFixed(2),
+      value: finalAppliedDiscountValue.toFixed(2),
       value_type: "fixed_amount"
     };
   }
@@ -367,7 +431,7 @@ async function createDraftOrderCheckout(
 
   const draftOrderPayload: any = {
     line_items: draftLineItems,
-    shipping_line: shippingLine,
+    shipping_line: finalShippingLine,
     applied_discount: appliedDiscount,
     note: cartNote,
     note_attributes: customAttributes,
