@@ -70,48 +70,63 @@ export async function createPartialPaymentCheckout(
   console.log('[PartialPayment] Step 0: Fetching native variant prices for decision engine...');
   const graphql = await getAdminGraphql(shop);
   
-  const variantGids = lineItems.map(item => `"gid://shopify/ProductVariant/${String(item.variantId).replace(/[^0-9]/g, '')}"`);
-  const query = `
-    query {
-      nodes(ids: [${variantGids.join(',')}]) {
-        ... on ProductVariant {
-          id
-          price
-        }
-      }
-    }
-  `;
-  
+  const validVariantGids = lineItems
+    .map(item => String(item.variantId || '').replace(/[^0-9]/g, ''))
+    .filter(id => id.length > 0)
+    .map(id => `"gid://shopify/ProductVariant/${id}"`);
+
   let hasCustomPricing = false;
   let nativeCartTotal = 0;
   const nativePrices: Record<string, number> = {};
 
-  try {
-    const priceRes = await graphql(query);
-    const priceData = await priceRes.json();
-    
-    if (priceData?.data?.nodes) {
-      priceData.data.nodes.forEach((node: any) => {
-        if (node && node.id && node.price) {
-          const numericId = node.id.replace(/[^0-9]/g, '');
-          const lineItem = lineItems.find(item => String(item.variantId) === numericId);
-          if (lineItem) {
-            const nativePrice = parseFloat(node.price);
-            nativePrices[numericId] = nativePrice;
-            nativeCartTotal += nativePrice * lineItem.quantity;
-            
-            // Compare native price with Fox COD's passed price
-            if (Math.abs(nativePrice - lineItem.price) > 0.01) {
-              hasCustomPricing = true;
-            }
+  if (validVariantGids.length > 0) {
+    const query = `
+      query {
+        nodes(ids: [${validVariantGids.join(',')}]) {
+          ... on ProductVariant {
+            id
+            price
           }
         }
-      });
+      }
+    `;
+
+    try {
+      const priceRes = await graphql(query);
+      const priceData = await priceRes.json();
+      
+      if (priceData?.data?.nodes) {
+        priceData.data.nodes.forEach((node: any) => {
+          if (node && node.id && node.price) {
+            const numericId = node.id.replace(/[^0-9]/g, '');
+            const lineItem = lineItems.find(item => String(item.variantId || '').replace(/[^0-9]/g, '') === numericId);
+            if (lineItem) {
+              const nativePrice = parseFloat(node.price);
+              nativePrices[numericId] = nativePrice;
+              nativeCartTotal += nativePrice * lineItem.quantity;
+              
+              // Compare native price with Fox COD's passed price
+              if (Math.abs(nativePrice - lineItem.price) > 0.01) {
+                hasCustomPricing = true;
+              }
+            }
+          }
+        });
+      }
+    } catch (error) {
+      console.warn('[PartialPayment] Failed to fetch native prices for decision engine.', error);
+      // Safe fallback to Draft Order if we can't verify native prices
+      hasCustomPricing = true;
     }
-  } catch (error) {
-    console.warn('[PartialPayment] Failed to fetch native prices for decision engine.', error);
-    // Safe fallback to Draft Order if we can't verify native prices
-    hasCustomPricing = true;
+  }
+
+  // Find any items that don't have a variant ID, or have a variant ID but weren't in nativePrices
+  for (const item of lineItems) {
+    const numericId = String(item.variantId || '').replace(/[^0-9]/g, '');
+    if (!numericId || !nativePrices[numericId]) {
+      hasCustomPricing = true;
+      nativeCartTotal += Number(item.price) * item.quantity;
+    }
   }
 
   if (params.codFeeAmount && params.codFeeAmount > 0) {
@@ -257,8 +272,8 @@ async function createDraftOrderCheckout(
   const { session } = await unauthenticated.admin(shop);
 
   const draftLineItems = lineItems.map(item => {
-    const numericId = String(item.variantId).replace(/[^0-9]/g, '');
-    const nativePrice = nativePrices[numericId] || item.price;
+    const numericId = String(item.variantId || '').replace(/[^0-9]/g, '');
+    const nativePrice = numericId ? (nativePrices[numericId] || item.price) : item.price;
     
     let applied_discount = undefined;
     if (nativePrice > item.price + 0.01) {
@@ -272,12 +287,21 @@ async function createDraftOrderCheckout(
       };
     }
 
-    return {
-      variant_id: Number(numericId),
-      quantity: item.quantity,
-      price: nativePrice.toFixed(2), // We MUST pass native price, Shopify ignores price overrides
-      applied_discount
-    };
+    if (numericId) {
+      return {
+        variant_id: Number(numericId),
+        quantity: item.quantity,
+        price: nativePrice.toFixed(2), // We MUST pass native price, Shopify ignores price overrides
+        applied_discount
+      };
+    } else {
+      return {
+        title: item.title || "Custom Item",
+        quantity: item.quantity,
+        price: nativePrice.toFixed(2),
+        custom: true
+      };
+    }
   });
 
   const shippingLine = shippingPrice > 0 ? {
