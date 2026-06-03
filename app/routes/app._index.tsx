@@ -44,7 +44,7 @@ type ShopifyRestClient = {
  */
 function getCodThemeEditorUrl(shop: string) {
   // Use the App's Client ID (API Key) as some older Shopify apps use it as the extension UUID
-  const extensionId = encodeURIComponent(process.env.SHOPIFY_API_KEY || FOX_COD_APP_CLIENT_ID);
+  const extensionId = encodeURIComponent(FOX_COD_EXTENSION_UID);
   const handle = encodeURIComponent(FOX_COD_EMBED_HANDLE);
 
   // App Embed URL — opens on product template and activates the embed block

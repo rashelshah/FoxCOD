@@ -10,6 +10,7 @@ import { useState, useCallback } from "react";
 import type { LoaderFunctionArgs } from "react-router";
 import { useLoaderData, useNavigate, useSearchParams } from "react-router";
 import { authenticate } from "../shopify.server";
+import { supabase } from "../config/supabase.server";
 import {
     Page,
     Layout,
@@ -250,7 +251,30 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         };
     }
 
-    return { ...metrics, shopCurrency, selectedDays };
+    // ── Partial Payment Analytics (from Supabase order_logs) ──
+    let partialOrdersCount = 0;
+    let advanceCollected = 0;
+    let remainingCodValue = 0;
+    try {
+        let partialQuery = supabase
+            .from('order_logs')
+            .select('advance_amount, remaining_cod_amount')
+            .eq('shop_domain', shop)
+            .eq('is_partial_cod', true);
+        if (createdAtMin) {
+            partialQuery = partialQuery.gte('created_at', createdAtMin);
+        }
+        const { data: partialData } = await partialQuery;
+        if (partialData) {
+            partialOrdersCount = partialData.length;
+            advanceCollected = partialData.reduce((sum, r) => sum + (r.advance_amount || 0), 0);
+            remainingCodValue = partialData.reduce((sum, r) => sum + (r.remaining_cod_amount || 0), 0);
+        }
+    } catch (e) {
+        console.error('[Analytics] Error fetching partial payment stats:', e);
+    }
+
+    return { ...metrics, shopCurrency, selectedDays, partialOrdersCount, advanceCollected, remainingCodValue };
 };
 
 // ─── Component ──────────────────────────────────────
@@ -275,6 +299,9 @@ export default function AnalyticsPage() {
         pendingRevenue,
         shopCurrency,
         selectedDays,
+        partialOrdersCount,
+        advanceCollected,
+        remainingCodValue,
     } = data;
 
     // Currency formatter
@@ -565,6 +592,50 @@ export default function AnalyticsPage() {
                         </Card>
                     </Layout.Section>
                 </Layout>
+                {/* ─── Partial Payments Section ─── */}
+                <Card>
+                    <BlockStack gap="400">
+                        <InlineStack align="space-between" blockAlign="center">
+                            <Text as="h2" variant="headingMd">
+                                Partial Payments
+                            </Text>
+                            <Badge tone="info">Advance + COD</Badge>
+                        </InlineStack>
+                        <Text as="p" variant="bodySm" tone="subdued">
+                            Orders where customers paid a deposit online and the remainder is collected on delivery.
+                        </Text>
+                        <InlineGrid columns={3} gap="400">
+                            <Box background="bg-surface-secondary" padding="400" borderRadius="200">
+                                <BlockStack gap="200">
+                                    <Text as="p" variant="bodySm" tone="subdued">Partial Orders</Text>
+                                    <Text as="p" variant="heading2xl" fontWeight="bold">{partialOrdersCount}</Text>
+                                    <Text as="p" variant="bodySm" tone="subdued">
+                                        {selectedDays === "all" ? "All time" : `Last ${selectedDays} days`}
+                                    </Text>
+                                </BlockStack>
+                            </Box>
+                            <Box background="bg-surface-secondary" padding="400" borderRadius="200">
+                                <BlockStack gap="200">
+                                    <Text as="p" variant="bodySm" tone="subdued">Advance Collected</Text>
+                                    <Text as="p" variant="heading2xl" fontWeight="bold">
+                                        {formatCurrency(advanceCollected)}
+                                    </Text>
+                                    <Text as="p" variant="bodySm" tone="subdued">Paid online at order time</Text>
+                                </BlockStack>
+                            </Box>
+                            <Box background="bg-surface-secondary" padding="400" borderRadius="200">
+                                <BlockStack gap="200">
+                                    <Text as="p" variant="bodySm" tone="subdued">Remaining COD Value</Text>
+                                    <Text as="p" variant="heading2xl" fontWeight="bold">
+                                        {formatCurrency(remainingCodValue)}
+                                    </Text>
+                                    <Text as="p" variant="bodySm" tone="subdued">To be collected on delivery</Text>
+                                </BlockStack>
+                            </Box>
+                        </InlineGrid>
+                    </BlockStack>
+                </Card>
+
                 <Box paddingBlockEnd="800" />
             </BlockStack>
         </Page>

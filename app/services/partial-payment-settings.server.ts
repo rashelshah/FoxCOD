@@ -1,0 +1,322 @@
+/**
+ * Partial Payment Settings — Server-side Service
+ *
+ * Handles Supabase CRUD for partial_payment_settings table and syncs
+ * the merchant's configuration to a shop metafield (PUBLIC_READ) so
+ * the storefront extension can read it without any App Proxy round-trip.
+ *
+ * Metafield location:
+ *   namespace: "fox_cod"
+ *   key:       "partial_payment_settings_json"
+ *   type:      "json"
+ *   ownerType: SHOP
+ */
+
+import { supabase } from '../config/supabase.server';
+import {
+  type PaymentOption,
+  type ModalSettings,
+  type ModuleFlags,
+  type PartialPaymentSettings,
+  DEFAULT_MODAL_SETTINGS,
+  DEFAULT_MODULE_FLAGS,
+  DEFAULT_PAYMENT_OPTIONS,
+} from '../config/partial-payment.types';
+
+// Re-export types so server-only callers can still import from one place
+export type { PaymentOption, ModalSettings, ModuleFlags, PartialPaymentSettings };
+export { DEFAULT_MODAL_SETTINGS, DEFAULT_MODULE_FLAGS, DEFAULT_PAYMENT_OPTIONS };
+
+// ── CRUD ───────────────────────────────────────────────────────────────────
+
+/**
+ * Fetch partial payment settings for a shop.
+ * Returns null if no row exists yet (first install).
+ */
+export async function getPartialPaymentSettings(
+  shopDomain: string
+): Promise<PartialPaymentSettings | null> {
+  const { data, error } = await supabase
+    .from('partial_payment_settings')
+    .select('*')
+    .eq('shop_domain', shopDomain)
+    .single();
+
+  if (error && error.code !== 'PGRST116') {
+    console.error('[PartialPayment] Error fetching settings:', error);
+    throw error;
+  }
+
+  return data as PartialPaymentSettings | null;
+}
+
+/**
+ * Save (upsert) partial payment settings for a shop.
+ * Returns the saved row.
+ */
+export async function savePartialPaymentSettings(
+  settings: PartialPaymentSettings
+): Promise<PartialPaymentSettings> {
+  const { shop_domain, id, created_at, ...rest } = settings as any;
+
+  const { data, error } = await supabase
+    .from('partial_payment_settings')
+    .upsert(
+      {
+        shop_domain,
+        ...rest,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'shop_domain' }
+    )
+    .select()
+    .single();
+
+  if (error) {
+    console.error('[PartialPayment] Error saving settings:', error);
+    throw error;
+  }
+
+  return data as PartialPaymentSettings;
+}
+
+// ── Metafield Sync ─────────────────────────────────────────────────────────
+
+/**
+ * Sync partial payment settings to a PUBLIC_READ shop metafield.
+ * Storefront reads: shop.metafields.fox_cod.partial_payment_settings_json
+ *
+ * Mirrors the pattern used by syncUpsellsToMetafield() in upsell-offers.server.ts.
+ */
+export async function syncPartialPaymentToMetafield(
+  admin: any,
+  shopDomain: string
+): Promise<void> {
+  // Ensure metafield definition exists (idempotent)
+  try {
+    await admin.graphql(
+      `mutation CreateMetafieldDefinition($definition: MetafieldDefinitionInput!) {
+        metafieldDefinitionCreate(definition: $definition) {
+          createdDefinition { id key }
+          userErrors { field message }
+        }
+      }`,
+      {
+        variables: {
+          definition: {
+            name: 'Partial Payment Settings JSON',
+            namespace: 'fox_cod',
+            key: 'partial_payment_settings_json',
+            type: 'json',
+            ownerType: 'SHOP',
+            access: { storefront: 'PUBLIC_READ' },
+          },
+        },
+      }
+    );
+  } catch (_e) {
+    // Definition already exists — safe to ignore
+  }
+
+  // Load current settings from Supabase
+  const settings = await getPartialPaymentSettings(shopDomain);
+
+  // Build the storefront payload (only what the extension needs)
+  const storefrontPayload = settings
+    ? {
+        enabled: settings.enabled,
+        payment_options: settings.payment_options ?? [],
+        cod_fee_enabled: settings.cod_fee_enabled,
+        cod_fee_name: settings.cod_fee_name,
+        cod_fee_type: settings.cod_fee_type,
+        cod_fee_amount: settings.cod_fee_amount,
+        minimum_order_total: settings.minimum_order_total,
+        maximum_order_total: settings.maximum_order_total,
+        allowed_product_ids: settings.allowed_product_ids ?? [],
+        allowed_collection_ids: settings.allowed_collection_ids ?? [],
+        allowed_countries: settings.allowed_countries ?? [],
+        excluded_countries: settings.excluded_countries ?? [],
+        modal_settings: settings.modal_settings ?? DEFAULT_MODAL_SETTINGS,
+        module_flags: settings.module_flags ?? DEFAULT_MODULE_FLAGS,
+      }
+    : { enabled: false };
+
+  // Get shop GID
+  const shopRes = await admin.graphql(`{ shop { id } }`);
+  const shopData = await shopRes.json();
+  const shopId = shopData?.data?.shop?.id;
+
+  if (!shopId) {
+    console.error('[PartialPayment] Could not get shop GID for metafield sync');
+    return;
+  }
+
+  // Write metafield
+  const setRes = await admin.graphql(
+    `mutation SetMetafield($metafields: [MetafieldsSetInput!]!) {
+      metafieldsSet(metafields: $metafields) {
+        metafields { id key value }
+        userErrors { field message }
+      }
+    }`,
+    {
+      variables: {
+        metafields: [
+          {
+            ownerId: shopId,
+            namespace: 'fox_cod',
+            key: 'partial_payment_settings_json',
+            value: JSON.stringify(storefrontPayload),
+            type: 'json',
+          },
+        ],
+      },
+    }
+  );
+
+  const setData = await setRes.json();
+  const errors = setData?.data?.metafieldsSet?.userErrors ?? [];
+  if (errors.length > 0) {
+    console.error('[PartialPayment] Metafield sync errors:', errors);
+  } else {
+    console.log('[PartialPayment] Metafield synced successfully for:', shopDomain);
+  }
+}
+
+// ── Eligibility Engine ─────────────────────────────────────────────────────
+
+/**
+ * Server-side eligibility check.
+ * Used by proxy routes that need to validate before checkout creation.
+ *
+ * Note: The storefront JS performs the same check client-side using the
+ * metafield payload, so this is a secondary server-side guard.
+ */
+export function isPartialPaymentEligibleServer(
+  settings: PartialPaymentSettings,
+  params: {
+    orderTotal: number;
+    productId?: string;
+    collectionIds?: string[];
+    country?: string;
+  }
+): { eligible: boolean; reason?: string } {
+  if (!settings.enabled) {
+    return { eligible: false, reason: 'Partial payments are disabled' };
+  }
+
+  const { orderTotal, productId, collectionIds = [], country } = params;
+
+  // Order total restrictions
+  if (settings.minimum_order_total > 0 && orderTotal < settings.minimum_order_total) {
+    return {
+      eligible: false,
+      reason: `Order total must be at least ${settings.minimum_order_total}`,
+    };
+  }
+  if (settings.maximum_order_total > 0 && orderTotal > settings.maximum_order_total) {
+    return {
+      eligible: false,
+      reason: `Order total exceeds maximum of ${settings.maximum_order_total}`,
+    };
+  }
+
+  // Country restrictions
+  if (settings.excluded_countries.length > 0 && country) {
+    if (settings.excluded_countries.includes(country)) {
+      return { eligible: false, reason: 'Partial payments not available in your country' };
+    }
+  }
+  if (settings.allowed_countries.length > 0 && country) {
+    if (!settings.allowed_countries.includes(country)) {
+      return { eligible: false, reason: 'Partial payments not available in your country' };
+    }
+  }
+
+  // Product restrictions
+  const hasProductFilter = settings.allowed_product_ids.length > 0;
+  const hasCollectionFilter = settings.allowed_collection_ids.length > 0;
+
+  if (hasProductFilter || hasCollectionFilter) {
+    let productAllowed = false;
+
+    if (hasProductFilter && productId) {
+      const numericId = String(productId).replace(/[^0-9]/g, '');
+      productAllowed = settings.allowed_product_ids.some(
+        (id) => String(id).replace(/[^0-9]/g, '') === numericId
+      );
+    }
+
+    if (!productAllowed && hasCollectionFilter && collectionIds.length > 0) {
+      productAllowed = collectionIds.some((cid) =>
+        settings.allowed_collection_ids.some(
+          (allowed) =>
+            String(allowed).replace(/[^0-9]/g, '') === String(cid).replace(/[^0-9]/g, '')
+        )
+      );
+    }
+
+    if (!productAllowed) {
+      return {
+        eligible: false,
+        reason: 'Partial payments not available for this product',
+      };
+    }
+  }
+
+  return { eligible: true };
+}
+
+// ── Deposit Calculation ────────────────────────────────────────────────────
+
+/**
+ * Calculate the advance amount (deposit) based on a payment option and order total.
+ * Also adds the COD fee if enabled.
+ *
+ * Returns: { depositAmount, codFeeAmount, payNow, remainingCod }
+ */
+export function calculateDepositAmounts(
+  option: PaymentOption,
+  orderTotal: number,
+  settings: PartialPaymentSettings
+): {
+  depositAmount: number;
+  codFeeAmount: number;
+  payNow: number;
+  remainingCod: number;
+} {
+  let depositAmount = 0;
+
+  switch (option.type) {
+    case 'percentage':
+      depositAmount = (orderTotal * option.value) / 100;
+      break;
+    case 'fixed':
+      depositAmount = Math.min(option.value, orderTotal);
+      break;
+    case 'remaining_percentage':
+      // e.g. "Pay 30% of discounted total" — same as percentage but labeled differently
+      depositAmount = (orderTotal * option.value) / 100;
+      break;
+    default:
+      depositAmount = option.value;
+  }
+
+  // Round to 2 decimal places
+  depositAmount = Math.round(depositAmount * 100) / 100;
+
+  // COD fee
+  let codFeeAmount = 0;
+  if (settings.cod_fee_enabled && settings.cod_fee_amount > 0) {
+    if (settings.cod_fee_type === 'percentage') {
+      codFeeAmount = Math.round((depositAmount * settings.cod_fee_amount) / 100 * 100) / 100;
+    } else {
+      codFeeAmount = settings.cod_fee_amount;
+    }
+  }
+
+  const payNow = Math.round((depositAmount + codFeeAmount) * 100) / 100;
+  const remainingCod = Math.max(Math.round((orderTotal - depositAmount) * 100) / 100, 0);
+
+  return { depositAmount, codFeeAmount, payNow, remainingCod };
+}

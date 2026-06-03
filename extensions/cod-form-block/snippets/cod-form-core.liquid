@@ -85,7 +85,9 @@
 {% assign show_add_to_cart = btn_styles.showAddToCart | default: false %}
 {% assign cod_shipping_options = shop.metafields.fox_cod.shipping_options | default: '{}' %}
 
-{% comment %} Partial COD Settings {% endcomment %}
+{% comment %} Partial Payment Settings (v2) — full config from admin metafield {% endcomment %}
+{% assign partial_payment_settings_raw = shop.metafields.fox_cod.partial_payment_settings_json.value %}
+{% comment %} Legacy fallback for old partial_cod_enabled metafield {% endcomment %}
 {% assign cod_partial_enabled = shop.metafields.fox_cod.partial_cod_enabled | default: 'false' %}
 {% assign cod_partial_advance = shop.metafields.fox_cod.partial_cod_advance_amount | default: '100' %}
 
@@ -306,6 +308,16 @@
     }
     window.FoxCod.upsellOffers = upsellData || { tick_upsells: [], click_upsells: [], downsells: [] };
     console.log('[FoxCod] Upsell offers injected:', window.FoxCod.upsellOffers);
+    
+    // ── Partial Payment Settings (v2) ──────────────────────────────────────
+    // Read from shop metafield synced by the admin on every save.
+    // No App Proxy round-trip needed on the storefront.
+    var ppRaw = {{ shop.metafields.fox_cod.partial_payment_settings_json.value | json | default: 'null' }};
+    if (typeof ppRaw === 'string') {
+      try { ppRaw = JSON.parse(ppRaw); } catch (e) {}
+    }
+    window.FoxCod.partialPaymentSettings = (ppRaw && typeof ppRaw === 'object') ? ppRaw : { enabled: false };
+    console.log('[FoxCod] Partial payment settings injected:', window.FoxCod.partialPaymentSettings?.enabled);
     
     // Form submit button style overrides
     var fsbRaw = {{ shop.metafields.fox_cod.form_submit_button_json.value | json | default: 'null' }};
