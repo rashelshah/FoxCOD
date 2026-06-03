@@ -461,7 +461,7 @@
   function ensureStickyButton(productId, config) {
     if (!config || !config.rootElement || !config.triggerElement || isShopifyEditor) return;
 
-    if (!config.stickyOnMobile || window.innerWidth > 600) {
+    if (!config.stickyOnMobile) {
       if (config._stickyButton && config._stickyButton.parentNode) {
         config._stickyButton.parentNode.removeChild(config._stickyButton);
       }
@@ -486,7 +486,7 @@
         e.stopPropagation();
         openModal(productId, config);
       });
-      config.rootElement.appendChild(stickyBtn);
+      document.body.appendChild(stickyBtn);
       config._stickyButton = stickyBtn;
     }
 
@@ -506,13 +506,20 @@
       if (!config._stickyButton || !config._stickyButton.isConnected) return;
       if (stickyBtn.getAttribute('data-hidden-by-modal') === 'true') return;
 
-      if (window.innerWidth > 600 || !isElementRenderable(config.triggerElement)) {
+      if (window.innerWidth > 600) {
         hideStickyButton();
         return;
       }
 
-      var rect = config.triggerElement.getBoundingClientRect();
-      if (rect.bottom < 0) {
+      var isOutOfViewport = false;
+      if (!isElementRenderable(config.triggerElement)) {
+        isOutOfViewport = true;
+      } else {
+        var rect = config.triggerElement.getBoundingClientRect();
+        isOutOfViewport = rect.bottom < 0 || rect.top > (window.innerHeight || document.documentElement.clientHeight);
+      }
+
+      if (isOutOfViewport) {
         showStickyButton();
       } else {
         hideStickyButton();
