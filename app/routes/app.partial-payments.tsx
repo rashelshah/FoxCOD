@@ -43,6 +43,7 @@ import {
   Banner,
   InlineGrid,
   Tag,
+  ColorPicker,
 } from '@shopify/polaris';
 import { DeleteIcon, PlusIcon } from '@shopify/polaris-icons';
 
@@ -311,9 +312,10 @@ const S = `
 /* ── Color swatches ── */
 .pp-color-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .pp-color-label { font-size: 13px; font-weight: 500; color: #374151; min-width: 140px; }
-.pp-color-input { width: 40px; height: 36px; border: none; border-radius: 8px; cursor: pointer; padding: 2px; background: transparent; flex-shrink: 0; }
-.pp-color-text { flex: 1; padding: 8px 12px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 13px; color: #111827; background: #f9fafb; font-family: monospace; }
-.pp-color-text:focus { border-color: #1f2937; background: #fff; outline: none; }
+.pp-color-picker-wrap { flex: 1; display: flex; align-items: center; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 4px; gap: 8px; }
+.pp-color-swatch-btn { width: 32px; height: 32px; border: 1px solid rgba(0,0,0,0.1); border-radius: 6px; cursor: pointer; flex-shrink: 0; }
+.pp-color-text { flex: 1; padding: 6px 8px; border: none; background: transparent; font-size: 13px; color: #111827; font-family: monospace; }
+.pp-color-text:focus { outline: none; }
 
 /* ── Modal Preview ── */
 .pp-modal-preview-wrap { margin-top: 20px; }
@@ -366,17 +368,17 @@ const S = `
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 480px;
+  min-height: 380px;
 }
 .pp-preview-modal-box {
   width: 100%;
-  max-width: 760px;
+  max-width: 840px;
   background: #ffffff;
   border-radius: 16px;
   overflow: hidden;
   box-shadow: 0 20px 40px rgba(0,0,0,0.1);
   display: grid;
-  grid-template-columns: 300px 1fr;
+  grid-template-columns: 340px 1fr;
   box-sizing: border-box;
   position: relative;
 }
@@ -391,12 +393,11 @@ const S = `
 
 /* Left Panel */
 .pp-preview-left-panel {
-  padding: 32px 24px;
+  padding: 32px;
   display: flex;
   flex-direction: column;
   position: relative;
   overflow: hidden;
-  min-height: 400px;
 }
 .pp-preview-shop-pill {
   align-self: flex-start;
@@ -479,10 +480,10 @@ const S = `
 
 /* Right Panel */
 .pp-preview-right-panel {
-  padding: 40px;
+  padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 16px;
   justify-content: space-between;
   box-sizing: border-box;
   position: relative;
@@ -777,29 +778,134 @@ function nanoid8() {
   return Math.random().toString(36).slice(2, 10);
 }
 
+// ── Color Utilities for ColorPicker ─────────────────────────────────────────
+interface HSBColor { hue: number; saturation: number; brightness: number; }
+function hexToHsb(hex: string): HSBColor {
+  let h = hex.replace('#', '');
+  if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+  const r = parseInt(h.substring(0, 2), 16) / 255;
+  const g = parseInt(h.substring(2, 4), 16) / 255;
+  const b = parseInt(h.substring(4, 6), 16) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+  let hue = 0;
+  if (d !== 0) {
+    if (max === r) hue = ((g - b) / d + (g < b ? 6 : 0)) * 60;
+    else if (max === g) hue = ((b - r) / d + 2) * 60;
+    else hue = ((r - g) / d + 4) * 60;
+  }
+  return { hue, saturation: max === 0 ? 0 : d / max, brightness: max };
+}
+function hsbToHex(hsb: HSBColor): string {
+  const { hue, saturation, brightness } = hsb;
+  const c = brightness * saturation;
+  const x = c * (1 - Math.abs(((hue / 60) % 2) - 1));
+  const m = brightness - c;
+  let r = 0, g = 0, b = 0;
+  if (hue < 60) { r = c; g = x; } else if (hue < 120) { r = x; g = c; }
+  else if (hue < 180) { g = c; b = x; } else if (hue < 240) { g = x; b = c; }
+  else if (hue < 300) { r = x; b = c; } else { r = c; b = x; }
+  const toHex = (v: number) => Math.round((v + m) * 255).toString(16).padStart(2, '0');
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+function isValidHex(hex: string): boolean { return /^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6})$/.test(hex); }
+function normalizeHex(hex: string): string {
+  if (/^#[A-Fa-f0-9]{3}$/.test(hex)) return '#' + hex[1] + hex[1] + hex[2] + hex[2] + hex[3] + hex[3];
+  return hex.toLowerCase();
+}
+
 interface ColorFieldProps {
   label: string;
   value: string;
   onChange: (v: string) => void;
 }
 function ColorField({ label, value, onChange }: ColorFieldProps) {
+  const safeValue = isValidHex(value) ? normalizeHex(value) : '#000000';
+  const [hsbColor, setHsbColor] = useState<HSBColor>(hexToHsb(safeValue));
+  const [hexInput, setHexInput] = useState(safeValue.toUpperCase());
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
+
+  useEffect(() => {
+    if (isValidHex(value)) {
+      const norm = normalizeHex(value);
+      setHsbColor(hexToHsb(norm));
+      setHexInput(norm.toUpperCase());
+    }
+  }, [value]);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setPickerOpen(false);
+      }
+    }
+    if (pickerOpen) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [pickerOpen]);
+
+  const handlePickerChange = useCallback((color: HSBColor) => {
+    setHsbColor(color);
+    const hex = hsbToHex(color);
+    onChange(hex);
+    setHexInput(hex.toUpperCase());
+  }, [onChange]);
+
+  const handleHexChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    let val = e.target.value.toUpperCase();
+    if (val && !val.startsWith('#')) val = '#' + val;
+    setHexInput(val);
+    if (isValidHex(val)) {
+      const normalized = normalizeHex(val);
+      onChange(normalized);
+      setHsbColor(hexToHsb(normalized));
+    }
+  }, [onChange]);
+
   return (
-    <div className="pp-color-row">
+    <div className="pp-color-row" ref={wrapperRef} style={{ position: 'relative' }}>
       <span className="pp-color-label">{label}</span>
-      <input
-        type="color"
-        className="pp-color-input"
-        value={value || '#000000'}
-        onChange={(e) => onChange(e.target.value)}
-      />
-      <input
-        type="text"
-        className="pp-color-text"
-        value={value || ''}
-        onChange={(e) => onChange(e.target.value)}
-        maxLength={9}
-        placeholder="#000000"
-      />
+      <div className="pp-color-picker-wrap">
+        <div
+          className="pp-color-swatch-btn"
+          style={{ backgroundColor: safeValue }}
+          onClick={() => {
+            if (!pickerOpen && wrapperRef.current) {
+              const rect = wrapperRef.current.getBoundingClientRect();
+              const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+              const estimatedHeight = 280;
+              const spaceBelow = viewportHeight - rect.bottom;
+              const openAbove = spaceBelow < estimatedHeight;
+
+              let top: number;
+              if (openAbove) {
+                top = rect.top - estimatedHeight - 8;
+                if (top < 8) top = 8;
+              } else {
+                top = rect.bottom + 8;
+              }
+
+              setPopoverPos({
+                top,
+                left: rect.left + 150, // offset rightwards past the label
+              });
+            }
+            setPickerOpen(!pickerOpen);
+          }}
+        />
+        <input
+          type="text"
+          className="pp-color-text"
+          value={hexInput}
+          onChange={handleHexChange}
+          maxLength={7}
+        />
+      </div>
+      {pickerOpen && popoverPos && (
+        <div style={{ position: 'fixed', top: popoverPos.top, left: popoverPos.left, zIndex: 9999, background: '#fff', padding: '12px', border: '1px solid #e5e7eb', borderRadius: '12px', boxShadow: '0 10px 30px rgba(0,0,0,0.15)' }}>
+          <ColorPicker onChange={handlePickerChange} color={hsbColor} />
+        </div>
+      )}
     </div>
   );
 }
@@ -1494,118 +1600,103 @@ export default function PartialPaymentsPage() {
                 </Text>
               </BlockStack>
 
-              <InlineGrid columns={2} gap="600">
-                {/* Left column — colors */}
-                <BlockStack gap="300">
+              {/* Preset Themes Above Columns */}
+              <BlockStack gap="100">
+                <Text as="h3" variant="headingSm">Preset Themes</Text>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
+                  {GRADIENT_PRESETS.map((preset) => {
+                    const isSelected =
+                      ms.left_bg_color === preset.bg &&
+                      ms.left_gradient_start === preset.start &&
+                      ms.left_gradient_end === preset.end &&
+                      ms.left_text_color === preset.text;
+
+                    return (
+                      <div
+                        key={preset.name}
+                        onClick={() => {
+                          updModal('left_bg_color', preset.bg);
+                          updModal('left_gradient_start', preset.start);
+                          updModal('left_gradient_end', preset.end);
+                          updModal('left_text_color', preset.text);
+                        }}
+                        title={preset.name}
+                        style={{
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '50%',
+                          background: `linear-gradient(135deg, ${preset.start} 0%, ${preset.end} 100%)`,
+                          border: isSelected ? '2px solid #008060' : '1px solid #d2d5d9',
+                          boxShadow: isSelected ? '0 0 0 2px #00806033, 0 1px 3px rgba(0,0,0,0.1)' : '0 1px 2px rgba(0,0,0,0.05)',
+                          cursor: 'pointer',
+                          boxSizing: 'border-box',
+                          transition: 'transform 0.15s ease, border-color 0.15s ease',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.15)'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                      >
+                        {isSelected && (
+                          <svg viewBox="0 0 20 20" fill="none" style={{ width: '12px', height: '12px', color: preset.text === '#ffffff' ? '#ffffff' : '#008060' }}>
+                            <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" fill="currentColor" fillRule="evenodd" clipRule="evenodd" />
+                          </svg>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </BlockStack>
+              <div style={{ height: '8px' }}></div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px 32px', alignItems: 'center' }}>
+                <div style={{ gridColumn: '1 / 2' }}>
                   <Text as="h3" variant="headingSm">Left Panel Colors</Text>
-                  
-                  {/* Preset Gradient Options */}
-                  <div style={{ marginBottom: '16px' }}>
-                    <div style={{ fontSize: '12px', color: '#6d7175', marginBottom: '8px' }}>
-                      Preset Themes
-                    </div>
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                      {GRADIENT_PRESETS.map((preset) => {
-                        const isSelected =
-                          ms.left_bg_color === preset.bg &&
-                          ms.left_gradient_start === preset.start &&
-                          ms.left_gradient_end === preset.end &&
-                          ms.left_text_color === preset.text;
+                </div>
 
-                        return (
-                          <div
-                            key={preset.name}
-                            onClick={() => {
-                              updModal('left_bg_color', preset.bg);
-                              updModal('left_gradient_start', preset.start);
-                              updModal('left_gradient_end', preset.end);
-                              updModal('left_text_color', preset.text);
-                            }}
-                            title={preset.name}
-                            style={{
-                              width: '28px',
-                              height: '28px',
-                              borderRadius: '50%',
-                              background: `linear-gradient(135deg, ${preset.start} 0%, ${preset.end} 100%)`,
-                              border: isSelected ? '2px solid #008060' : '1px solid #d2d5d9',
-                              boxShadow: isSelected ? '0 0 0 2px #00806033, 0 1px 3px rgba(0,0,0,0.1)' : '0 1px 2px rgba(0,0,0,0.05)',
-                              cursor: 'pointer',
-                              boxSizing: 'border-box',
-                              transition: 'transform 0.15s ease, border-color 0.15s ease',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                            }}
-                            onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.15)'; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
-                          >
-                            {isSelected && (
-                              <svg viewBox="0 0 20 20" fill="none" style={{ width: '12px', height: '12px', color: preset.text === '#ffffff' ? '#ffffff' : '#008060' }}>
-                                <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" fill="currentColor" fillRule="evenodd" clipRule="evenodd" />
-                              </svg>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <ColorField label="Background Color" value={ms.left_bg_color} onChange={(v) => updModal('left_bg_color', v)} />
-                  <ColorField label="Gradient Start" value={ms.left_gradient_start} onChange={(v) => updModal('left_gradient_start', v)} />
-                  <ColorField label="Gradient End" value={ms.left_gradient_end} onChange={(v) => updModal('left_gradient_end', v)} />
-                  <ColorField label="Text Color" value={ms.left_text_color} onChange={(v) => updModal('left_text_color', v)} />
-
-                  <hr className="pp-divider" />
-
+                <div style={{ gridColumn: '2 / 3' }}>
                   <Text as="h3" variant="headingSm">Right Panel Colors</Text>
+                </div>
+
+                <div style={{ gridColumn: '1 / 2' }}>
+                  <ColorField label="Background Color" value={ms.left_bg_color} onChange={(v) => updModal('left_bg_color', v)} />
+                </div>
+                <div style={{ gridColumn: '2 / 3' }}>
                   <ColorField label="Background Color" value={ms.right_bg_color} onChange={(v) => updModal('right_bg_color', v)} />
+                </div>
+
+                <div style={{ gridColumn: '1 / 2' }}>
+                  <ColorField label="Gradient Start" value={ms.left_gradient_start} onChange={(v) => updModal('left_gradient_start', v)} />
+                </div>
+                <div style={{ gridColumn: '2 / 3' }}>
                   <ColorField label="Border Color" value={ms.right_border_color} onChange={(v) => updModal('right_border_color', v)} />
+                </div>
+
+                <div style={{ gridColumn: '1 / 2' }}>
+                  <ColorField label="Gradient End" value={ms.left_gradient_end} onChange={(v) => updModal('left_gradient_end', v)} />
+                </div>
+                <div style={{ gridColumn: '2 / 3' }}>
                   <ColorField label="Button Color" value={ms.button_color} onChange={(v) => updModal('button_color', v)} />
-                  <ColorField label="Button Text Color" value={ms.button_text_color} onChange={(v) => updModal('button_text_color', v)} />
-                </BlockStack>
+                </div>
 
-                {/* Right column — branding settings */}
-                <BlockStack gap="300">
+                <div style={{ gridColumn: '1 / 2' }}>
+                  <ColorField label="Text Color" value={ms.left_text_color} onChange={(v) => updModal('left_text_color', v)} />
+                  <hr className="pp-divider" style={{ margin: '20px 0' }} />
                   <Text as="h3" variant="headingSm">Branding</Text>
-
-                  <TextField
-                    label="Title"
-                    value={ms.title}
-                    onChange={(v) => updModal('title', v)}
-                    autoComplete="off"
-                    placeholder="Choose Your Payment Option"
-                  />
-                  <TextField
-                    label="Subtitle"
-                    value={ms.subtitle}
-                    onChange={(v) => updModal('subtitle', v)}
-                    autoComplete="off"
-                    multiline={2}
-                    placeholder="Pay a small amount now and the rest on delivery"
-                  />
-                  <TextField
-                    label="Security Text"
-                    value={ms.security_text}
-                    onChange={(v) => updModal('security_text', v)}
-                    autoComplete="off"
-                    placeholder="Secure Payments · Verified Seller · Assured Delivery"
-                  />
-                  <TextField
-                    label="Footer Text"
-                    value={ms.footer_text}
-                    onChange={(v) => updModal('footer_text', v)}
-                    autoComplete="off"
-                    placeholder="Remaining amount collected on delivery"
-                  />
-
-                  <ToggleRow
-                    label="Show Security Icons"
-                    sub="Display trust badges in the payment modal."
-                    checked={ms.show_security_icons}
-                    onChange={(v) => updModal('show_security_icons', v)}
-                  />
-                </BlockStack>
-              </InlineGrid>
+                  <div style={{ marginTop: '12px' }}>
+                    <ToggleRow
+                      label="Show Security Icons"
+                      sub="Display trust badges in the payment modal."
+                      checked={ms.show_security_icons}
+                      onChange={(v) => updModal('show_security_icons', v)}
+                    />
+                  </div>
+                </div>
+                <div style={{ gridColumn: '2 / 3', alignSelf: 'start' }}>
+                  <ColorField label="Button Text Color" value={ms.button_text_color} onChange={(v) => updModal('button_text_color', v)} />
+                </div>
+              </div>
             </BlockStack>
           </Card>
 

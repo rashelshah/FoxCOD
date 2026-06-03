@@ -6536,12 +6536,12 @@ function darkenColor(hex, percent) {
 
       var panel = document.createElement('div');
       panel.id = 'foxcod-pp-panel';
-      panel.style.cssText = 'display:grid;grid-template-columns:300px 1fr;width:100%;max-width:760px;border-radius:16px;overflow:hidden;box-shadow:0 20px 40px rgba(0,0,0,0.1);animation:foxcodPartialSlideUp 0.3s cubic-bezier(0.34,1.56,0.64,1);font-family:"Inter",-apple-system,sans-serif;position:relative;background:#ffffff;';
+      panel.style.cssText = 'display:grid;grid-template-columns:340px 1fr;width:100%;max-width:840px;border-radius:16px;overflow:hidden;box-shadow:0 20px 40px rgba(0,0,0,0.1);animation:foxcodPartialSlideUp 0.3s cubic-bezier(0.34,1.56,0.64,1);font-family:"Inter",-apple-system,sans-serif;position:relative;background:#ffffff;';
 
       // Left column
       var leftCol = document.createElement('div');
       leftCol.id = 'foxcod-pp-left-col';
-      leftCol.style.cssText = 'background:' + leftBg + ';color:' + leftColor + ';padding:32px 24px;display:flex;flex-direction:column;position:relative;overflow:hidden;min-height:400px;';
+      leftCol.style.cssText = 'background:' + leftBg + ';color:' + leftColor + ';padding:32px;display:flex;flex-direction:column;position:relative;overflow:hidden;';
 
       // Inject Media Query Styles
       if (!document.getElementById('foxcod-pp-mobile-styles')) {
@@ -6581,7 +6581,7 @@ function darkenColor(hex, percent) {
 
       // Right column
       var rightCol = document.createElement('div');
-      rightCol.style.cssText = 'background:' + rightBg + ';padding:40px;display:flex;flex-direction:column;gap:24px;justify-content:space-between;box-sizing:border-box;position:relative;overflow-y:auto;max-height:90vh;';
+      rightCol.style.cssText = 'background:' + rightBg + ';padding:40px;display:flex;flex-direction:column;gap:16px;justify-content:space-between;box-sizing:border-box;position:relative;overflow-y:auto;max-height:90vh;';
 
       var closeBtnHTML = '<button id="foxcod-partial-cancel-icon" type="button" aria-label="Close" style="position:absolute;top:16px;right:16px;width:32px;height:32px;border-radius:50%;border:1px solid #e5e7eb;background:#ffffff;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#6b7280;padding:0;transition:all 0.2s;"><svg viewBox="0 0 20 20" fill="currentColor" style="width:16px;height:16px;"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg></button>';
 
