@@ -1605,7 +1605,7 @@ export default function PartialPaymentsPage() {
               {/* Preset Themes Above Columns */}
               <BlockStack gap="100">
                 <Text as="h3" variant="headingSm">Preset Themes</Text>
-                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px', marginTop: '6px' }}>
                   {GRADIENT_PRESETS.map((preset) => {
                     const isSelected =
                       ms.left_bg_color === preset.bg &&
@@ -1622,29 +1622,54 @@ export default function PartialPaymentsPage() {
                           updModal('left_gradient_end', preset.end);
                           updModal('left_text_color', preset.text);
                         }}
-                        title={preset.name}
                         style={{
-                          width: '28px',
-                          height: '28px',
-                          borderRadius: '50%',
-                          background: `linear-gradient(135deg, ${preset.start} 0%, ${preset.end} 100%)`,
-                          border: isSelected ? '2px solid #008060' : '1px solid #d2d5d9',
-                          boxShadow: isSelected ? '0 0 0 2px #00806033, 0 1px 3px rgba(0,0,0,0.1)' : '0 1px 2px rgba(0,0,0,0.05)',
-                          cursor: 'pointer',
-                          boxSizing: 'border-box',
-                          transition: 'transform 0.15s ease, border-color 0.15s ease',
                           display: 'flex',
                           alignItems: 'center',
-                          justifyContent: 'center',
+                          gap: '10px',
+                          padding: '8px 12px',
+                          borderRadius: '8px',
+                          border: isSelected ? '1.5px solid #008060' : '1px solid #e1e3e6',
+                          backgroundColor: isSelected ? '#f0fbf7' : '#ffffff',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                          boxSizing: 'border-box',
+                          boxShadow: isSelected ? '0 1px 3px rgba(0, 128, 96, 0.15)' : '0 1px 2px rgba(0,0,0,0.05)',
                         }}
-                        onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.15)'; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                        onMouseEnter={(e) => {
+                          if (!isSelected) {
+                            e.currentTarget.style.borderColor = '#b4b9bf';
+                            e.currentTarget.style.backgroundColor = '#f9fafb';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isSelected) {
+                            e.currentTarget.style.borderColor = '#e1e3e6';
+                            e.currentTarget.style.backgroundColor = '#ffffff';
+                          }
+                        }}
                       >
-                        {isSelected && (
-                          <svg viewBox="0 0 20 20" fill="none" style={{ width: '12px', height: '12px', color: preset.text === '#ffffff' ? '#ffffff' : '#008060' }}>
-                            <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" fill="currentColor" fillRule="evenodd" clipRule="evenodd" />
-                          </svg>
-                        )}
+                        <div
+                          style={{
+                            width: '20px',
+                            height: '20px',
+                            borderRadius: '50%',
+                            background: `linear-gradient(135deg, ${preset.start} 0%, ${preset.end} 100%)`,
+                            border: '1px solid rgba(0,0,0,0.08)',
+                            flexShrink: 0,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          {isSelected && (
+                            <svg viewBox="0 0 20 20" fill="none" style={{ width: '10px', height: '10px', color: preset.text === '#ffffff' ? '#ffffff' : '#008060' }}>
+                              <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" fill="currentColor" fillRule="evenodd" clipRule="evenodd" />
+                            </svg>
+                          )}
+                        </div>
+                        <span style={{ fontSize: '13px', fontWeight: isSelected ? '600' : '500', color: isSelected ? '#004d38' : '#202223' }}>
+                          {preset.name}
+                        </span>
                       </div>
                     );
                   })}
