@@ -4043,12 +4043,6 @@ export default function SettingsPage() {
                             Form Fields
                         </button>
                         <button
-                            className={`tab ${activeTab === 'style' ? 'active' : ''}`}
-                            onClick={() => setActiveTab('style')}
-                        >
-                            Style
-                        </button>
-                        <button
                             className={`tab ${activeTab === 'shipping' ? 'active' : ''}`}
                             onClick={() => setActiveTab('shipping')}
                         >

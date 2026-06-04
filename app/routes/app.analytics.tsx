@@ -10,7 +10,6 @@ import { useState, useCallback } from "react";
 import type { LoaderFunctionArgs } from "react-router";
 import { useLoaderData, useNavigate, useSearchParams } from "react-router";
 import { authenticate } from "../shopify.server";
-import { supabase } from "../config/supabase.server";
 import {
     Page,
     Layout,
@@ -141,6 +140,8 @@ function computeMetrics(orders: ShopifyOrder[]): AnalyticsData {
     let partialOrdersCount = 0;
     let advanceCollected = 0;
     let remainingCodValue = 0;
+    let fullPrepaidOrdersCount = 0;
+    let fullPrepaidRevenue = 0;
 
     for (const order of orders) {
         const createdAt = new Date(order.created_at);
@@ -191,6 +192,15 @@ function computeMetrics(orders: ShopifyOrder[]): AnalyticsData {
             if (advanceAttr) advanceCollected += parseFloat(advanceAttr.value) || 0;
             if (remainingAttr) remainingCodValue += parseFloat(remainingAttr.value) || 0;
         }
+
+        // Full Prepaid calculations
+        const isFullPrepaid = order.tags?.includes("Full Prepaid") || order.note_attributes?.some(attr => attr.name === "full_prepaid" && attr.value === "true");
+        if (isFullPrepaid) {
+            fullPrepaidOrdersCount++;
+            if (!isCancelled && order.financial_status !== "refunded") {
+                fullPrepaidRevenue += price;
+            }
+        }
     }
 
     const totalOrders = orders.length;
@@ -213,8 +223,8 @@ function computeMetrics(orders: ShopifyOrder[]): AnalyticsData {
         partialOrdersCount,
         advanceCollected,
         remainingCodValue,
-        fullPrepaidOrdersCount: 0,
-        fullPrepaidRevenue: 0,
+        fullPrepaidOrdersCount,
+        fullPrepaidRevenue,
     };
 }
 
@@ -281,41 +291,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         };
     }
 
-    // Partial metrics are now calculated in computeMetrics
-    const { partialOrdersCount, advanceCollected, remainingCodValue } = metrics;
-
-    // Fetch Full Prepaid metrics from order_logs
-    let fullPrepaidOrdersCount = 0;
-    let fullPrepaidRevenue = 0;
-    try {
-        let q = supabase
-            .from("order_logs")
-            .select("total_price")
-            .eq("shop_domain", shop)
-            .eq("payment_method", "full_prepaid");
-        
-        if (createdAtMin) {
-            q = q.gte("created_at", createdAtMin);
-        }
-        
-        const { data: fpLogs, error } = await q;
-        if (!error && fpLogs) {
-            fullPrepaidOrdersCount = fpLogs.length;
-            fullPrepaidRevenue = fpLogs.reduce((acc, log) => acc + (parseFloat(log.total_price || "0")), 0);
-        }
-    } catch (e) {
-        console.error("[Analytics] Error fetching Full Prepaid logs:", e);
-    }
-
     return { 
         ...metrics, 
         shopCurrency, 
         selectedDays, 
-        partialOrdersCount, 
-        advanceCollected, 
-        remainingCodValue,
-        fullPrepaidOrdersCount,
-        fullPrepaidRevenue,
     };
 };
 
