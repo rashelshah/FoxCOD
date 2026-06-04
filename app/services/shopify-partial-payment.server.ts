@@ -36,6 +36,7 @@ export interface PartialPaymentCheckoutParams {
   notes?: string;
   couponCode?: string;
   shippingPrice?: number;
+  shippingTitle?: string;
   codFeeAmount?: number;
   isFullPrepaid?: boolean;
 }
@@ -258,9 +259,9 @@ async function createCartPermalinkCheckout(
   queryParams.append('attributes[checkout_type]', 'cart_permalink');
   
   const cartNote = [
-    `PARTIAL COD ORDER [${partialPaymentReference}]`,
-    `Advance: ${params.currency} ${advanceAmount.toFixed(2)}`,
-    `Remaining (COD): ${params.currency} ${remainingAmount.toFixed(2)}`,
+    params.isFullPrepaid ? `FULL PREPAID ORDER [${partialPaymentReference}]` : `PARTIAL COD ORDER [${partialPaymentReference}]`,
+    !params.isFullPrepaid ? `Advance: ${params.currency} ${advanceAmount.toFixed(2)}` : '',
+    !params.isFullPrepaid ? `Remaining (COD): ${params.currency} ${remainingAmount.toFixed(2)}` : '',
     codFeeAmount > 0 ? `Includes COD Fee: ${params.currency} ${codFeeAmount.toFixed(2)}` : '',
     notes ? notes : '',
   ].filter(Boolean).join('\n');
@@ -379,32 +380,32 @@ async function createDraftOrderCheckout(
   }
 
   const finalShippingLine = finalShippingPrice > 0 ? {
-    title: "Shipping",
+    title: params.shippingTitle || "Shipping",
     price: finalShippingPrice.toFixed(2),
     custom: true
   } : {
-    title: "Free Shipping",
+    title: params.shippingTitle || "Free Shipping",
     price: "0.00",
     custom: true
   };
 
   const cartNote = [
-    `PARTIAL COD ORDER [${partialPaymentReference}]`,
-    `Advance: ${params.currency} ${advanceAmount.toFixed(2)}`,
-    `Remaining (COD): ${params.currency} ${remainingAmount.toFixed(2)}`,
+    params.isFullPrepaid ? `FULL PREPAID ORDER [${partialPaymentReference}]` : `PARTIAL COD ORDER [${partialPaymentReference}]`,
+    !params.isFullPrepaid ? `Advance: ${params.currency} ${advanceAmount.toFixed(2)}` : '',
+    !params.isFullPrepaid ? `Remaining (COD): ${params.currency} ${remainingAmount.toFixed(2)}` : '',
     codFeeAmount > 0 ? `Includes COD Fee: ${params.currency} ${codFeeAmount.toFixed(2)}` : '',
     notes ? notes : '',
   ].filter(Boolean).join('\n');
 
   const customAttributes = [
-    { name: 'partial_cod', value: 'true' },
-    { name: 'advance_amount', value: advanceAmount.toFixed(2) },
-    { name: 'remaining_amount', value: remainingAmount.toFixed(2) },
+    { name: params.isFullPrepaid ? 'full_prepaid' : 'partial_cod', value: 'true' },
+    !params.isFullPrepaid ? { name: 'advance_amount', value: advanceAmount.toFixed(2) } : null,
+    !params.isFullPrepaid ? { name: 'remaining_amount', value: remainingAmount.toFixed(2) } : null,
     { name: 'original_total', value: totalOrderValue.toFixed(2) },
     { name: 'partial_payment_reference', value: partialPaymentReference },
     { name: 'order_source', value: 'FoxCOD' },
     { name: 'checkout_type', value: 'draft_order' }
-  ];
+  ].filter(Boolean);
 
   // Recompute the discount based on final line items + final shipping line,
   // so the checkout grand total is exactly advanceAmount regardless of how

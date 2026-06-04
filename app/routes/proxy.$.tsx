@@ -383,6 +383,7 @@ async function handlePartialCodCheckout(request: Request, data: any) {
             notes: orderNotes,
             couponCode: normalizedCouponCode || undefined,
             shippingPrice: pricing.shippingPrice,
+            shippingTitle: pricing.shippingTitle,
             codFeeAmount: parseFloat(partialCodFeeAmount) || 0,
         });
 
@@ -603,7 +604,6 @@ async function handleFullPrepaidCheckout(request: Request, data: any) {
         };
         const orderNotes = [
             notes || '',
-            `FULL PREPAID ORDER`,
             `Total paid: ${fmtAmt(totalOrderValue)}`,
             normalizedCouponCode ? `Coupon: ${normalizedCouponCode} (-${fmtAmt(couponDiscount)})` : '',
         ].filter(Boolean).join('\n');
@@ -630,6 +630,7 @@ async function handleFullPrepaidCheckout(request: Request, data: any) {
             notes: orderNotes,
             couponCode: normalizedCouponCode || undefined,
             shippingPrice: pricing.shippingPrice,
+            shippingTitle: pricing.shippingTitle,
         });
 
         const fullPrepaidRef = checkoutResult.partialPaymentReference; // FPAID-* reference

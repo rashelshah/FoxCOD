@@ -44,6 +44,7 @@ export interface OrderPricingSummary {
     bundleDiscountAmount: number;
     merchandiseTotal: number;
     shippingPrice: number;
+    shippingTitle: string;
     upsellTotal: number;
     originalTotal: number;
     discountItems: OrderDiscountItem[];
@@ -915,6 +916,7 @@ export async function validateCouponForShop(shop: string, couponCode: string, ca
 export function calculateOrderPricing(body: any): OrderPricingSummary {
     const discountItems = buildOrderDiscountItems(body);
     const shippingPrice = roundCurrency(Number(body?.shippingPrice) || 0);
+    const shippingTitle = String(body?.shippingTitle || body?.shippingLabel || "Shipping");
     const discountPercent = Math.max(0, Number(body?.discountPercent) || 0);
     const quantity = Math.max(1, parseInt(String(body?.quantity || 1), 10) || 1);
     const bundleVariants = Array.isArray(body?.bundleVariants) && body.bundleVariants.length > 1
@@ -957,6 +959,7 @@ export function calculateOrderPricing(body: any): OrderPricingSummary {
         bundleDiscountAmount,
         merchandiseTotal,
         shippingPrice,
+        shippingTitle,
         upsellTotal,
         originalTotal,
         discountItems,
