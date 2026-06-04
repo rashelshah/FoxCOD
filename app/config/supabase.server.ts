@@ -294,6 +294,10 @@ export interface OrderLogEntry {
     is_partial_cod?: boolean;
     advance_amount?: number;
     remaining_cod_amount?: number;
+    // Full Prepaid tracking
+    is_full_prepaid?: boolean;
+    /** Canonical payment method: 'cod' | 'partial_cod' | 'full_prepaid' */
+    payment_method?: 'cod' | 'partial_cod' | 'full_prepaid';
     // 2-phase sync: full request payload for retry after restart
     order_payload?: Record<string, any>;
 }
@@ -356,6 +360,9 @@ export async function logOrder(order: OrderLogEntry) {
     if (order.is_partial_cod != null) insertPayload.is_partial_cod = order.is_partial_cod;
     if (order.advance_amount != null) insertPayload.advance_amount = order.advance_amount;
     if (order.remaining_cod_amount != null) insertPayload.remaining_cod_amount = order.remaining_cod_amount;
+    if (order.is_full_prepaid != null) insertPayload.is_full_prepaid = order.is_full_prepaid;
+    // payment_method: always set — defaults to 'cod' if not provided
+    insertPayload.payment_method = order.payment_method ?? 'cod';
 
     const { data, error } = await supabase
         .from('order_logs')
@@ -417,6 +424,9 @@ export async function logOrderWithShopifyIds(
     if (order.is_partial_cod != null) insertPayload.is_partial_cod = order.is_partial_cod;
     if (order.advance_amount != null) insertPayload.advance_amount = order.advance_amount;
     if (order.remaining_cod_amount != null) insertPayload.remaining_cod_amount = order.remaining_cod_amount;
+    if (order.is_full_prepaid != null) insertPayload.is_full_prepaid = order.is_full_prepaid;
+    // payment_method: always set — defaults to 'cod' if not provided
+    insertPayload.payment_method = order.payment_method ?? 'cod';
 
     const { data, error } = await supabase
         .from('order_logs')

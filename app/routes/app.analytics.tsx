@@ -57,6 +57,8 @@ interface AnalyticsData {
     partialOrdersCount: number;
     advanceCollected: number;
     remainingCodValue: number;
+    fullPrepaidOrdersCount: number;
+    fullPrepaidRevenue: number;
 }
 
 // ─── Fetch ALL orders from Shopify via SDK RestClient with pagination ──
@@ -211,6 +213,8 @@ function computeMetrics(orders: ShopifyOrder[]): AnalyticsData {
         partialOrdersCount,
         advanceCollected,
         remainingCodValue,
+        fullPrepaidOrdersCount: 0,
+        fullPrepaidRevenue: 0,
     };
 }
 
@@ -272,13 +276,47 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             partialOrdersCount: 0,
             advanceCollected: 0,
             remainingCodValue: 0,
+            fullPrepaidOrdersCount: 0,
+            fullPrepaidRevenue: 0,
         };
     }
 
     // Partial metrics are now calculated in computeMetrics
     const { partialOrdersCount, advanceCollected, remainingCodValue } = metrics;
 
-    return { ...metrics, shopCurrency, selectedDays, partialOrdersCount, advanceCollected, remainingCodValue };
+    // Fetch Full Prepaid metrics from order_logs
+    let fullPrepaidOrdersCount = 0;
+    let fullPrepaidRevenue = 0;
+    try {
+        let q = supabase
+            .from("order_logs")
+            .select("total_price")
+            .eq("shop_domain", shop)
+            .eq("payment_method", "full_prepaid");
+        
+        if (createdAtMin) {
+            q = q.gte("created_at", createdAtMin);
+        }
+        
+        const { data: fpLogs, error } = await q;
+        if (!error && fpLogs) {
+            fullPrepaidOrdersCount = fpLogs.length;
+            fullPrepaidRevenue = fpLogs.reduce((acc, log) => acc + (parseFloat(log.total_price || "0")), 0);
+        }
+    } catch (e) {
+        console.error("[Analytics] Error fetching Full Prepaid logs:", e);
+    }
+
+    return { 
+        ...metrics, 
+        shopCurrency, 
+        selectedDays, 
+        partialOrdersCount, 
+        advanceCollected, 
+        remainingCodValue,
+        fullPrepaidOrdersCount,
+        fullPrepaidRevenue,
+    };
 };
 
 // ─── Component ──────────────────────────────────────
@@ -306,6 +344,8 @@ export default function AnalyticsPage() {
         partialOrdersCount,
         advanceCollected,
         remainingCodValue,
+        fullPrepaidOrdersCount,
+        fullPrepaidRevenue,
     } = data;
 
     // Currency formatter
@@ -634,6 +674,41 @@ export default function AnalyticsPage() {
                                         {formatCurrency(remainingCodValue)}
                                     </Text>
                                     <Text as="p" variant="bodySm" tone="subdued">To be collected on delivery</Text>
+                                </BlockStack>
+                            </Box>
+                        </InlineGrid>
+                    </BlockStack>
+                </Card>
+
+                {/* ─── Full Prepaid Section ─── */}
+                <Card>
+                    <BlockStack gap="400">
+                        <InlineStack align="space-between" blockAlign="center">
+                            <Text as="h2" variant="headingMd">
+                                Full Prepaid
+                            </Text>
+                            <Badge tone="success">100% Upfront</Badge>
+                        </InlineStack>
+                        <Text as="p" variant="bodySm" tone="subdued">
+                            Orders where customers paid the full amount online instead of choosing COD.
+                        </Text>
+                        <InlineGrid columns={2} gap="400">
+                            <Box background="bg-surface-secondary" padding="400" borderRadius="200">
+                                <BlockStack gap="200">
+                                    <Text as="p" variant="bodySm" tone="subdued">Full Prepaid Orders</Text>
+                                    <Text as="p" variant="heading2xl" fontWeight="bold">{fullPrepaidOrdersCount}</Text>
+                                    <Text as="p" variant="bodySm" tone="subdued">
+                                        {selectedDays === "all" ? "All time" : `Last ${selectedDays} days`}
+                                    </Text>
+                                </BlockStack>
+                            </Box>
+                            <Box background="bg-surface-secondary" padding="400" borderRadius="200">
+                                <BlockStack gap="200">
+                                    <Text as="p" variant="bodySm" tone="subdued">Total Revenue</Text>
+                                    <Text as="p" variant="heading2xl" fontWeight="bold">
+                                        {formatCurrency(fullPrepaidRevenue)}
+                                    </Text>
+                                    <Text as="p" variant="bodySm" tone="subdued">100% paid online</Text>
                                 </BlockStack>
                             </Box>
                         </InlineGrid>

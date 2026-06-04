@@ -57,6 +57,12 @@ export interface PartialPaymentSettings {
   excluded_countries: string[];
   modal_settings: ModalSettings;
   module_flags: ModuleFlags;
+  // Full Prepaid settings
+  full_prepaid_enabled: boolean;
+  full_prepaid_minimum_order_total: number;
+  full_prepaid_maximum_order_total: number;
+  full_prepaid_allowed_product_ids: string[];
+  full_prepaid_allowed_collection_ids: string[];
   created_at?: string;
   updated_at?: string;
 }

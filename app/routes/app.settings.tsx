@@ -4962,17 +4962,6 @@ export default function SettingsPage() {
                                         </div>
                                     </AccordionSection>
 
-                                    {/* Full Prepaid */}
-                                    <AccordionSection id="full-prepaid" tab="form" title="Full Prepaid (Visual Only)" helperText="Show a static Full Prepaid option in the form" expandedSection={expandedSection} toggleSection={toggleSection}>
-                                        <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '16px' }}>
-                                            Displays a static "Full Prepaid" button above the COD options. This button is visual only and does not process actual payments.
-                                        </p>
-                                        <div className="toggle-option" onClick={() => setFormStyles(s => ({ ...s, fullPrepaidEnabled: !s.fullPrepaidEnabled }))}>
-                                            <span className="toggle-option-label">Enable Full Prepaid</span>
-                                            <div className={`mini-toggle ${formStyles.fullPrepaidEnabled ? 'on' : 'off'}`} />
-                                        </div>
-                                    </AccordionSection>
-
 
 
                                     {/* Form Content */}

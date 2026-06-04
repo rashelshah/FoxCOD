@@ -25,6 +25,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   try {
     const noteAttributes = payload.note_attributes || [];
     const partialCodAttr = noteAttributes.find((attr: any) => attr.name === "partial_cod");
+    const fullPrepaidAttr = noteAttributes.find((attr: any) => attr.name === "full_prepaid");
     const discountCodes = payload.discount_codes || [];
     const discountApps = payload.discount_applications || [];
     
@@ -36,14 +37,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const pcodCode = discountCodes.find((dc: any) => dc.code?.startsWith("FOX-PCOD-"));
     const pcodApp = discountApps.find((da: any) => da.code?.startsWith("FOX-PCOD-") || da.title?.startsWith("FoxCOD Partial Payment"));
     
-    const isPartialCod = partialCodAttr?.value === "true" || !!pcodCode || !!pcodApp;
+    const isFullPrepaid = fullPrepaidAttr?.value === "true" || (payload.tags && payload.tags.includes("FoxCOD, Full Prepaid"));
+    const isPartialCod = !isFullPrepaid && (partialCodAttr?.value === "true" || !!pcodCode || !!pcodApp);
 
-    if (!isPartialCod) {
-      console.log("[Webhook] Not a partial COD order, skipping");
+    if (!isPartialCod && !isFullPrepaid) {
+      console.log("[Webhook] Not a partial COD or Full Prepaid order, skipping");
       return new Response(null, { status: 200 });
     }
 
-    console.log("[Webhook] Detected Partial COD order:", payload.name);
+    console.log("[Webhook] Detected Special COD order:", payload.name, "| isFullPrepaid:", isFullPrepaid);
 
     const getAttrValue = (key: string) => {
       const attr = noteAttributes.find((attribute: any) => attribute.name === key);
@@ -96,15 +98,24 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       state: customerState || shippingAddress.province || "",
       pincode: customerZipcode || shippingAddress.zip || "",
       notes: payload.note || "",
-      is_partial_cod: true,
-      advance_amount: advanceAmount,
-      remaining_cod_amount: remainingAmount,
       currency: payload.currency || "USD"
     };
 
-    console.log("[Webhook] Logging partial COD order:", orderLogEntry);
+    if (isFullPrepaid) {
+      orderLogEntry.payment_method = 'full_prepaid';
+      orderLogEntry.is_full_prepaid = true;
+      orderLogEntry.advance_amount = advanceAmount;
+      orderLogEntry.remaining_cod_amount = remainingAmount; // Should be 0
+    } else {
+      orderLogEntry.payment_method = 'partial_payment';
+      orderLogEntry.is_partial_cod = true;
+      orderLogEntry.advance_amount = advanceAmount;
+      orderLogEntry.remaining_cod_amount = remainingAmount;
+    }
+
+    console.log("[Webhook] Logging special COD order:", orderLogEntry);
     await logOrder(orderLogEntry);
-    console.log("[Webhook] Partial COD order logged successfully:", payload.name);
+    console.log("[Webhook] Special COD order logged successfully:", payload.name);
 
     // ── Apply Order Edit to Fix Order Total and Payment Status ──
     let graphqlAdmin = admin;
@@ -135,7 +146,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           {
             variables: { 
               id: `gid://shopify/Order/${payload.id}`,
-              tags: ["FoxCOD", "Partial COD", "Pending Advance"]
+              tags: isFullPrepaid ? ["FoxCOD", "Full Prepaid"] : ["FoxCOD", "Partial COD", "Pending Advance"]
             },
           }
         );

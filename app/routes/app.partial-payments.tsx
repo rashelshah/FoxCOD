@@ -73,6 +73,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       excluded_countries: [],
       modal_settings: DEFAULT_MODAL_SETTINGS,
       module_flags: DEFAULT_MODULE_FLAGS,
+      full_prepaid_enabled: false,
+      full_prepaid_minimum_order_total: 0,
+      full_prepaid_maximum_order_total: 0,
+      full_prepaid_allowed_product_ids: [],
+      full_prepaid_allowed_collection_ids: [],
     };
   }
 
@@ -144,6 +149,12 @@ const S = `
 .pp-back-btn:hover { background: #f9fafb; }
 .pp-title h1 { font-size: 24px; font-weight: 700; color: #111827; margin: 0 0 2px; }
 .pp-title p { font-size: 14px; color: #6b7280; margin: 0; }
+
+/* ── Tabs ── */
+.tabs { display: flex; gap: 8px; margin-bottom: 24px; background: #f3f4f6; padding: 6px; border-radius: 12px; }
+.tab { flex: 1; padding: 14px 20px; border: none; background: transparent; border-radius: 8px; font-size: 14px; font-weight: 600; color: #6b7280; cursor: pointer; transition: all 0.2s ease; }
+.tab:hover { color: #111827; }
+.tab.active { background: white; color: #111827; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
 
 /* ── Toggle ── */
 .pp-toggle-track { width: 44px; height: 24px; border-radius: 12px; background: #dfe3e8; cursor: pointer; position: relative; transition: .2s cubic-bezier(.25,.1,.25,1); flex-shrink: 0; }
@@ -947,6 +958,7 @@ export default function PartialPaymentsPage() {
   const [allowedCountrySelect, setAllowedCountrySelect] = useState('');
   const [excludedCountrySelect, setExcludedCountrySelect] = useState('');
   const [showPreview, setShowPreview] = useState(true);
+  const [selectedTab, setSelectedTab] = useState(0);
 
   const hasChanges = useMemo(
     () => JSON.stringify(settings) !== savedStr,
@@ -1125,19 +1137,38 @@ export default function PartialPaymentsPage() {
           <div className="pp-header-left">
             <Link to="/app" className="pp-back-btn">←</Link>
             <div className="pp-title">
-              <h1>Partial Payments</h1>
-              <p>Let customers pay a deposit now and the rest on delivery</p>
+              <h1>Payment Methods</h1>
+              <p>Configure partial payments and prepaid options for your customers.</p>
             </div>
           </div>
-          <Badge tone={settings.enabled ? 'success' : 'critical'}>
-            {settings.enabled ? 'Active' : 'Inactive'}
+          <Badge tone={(selectedTab === 0 ? settings.enabled : settings.full_prepaid_enabled) ? 'success' : 'critical'}>
+            {(selectedTab === 0 ? settings.enabled : settings.full_prepaid_enabled) ? 'Active' : 'Inactive'}
           </Badge>
         </div>
 
-        <BlockStack gap="500">
-          {/* ════════════════════════════════════════════════
-              CARD 1 — GENERAL SETTINGS
-          ════════════════════════════════════════════════ */}
+        <div className="tabs">
+          <button
+            className={`tab ${selectedTab === 0 ? 'active' : ''}`}
+            onClick={() => setSelectedTab(0)}
+          >
+            Partial Payments
+          </button>
+          <button
+            className={`tab ${selectedTab === 1 ? 'active' : ''}`}
+            onClick={() => setSelectedTab(1)}
+          >
+            Full Prepaid
+          </button>
+        </div>
+        <Box paddingBlockStart="400">
+          {selectedTab === 0 ? (
+              <BlockStack gap="500">
+                {/* ════════════════════════════════════════════════
+                    PARTIAL PAYMENTS CARDS
+                ════════════════════════════════════════════════ */}
+                {/* ════════════════════════════════════════════════
+                    CARD 1 — GENERAL SETTINGS
+                ════════════════════════════════════════════════ */}
           <Card>
             <BlockStack gap="400">
               <InlineStack align="space-between" blockAlign="center">
@@ -1575,10 +1606,173 @@ export default function PartialPaymentsPage() {
             </BlockStack>
           </Card>
 
+          <Box paddingBlockEnd="800" />
+        </BlockStack>
+      ) : (
+        <BlockStack gap="500">
+          {/* ════════════════════════════════════════════════
+              FULL PREPAID CARDS
+          ════════════════════════════════════════════════ */}
+          <Card>
+            <BlockStack gap="400">
+              <InlineStack align="space-between" blockAlign="center">
+                <BlockStack gap="100">
+                  <Text as="h2" variant="headingMd">Full Prepaid Settings</Text>
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    Offer customers an option to pay the full amount upfront.
+                  </Text>
+                </BlockStack>
+              </InlineStack>
 
+              <ToggleRow
+                label="Full Prepaid Status"
+                sub={settings.full_prepaid_enabled ? 'Customers can choose to pay the full amount upfront.' : 'Full prepaid option is hidden.'}
+                checked={settings.full_prepaid_enabled}
+                onChange={(v) => upd('full_prepaid_enabled', v)}
+              />
+            </BlockStack>
+          </Card>
+
+          <Card>
+            <BlockStack gap="400">
+              <BlockStack gap="100">
+                <Text as="h2" variant="headingMd">Restrictions</Text>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  Control exactly when the full prepaid option appears. All rules must pass for it to show.
+                </Text>
+              </BlockStack>
+
+              <Text as="h3" variant="headingSm">Order Total Range</Text>
+              <Text as="p" variant="bodySm" tone="subdued">
+                Set to 0 to disable the restriction.
+              </Text>
+              <InlineGrid columns={2} gap="400">
+                <TextField
+                  label="Minimum Order Total"
+                  type="number"
+                  value={String(settings.full_prepaid_minimum_order_total)}
+                  prefix={shopCurrency}
+                  min="0"
+                  onChange={(v) => upd('full_prepaid_minimum_order_total', parseFloat(v) || 0)}
+                  autoComplete="off"
+                  helpText="0 = no minimum"
+                />
+                <TextField
+                  label="Maximum Order Total"
+                  type="number"
+                  value={String(settings.full_prepaid_maximum_order_total)}
+                  prefix={shopCurrency}
+                  min="0"
+                  onChange={(v) => upd('full_prepaid_maximum_order_total', parseFloat(v) || 0)}
+                  autoComplete="off"
+                  helpText="0 = no maximum"
+                />
+              </InlineGrid>
+
+              <Divider />
+
+              <InlineStack align="space-between" blockAlign="center">
+                <BlockStack gap="100">
+                  <Text as="h3" variant="headingSm">Specific Products</Text>
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    {settings.full_prepaid_allowed_product_ids.length === 0
+                      ? 'Full prepaid shows on all products.'
+                      : `Only shows for ${settings.full_prepaid_allowed_product_ids.length} selected product(s).`}
+                  </Text>
+                </BlockStack>
+                <Button variant="secondary" onClick={async () => {
+                  try {
+                    const sel = await shopify.resourcePicker({
+                      type: 'product',
+                      multiple: true,
+                      selectionIds: settings.full_prepaid_allowed_product_ids.map((id) => ({
+                        id: id.includes('gid://') ? id : `gid://shopify/Product/${id}`,
+                      })),
+                    });
+                    if (sel) {
+                      const ids = sel.map((p: any) => p.id.replace('gid://shopify/Product/', ''));
+                      const titles: Record<string, string> = {};
+                      sel.forEach((p: any) => {
+                        titles[p.id.replace('gid://shopify/Product/', '')] = p.title;
+                      });
+                      upd('full_prepaid_allowed_product_ids', ids);
+                      setProductTitles((prev) => ({ ...prev, ...titles }));
+                    }
+                  } catch (_e) {}
+                }}>
+                  {settings.full_prepaid_allowed_product_ids.length === 0 ? 'Add Products' : `Edit Products (${settings.full_prepaid_allowed_product_ids.length})`}
+                </Button>
+              </InlineStack>
+              {settings.full_prepaid_allowed_product_ids.length > 0 && (
+                <div style={{ marginTop: '12px' }}>
+                  <InlineStack gap="200">
+                    {settings.full_prepaid_allowed_product_ids.map((id) => (
+                      <Tag
+                        key={id}
+                        onRemove={() => upd('full_prepaid_allowed_product_ids', settings.full_prepaid_allowed_product_ids.filter((x) => x !== id))}
+                      >
+                        {productTitles[id] || `Product …${id.slice(-6)}`}
+                      </Tag>
+                    ))}
+                  </InlineStack>
+                </div>
+              )}
+
+              <Divider />
+
+              <InlineStack align="space-between" blockAlign="center">
+                <BlockStack gap="100">
+                  <Text as="h3" variant="headingSm">Specific Collections</Text>
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    {settings.full_prepaid_allowed_collection_ids.length === 0
+                      ? 'Full prepaid shows for all collections.'
+                      : `Only shows for products in ${settings.full_prepaid_allowed_collection_ids.length} selected collection(s).`}
+                  </Text>
+                </BlockStack>
+                <Button variant="secondary" onClick={async () => {
+                  try {
+                    const sel = await shopify.resourcePicker({
+                      type: 'collection',
+                      multiple: true,
+                      selectionIds: settings.full_prepaid_allowed_collection_ids.map((id) => ({
+                        id: id.includes('gid://') ? id : `gid://shopify/Collection/${id}`,
+                      })),
+                    });
+                    if (sel) {
+                      const ids = sel.map((c: any) => c.id.replace('gid://shopify/Collection/', ''));
+                      const titles: Record<string, string> = {};
+                      sel.forEach((c: any) => {
+                        titles[c.id.replace('gid://shopify/Collection/', '')] = c.title;
+                      });
+                      upd('full_prepaid_allowed_collection_ids', ids);
+                      setCollectionTitles((prev) => ({ ...prev, ...titles }));
+                    }
+                  } catch (_e) {}
+                }}>
+                  {settings.full_prepaid_allowed_collection_ids.length === 0 ? 'Add Collections' : `Edit Collections (${settings.full_prepaid_allowed_collection_ids.length})`}
+                </Button>
+              </InlineStack>
+              {settings.full_prepaid_allowed_collection_ids.length > 0 && (
+                <div style={{ marginTop: '12px' }}>
+                  <InlineStack gap="200">
+                    {settings.full_prepaid_allowed_collection_ids.map((id) => (
+                      <Tag
+                        key={id}
+                        onRemove={() => upd('full_prepaid_allowed_collection_ids', settings.full_prepaid_allowed_collection_ids.filter((x) => x !== id))}
+                      >
+                        {collectionTitles[id] || `Collection …${id.slice(-6)}`}
+                      </Tag>
+                    ))}
+                  </InlineStack>
+                </div>
+              )}
+            </BlockStack>
+          </Card>
 
           <Box paddingBlockEnd="800" />
         </BlockStack>
+      )}
+      </Box>
       </div>
     </>
   );

@@ -4273,42 +4273,61 @@ function darkenColor(hex, percent) {
       var partialAdvance = config.partialCodAdvance || 0;
       var remainingAmount = Math.max(0, orderTotal - partialAdvance);
 
-      // ── Partial Payment eligibility check (v2) ────────────────────────────
-      var ppSettings = config.partialPaymentSettings;
-      var showPartial = false;
-      if (ppSettings && typeof ppSettings.enabled !== 'undefined') {
-          if (ppSettings.enabled) {
-              var ppEligible = true;
-              // Min/Max order total
-              if (ppSettings.minimum_order_total > 0 && orderTotal < ppSettings.minimum_order_total) ppEligible = false;
-              if (ppSettings.maximum_order_total > 0 && orderTotal > ppSettings.maximum_order_total) ppEligible = false;
-              // Product restrictions
-              var hasProdFilter = ppSettings.allowed_product_ids && ppSettings.allowed_product_ids.length > 0;
-              var hasCollFilter = ppSettings.allowed_collection_ids && ppSettings.allowed_collection_ids.length > 0;
-              if ((hasProdFilter || hasCollFilter) && ppEligible) {
-                  var productId = String(config.productId || '');
-                  var productAllowed = false;
-                  if (hasProdFilter) {
-                      productAllowed = ppSettings.allowed_product_ids.some(function(id) { return String(id) === productId; });
-                  }
-                  if (!productAllowed && hasCollFilter) {
-                      var collIds = (config.productCollectionIds || []).map(String);
-                      productAllowed = collIds.some(function(cid) {
-                          return ppSettings.allowed_collection_ids.some(function(aid) { return String(aid) === cid; });
-                      });
-                  }
-                  if (!productAllowed) ppEligible = false;
+      // ── Unified Payment Method Eligibility Helper ────────────────────────────────
+      // Mirrors the server-side isPaymentMethodEligible() engine.
+      // Both methods share the same min/max, product, and collection logic;
+      // only the settings keys differ depending on which method is checked.
+      function isPaymentMethodEligible(method, orderTotalAmt) {
+          var ppSet = config.partialPaymentSettings;
+          if (!ppSet) return false;
+
+          var enabled = method === 'full_prepaid' ? ppSet.full_prepaid_enabled : ppSet.enabled;
+          if (!enabled) return false;
+
+          var min = method === 'full_prepaid'
+              ? (ppSet.full_prepaid_minimum_order_total || 0)
+              : (ppSet.minimum_order_total || 0);
+          var max = method === 'full_prepaid'
+              ? (ppSet.full_prepaid_maximum_order_total || 0)
+              : (ppSet.maximum_order_total || 0);
+          if (min > 0 && orderTotalAmt < min) return false;
+          if (max > 0 && orderTotalAmt > max) return false;
+
+          var allowedProds = method === 'full_prepaid'
+              ? (ppSet.full_prepaid_allowed_product_ids || [])
+              : (ppSet.allowed_product_ids || []);
+          var allowedColls = method === 'full_prepaid'
+              ? (ppSet.full_prepaid_allowed_collection_ids || [])
+              : (ppSet.allowed_collection_ids || []);
+
+          var hasProdF = allowedProds.length > 0;
+          var hasCollF = allowedColls.length > 0;
+          if (hasProdF || hasCollF) {
+              var pId = String(config.productId || '');
+              var prodOk = false;
+              if (hasProdF) {
+                  prodOk = allowedProds.some(function(id) { return String(id) === pId; });
               }
-              showPartial = ppEligible;
-          } else {
-              showPartial = false;
+              if (!prodOk && hasCollF) {
+                  var cIds = (config.productCollectionIds || []).map(String);
+                  prodOk = cIds.some(function(cid) {
+                      return allowedColls.some(function(aid) { return String(aid) === cid; });
+                  });
+              }
+              if (!prodOk) return false;
           }
-      } else {
-          // Legacy fallback
-          showPartial = config.partialCodEnabled;
+          return true;
       }
 
-      var showFullPrepaid = config.styles && config.styles.fullPrepaidEnabled;
+      // ── Determine visibility using unified helper ───────────────────────────
+      var ppSettings = config.partialPaymentSettings;
+      var showPartial = ppSettings
+          ? isPaymentMethodEligible('partial_payment', orderTotal)
+          : config.partialCodEnabled; // legacy fallback
+
+      var showFullPrepaid = ppSettings
+          ? isPaymentMethodEligible('full_prepaid', orderTotal)
+          : !!(config.styles && config.styles.fullPrepaidEnabled); // legacy fallback
 
       var html = '<div style="margin-bottom: 16px;">';
       html += '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">';
@@ -6283,8 +6302,8 @@ function darkenColor(hex, percent) {
 
       var selectedPaymentInput = form.querySelector('input[name="payment_method"]:checked');
       if (selectedPaymentInput && selectedPaymentInput.value === 'full_prepaid') {
-          console.log('[COD Form] Full Prepaid selected (visual only). Doing nothing.');
-          return; // stop submission, do absolutely nothing per user request
+          // Full Prepaid is handled in the upsell/submission flow below — no early return
+          console.log('[COD Form] Full Prepaid selected — proceeding to checkout flow.');
       }
 
       console.log('[COD Form] Validation passed');
@@ -6476,6 +6495,8 @@ function darkenColor(hex, percent) {
 
               if (pmAfter === 'partial_cod' && config.partialCodEnabled) {
                   showPartialCodModal(form, config, payload, submitBtn, originalBtnText);
+              } else if (pmAfter === 'full_prepaid') {
+                  submitFullPrepaidCheckout(form, config, payload, submitBtn, originalBtnText);
               } else {
                   submitFullCodOrder(form, config, productId, payload, submitBtn, originalBtnText);
               }
@@ -6485,6 +6506,10 @@ function darkenColor(hex, percent) {
           // No upsells to show — go straight to partial COD modal
           showPartialCodModal(form, config, payload, submitBtn, originalBtnText);
           return; // Exit — partial COD handling complete
+      } else if (selectedPaymentMethod === 'full_prepaid') {
+          // No upsells to show — go straight to Full Prepaid checkout
+          submitFullPrepaidCheckout(form, config, payload, submitBtn, originalBtnText);
+          return; // Exit — Full Prepaid handling complete
       }
 
       // Full COD with no upsells: Submit directly
@@ -6636,6 +6661,51 @@ function darkenColor(hex, percent) {
       })
       .catch(function(err) {
           console.error('[COD Form] Partial COD v2 error:', err);
+          hidePartialCodLoader();
+          config._isSubmitting = false;
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalBtnText;
+          submitBtn.style.removeProperty('opacity');
+          setFormMessage(form, 'error', err.message || 'Network error. Please try again.');
+          setBlockStatus(config, 'Checkout request failed. The form is still available to try again.', 'warning');
+      });
+  }
+
+  /**
+   * Submit Full Prepaid Checkout
+   * Posts to the same endpoint as Partial COD — routed server-side by paymentMethod='full_prepaid'.
+   * The server's decision engine (createFullPrepaidCheckout) automatically selects:
+   *   - Cart Permalink: for standard products with native pricing (fastest)
+   *   - Draft Order:    when bundle/upsell/downsell/coupon/custom pricing is present
+   *     (so Shopify Checkout always shows the correct Fox COD price — no trust issue)
+   */
+  function submitFullPrepaidCheckout(form, config, payload, submitBtn, originalBtnText) {
+      var fpPayload = Object.assign({}, payload, {
+          paymentMethod: 'full_prepaid'
+      });
+
+      console.log('[COD Form] Full Prepaid checkout payload:', fpPayload);
+      showPartialCodLoader(); // reuse existing loader for consistent UX
+
+      requestProxyJson(config, '/api/partial-cod/create-checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(fpPayload)
+      })
+      .then(function(result) {
+          if (result && result.success && result.checkoutUrl) {
+              window.location.href = result.checkoutUrl;
+          } else {
+              hidePartialCodLoader();
+              config._isSubmitting = false;
+              submitBtn.disabled = false;
+              submitBtn.textContent = originalBtnText;
+              submitBtn.style.removeProperty('opacity');
+              setFormMessage(form, 'error', (result && result.error) || 'Unable to start checkout. Please try again.');
+              setBlockStatus(config, 'Checkout could not be started. Please try again.', 'warning');
+          }
+      })
+      .catch(function(err) {
           hidePartialCodLoader();
           config._isSubmitting = false;
           submitBtn.disabled = false;

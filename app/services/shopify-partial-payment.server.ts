@@ -37,6 +37,7 @@ export interface PartialPaymentCheckoutParams {
   couponCode?: string;
   shippingPrice?: number;
   codFeeAmount?: number;
+  isFullPrepaid?: boolean;
 }
 
 export interface PartialPaymentCheckoutResult {
@@ -243,9 +244,14 @@ async function createCartPermalinkCheckout(
     queryParams.append('discount', discountCode);
   }
 
-  queryParams.append('attributes[partial_cod]', 'true');
-  queryParams.append('attributes[advance_amount]', advanceAmount.toFixed(2));
-  queryParams.append('attributes[remaining_amount]', remainingAmount.toFixed(2));
+  if (params.isFullPrepaid) {
+    queryParams.append('attributes[full_prepaid]', 'true');
+  } else {
+    queryParams.append('attributes[partial_cod]', 'true');
+    queryParams.append('attributes[advance_amount]', advanceAmount.toFixed(2));
+    queryParams.append('attributes[remaining_amount]', remainingAmount.toFixed(2));
+  }
+  
   queryParams.append('attributes[original_total]', totalOrderValue.toFixed(2));
   queryParams.append('attributes[partial_payment_reference]', partialPaymentReference);
   queryParams.append('attributes[order_source]', 'FoxCOD');
@@ -435,7 +441,7 @@ async function createDraftOrderCheckout(
     applied_discount: appliedDiscount,
     note: cartNote,
     note_attributes: customAttributes,
-    tags: "FoxCOD, Partial COD, Pending Advance",
+    tags: params.isFullPrepaid ? "FoxCOD, Full Prepaid" : "FoxCOD, Partial COD, Pending Advance",
   };
 
   if (Object.keys(addressInput).length > 0) {
@@ -474,6 +480,38 @@ async function createDraftOrderCheckout(
     partialPaymentReference,
     checkoutType: 'draft_order',
   };
+}
+
+// ── Full Prepaid Checkout ──────────────────────────────────────────────────
+
+/**
+ * Create a Full Prepaid checkout where the customer pays 100% upfront.
+ *
+ * This is a thin wrapper around createPartialPaymentCheckout that sets:
+ *   advanceAmount = totalOrderValue  (customer pays everything now)
+ *   remainingAmount = 0              (no COD split)
+ *
+ * The existing decision engine automatically:
+ *   - Uses Cart Permalink when pricing is native (fastest path)
+ *   - Falls back to Draft Order when custom pricing exists
+ *     (bundle variants, upsells, downsells, coupons, paid shipping)
+ *     so checkout always shows the correct Fox COD price.
+ *
+ * No discount code is generated for standard products since
+ * requiredDiscount = nativeCartTotal - totalOrderValue = 0 in that case.
+ */
+export async function createFullPrepaidCheckout(
+  params: Omit<PartialPaymentCheckoutParams, 'advanceAmount' | 'remainingAmount' | 'partialPaymentReference' | 'isFullPrepaid'>
+): Promise<PartialPaymentCheckoutResult> {
+  const reference = 'FPAID-' + Date.now().toString(36).toUpperCase() + randomSuffix(4);
+
+  return createPartialPaymentCheckout({
+    ...params,
+    advanceAmount: params.totalOrderValue,
+    remainingAmount: 0,
+    partialPaymentReference: reference,
+    isFullPrepaid: true
+  });
 }
 
 // ── Discount Cleanup ───────────────────────────────────────────────────────

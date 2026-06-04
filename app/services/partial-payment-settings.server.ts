@@ -138,8 +138,14 @@ export async function syncPartialPaymentToMetafield(
         excluded_countries: settings.excluded_countries ?? [],
         modal_settings: settings.modal_settings ?? DEFAULT_MODAL_SETTINGS,
         module_flags: settings.module_flags ?? DEFAULT_MODULE_FLAGS,
+        // Full Prepaid fields
+        full_prepaid_enabled: settings.full_prepaid_enabled ?? false,
+        full_prepaid_minimum_order_total: settings.full_prepaid_minimum_order_total ?? 0,
+        full_prepaid_maximum_order_total: settings.full_prepaid_maximum_order_total ?? 0,
+        full_prepaid_allowed_product_ids: settings.full_prepaid_allowed_product_ids ?? [],
+        full_prepaid_allowed_collection_ids: settings.full_prepaid_allowed_collection_ids ?? [],
       }
-    : { enabled: false };
+    : { enabled: false, full_prepaid_enabled: false };
 
   // Get shop GID
   const shopRes = await admin.graphql(`{ shop { id } }`);
@@ -186,11 +192,107 @@ export async function syncPartialPaymentToMetafield(
 // ── Eligibility Engine ─────────────────────────────────────────────────────
 
 /**
- * Server-side eligibility check.
+ * Unified server-side eligibility check for both Partial Payment and Full Prepaid.
  * Used by proxy routes that need to validate before checkout creation.
  *
- * Note: The storefront JS performs the same check client-side using the
+ * The storefront JS performs the same check client-side using the
  * metafield payload, so this is a secondary server-side guard.
+ *
+ * @param settings - the loaded PartialPaymentSettings row
+ * @param method   - 'partial_payment' | 'full_prepaid'
+ * @param params   - orderTotal, productId, collectionIds, country
+ */
+export function isPaymentMethodEligible(
+  settings: PartialPaymentSettings,
+  method: 'partial_payment' | 'full_prepaid',
+  params: {
+    orderTotal: number;
+    productId?: string;
+    collectionIds?: string[];
+    country?: string;
+  }
+): { eligible: boolean; reason?: string } {
+  // ── 1. enabled check ──
+  const enabled = method === 'full_prepaid' ? settings.full_prepaid_enabled : settings.enabled;
+  if (!enabled) {
+    return { eligible: false, reason: `${method.replace('_', ' ')} is disabled` };
+  }
+
+  const { orderTotal, productId, collectionIds = [], country } = params;
+
+  // ── 2. Order total restrictions ──
+  const min = method === 'full_prepaid'
+    ? (settings.full_prepaid_minimum_order_total ?? 0)
+    : (settings.minimum_order_total ?? 0);
+  const max = method === 'full_prepaid'
+    ? (settings.full_prepaid_maximum_order_total ?? 0)
+    : (settings.maximum_order_total ?? 0);
+
+  if (min > 0 && orderTotal < min) {
+    return { eligible: false, reason: `Order total must be at least ${min}` };
+  }
+  if (max > 0 && orderTotal > max) {
+    return { eligible: false, reason: `Order total exceeds maximum of ${max}` };
+  }
+
+  // ── 3. Country restrictions (partial payment only) ──
+  if (method === 'partial_payment') {
+    if ((settings.excluded_countries ?? []).length > 0 && country) {
+      if (settings.excluded_countries.includes(country)) {
+        return { eligible: false, reason: 'Partial payments not available in your country' };
+      }
+    }
+    if ((settings.allowed_countries ?? []).length > 0 && country) {
+      if (!settings.allowed_countries.includes(country)) {
+        return { eligible: false, reason: 'Partial payments not available in your country' };
+      }
+    }
+  }
+
+  // ── 4. Product / Collection restrictions ──
+  const allowedProducts = method === 'full_prepaid'
+    ? (settings.full_prepaid_allowed_product_ids ?? [])
+    : (settings.allowed_product_ids ?? []);
+  const allowedCollections = method === 'full_prepaid'
+    ? (settings.full_prepaid_allowed_collection_ids ?? [])
+    : (settings.allowed_collection_ids ?? []);
+
+  const hasProductFilter = allowedProducts.length > 0;
+  const hasCollectionFilter = allowedCollections.length > 0;
+
+  if (hasProductFilter || hasCollectionFilter) {
+    let productAllowed = false;
+
+    if (hasProductFilter && productId) {
+      const numericId = String(productId).replace(/[^0-9]/g, '');
+      productAllowed = allowedProducts.some(
+        (id) => String(id).replace(/[^0-9]/g, '') === numericId
+      );
+    }
+
+    if (!productAllowed && hasCollectionFilter && collectionIds.length > 0) {
+      productAllowed = collectionIds.some((cid) =>
+        allowedCollections.some(
+          (allowed) =>
+            String(allowed).replace(/[^0-9]/g, '') === String(cid).replace(/[^0-9]/g, '')
+        )
+      );
+    }
+
+    if (!productAllowed) {
+      return {
+        eligible: false,
+        reason: `${method.replace('_', ' ')} not available for this product`,
+      };
+    }
+  }
+
+  return { eligible: true };
+}
+
+/**
+ * @deprecated Use isPaymentMethodEligible({ method: 'partial_payment' }) instead.
+ * Kept for backward compatibility with existing callers.
  */
 export function isPartialPaymentEligibleServer(
   settings: PartialPaymentSettings,
@@ -201,70 +303,7 @@ export function isPartialPaymentEligibleServer(
     country?: string;
   }
 ): { eligible: boolean; reason?: string } {
-  if (!settings.enabled) {
-    return { eligible: false, reason: 'Partial payments are disabled' };
-  }
-
-  const { orderTotal, productId, collectionIds = [], country } = params;
-
-  // Order total restrictions
-  if (settings.minimum_order_total > 0 && orderTotal < settings.minimum_order_total) {
-    return {
-      eligible: false,
-      reason: `Order total must be at least ${settings.minimum_order_total}`,
-    };
-  }
-  if (settings.maximum_order_total > 0 && orderTotal > settings.maximum_order_total) {
-    return {
-      eligible: false,
-      reason: `Order total exceeds maximum of ${settings.maximum_order_total}`,
-    };
-  }
-
-  // Country restrictions
-  if (settings.excluded_countries.length > 0 && country) {
-    if (settings.excluded_countries.includes(country)) {
-      return { eligible: false, reason: 'Partial payments not available in your country' };
-    }
-  }
-  if (settings.allowed_countries.length > 0 && country) {
-    if (!settings.allowed_countries.includes(country)) {
-      return { eligible: false, reason: 'Partial payments not available in your country' };
-    }
-  }
-
-  // Product restrictions
-  const hasProductFilter = settings.allowed_product_ids.length > 0;
-  const hasCollectionFilter = settings.allowed_collection_ids.length > 0;
-
-  if (hasProductFilter || hasCollectionFilter) {
-    let productAllowed = false;
-
-    if (hasProductFilter && productId) {
-      const numericId = String(productId).replace(/[^0-9]/g, '');
-      productAllowed = settings.allowed_product_ids.some(
-        (id) => String(id).replace(/[^0-9]/g, '') === numericId
-      );
-    }
-
-    if (!productAllowed && hasCollectionFilter && collectionIds.length > 0) {
-      productAllowed = collectionIds.some((cid) =>
-        settings.allowed_collection_ids.some(
-          (allowed) =>
-            String(allowed).replace(/[^0-9]/g, '') === String(cid).replace(/[^0-9]/g, '')
-        )
-      );
-    }
-
-    if (!productAllowed) {
-      return {
-        eligible: false,
-        reason: 'Partial payments not available for this product',
-      };
-    }
-  }
-
-  return { eligible: true };
+  return isPaymentMethodEligible(settings, 'partial_payment', params);
 }
 
 // ── Deposit Calculation ────────────────────────────────────────────────────

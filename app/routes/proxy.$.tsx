@@ -21,7 +21,7 @@ import {
     sanitizeVariantPricedLineItems,
 } from "../services/shopify-sync.server";
 import { getRestClient } from "../shopify/rest-client.server";
-import { createPartialPaymentCheckout } from "../services/shopify-partial-payment.server";
+import { createPartialPaymentCheckout, createFullPrepaidCheckout } from "../services/shopify-partial-payment.server";
 
 // ── In-process caches to avoid repeated DB/session round-trips ──
 // REST clients and fraud settings are stable per shop for minutes at a time.
@@ -164,16 +164,24 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
             });
         }
 
-        // Route: Partial COD Checkout Creation
-        // Check BOTH path and payload to catch all partial COD requests
-        const isPartialCodPath = path.includes("partial-cod") || path.includes("create-checkout");
-        // Only consider it partial COD if paymentMethod is explicitly 'partial_cod' OR advanceAmount is a positive number
+        // Route: Checkout Creation (Partial COD + Full Prepaid share one endpoint)
+        const isCheckoutPath = path.includes("partial-cod") || path.includes("create-checkout");
         const isPartialCodPayload = data.paymentMethod === 'partial_cod' ||
             (data.advanceAmount !== undefined && data.advanceAmount !== null && parseFloat(data.advanceAmount) > 0);
+        const isFullPrepaidPayload = data.paymentMethod === 'full_prepaid';
 
-        if (isPartialCodPath || isPartialCodPayload) {
-            console.log('[Proxy] ✅ Matched Partial COD route (path:', isPartialCodPath, ', payload:', isPartialCodPayload, ')');
-            return await handlePartialCodCheckout(request, data);
+        if (isCheckoutPath || isPartialCodPayload || isFullPrepaidPayload) {
+            switch (data.paymentMethod) {
+                case 'full_prepaid':
+                    console.log('[Proxy] ✅ Matched Full Prepaid route');
+                    return await handleFullPrepaidCheckout(request, data);
+                case 'partial_cod':
+                default:
+                    if (isPartialCodPayload || isCheckoutPath) {
+                        console.log('[Proxy] ✅ Matched Partial COD route (path:', isCheckoutPath, ', payload:', isPartialCodPayload, ')');
+                        return await handlePartialCodCheckout(request, data);
+                    }
+            }
         }
 
         // Default Route: Regular COD Order Creation
@@ -407,6 +415,7 @@ async function handlePartialCodCheckout(request: Request, data: any) {
                 is_partial_cod: true,
                 advance_amount: safeAdvance,
                 remaining_cod_amount: remainingAmount,
+                payment_method: 'partial_cod' as const,
                 order_payload: {
                     ...data,
                     partial_payment_reference: partialRef,
@@ -474,6 +483,239 @@ async function handlePartialCodCheckout(request: Request, data: any) {
 // Tiny helper for random hex suffix
 function randomHex(bytes: number): string {
     return Math.random().toString(16).slice(2, 2 + bytes * 2).toUpperCase();
+}
+
+// ─── Handle Full Prepaid Checkout ─────────────────────────────────────────────
+// Customer pays 100% upfront through Shopify Checkout.
+// Reuses all partial COD infrastructure: pricing engine, fraud check, coupon validation.
+async function handleFullPrepaidCheckout(request: Request, data: any) {
+    const start = Date.now();
+    console.log('[Proxy Full Prepaid] Starting checkout flow');
+
+    try {
+        const {
+            shop,
+            productId,
+            variantId,
+            productTitle,
+            quantity,
+            price,
+            customerName,
+            customerPhone,
+            customerAddress,
+            customerEmail,
+            customerCity,
+            customerState,
+            customerZipcode,
+            customerCountry,
+            shippingPrice,
+            notes,
+            couponCode,
+            upsell_items,
+            currency,
+        } = data;
+
+        // ── Validate required fields ────────────────────────────────────────
+        if (!shop || !variantId) {
+            return new Response(JSON.stringify({
+                success: false,
+                error: 'Missing required fields: shop, variantId',
+            }), { status: 400, headers: corsHeaders });
+        }
+
+        // ── Fraud Protection ────────────────────────────────────────────────
+        const clientIp =
+            request.headers.get('x-shopify-client-ip')
+            || request.headers.get('cf-connecting-ip')
+            || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+            || request.headers.get('x-real-ip')
+            || 'unknown';
+
+        const fraudSettings = await getCachedFraudSettings(shop);
+
+        try {
+            const fraudResult = await validateOrderAgainstFraudRulesWithSettings({
+                phone: customerPhone,
+                email: customerEmail,
+                ip: clientIp,
+                zipcode: customerZipcode,
+                quantity: parseInt(quantity) || 1,
+                shopDomain: shop,
+            }, fraudSettings);
+
+            if (!fraudResult.allowed) {
+                console.warn('[Proxy Full Prepaid] Blocked by fraud protection:', fraudResult.message);
+                return new Response(JSON.stringify({
+                    success: false,
+                    error: fraudResult.message,
+                }), { status: 403, headers: corsHeaders });
+            }
+        } catch (fraudErr: any) {
+            console.error('[Proxy Full Prepaid] Fraud check error (allowing order):', fraudErr.message);
+        }
+        console.log('⏱ [Proxy Full Prepaid] Fraud checks done:', Date.now() - start, 'ms');
+
+        // ── Pricing ─────────────────────────────────────────────────────────
+        const pricing = calculateOrderPricing(data);
+        let totalOrderValue = pricing.originalTotal;
+        let couponDiscount = 0;
+        let normalizedCouponCode = '';
+        const currencyCode = currency || 'INR';
+
+        // ── Coupon validation ────────────────────────────────────────────────
+        if (couponCode) {
+            const couponResult = await validateCouponForShop(shop, couponCode, pricing.originalTotal, data);
+            if (!couponResult.valid) {
+                return new Response(JSON.stringify({
+                    success: false,
+                    error: couponResult.message || 'Invalid coupon',
+                }), { status: 400, headers: corsHeaders });
+            }
+            couponDiscount = couponResult.discount;
+            totalOrderValue = couponResult.finalTotal;
+            normalizedCouponCode = normalizeCouponCode(couponCode);
+            console.log('[Proxy Full Prepaid] Coupon applied:', normalizedCouponCode, 'discount:', couponDiscount);
+        }
+
+        console.log('[Proxy Full Prepaid] Pricing — total:', totalOrderValue);
+
+        // ── Normalize customer name ──────────────────────────────────────────
+        const nameStr = (customerName || 'Customer').trim();
+        const nameParts = nameStr.split(/\s+/);
+        const firstName = nameParts[0] || 'Customer';
+        const lastName = nameParts.slice(1).join(' ') || '';
+        const formattedPhone = formatPhoneE164(customerPhone || '');
+
+        // ── Build line items ─────────────────────────────────────────────────
+        const storefrontLineItems = pricing.discountItems.map((item: any) => {
+            let title = data.productTitle || 'Product';
+            const upsellMatch = Array.isArray(upsell_items) && upsell_items.find(
+                (u: any) => toNumericVariantId(u.variant_id) === toNumericVariantId(item.variantId)
+            );
+            if (upsellMatch && upsellMatch.title) title = upsellMatch.title;
+            return { variantId: item.variantId, productId: item.productId, quantity: item.quantity, price: item.price, title };
+        });
+
+        // ── Build notes (no advance/remaining split) ─────────────────────────
+        const fmtAmt = (amt: number) => {
+            try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: currencyCode }).format(amt); }
+            catch { return `${currencyCode} ${amt.toFixed(2)}`; }
+        };
+        const orderNotes = [
+            notes || '',
+            `FULL PREPAID ORDER`,
+            `Total paid: ${fmtAmt(totalOrderValue)}`,
+            normalizedCouponCode ? `Coupon: ${normalizedCouponCode} (-${fmtAmt(couponDiscount)})` : '',
+        ].filter(Boolean).join('\n');
+
+        // ── Create Shopify Checkout ──────────────────────────────────────────
+        console.log('[Proxy Full Prepaid] Calling createFullPrepaidCheckout, total:', totalOrderValue);
+
+        const checkoutResult = await createFullPrepaidCheckout({
+            shop,
+            customer: {
+                firstName,
+                lastName,
+                email: customerEmail || '',
+                phone: formattedPhone || customerPhone || '',
+                address1: customerAddress || '',
+                city: customerCity || '',
+                province: customerState || '',
+                country: customerCountry || '',
+                zip: customerZipcode || '',
+            },
+            lineItems: storefrontLineItems,
+            totalOrderValue,
+            currency: currencyCode,
+            notes: orderNotes,
+            couponCode: normalizedCouponCode || undefined,
+            shippingPrice: pricing.shippingPrice,
+        });
+
+        const fullPrepaidRef = checkoutResult.partialPaymentReference; // FPAID-* reference
+        console.log('⏱ [Proxy Full Prepaid] Checkout created:', Date.now() - start, 'ms', '| ref:', fullPrepaidRef);
+
+        // ── Non-blocking DB log ──────────────────────────────────────────────
+        Promise.resolve(
+            logOrder({
+                shop_domain: shop,
+                customer_name: nameStr,
+                customer_phone: customerPhone || '',
+                customer_address: customerAddress || '',
+                customer_email: customerEmail || '',
+                notes: orderNotes,
+                city: customerCity || '',
+                state: customerState || '',
+                pincode: customerZipcode || '',
+                product_id: productId || variantId,
+                product_title: productTitle || 'Product',
+                variant_id: variantId,
+                quantity: parseInt(quantity) || 1,
+                price: String(price),
+                shipping_label: data.shippingLabel || '',
+                shipping_price: parseFloat(shippingPrice) || 0,
+                coupon_code: normalizedCouponCode || undefined,
+                discount_amount: couponDiscount || undefined,
+                original_total: pricing.originalTotal,
+                final_total: totalOrderValue,
+                currency: currencyCode,
+                is_full_prepaid: true,
+                payment_method: 'full_prepaid' as const,
+                order_payload: {
+                    ...data,
+                    full_prepaid_reference: fullPrepaidRef,
+                    checkout_id: checkoutResult.checkoutId,
+                    checkout_url: checkoutResult.checkoutUrl,
+                    checkout_type: checkoutResult.checkoutType,
+                    couponCode: normalizedCouponCode || '',
+                    discountAmount: couponDiscount,
+                    originalTotal: pricing.originalTotal,
+                    finalTotal: totalOrderValue,
+                },
+            })
+        ).then(() => {
+            console.log('⏱ [Proxy Full Prepaid] DB log done (async):', Date.now() - start, 'ms');
+        }).catch((dbErr: any) => {
+            console.error('[Proxy Full Prepaid] DB log failed (non-fatal):', dbErr.message);
+        });
+
+        // ── Non-blocking Google Sheets sync ─────────────────────────────────
+        syncOrderToGoogleSheets(shop, {
+            orderId: fullPrepaidRef,
+            orderName: fullPrepaidRef,
+            customerName: nameStr,
+            phone: customerPhone || '',
+            email: customerEmail || '',
+            address: customerAddress || '',
+            city: customerCity || '',
+            state: customerState || '',
+            pincode: customerZipcode || '',
+            product: productTitle || 'Product',
+            quantity: parseInt(quantity) || 1,
+            totalPrice: totalOrderValue.toString(),
+            paymentMethod: 'full_prepaid' as any,
+            status: 'full_prepaid_checkout_pending',
+        }).catch((err: any) => {
+            console.error('[Proxy Full Prepaid] Google Sheets sync error (non-blocking):', err.message);
+        });
+
+        console.log('⏱ [Proxy Full Prepaid] Total time to response:', Date.now() - start, 'ms');
+
+        return new Response(JSON.stringify({
+            success: true,
+            checkoutUrl: checkoutResult.checkoutUrl,
+            fullPrepaidReference: fullPrepaidRef,
+        }), { headers: corsHeaders });
+
+    } catch (error: any) {
+        console.error('[Proxy Full Prepaid] ❌ Unexpected error:', error?.message);
+        console.error('[Proxy Full Prepaid] Stack:', error?.stack);
+        return new Response(JSON.stringify({
+            success: false,
+            error: error.message || 'Unable to create Full Prepaid checkout. Please try again.',
+            _debug: process.env.NODE_ENV !== 'production' ? error?.stack?.slice(0, 500) : undefined,
+        }), { status: 500, headers: corsHeaders });
+    }
 }
 
 // ─── Optimized Regular COD Order Flow ─────────────────────────────────────────
