@@ -530,18 +530,18 @@
   /* Modal Overlay - prevent horizontal swipe/scroll */
   .cod-modal-overlay {
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    inset: 0;
     background: rgba(0, 0, 0, 0.5);
     z-index: 2147483640 !important;
     display: flex;
-    align-items: center;
     justify-content: center;
-    padding: 20px;
+    align-items: flex-start;
+    padding: 24px;
+    padding-top: 20px;
+    padding-bottom: 40px;
     animation: fadeIn 0.2s ease;
     touch-action: pan-y;
+    overflow-y: auto;
     overflow-x: hidden;
     overscroll-behavior-x: contain;
   }
@@ -562,14 +562,9 @@
     touch-action: pan-y;
     overscroll-behavior-x: none;
     animation: slideUp 0.3s ease;
-  }
-
-  /* Desktop: constrain height so form scrolls inside and rounded corners stay visible */
-  @media only screen and (min-width: 601px) {
-    .cod-form-container.cod-modal {
-      max-height: 85vh;
-      overflow-y: auto;
-    }
+    overflow: visible;
+    height: auto;
+    max-height: none;
   }
 
   @keyframes slideUp {
@@ -1685,6 +1680,14 @@
   @media only screen and (max-width: 768px) {
       .cod-coupon-field input[name="coupon"] {
           font-size: 16px !important;
+      }
+      .cod-modal-overlay {
+        padding: 20px 10px 30px 10px !important;
+      }
+      .cod-form-container {
+        width: 100%;
+        min-height: 100%;
+        border-radius: 16px 16px 0 0;
       }
   }
   
