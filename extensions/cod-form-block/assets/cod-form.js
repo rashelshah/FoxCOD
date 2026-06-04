@@ -4337,20 +4337,44 @@ function darkenColor(hex, percent) {
       }
 
       if (showPartial) {
+          var depositAmount = partialAdvance;
+          var codFeeAmount = 0;
+          if (ppSettings && ppSettings.payment_options && ppSettings.payment_options.length > 0) {
+              var opt = ppSettings.payment_options[0];
+              if (opt.type === 'percentage' || opt.type === 'remaining_percentage') {
+                  depositAmount = (orderTotal * opt.value) / 100;
+              } else {
+                  depositAmount = Math.min(opt.value, orderTotal);
+              }
+              
+              if (ppSettings.cod_fee_enabled && ppSettings.cod_fee_amount) {
+                  if (ppSettings.cod_fee_type === 'percentage') {
+                      codFeeAmount = (depositAmount * ppSettings.cod_fee_amount) / 100;
+                  } else {
+                      codFeeAmount = ppSettings.cod_fee_amount;
+                  }
+              }
+          }
+          var depositText = formatMoney(depositAmount);
+
           html += '<label class="pm-row pm-partial" style="display: flex; flex-direction: column; background: #eff6ff; border-radius: 12px; border: 2px solid ' + (showFullPrepaid ? '#bfdbfe' : '#2563eb') + '; cursor: pointer; position: relative; padding: 0 !important; margin: 0 !important; box-sizing: border-box; overflow: hidden !important;">';
           html += '<input type="radio" name="payment_method" value="partial_cod" ' + (!showFullPrepaid ? 'checked' : '') + ' style="position:absolute; opacity:0; pointer-events:none; margin:0; padding:0;">';
           html += '<div style="display: flex; align-items: flex-start; gap: 12px; padding: 16px 12px 12px 12px; box-sizing: border-box; width: 100%; margin: 0;">';
           html += '<div style="display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px; color: #2563eb; background-color: #dbeafe;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg></div>';
           html += '<div style="flex: 1; min-width: 0; padding-top: 2px;">';
           html += '<div style="font-weight: 700; font-size: 14px; color: #1e3a8a; line-height: 1.2; display: flex; align-items: center; gap: 4px;">Partial Payment <svg width="14" height="14" viewBox="0 0 24 24" fill="#2563eb" stroke="#eff6ff" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/></svg></div>';
-          html += '<div class="pm-desc-partial" style="color: #60a5fa; font-size: 11px; margin-top: 4px; line-height: 1.3;">Pay a small amount now • Rest on delivery</div>';
+          html += '<div class="pm-desc-partial" style="color: #60a5fa; font-size: 11px; margin-top: 4px; line-height: 1.3;">Pay ' + depositText + ' now • Rest on delivery</div>';
           html += '</div>';
           html += '<div style="display: flex; align-items: center; gap: 12px; flex-shrink: 0;">';
-          html += '<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">';
+          html += '<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">';
+          if (codFeeAmount > 0) {
+              html += '<div style="background: #dbeafe; color: #1e3a8a; font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 99px; line-height: 1;">+ ' + formatMoney(codFeeAmount) + ' COD fee</div>';
+          }
+          html += '<span class="pm-amt-partial" style="font-weight: 800; font-size: 15px; color: #1e3a8a;">' + depositText + '</span>';
           html += '</div>';
           html += '<input type="radio" name="payment_method_visual" class="pm-pill" ' + (!showFullPrepaid ? 'checked' : '') + ' style="width: 18px; height: 18px; accent-color: #2563eb; margin: 0; pointer-events: none;">';
           html += '</div></div>';
-          html += '<div style="background: #dbeafe; padding: 10px 12px; font-size: 10px; color: #1e40af; display: flex; justify-content: center; align-items: center; font-weight: 500; width: 100%; box-sizing: border-box; margin: 0;">🛡️ Secure your order • Priority dispatch • Avoid fake cancellations</div>';
+          html += '<div style="background: #dbeafe; padding: 10px 12px; font-size: 10px; color: #1e40af; display: flex; justify-content: center; align-items: center; font-weight: 500; width: 100%; box-sizing: border-box; margin: 0;">Secure your order • Priority dispatch • Avoid fake cancellations</div>';
           html += '</label>';
       }
 
@@ -4415,7 +4439,7 @@ function darkenColor(hex, percent) {
               if (submitBtn) {
                   applySubmitButtonStyles(submitBtn, config);
                   if (radio.value === 'partial_cod') {
-                      submitBtn.textContent = 'Continue with Partial Payment';
+                      submitBtn.textContent = typeof depositText !== 'undefined' ? 'Pay ' + depositText + ' now' : 'Continue with Partial Payment';
                   } else if (radio.value === 'full_prepaid') {
                       submitBtn.textContent = 'Proceed to Payment';
                   } else {
@@ -6411,38 +6435,10 @@ function darkenColor(hex, percent) {
       submitFullCodOrder(form, config, productId, payload, submitBtn, originalBtnText);
   }
 
-  /**
-   * Show Partial Payment Modal v2
-   *
-   * If v2 settings available (window.FoxCod.partialPaymentSettings):
-   *   - Shows all merchant-configured payment options for selection
-   *   - Uses merchant branding (colors, title, subtitle, footer)
-   *   - Calculates deposit + COD fee per selected option
-   *   - On confirm → submitPartialCodCheckout with correct advanceAmount
-   *
-   * Falls back to legacy single-advance behavior if no v2 settings found.
-   */
   function showPartialCodModal(form, config, payload, submitBtn, originalBtnText) {
       var finalTotal = payload.finalTotal || 0;
       var ppSettings = config.partialPaymentSettings;
-      var ms = (ppSettings && ppSettings.modal_settings) || {};
 
-      // ── Inject CSS once ──────────────────────────────────────────────────
-      if (!document.getElementById('foxcod-partial-modal-css')) {
-          var css = document.createElement('style');
-          css.id = 'foxcod-partial-modal-css';
-          css.textContent = [
-              '@keyframes foxcodPartialFadeIn{from{opacity:0}to{opacity:1}}',
-              '@keyframes foxcodPartialSlideUp{from{opacity:0;transform:translateY(100%)}to{opacity:1;transform:translateY(0)}}',
-              '@keyframes foxcodPartialSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}',
-              '.foxcod-pp-opt{cursor:pointer;transition:all .15s ease;}',
-              '.foxcod-pp-opt:hover{transform:translateY(-1px);}',
-              '.foxcod-pp-opt.selected{border-width:2px !important;}',
-          ].join('');
-          document.head.appendChild(css);
-      }
-
-      // ── Compute deposit for all options ─────────────────────────────────
       function calcDeposit(opt) {
           var d = 0;
           if (opt.type === 'percentage' || opt.type === 'remaining_percentage') {
@@ -6452,6 +6448,7 @@ function darkenColor(hex, percent) {
           }
           return Math.round(d * 100) / 100;
       }
+
       function calcCodFee(depositAmt) {
           if (!ppSettings || !ppSettings.cod_fee_enabled || !ppSettings.cod_fee_amount) return 0;
           var fee = 0;
@@ -6467,208 +6464,18 @@ function darkenColor(hex, percent) {
           ? ppSettings.payment_options
           : [{ id: 'legacy', label: 'Partial Payment', type: 'fixed', value: config.partialCodAdvance || 100 }];
 
-      // Active selection index
-      var selectedIdx = 0;
+      // Always pick the first option directly
+      var selOpt = paymentOptions[0];
+      var advanceAmount = calcDeposit(selOpt);
+      var codFeeAmount = calcCodFee(advanceAmount);
+      var payNow = advanceAmount;
+      var remainingAmount = Math.max(finalTotal - advanceAmount, 0) + codFeeAmount;
 
-      // Build overlay
-      var overlay = document.createElement('div');
-      overlay.id = 'foxcod-partial-modal-overlay';
-      overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483646;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:flex;justify-content:center;animation:foxcodPartialFadeIn 0.25s ease;box-sizing:border-box;';
-      
-      var isMobile = window.innerWidth <= 768;
-      overlay.style.alignItems = isMobile ? 'flex-end' : 'center';
-      overlay.style.padding = isMobile ? '0' : '16px';
-
-      // ── Build v2 panel (two-column split) ────────────────────────────────
-      var leftBg = 'linear-gradient(160deg,' + (ms.left_gradient_start || '#16213e') + ' 0%,' + (ms.left_gradient_end || '#0f3460') + ' 100%)';
-      var leftColor = ms.left_text_color || '#ffffff';
-      var rightBg = ms.right_bg_color || '#ffffff';
-      var rightBorder = ms.right_border_color || '#e5e7eb';
-      var btnBg = ms.button_color || '#1f2937';
-      var btnColor = ms.button_text_color || '#ffffff';
-      var modalTitle = ms.title || 'Choose Your Payment Option';
-      var modalSubtitle = ms.subtitle || 'Pay a small amount now and the rest on delivery';
-      var securityText = ms.security_text || 'Secure Payments · Verified Seller · Assured Delivery';
-      var footerText = ms.footer_text || 'Remaining amount collected on delivery';
-      var showSecIcon = ms.show_security_icons !== false;
-
-      function buildOptionHTML(opt, idx) {
-          var dep = calcDeposit(opt);
-          var fee = calcCodFee(dep);
-          var payNow = dep;
-          var remaining = Math.max(finalTotal - dep, 0) + fee;
-          var isSelected = idx === selectedIdx;
-          
-          var optLabel = opt.type === 'percentage' || opt.type === 'remaining_percentage' ? opt.value + '%' : formatMoney(dep);
-          var subText = 'Total: ' + formatMoney(finalTotal) + '. Pay now ' + optLabel + ' (' + formatMoney(payNow) + '), ' + formatMoney(remaining) + ' remaining on delivery';
-          
-          var optCardContent = [
-              '<div style="display:flex;align-items:flex-start;justify-content:space-between;width:100%;">',
-                  '<div style="display:flex;align-items:flex-start;gap:16px;">',
-                      '<div style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;color:' + btnBg + ';flex-shrink:0;margin-top:2px;">',
-                          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/><path d="M6 15h2"/><circle cx="14" cy="15" r="1.5"/></svg>',
-                      '</div>',
-                      '<div style="display:flex;flex-direction:column;gap:4px;">',
-                          '<span style="font-size:15px;font-weight:600;color:#1f2937;">' + opt.label + '</span>',
-                          '<span style="font-size:12px;color:#6b7280;line-height:1.4;">' + subText + '</span>',
-                      '</div>',
-                  '</div>',
-                  '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;margin-left:16px;">',
-                      '<span style="font-size:16px;font-weight:700;color:#1f2937;">' + formatMoney(payNow) + '</span>',
-                      '<span style="font-size:10px;color:#9ca3af;">Taxes computed later</span>',
-                      (isSelected ? '<div style="width:20px;height:20px;border-radius:50%;background:' + btnBg + ';color:' + btnColor + ';display:flex;align-items:center;justify-content:center;margin-top:8px;"><svg viewBox="0 0 20 20" fill="currentColor" style="width:12px;height:12px;"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg></div>' : ''),
-                  '</div>',
-              '</div>'
-          ].join('');
-
-          var feeCard = (isSelected && fee > 0) ? [
-              '<div style="border:1px dashed #34d399;background:#ecfdf5;color:#059669;padding:12px 16px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;margin-top:16px;font-weight:600;font-size:14px;font-family:Inter,-apple-system,sans-serif;width:100%;box-sizing:border-box;">',
-                  '<div style="display:flex;align-items:center;gap:8px;">',
-                      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><rect x="3" y="5" width="18" height="14" rx="2" ry="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="7" y1="15" x2="11" y2="15"/></svg>',
-                      '<span>COD Fee</span>',
-                  '</div>',
-                  '<span>' + formatMoney(fee) + '</span>',
-              '</div>'
-          ].join('') : '';
-
-          return [
-              '<div class="foxcod-pp-opt' + (isSelected ? ' selected' : '') + '"',
-              ' data-idx="' + idx + '"',
-              ' style="border:1px solid ' + (isSelected ? btnBg : rightBorder) + ';border-radius:12px;padding:16px;display:flex;flex-direction:column;align-items:flex-start;cursor:pointer;transition:all 0.2s ease;background:' + (isSelected ? btnBg+'06' : '#ffffff') + ';margin-bottom:0;border-width:' + (isSelected ? '2px' : '1px') + ';font-family:Inter,-apple-system,sans-serif;">',
-              optCardContent,
-              feeCard,
-              '</div>'
-          ].join('');
-      }
-
-      function buildSecurityBadges() {
-          if (!showSecIcon) return '';
-          return [
-              '<div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:12px;margin-top:12px;">',
-              '<div style="display:flex;flex-direction:column;align-items:center;gap:8px;font-size:11px;color:#6b7280;font-weight:500;text-align:center;">',
-                  '<span style="color:#9ca3af;display:flex;align-items:center;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><rect x="5" y="11" width="14" height="10" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></span>',
-                  '<span>Secure payments</span>',
-              '</div>',
-              '<div style="display:flex;flex-direction:column;align-items:center;gap:8px;font-size:11px;color:#6b7280;font-weight:500;text-align:center;">',
-                  '<span style="color:#9ca3af;display:flex;align-items:center;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><rect x="1" y="3" width="15" height="13" rx="2" ry="2"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg></span>',
-                  '<span>Assured delivery</span>',
-              '</div>',
-              '<div style="display:flex;flex-direction:column;align-items:center;gap:8px;font-size:11px;color:#6b7280;font-weight:500;text-align:center;">',
-                  '<span style="color:#9ca3af;display:flex;align-items:center;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></span>',
-                  '<span>Verified seller</span>',
-              '</div>',
-              '</div>'
-          ].join('');
-      }
-
-      var panel = document.createElement('div');
-      panel.id = 'foxcod-pp-panel';
-      panel.style.cssText = 'display:grid;grid-template-columns:340px 1fr;width:100%;max-width:840px;border-radius:16px;overflow:hidden;box-shadow:0 20px 40px rgba(0,0,0,0.1);animation:foxcodPartialSlideUp 0.3s cubic-bezier(0.34,1.56,0.64,1);font-family:"Inter",-apple-system,sans-serif;position:relative;background:#ffffff;';
-
-      // Left column
-      var leftCol = document.createElement('div');
-      leftCol.id = 'foxcod-pp-left-col';
-      leftCol.style.cssText = 'background:' + leftBg + ';color:' + leftColor + ';padding:32px;display:flex;flex-direction:column;position:relative;overflow:hidden;';
-
-      // Inject Media Query Styles
-      if (!document.getElementById('foxcod-pp-mobile-styles')) {
-          var style = document.createElement('style');
-          style.id = 'foxcod-pp-mobile-styles';
-          style.innerHTML = '@media (max-width: 850px) { #foxcod-partial-modal-overlay { align-items: flex-end !important; padding: 0 !important; } #foxcod-pp-panel { grid-template-columns: 1fr !important; max-height: 90vh !important; border-radius: 20px 20px 0 0 !important; } #foxcod-pp-left-col { display: none !important; } }';
-          document.head.appendChild(style);
-      }
-
-      var ogImage = document.querySelector('meta[property="og:image"]');
-      var imgSrc = ogImage ? ogImage.content : '';
-      var ogTitle = document.querySelector('meta[property="og:title"]');
-      var pTitle = ogTitle ? ogTitle.content : 'Your Order';
-      var imgHTML = imgSrc ? '<img src="' + imgSrc + '" style="width:100%;height:100%;object-fit:cover;">' : '<div style="width:20px;height:40px;background:#2dd4bf;border-radius:4px;"></div>';
-
-      leftCol.innerHTML = [
-          '<div style="align-self:flex-start;background:#ffffff;color:#1f2937;border-radius:6px;padding:4px 8px;font-size:11px;display:flex;align-items:center;gap:6px;font-weight:600;margin-bottom:32px;">',
-          '<svg viewBox="0 0 20 20" fill="currentColor" style="width:12px;height:12px;"><path d="M3 5a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-2.22l-.11.22-1.5 3a1 1 0 01-1.78 0l-1.5-3-.11-.22H5a2 2 0 01-2-2V5zm2 2v6h10V7H5zm8 4H7V9h6v2z"/></svg>',
-          (window.location.hostname || 'fox-cod.myshopify.com'),
-          '</div>',
-          '<div style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.2);border-radius:12px;padding:20px;backdrop-filter:blur(8px);">',
-              '<div style="display:flex;justify-content:space-between;align-items:center;font-size:10px;font-weight:700;letter-spacing:0.5px;margin-bottom:16px;opacity:0.8;text-transform:uppercase;">',
-                  '<span>Order summary</span><span>❯</span>',
-              '</div>',
-              '<div style="display:flex;align-items:center;gap:16px;">',
-                  '<div style="width:56px;height:56px;background:#ffffff;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden;">',
-                      imgHTML,
-                  '</div>',
-                  '<div style="display:flex;flex-direction:column;gap:4px;">',
-                      '<span style="font-size:14px;font-weight:600;line-height:1.2;">' + pTitle + '</span>',
-                      '<span style="font-size:10px;opacity:0.7;text-transform:uppercase;font-weight:600;letter-spacing:0.5px;">Full price</span>',
-                      '<span style="font-size:16px;font-weight:700;">' + formatMoney(finalTotal) + '</span>',
-                  '</div>',
-              '</div>',
-          '</div>'
-      ].join('');
-
-      // Right column
-      var rightCol = document.createElement('div');
-      rightCol.style.cssText = 'background:' + rightBg + ';padding:40px;display:flex;flex-direction:column;gap:16px;justify-content:space-between;box-sizing:border-box;position:relative;overflow-y:auto;max-height:90vh;';
-
-      var closeBtnHTML = '<button id="foxcod-partial-cancel-icon" type="button" aria-label="Close" style="position:absolute;top:16px;right:16px;width:32px;height:32px;border-radius:50%;border:1px solid #e5e7eb;background:#ffffff;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#6b7280;padding:0;transition:all 0.2s;"><svg viewBox="0 0 20 20" fill="currentColor" style="width:16px;height:16px;"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg></button>';
-
-      var optionsHTML = paymentOptions.map(buildOptionHTML).join('');
-      rightCol.innerHTML = [
-          closeBtnHTML,
-          '<h3 style="font-size:24px;font-weight:700;color:#111827;margin:0 0 8px 0;text-align:center;">' + (modalTitle || 'Choose Your Payment Option') + '</h3>',
-          '<div id="foxcod-pp-options-list" style="display:flex;flex-direction:column;gap:16px;flex-grow:1;">' + optionsHTML + '</div>',
-          '<div>',
-              '<button id="foxcod-partial-confirm-btn" style="width:100%;padding:16px;background:' + btnBg + ';color:' + btnColor + ';font-size:15px;font-weight:700;border:none;border-radius:8px;cursor:pointer;font-family:inherit;transition:opacity .2s;text-align:center;margin-top:12px;">',
-                  'Continue to Payment',
-              '</button>',
-              buildSecurityBadges(),
-              '<hr style="border:none;border-top:1px solid #f3f4f6;margin:16px 0 12px;">',
-              '<div style="display:flex;justify-content:space-between;align-items:center;font-size:10px;color:#9ca3af;">',
-                  '<span>T&C | Privacy Policy</span>',
-                  '<span>Fox COD</span>',
-              '</div>',
-          '</div>'
-      ].join('');
-
-      panel.appendChild(leftCol);
-      panel.appendChild(rightCol);
-      overlay.appendChild(panel);
-      document.body.appendChild(overlay);
-
-      // ── Option selection ──────────────────────────────────────────────────
-      var optionsList = document.getElementById('foxcod-pp-options-list');
-      optionsList.addEventListener('click', function(e) {
-          var el = e.target.closest('.foxcod-pp-opt');
-          if (!el) return;
-          selectedIdx = parseInt(el.getAttribute('data-idx'), 10);
-          optionsList.innerHTML = paymentOptions.map(buildOptionHTML).join('');
+      submitPartialCodCheckout(form, config, payload, submitBtn, originalBtnText, payNow, remainingAmount, {
+          optionLabel: selOpt.label,
+          depositAmount: advanceAmount,
+          codFeeAmount: codFeeAmount,
       });
-
-      // ── Confirm ───────────────────────────────────────────────────────────
-      document.getElementById('foxcod-partial-confirm-btn').addEventListener('click', function() {
-          var selOpt = paymentOptions[selectedIdx];
-          var advanceAmount = calcDeposit(selOpt);
-          var codFeeAmount = calcCodFee(advanceAmount);
-          var payNow = advanceAmount;
-          var remainingAmount = Math.max(finalTotal - advanceAmount, 0) + codFeeAmount;
-          overlay.remove();
-          submitPartialCodCheckout(form, config, payload, submitBtn, originalBtnText, payNow, remainingAmount, {
-              optionLabel: selOpt.label,
-              depositAmount: advanceAmount,
-              codFeeAmount: codFeeAmount,
-          });
-      });
-
-      // ── Cancel ────────────────────────────────────────────────────────────
-      function cancelModal() {
-          overlay.remove();
-          config._isSubmitting = false;
-          submitBtn.disabled = false;
-          submitBtn.textContent = originalBtnText;
-          submitBtn.style.removeProperty('opacity');
-      }
-      document.getElementById('foxcod-partial-cancel-icon').addEventListener('click', cancelModal);
-      overlay.addEventListener('click', function(e) { if (e.target === overlay) cancelModal(); });
   }
 
   /**
@@ -6676,6 +6483,13 @@ function darkenColor(hex, percent) {
    * Returns the overlay element so it can be hidden on error.
    */
   function showPartialCodLoader() {
+      if (!document.getElementById('foxcod-partial-loader-css')) {
+          var css = document.createElement('style');
+          css.id = 'foxcod-partial-loader-css';
+          css.textContent = '@keyframes foxcodPartialFadeIn{from{opacity:0}to{opacity:1}} @keyframes foxcodPartialSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}';
+          document.head.appendChild(css);
+      }
+
       var existing = document.getElementById('foxcod-partial-loader');
       if (existing) existing.remove();
 
