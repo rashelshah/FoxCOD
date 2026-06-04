@@ -694,10 +694,10 @@ export const ButtonIconSvg = ({ iconType, color = 'currentColor', size = 18 }: {
     if (iconType === 'checkout') return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 11 12 14 22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>;
     if (iconType === 'lock') return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>;
     if (iconType === 'cart-plus') return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" /><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" /><line x1="11.5" y1="10.5" x2="17.5" y2="10.5" /><line x1="14.5" y1="7.5" x2="14.5" y2="13.5" /></svg>;
-    if (iconType === 'cart-check') return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" /><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" /><path d="M11 11.5l2 2 4-4"/></svg>;
+    if (iconType === 'cart-check') return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" /><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" /><path d="M11 11.5l2 2 4-4" /></svg>;
     if (iconType === 'bag-check') return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" /><line x1="3" y1="6" x2="21" y2="6" /><path d="M9 13l2 2 4-4" /></svg>;
-    if (iconType === 'basket') return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18l-2.4 12.3A2 2 0 0 1 16.65 20H7.35a2 2 0 0 1-1.95-1.7L3 6z"/><path d="M8 6L12 2l4 4"/></svg>;
-    if (iconType === 'cash') return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="2" ry="2" /><circle cx="12" cy="12" r="2" /><path d="M6 12h.01M18 12h.01"/></svg>;
+    if (iconType === 'basket') return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18l-2.4 12.3A2 2 0 0 1 16.65 20H7.35a2 2 0 0 1-1.95-1.7L3 6z" /><path d="M8 6L12 2l4 4" /></svg>;
+    if (iconType === 'cash') return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="2" ry="2" /><circle cx="12" cy="12" r="2" /><path d="M6 12h.01M18 12h.01" /></svg>;
     if (iconType === 'truck') return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1" ry="1" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>;
     if (iconType === 'whatsapp') return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" /></svg>;
     if (iconType === 'arrow-right') return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></svg>;
@@ -1073,594 +1073,594 @@ const PreviewDisplay = memo(({
                                 borderRadius: (formStyles?.borderRadius || borderRadius) + 'px',
                                 ...(modalStyle === 'glassmorphism' ? { backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.3)', boxShadow: formStyles?.shadow ? '0 8px 32px rgba(0,0,0,0.1)' : 'none' } : modalStyle === 'minimal' ? { border: '1px solid #e5e7eb', boxShadow: 'none' } : { boxShadow: formStyles?.shadow ? '0 10px 25px rgba(0,0,0,0.1)' : 'none' }),
                             }}>
-                            {/* Product Info - horizontal layout matching storefront mobile */}
-                            {activeTab !== 'button' && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingBottom: '12px', borderBottom: '1px solid rgba(0,0,0,0.08)', marginBottom: '8px', position: 'relative' }}>
-                                    {showProductImage && (
-                                        <div style={{ position: 'relative', flexShrink: 0 }}>
-                                            <img
-                                                src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRfEiGMrC1y0OMGHknT1nakNKz7HWAgTAl3LQ&s?w=200&h=200&fit=crop&crop=center"
-                                                alt="Sample Product"
-                                                style={{ width: '55px', height: '55px', objectFit: 'cover', borderRadius: '8px' }}
-                                            />
-                                            {/* Quantity badge - black circle with "1" */}
-                                            <div style={{
-                                                position: 'absolute',
-                                                top: '-6px',
-                                                right: '-6px',
-                                                width: '20px',
-                                                height: '20px',
-                                                background: '#000000',
-                                                borderRadius: '50%',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                fontSize: '11px',
-                                                fontWeight: 600,
-                                                color: '#ffffff',
-                                                border: '2px solid #ffffff'
-                                            }}>1</div>
-                                        </div>
-                                    )}
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                        <div style={{ fontSize: '14px', fontWeight: 650, color: '#1f2937', lineHeight: 1.3, marginBottom: '2px' }}>Sample Product</div>
-                                        {showPrice && (
-                                            <div style={{ fontSize: '14px', fontWeight: 650, color: formStyles?.priceColor || '#111827' }}>{fmtCurrency(299.99)}</div>
+                                {/* Product Info - horizontal layout matching storefront mobile */}
+                                {activeTab !== 'button' && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingBottom: '12px', borderBottom: '1px solid rgba(0,0,0,0.08)', marginBottom: '8px', position: 'relative' }}>
+                                        {showProductImage && (
+                                            <div style={{ position: 'relative', flexShrink: 0 }}>
+                                                <img
+                                                    src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRfEiGMrC1y0OMGHknT1nakNKz7HWAgTAl3LQ&s?w=200&h=200&fit=crop&crop=center"
+                                                    alt="Sample Product"
+                                                    style={{ width: '55px', height: '55px', objectFit: 'cover', borderRadius: '8px' }}
+                                                />
+                                                {/* Quantity badge - black circle with "1" */}
+                                                <div style={{
+                                                    position: 'absolute',
+                                                    top: '-6px',
+                                                    right: '-6px',
+                                                    width: '20px',
+                                                    height: '20px',
+                                                    background: '#000000',
+                                                    borderRadius: '50%',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    fontSize: '11px',
+                                                    fontWeight: 600,
+                                                    color: '#ffffff',
+                                                    border: '2px solid #ffffff'
+                                                }}>1</div>
+                                            </div>
                                         )}
-                                    </div>
-                                    {/* Quantity selector - pill shape like storefront */}
-                                    <div style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid #d1d5db', borderRadius: '999px', overflow: 'hidden', background: '#fff', flexShrink: 0 }}>
-                                        <div style={{ width: '28px', height: '28px', background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 500, color: '#6b7280', cursor: 'default' }}>−</div>
-                                        <div style={{ width: '28px', height: '28px', borderLeft: '1px solid #e5e7eb', borderRight: '1px solid #e5e7eb', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 600, color: '#1f2937', fontFamily: "'Inter', sans-serif" }}>1</div>
-                                        <div style={{ width: '28px', height: '28px', background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 500, color: '#6b7280', cursor: 'default' }}>+</div>
-                                    </div>
-                                </div>
-                            )}
-                            {/* Only show Order button in Button tab */}
-                            {activeTab === 'button' && (
-                                <>
-                                    <style dangerouslySetInnerHTML={{ __html: getPreviewKeyframesCSS() }} />
-                                    <button
-                                        className={getButtonAnimationClasses()}
-                                        style={{ ...getButtonStyle(), ...getButtonAnimationStyle(), maxWidth: '200px', width: '100%', position: 'relative', '--btn-border-color': buttonStylesState?.borderColor || primaryColor || '#6366f1' } as any}
-                                    >
-                                        {buttonStylesState?.borderEffect === 'dashed-moving' && (
-                                            <svg className="marching-ants-svg" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }}>
-                                                <rect x="1" y="1" style={{ width: 'calc(100% - 2px)', height: 'calc(100% - 2px)', fill: 'none', stroke: buttonStylesState?.borderColor || primaryColor || '#6366f1', strokeWidth: 2, strokeDasharray: '8 4', animation: 'border-dash 0.6s linear infinite' }} rx={buttonStylesState?.borderRadius ?? 12} ry={buttonStylesState?.borderRadius ?? 12} />
-                                            </svg>
-                                        )}
-                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
-                                            {buttonStylesState?.iconType && buttonStylesState.iconType !== 'none' && buttonStylesState.iconPosition !== 'right' && (
-                                                <ButtonIconSvg iconType={buttonStylesState.iconType} />
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={{ fontSize: '14px', fontWeight: 650, color: '#1f2937', lineHeight: 1.3, marginBottom: '2px' }}>Sample Product</div>
+                                            {showPrice && (
+                                                <div style={{ fontSize: '14px', fontWeight: 650, color: formStyles?.priceColor || '#111827' }}>{fmtCurrency(299.99)}</div>
                                             )}
-                                            <span>{buttonText || 'Buy with COD'}</span>
-                                            {buttonStylesState?.iconType && buttonStylesState.iconType !== 'none' && buttonStylesState.iconPosition === 'right' && (
-                                                <ButtonIconSvg iconType={buttonStylesState.iconType} />
+                                        </div>
+                                        {/* Quantity selector - pill shape like storefront */}
+                                        <div style={{ display: 'inline-flex', alignItems: 'center', border: '1px solid #d1d5db', borderRadius: '999px', overflow: 'hidden', background: '#fff', flexShrink: 0 }}>
+                                            <div style={{ width: '28px', height: '28px', background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 500, color: '#6b7280', cursor: 'default' }}>−</div>
+                                            <div style={{ width: '28px', height: '28px', borderLeft: '1px solid #e5e7eb', borderRight: '1px solid #e5e7eb', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 600, color: '#1f2937', fontFamily: "'Inter', sans-serif" }}>1</div>
+                                            <div style={{ width: '28px', height: '28px', background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 500, color: '#6b7280', cursor: 'default' }}>+</div>
+                                        </div>
+                                    </div>
+                                )}
+                                {/* Only show Order button in Button tab */}
+                                {activeTab === 'button' && (
+                                    <>
+                                        <style dangerouslySetInnerHTML={{ __html: getPreviewKeyframesCSS() }} />
+                                        <button
+                                            className={getButtonAnimationClasses()}
+                                            style={{ ...getButtonStyle(), ...getButtonAnimationStyle(), maxWidth: '200px', width: '100%', position: 'relative', '--btn-border-color': buttonStylesState?.borderColor || primaryColor || '#6366f1' } as any}
+                                        >
+                                            {buttonStylesState?.borderEffect === 'dashed-moving' && (
+                                                <svg className="marching-ants-svg" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }}>
+                                                    <rect x="1" y="1" style={{ width: 'calc(100% - 2px)', height: 'calc(100% - 2px)', fill: 'none', stroke: buttonStylesState?.borderColor || primaryColor || '#6366f1', strokeWidth: 2, strokeDasharray: '8 4', animation: 'border-dash 0.6s linear infinite' }} rx={buttonStylesState?.borderRadius ?? 12} ry={buttonStylesState?.borderRadius ?? 12} />
+                                                </svg>
                                             )}
-                                        </span>
-                                    </button>
-                                </>
-                            )}
-                            {/* Only show form when NOT on button tab */}
-                            {activeTab !== 'button' && (
-                                <div className="preview-modal" style={{ ...getModalStyle(), marginTop: '0', background: 'transparent', boxShadow: 'none', border: 'none', backdropFilter: 'none', padding: '0 0 16px 0' }}>
-                                    <div className="preview-modal-title" style={{
-                                        fontWeight: 700,
-                                        fontSize: '16px',
-                                        marginBottom: '6px',
-                                        color: formStyles?.textColor || '#111',
-                                        textAlign: 'center',
-                                        fontFamily: formStyles?.fontFamily || 'Inter'
-                                    }}>
-                                        {formTitle || 'Cash on Delivery'}
-                                    </div>
-                                    <div className="preview-modal-subtitle" style={{
-                                        fontSize: '12px',
-                                        color: '#36383dff',
-                                        marginBottom: '16px',
-                                        textAlign: 'center',
-                                        lineHeight: '1.4',
-                                        fontFamily: formStyles?.fontFamily || 'Inter'
-                                    }}>
-                                        {formSubtitle || 'Fill in your details to place a COD order'}
-                                    </div>
-                                    <div className="cod-trust-badge-band" style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'space-between',
-                                        flexWrap: 'nowrap',
-                                        backgroundColor: '#EBF8EE',
-                                        borderRadius: '8px',
-                                        padding: '6px 8px',
-                                        margin: '12px 0 16px 0',
-                                        gap: '4px',
-                                        fontFamily: formStyles?.fontFamily || 'Inter',
-                                        fontSize: 'clamp(5.8px, 1.4vw, 7.8px)',
-                                        fontWeight: 600,
-                                        color: '#000000',
-                                        border: '1px solid #d1fae5',
-                                        whiteSpace: 'nowrap',
-                                        overflow: 'hidden',
-                                        boxSizing: 'border-box',
-                                        letterSpacing: '-0.1px'
-                                    }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '2px', whiteSpace: 'nowrap' }}>
-                                            <svg width="8.5" height="8.5" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 11 2 2 4-4"></path></svg>
-                                            <span style={{ color: '#000000', marginLeft: '2px' }}>100% Secure Order</span>
+                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
+                                                {buttonStylesState?.iconType && buttonStylesState.iconType !== 'none' && buttonStylesState.iconPosition !== 'right' && (
+                                                    <ButtonIconSvg iconType={buttonStylesState.iconType} />
+                                                )}
+                                                <span>{buttonText || 'Buy with COD'}</span>
+                                                {buttonStylesState?.iconType && buttonStylesState.iconType !== 'none' && buttonStylesState.iconPosition === 'right' && (
+                                                    <ButtonIconSvg iconType={buttonStylesState.iconType} />
+                                                )}
+                                            </span>
+                                        </button>
+                                    </>
+                                )}
+                                {/* Only show form when NOT on button tab */}
+                                {activeTab !== 'button' && (
+                                    <div className="preview-modal" style={{ ...getModalStyle(), marginTop: '0', background: 'transparent', boxShadow: 'none', border: 'none', backdropFilter: 'none', padding: '0 0 16px 0' }}>
+                                        <div className="preview-modal-title" style={{
+                                            fontWeight: 700,
+                                            fontSize: '16px',
+                                            marginBottom: '6px',
+                                            color: formStyles?.textColor || '#111',
+                                            textAlign: 'center',
+                                            fontFamily: formStyles?.fontFamily || 'Inter'
+                                        }}>
+                                            {formTitle || 'Cash on Delivery'}
                                         </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '2px', whiteSpace: 'nowrap' }}>
-                                            <svg width="8.5" height="8.5" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
-                                            <span style={{ color: '#000000', marginLeft: '2px' }}>Instant Confirmation</span>
+                                        <div className="preview-modal-subtitle" style={{
+                                            fontSize: '12px',
+                                            color: '#36383dff',
+                                            marginBottom: '16px',
+                                            textAlign: 'center',
+                                            lineHeight: '1.4',
+                                            fontFamily: formStyles?.fontFamily || 'Inter'
+                                        }}>
+                                            {formSubtitle || 'Fill in your details to place a COD order'}
                                         </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '2px', whiteSpace: 'nowrap' }}>
-                                            <svg width="8.5" height="8.5" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
-                                            <span style={{ color: '#000000', marginLeft: '2px' }}>Free Shipping</span>
+                                        <div className="cod-trust-badge-band" style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            flexWrap: 'nowrap',
+                                            backgroundColor: '#EBF8EE',
+                                            borderRadius: '8px',
+                                            padding: '6px 8px',
+                                            margin: '12px 0 16px 0',
+                                            gap: '4px',
+                                            fontFamily: formStyles?.fontFamily || 'Inter',
+                                            fontSize: 'clamp(5.8px, 1.4vw, 7.8px)',
+                                            fontWeight: 600,
+                                            color: '#000000',
+                                            border: '1px solid #d1fae5',
+                                            whiteSpace: 'nowrap',
+                                            overflow: 'hidden',
+                                            boxSizing: 'border-box',
+                                            letterSpacing: '-0.1px'
+                                        }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '2px', whiteSpace: 'nowrap' }}>
+                                                <svg width="8.5" height="8.5" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 11 2 2 4-4"></path></svg>
+                                                <span style={{ color: '#000000', marginLeft: '2px' }}>100% Secure Order</span>
+                                            </div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '2px', whiteSpace: 'nowrap' }}>
+                                                <svg width="8.5" height="8.5" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                                                <span style={{ color: '#000000', marginLeft: '2px' }}>Instant Confirmation</span>
+                                            </div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '2px', whiteSpace: 'nowrap' }}>
+                                                <svg width="8.5" height="8.5" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+                                                <span style={{ color: '#000000', marginLeft: '2px' }}>Free Shipping</span>
+                                            </div>
                                         </div>
-                                    </div>
 
-                                    {/* Dynamic Fields based on visibility and drag-drop order */}
-                                    {visibleFields.map((field: FormField) => {
-                                        const fsAny: any = formStyles || {};
-                                        const themeKey = fsAny.themeKey || 'custom';
-                                        let formThemeColor = primaryColor;
-                                        if (themeKey === 'modern_slate') formThemeColor = '#ea580c';
-                                        else if (themeKey === 'dark_mode') formThemeColor = '#6366f1';
-                                        else if (themeKey === 'eastern_gold') formThemeColor = '#b45309';
-                                        else if (themeKey === 'arctic_blue') formThemeColor = '#0891b2';
-                                        else if (themeKey === 'rose_garden') formThemeColor = '#e11d48';
-                                        else if (themeKey === 'midnight_purple') formThemeColor = '#7c3aed';
-                                        else if (themeKey === 'forest_green') formThemeColor = '#16a34a';
-                                        else if (themeKey === 'professional') formThemeColor = '#374151';
-                                        else if (themeKey === 'minimal_white') formThemeColor = '#111827';
-                                        else if (themeKey === 'luxury_gold') formThemeColor = '#d97706';
-                                        else if (themeKey === 'ocean_breeze') formThemeColor = '#14b8a6';
-                                        else if (themeKey === 'default') formThemeColor = '#000000';
-
-                                        // Shipping section field
-                                        if (field.id === 'shipping') {
-                                            const hasNewRates = shippingRatesEnabled && shippingRates?.length > 0;
-                                            const hasOldRates = shippingOpts?.enabled && (!shippingRatesEnabled || !shippingRates?.length);
-                                            if (!hasNewRates && !hasOldRates) return null;
-                                            return (
-                                                <div key={field.id} style={{ marginBottom: '12px', marginTop: '12px' }}>
-                                                    <div style={{ fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
-                                                        Shipping Method
-                                                    </div>
-                                                    {hasNewRates ? (
-                                                        shippingRates.filter((r: any) => r.is_active).slice(0, 3).map((rate: any, idx: number) => (
-                                                            <div key={rate.id} style={{
-                                                                display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px',
-                                                                border: idx === 0 ? `2px solid ${formThemeColor}` : '2px solid #e5e7eb',
-                                                                borderRadius: '10px',
-                                                                background: idx === 0 ? `${formThemeColor}08` : '#fff',
-                                                                boxShadow: idx === 0 ? `0 0 0 1px ${formThemeColor}, 0 0 0 4px ${formThemeColor}33` : 'none',
-                                                                marginBottom: '6px', cursor: 'default'
-                                                            }}>
-                                                                {/* Icon pill */}
-                                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '30px', height: '30px', borderRadius: '7px', color: (formStyles as any)?.iconColor || '#6b7280', backgroundColor: `${formThemeColor}14` }}>
-                                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
-                                                                </div>
-                                                                {/* Center: name + description */}
-                                                                <div style={{ flex: 1, minWidth: 0 }}>
-                                                                    <div style={{ fontWeight: 600, fontSize: '12px', color: '#1f2937', marginBottom: '1px', lineHeight: 1.3 }}>{rate.name}</div>
-                                                                    {rate.description && (
-                                                                        <div style={{ fontSize: '10px', color: '#6b7280', display: 'flex', alignItems: 'center', gap: '3px', lineHeight: 1.4 }}>
-                                                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
-                                                                            {rate.description}
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                                {/* Right: price + radio pill */}
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                                                                    {rate.price === 0 ? (
-                                                                        <span style={{ background: '#10b981', color: 'white', padding: '3px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 600 }}>FREE</span>
-                                                                    ) : (
-                                                                        <span style={{ fontWeight: 700, fontSize: '12px', color: '#1f2937' }}>{fmtCurrency(rate.price)}</span>
-                                                                    )}
-                                                                    <input type="radio" name="shipping-preview" disabled checked={idx === 0} style={{ width: '14px', height: '14px', accentColor: formThemeColor, flexShrink: 0, margin: 0 }} />
-                                                                </div>
-                                                            </div>
-                                                        ))
-                                                    ) : (
-                                                        shippingOpts.options?.slice(0, 2).map((opt: any) => (
-                                                            <div key={opt.id} style={{
-                                                                display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px',
-                                                                border: opt.id === shippingOpts.defaultOption ? `2px solid ${formThemeColor}` : '2px solid #e5e7eb',
-                                                                borderRadius: '10px',
-                                                                background: opt.id === shippingOpts.defaultOption ? `${formThemeColor}08` : '#fff',
-                                                                boxShadow: opt.id === shippingOpts.defaultOption ? `0 0 0 1px ${formThemeColor}, 0 0 0 4px ${formThemeColor}33` : 'none',
-                                                                marginBottom: '6px', cursor: 'default'
-                                                            }}>
-                                                                {/* Icon pill */}
-                                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '30px', height: '30px', borderRadius: '7px', color: (formStyles as any)?.iconColor || '#6b7280', backgroundColor: `${formThemeColor}14` }}>
-                                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
-                                                                </div>
-                                                                {/* Center */}
-                                                                <div style={{ flex: 1, minWidth: 0 }}>
-                                                                    <div style={{ fontWeight: 600, fontSize: '12px', color: '#1f2937', lineHeight: 1.3 }}>{opt.label}</div>
-                                                                </div>
-                                                                {/* Right: price + radio pill */}
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                                                                    {opt.price === 0 ? (
-                                                                        <span style={{ background: '#10b981', color: 'white', padding: '3px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 600 }}>Free</span>
-                                                                    ) : (
-                                                                        <span style={{ fontWeight: 700, fontSize: '12px', color: '#1f2937' }}>{fmtCurrency(opt.price)}</span>
-                                                                    )}
-                                                                    <input type="radio" name="shipping-preview" disabled checked={opt.id === shippingOpts.defaultOption} style={{ width: '14px', height: '14px', accentColor: formThemeColor, flexShrink: 0, margin: 0 }} />
-                                                                </div>
-                                                            </div>
-                                                        ))
-                                                    )}
-                                                </div>
-                                            );
-                                        }
-
-                                        // Order Summary section field (preview)
-                                        if (field.id === 'order_summary') {
+                                        {/* Dynamic Fields based on visibility and drag-drop order */}
+                                        {visibleFields.map((field: FormField) => {
                                             const fsAny: any = formStyles || {};
                                             const themeKey = fsAny.themeKey || 'custom';
-                                            const isPresetTheme = themeKey && themeKey !== 'custom';
-                                            const formBackgroundColor = fsAny.backgroundColor || '#ffffff';
+                                            let formThemeColor = primaryColor;
+                                            if (themeKey === 'modern_slate') formThemeColor = '#ea580c';
+                                            else if (themeKey === 'dark_mode') formThemeColor = '#6366f1';
+                                            else if (themeKey === 'eastern_gold') formThemeColor = '#b45309';
+                                            else if (themeKey === 'arctic_blue') formThemeColor = '#0891b2';
+                                            else if (themeKey === 'rose_garden') formThemeColor = '#e11d48';
+                                            else if (themeKey === 'midnight_purple') formThemeColor = '#7c3aed';
+                                            else if (themeKey === 'forest_green') formThemeColor = '#16a34a';
+                                            else if (themeKey === 'professional') formThemeColor = '#374151';
+                                            else if (themeKey === 'minimal_white') formThemeColor = '#111827';
+                                            else if (themeKey === 'luxury_gold') formThemeColor = '#d97706';
+                                            else if (themeKey === 'ocean_breeze') formThemeColor = '#14b8a6';
+                                            else if (themeKey === 'default') formThemeColor = '#000000';
 
-                                            const customGreyBg = '#f3f4f6';
-                                            const customBorder = '1px solid #e5e7eb';
-
-                                            // Replicate darkenColor logic from cod-form.js
-                                            const darkenColor = (hex: string, percent: number) => {
-                                                if (!hex) return null;
-                                                hex = hex.replace('#', '');
-                                                if (hex.length === 3) {
-                                                    hex = hex.split('').map(c => c + c).join('');
-                                                }
-                                                // Default to #ffffff if invalid
-                                                if (hex.length !== 6) hex = 'ffffff';
-
-                                                let r = parseInt(hex.substring(0, 2), 16);
-                                                let g = parseInt(hex.substring(2, 4), 16);
-                                                let b = parseInt(hex.substring(4, 6), 16);
-
-                                                if (isNaN(r) || isNaN(g) || isNaN(b)) return null;
-
-                                                r = Math.max(0, Math.floor(r * (1 - percent)));
-                                                g = Math.max(0, Math.floor(g * (1 - percent)));
-                                                b = Math.max(0, Math.floor(b * (1 - percent)));
-
-                                                return `rgb(${r}, ${g}, ${b})`;
-                                            };
-
-                                            let presetBg;
-                                            if (themeKey === 'default' || themeKey === 'professional') {
-                                                presetBg = 'rgb(243, 244, 246)';
-                                            } else {
-                                                presetBg = darkenColor(formBackgroundColor, 0.06) || '#f3f4f6';
+                                            // Shipping section field
+                                            if (field.id === 'shipping') {
+                                                const hasNewRates = shippingRatesEnabled && shippingRates?.length > 0;
+                                                const hasOldRates = shippingOpts?.enabled && (!shippingRatesEnabled || !shippingRates?.length);
+                                                if (!hasNewRates && !hasOldRates) return null;
+                                                return (
+                                                    <div key={field.id} style={{ marginBottom: '12px', marginTop: '12px' }}>
+                                                        <div style={{ fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
+                                                            Shipping Method
+                                                        </div>
+                                                        {hasNewRates ? (
+                                                            shippingRates.filter((r: any) => r.is_active).slice(0, 3).map((rate: any, idx: number) => (
+                                                                <div key={rate.id} style={{
+                                                                    display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px',
+                                                                    border: idx === 0 ? `2px solid ${formThemeColor}` : '2px solid #e5e7eb',
+                                                                    borderRadius: '10px',
+                                                                    background: idx === 0 ? `${formThemeColor}08` : '#fff',
+                                                                    boxShadow: idx === 0 ? `0 0 0 1px ${formThemeColor}, 0 0 0 4px ${formThemeColor}33` : 'none',
+                                                                    marginBottom: '6px', cursor: 'default'
+                                                                }}>
+                                                                    {/* Icon pill */}
+                                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '30px', height: '30px', borderRadius: '7px', color: (formStyles as any)?.iconColor || '#6b7280', backgroundColor: `${formThemeColor}14` }}>
+                                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
+                                                                    </div>
+                                                                    {/* Center: name + description */}
+                                                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                                                        <div style={{ fontWeight: 600, fontSize: '12px', color: '#1f2937', marginBottom: '1px', lineHeight: 1.3 }}>{rate.name}</div>
+                                                                        {rate.description && (
+                                                                            <div style={{ fontSize: '10px', color: '#6b7280', display: 'flex', alignItems: 'center', gap: '3px', lineHeight: 1.4 }}>
+                                                                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+                                                                                {rate.description}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                    {/* Right: price + radio pill */}
+                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                                                                        {rate.price === 0 ? (
+                                                                            <span style={{ background: '#10b981', color: 'white', padding: '3px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 600 }}>FREE</span>
+                                                                        ) : (
+                                                                            <span style={{ fontWeight: 700, fontSize: '12px', color: '#1f2937' }}>{fmtCurrency(rate.price)}</span>
+                                                                        )}
+                                                                        <input type="radio" name="shipping-preview" disabled checked={idx === 0} style={{ width: '14px', height: '14px', accentColor: formThemeColor, flexShrink: 0, margin: 0 }} />
+                                                                    </div>
+                                                                </div>
+                                                            ))
+                                                        ) : (
+                                                            shippingOpts.options?.slice(0, 2).map((opt: any) => (
+                                                                <div key={opt.id} style={{
+                                                                    display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px',
+                                                                    border: opt.id === shippingOpts.defaultOption ? `2px solid ${formThemeColor}` : '2px solid #e5e7eb',
+                                                                    borderRadius: '10px',
+                                                                    background: opt.id === shippingOpts.defaultOption ? `${formThemeColor}08` : '#fff',
+                                                                    boxShadow: opt.id === shippingOpts.defaultOption ? `0 0 0 1px ${formThemeColor}, 0 0 0 4px ${formThemeColor}33` : 'none',
+                                                                    marginBottom: '6px', cursor: 'default'
+                                                                }}>
+                                                                    {/* Icon pill */}
+                                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '30px', height: '30px', borderRadius: '7px', color: (formStyles as any)?.iconColor || '#6b7280', backgroundColor: `${formThemeColor}14` }}>
+                                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
+                                                                    </div>
+                                                                    {/* Center */}
+                                                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                                                        <div style={{ fontWeight: 600, fontSize: '12px', color: '#1f2937', lineHeight: 1.3 }}>{opt.label}</div>
+                                                                    </div>
+                                                                    {/* Right: price + radio pill */}
+                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                                                                        {opt.price === 0 ? (
+                                                                            <span style={{ background: '#10b981', color: 'white', padding: '3px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 600 }}>Free</span>
+                                                                        ) : (
+                                                                            <span style={{ fontWeight: 700, fontSize: '12px', color: '#1f2937' }}>{fmtCurrency(opt.price)}</span>
+                                                                        )}
+                                                                        <input type="radio" name="shipping-preview" disabled checked={opt.id === shippingOpts.defaultOption} style={{ width: '14px', height: '14px', accentColor: formThemeColor, flexShrink: 0, margin: 0 }} />
+                                                                    </div>
+                                                                </div>
+                                                            ))
+                                                        )}
+                                                    </div>
+                                                );
                                             }
 
-                                            const cardStyle: React.CSSProperties = {
-                                                background: isPresetTheme ? presetBg : (darkenColor(formBackgroundColor, 0.08) || customGreyBg),
-                                                borderRadius: 14,
-                                                padding: 12,
-                                                marginTop: 16,
-                                                border: isPresetTheme ? (themeKey === 'default' ? customBorder : 'none') : customBorder,
-                                                boxShadow: "0 6px 18px rgba(0,0,0,0.06)"
-                                            };
+                                            // Order Summary section field (preview)
+                                            if (field.id === 'order_summary') {
+                                                const fsAny: any = formStyles || {};
+                                                const themeKey = fsAny.themeKey || 'custom';
+                                                const isPresetTheme = themeKey && themeKey !== 'custom';
+                                                const formBackgroundColor = fsAny.backgroundColor || '#ffffff';
 
-                                            const priceColor = fsAny.priceColor || primaryColor || '#111827';
+                                                const customGreyBg = '#f3f4f6';
+                                                const customBorder = '1px solid #e5e7eb';
 
-                                            return (
-                                                <div key={field.id} style={cardStyle}>
-                                                    <div style={{ fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                        Order Summary
-                                                    </div>
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280', marginBottom: '6px' }}>
-                                                        <span>Subtotal</span><span>{fmtCurrency(subtotal)}</span>
-                                                    </div>
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#10b981', marginBottom: '6px' }}>
-                                                        <span>Discount</span><span>-{fmtCurrency(discount)}</span>
-                                                    </div>
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280', marginBottom: '8px' }}>
-                                                        <span>Shipping</span><span>{shippingCost === 0 ? 'FREE' : fmtCurrency(shippingCost)}</span>
-                                                    </div>
-                                                    <div style={{
-                                                        display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 700,
-                                                        color: '#111827', paddingTop: '8px', borderTop: '1px dashed #d1d5db'
-                                                    }}>
-                                                        <span>Total</span><span style={{ color: priceColor }}>{fmtCurrency(total)}</span>
-                                                    </div>
-                                                </div>
-                                            );
-                                        }
+                                                // Replicate darkenColor logic from cod-form.js
+                                                const darkenColor = (hex: string, percent: number) => {
+                                                    if (!hex) return null;
+                                                    hex = hex.replace('#', '');
+                                                    if (hex.length === 3) {
+                                                        hex = hex.split('').map(c => c + c).join('');
+                                                    }
+                                                    // Default to #ffffff if invalid
+                                                    if (hex.length !== 6) hex = 'ffffff';
 
-                                        // Payment Mode section field
-                                        if (field.id === 'payment_mode') {
-                                            const showFullPrepaid = formStyles?.fullPrepaidEnabled;
-                                            const showPartial = partialCodEnabled;
-                                            const remainingCod = Math.max(0, total - (partialCodAdvanceAmount || 0));
-                                            
-                                            return (
-                                                <div key={field.id} style={{ marginBottom: '16px', marginTop: '16px' }}>
-                                                    {/* Header */}
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                                        <div style={{ fontSize: '11px', fontWeight: 700, color: '#1f2937' }}>
-                                                            Choose Payment Option
+                                                    let r = parseInt(hex.substring(0, 2), 16);
+                                                    let g = parseInt(hex.substring(2, 4), 16);
+                                                    let b = parseInt(hex.substring(4, 6), 16);
+
+                                                    if (isNaN(r) || isNaN(g) || isNaN(b)) return null;
+
+                                                    r = Math.max(0, Math.floor(r * (1 - percent)));
+                                                    g = Math.max(0, Math.floor(g * (1 - percent)));
+                                                    b = Math.max(0, Math.floor(b * (1 - percent)));
+
+                                                    return `rgb(${r}, ${g}, ${b})`;
+                                                };
+
+                                                let presetBg;
+                                                if (themeKey === 'default' || themeKey === 'professional') {
+                                                    presetBg = 'rgb(243, 244, 246)';
+                                                } else {
+                                                    presetBg = darkenColor(formBackgroundColor, 0.06) || '#f3f4f6';
+                                                }
+
+                                                const cardStyle: React.CSSProperties = {
+                                                    background: isPresetTheme ? presetBg : (darkenColor(formBackgroundColor, 0.08) || customGreyBg),
+                                                    borderRadius: 14,
+                                                    padding: 12,
+                                                    marginTop: 16,
+                                                    border: isPresetTheme ? (themeKey === 'default' ? customBorder : 'none') : customBorder,
+                                                    boxShadow: "0 6px 18px rgba(0,0,0,0.06)"
+                                                };
+
+                                                const priceColor = fsAny.priceColor || primaryColor || '#111827';
+
+                                                return (
+                                                    <div key={field.id} style={cardStyle}>
+                                                        <div style={{ fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                            Order Summary
                                                         </div>
-                                                        <div style={{ background: '#dcfce7', color: '#166534', fontSize: '8.5px', fontWeight: 600, padding: '3px 6px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                                            🔥 Save more on prepaid!
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280', marginBottom: '6px' }}>
+                                                            <span>Subtotal</span><span>{fmtCurrency(subtotal)}</span>
+                                                        </div>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#10b981', marginBottom: '6px' }}>
+                                                            <span>Discount</span><span>-{fmtCurrency(discount)}</span>
+                                                        </div>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280', marginBottom: '8px' }}>
+                                                            <span>Shipping</span><span>{shippingCost === 0 ? 'FREE' : fmtCurrency(shippingCost)}</span>
+                                                        </div>
+                                                        <div style={{
+                                                            display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 700,
+                                                            color: '#111827', paddingTop: '8px', borderTop: '1px dashed #d1d5db'
+                                                        }}>
+                                                            <span>Total</span><span style={{ color: priceColor }}>{fmtCurrency(total)}</span>
                                                         </div>
                                                     </div>
+                                                );
+                                            }
 
-                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                                        {/* 1. Full Prepaid (Visual Only) */}
-                                                        {showFullPrepaid && (
-                                                            <label style={{
-                                                                display: 'flex', flexDirection: 'column', background: '#f0fdf4', borderRadius: '10px',
-                                                                border: '2px solid #22c55e', cursor: 'pointer', position: 'relative', overflow: 'visible',
-                                                                padding: '18px 10px 8px 10px', opacity: 1
-                                                            }}>
-                                                                {/* Most Popular Badge */}
-                                                                <div style={{
-                                                                    position: 'absolute', top: '-10px', left: '12px', background: '#22c55e', color: 'white',
-                                                                    fontSize: '7.5px', fontWeight: 700, padding: '2px 5px', borderRadius: '4px', letterSpacing: '0.05em',
-                                                                    display: 'flex', alignItems: 'center', gap: '3px', textTransform: 'uppercase'
+                                            // Payment Mode section field
+                                            if (field.id === 'payment_mode') {
+                                                const showFullPrepaid = formStyles?.fullPrepaidEnabled;
+                                                const showPartial = partialCodEnabled;
+                                                const remainingCod = Math.max(0, total - (partialCodAdvanceAmount || 0));
+
+                                                return (
+                                                    <div key={field.id} style={{ marginBottom: '16px', marginTop: '16px' }}>
+                                                        {/* Header */}
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                                            <div style={{ fontSize: '11px', fontWeight: 700, color: '#1f2937' }}>
+                                                                Choose Payment Option
+                                                            </div>
+                                                            <div style={{ background: '#dcfce7', color: '#166534', fontSize: '8.5px', fontWeight: 600, padding: '3px 6px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                                                🔥 Save more on prepaid!
+                                                            </div>
+                                                        </div>
+
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                            {/* 1. Full Prepaid (Visual Only) */}
+                                                            {showFullPrepaid && (
+                                                                <label style={{
+                                                                    display: 'flex', flexDirection: 'column', background: '#f0fdf4', borderRadius: '10px',
+                                                                    border: '2px solid #22c55e', cursor: 'pointer', position: 'relative', overflow: 'visible',
+                                                                    padding: '18px 10px 8px 10px', opacity: 1
                                                                 }}>
-                                                                    ★ MOST POPULAR
-                                                                </div>
+                                                                    {/* Most Popular Badge */}
+                                                                    <div style={{
+                                                                        position: 'absolute', top: '-10px', left: '12px', background: '#22c55e', color: 'white',
+                                                                        fontSize: '7.5px', fontWeight: 700, padding: '2px 5px', borderRadius: '4px', letterSpacing: '0.05em',
+                                                                        display: 'flex', alignItems: 'center', gap: '3px', textTransform: 'uppercase'
+                                                                    }}>
+                                                                        ★ MOST POPULAR
+                                                                    </div>
 
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                                    {/* Icon */}
-                                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '24px', height: '24px', borderRadius: '6px', color: '#16a34a', backgroundColor: '#dcfce7' }}>
-                                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4" /><path d="M4 6v12c0 1.1.9 2 2 2h14v-4" /><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z" /></svg>
-                                                                    </div>
-                                                                    
-                                                                    {/* Center text */}
-                                                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                                                        <div style={{ fontWeight: 700, fontSize: '11px', color: '#166534', lineHeight: 1.1 }}>Full Prepaid</div>
-                                                                        <div style={{ color: '#4ade80', fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>Pay now & get fastest delivery</div>
-                                                                    </div>
-                                                                    
-                                                                    {/* Right side pricing */}
-                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                                                                        <span style={{ fontWeight: 800, fontSize: '12px', color: '#166534' }}>{fmtCurrency(total)}</span>
-                                                                        <input type="radio" name="preview-payment" checked readOnly style={{ width: '14px', height: '14px', accentColor: '#22c55e', margin: 0, cursor: 'pointer' }} />
-                                                                    </div>
-                                                                </div>
-                                                            </label>
-                                                        )}
+                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                        {/* Icon */}
+                                                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '24px', height: '24px', borderRadius: '6px', color: '#16a34a', backgroundColor: '#dcfce7' }}>
+                                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4" /><path d="M4 6v12c0 1.1.9 2 2 2h14v-4" /><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z" /></svg>
+                                                                        </div>
 
-                                                        {/* 2. Partial Payment */}
-                                                        {showPartial && (
+                                                                        {/* Center text */}
+                                                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                                                            <div style={{ fontWeight: 700, fontSize: '11px', color: '#166534', lineHeight: 1.1 }}>Full Prepaid</div>
+                                                                            <div style={{ color: '#4ade80', fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>Pay now & get fastest delivery</div>
+                                                                        </div>
+
+                                                                        {/* Right side pricing */}
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                                                                            <span style={{ fontWeight: 800, fontSize: '12px', color: '#166534' }}>{fmtCurrency(total)}</span>
+                                                                            <input type="radio" name="preview-payment" checked readOnly style={{ width: '14px', height: '14px', accentColor: '#22c55e', margin: 0, cursor: 'pointer' }} />
+                                                                        </div>
+                                                                    </div>
+                                                                </label>
+                                                            )}
+
+                                                            {/* 2. Partial Payment */}
+                                                            {showPartial && (
+                                                                <label style={{
+                                                                    display: 'flex', flexDirection: 'column', background: '#eff6ff', borderRadius: '10px',
+                                                                    border: '2px solid #bfdbfe', cursor: 'default', position: 'relative'
+                                                                }}>
+                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px' }}>
+                                                                        {/* Icon */}
+                                                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '24px', height: '24px', borderRadius: '6px', color: '#2563eb', backgroundColor: '#dbeafe' }}>
+                                                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>
+                                                                        </div>
+
+                                                                        {/* Center text */}
+                                                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                                                            <div style={{ fontWeight: 700, fontSize: '11px', color: '#1e3a8a', lineHeight: 1.1, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                                                                Partial Payment
+                                                                                <svg width="10" height="10" viewBox="0 0 24 24" fill="#2563eb" stroke="#eff6ff" strokeWidth="2.5"><circle cx="12" cy="12" r="10" /><path d="M9 12l2 2 4-4" /></svg>
+                                                                            </div>
+                                                                            <div style={{ color: '#60a5fa', fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>Pay {fmtCurrency(partialCodAdvanceAmount || 0)} now • Rest on delivery</div>
+                                                                        </div>
+
+                                                                        {/* Right side pricing */}
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                                                                            <span style={{ fontWeight: 800, fontSize: '12px', color: '#1e3a8a' }}>{fmtCurrency(partialCodAdvanceAmount || 0)}</span>
+                                                                            <input type="radio" name="preview-payment" disabled style={{ width: '14px', height: '14px', margin: 0 }} />
+                                                                        </div>
+                                                                    </div>
+                                                                    {/* Info Bar */}
+                                                                    <div style={{ background: '#dbeafe', padding: '5px 8px', borderBottomLeftRadius: '8px', borderBottomRightRadius: '8px', fontSize: '8.5px', color: '#1e40af', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500 }}>
+                                                                        🛡️ Secure your order • Priority dispatch
+                                                                    </div>
+                                                                </label>
+                                                            )}
+
+                                                            {/* 3. Cash on Delivery */}
                                                             <label style={{
-                                                                display: 'flex', flexDirection: 'column', background: '#eff6ff', borderRadius: '10px',
-                                                                border: '2px solid #bfdbfe', cursor: 'default', position: 'relative'
+                                                                display: 'flex', flexDirection: 'column', background: '#fff7ed', borderRadius: '10px',
+                                                                border: '2px solid #fed7aa', cursor: 'default', position: 'relative'
                                                             }}>
                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px' }}>
                                                                     {/* Icon */}
-                                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '24px', height: '24px', borderRadius: '6px', color: '#2563eb', backgroundColor: '#dbeafe' }}>
-                                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>
+                                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '24px', height: '24px', borderRadius: '6px', color: '#ea580c', backgroundColor: '#ffedd5' }}>
+                                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1" ry="1" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
                                                                     </div>
-                                                                    
+
                                                                     {/* Center text */}
                                                                     <div style={{ flex: 1, minWidth: 0 }}>
-                                                                        <div style={{ fontWeight: 700, fontSize: '11px', color: '#1e3a8a', lineHeight: 1.1, display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                                                            Partial Payment
-                                                                            <svg width="10" height="10" viewBox="0 0 24 24" fill="#2563eb" stroke="#eff6ff" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/></svg>
-                                                                        </div>
-                                                                        <div style={{ color: '#60a5fa', fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>Pay {fmtCurrency(partialCodAdvanceAmount || 0)} now • Rest on delivery</div>
+                                                                        <div style={{ fontWeight: 700, fontSize: '11px', color: '#9a3412', lineHeight: 1.1 }}>Cash on Delivery</div>
+                                                                        <div style={{ color: '#fb923c', fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>Pay when you receive</div>
                                                                     </div>
-                                                                    
+
                                                                     {/* Right side pricing */}
                                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                                                                        <span style={{ fontWeight: 800, fontSize: '12px', color: '#1e3a8a' }}>{fmtCurrency(partialCodAdvanceAmount || 0)}</span>
+                                                                        <span style={{ fontWeight: 800, fontSize: '12px', color: '#9a3412' }}>{fmtCurrency(total)}</span>
                                                                         <input type="radio" name="preview-payment" disabled style={{ width: '14px', height: '14px', margin: 0 }} />
                                                                     </div>
                                                                 </div>
                                                                 {/* Info Bar */}
-                                                                <div style={{ background: '#dbeafe', padding: '5px 8px', borderBottomLeftRadius: '8px', borderBottomRightRadius: '8px', fontSize: '8.5px', color: '#1e40af', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500 }}>
-                                                                    🛡️ Secure your order • Priority dispatch
+                                                                <div style={{ background: '#ffedd5', padding: '5px 8px', borderBottomLeftRadius: '8px', borderBottomRightRadius: '8px', fontSize: '8.5px', color: '#9a3412', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500 }}>
+                                                                    ⚠️ Higher return risk • Slower processing
                                                                 </div>
                                                             </label>
-                                                        )}
-
-                                                        {/* 3. Cash on Delivery */}
-                                                        <label style={{
-                                                            display: 'flex', flexDirection: 'column', background: '#fff7ed', borderRadius: '10px',
-                                                            border: '2px solid #fed7aa', cursor: 'default', position: 'relative'
-                                                        }}>
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px' }}>
-                                                                {/* Icon */}
-                                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '24px', height: '24px', borderRadius: '6px', color: '#ea580c', backgroundColor: '#ffedd5' }}>
-                                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1" ry="1" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
-                                                                </div>
-                                                                
-                                                                {/* Center text */}
-                                                                <div style={{ flex: 1, minWidth: 0 }}>
-                                                                    <div style={{ fontWeight: 700, fontSize: '11px', color: '#9a3412', lineHeight: 1.1 }}>Cash on Delivery</div>
-                                                                    <div style={{ color: '#fb923c', fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>Pay when you receive</div>
-                                                                </div>
-                                                                
-                                                                {/* Right side pricing */}
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                                                                    <span style={{ fontWeight: 800, fontSize: '12px', color: '#9a3412' }}>{fmtCurrency(total)}</span>
-                                                                    <input type="radio" name="preview-payment" disabled style={{ width: '14px', height: '14px', margin: 0 }} />
-                                                                </div>
-                                                            </div>
-                                                            {/* Info Bar */}
-                                                            <div style={{ background: '#ffedd5', padding: '5px 8px', borderBottomLeftRadius: '8px', borderBottomRightRadius: '8px', fontSize: '8.5px', color: '#9a3412', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500 }}>
-                                                                ⚠️ Higher return risk • Slower processing
-                                                            </div>
-                                                        </label>
-                                                    </div>
-                                                </div>
-                                            );
-                                        }
-                                        if (field.id === 'marketing') {
-                                            return (
-                                                <div key={field.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', fontSize: '10px', color: '#6b7280' }}>
-                                                    <input type="checkbox" disabled style={{ width: '14px', height: '14px' }} />
-                                                    <span>Keep me updated with offers & news</span>
-                                                </div>
-                                            );
-                                        }
-
-                                        if (field.id === 'coupon') {
-                                            const couponRadius = Math.max((formStyles?.borderRadius || 12) + 3, 15);
-                                            const couponControlRadius = Math.max((formStyles?.borderRadius || 12) + 1, 13);
-                                            return (
-                                                <div key={field.id} style={{
-                                                    marginBottom: '12px',
-                                                    padding: '12px',
-                                                    borderRadius: `${couponRadius}px`,
-                                                    background: `linear-gradient(135deg, ${formThemeColor}12 0%, ${formStyles?.fieldBackgroundColor || '#ffffff'} 58%, ${formThemeColor}08 100%)`,
-                                                    border: `1px solid ${formThemeColor}33`,
-                                                    boxShadow: '0 10px 24px rgba(15,23,42,0.07), inset 0 1px 0 rgba(255,255,255,0.75)',
-                                                    position: 'relative',
-                                                    overflow: 'hidden'
-                                                }}>
-                                                    <div style={{
-                                                        position: 'absolute',
-                                                        inset: 0,
-                                                        background: `radial-gradient(circle at top right, ${formThemeColor}1f 0%, transparent 42%)`,
-                                                        pointerEvents: 'none'
-                                                    }} />
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                            <div style={{
-                                                                width: '40px',
-                                                                height: '40px',
-                                                                display: 'flex',
-                                                                alignItems: 'center',
-                                                                justifyContent: 'center',
-                                                                borderRadius: '12px',
-                                                                color: formThemeColor,
-                                                                background: `linear-gradient(135deg, ${formThemeColor}29 0%, rgba(255,255,255,0.82) 100%)`,
-                                                                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.85)'
-                                                            }}>
-                                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5A2.5 2.5 0 0 1 5.5 7H9l1.2-1.9a1 1 0 0 1 .84-.46H18.5A2.5 2.5 0 0 1 21 7v3a2 2 0 0 0 0 4v3a2.5 2.5 0 0 1-2.5 2.5H11a1 1 0 0 1-.84-.46L9 17H5.5A2.5 2.5 0 0 1 3 14.5v-5Z" /><path d="M14 7v10" /><path d="M14 10h.01" /><path d="M14 14h.01" /></svg>
-                                                            </div>
-                                                            <div>
-                                                                <label style={{ ...getLabelStyle(), marginBottom: 2, fontSize: `${Math.max((formStyles?.labelFontSize || formStyles?.textSize || 14), 15)}px` } as any}>Coupon Code</label>
-                                                                <div style={{ fontSize: '12px', lineHeight: 1.4, color: '#6b7280' }}>Apply your exclusive offer before placing the order</div>
-                                                            </div>
                                                         </div>
                                                     </div>
-                                                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '8px', alignItems: 'stretch' }}>
-                                                        <div style={{ position: 'relative', minWidth: 0 }}>
-                                                            <FieldIconSvg field={field} />
-                                                            <input
+                                                );
+                                            }
+                                            if (field.id === 'marketing') {
+                                                return (
+                                                    <div key={field.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', fontSize: '10px', color: '#6b7280' }}>
+                                                        <input type="checkbox" disabled style={{ width: '14px', height: '14px' }} />
+                                                        <span>Keep me updated with offers & news</span>
+                                                    </div>
+                                                );
+                                            }
+
+                                            if (field.id === 'coupon') {
+                                                const couponRadius = Math.max((formStyles?.borderRadius || 12) + 3, 15);
+                                                const couponControlRadius = Math.max((formStyles?.borderRadius || 12) + 1, 13);
+                                                return (
+                                                    <div key={field.id} style={{
+                                                        marginBottom: '12px',
+                                                        padding: '12px',
+                                                        borderRadius: `${couponRadius}px`,
+                                                        background: `linear-gradient(135deg, ${formThemeColor}12 0%, ${formStyles?.fieldBackgroundColor || '#ffffff'} 58%, ${formThemeColor}08 100%)`,
+                                                        border: `1px solid ${formThemeColor}33`,
+                                                        boxShadow: '0 10px 24px rgba(15,23,42,0.07), inset 0 1px 0 rgba(255,255,255,0.75)',
+                                                        position: 'relative',
+                                                        overflow: 'hidden'
+                                                    }}>
+                                                        <div style={{
+                                                            position: 'absolute',
+                                                            inset: 0,
+                                                            background: `radial-gradient(circle at top right, ${formThemeColor}1f 0%, transparent 42%)`,
+                                                            pointerEvents: 'none'
+                                                        }} />
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                                <div style={{
+                                                                    width: '40px',
+                                                                    height: '40px',
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'center',
+                                                                    borderRadius: '12px',
+                                                                    color: formThemeColor,
+                                                                    background: `linear-gradient(135deg, ${formThemeColor}29 0%, rgba(255,255,255,0.82) 100%)`,
+                                                                    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.85)'
+                                                                }}>
+                                                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5A2.5 2.5 0 0 1 5.5 7H9l1.2-1.9a1 1 0 0 1 .84-.46H18.5A2.5 2.5 0 0 1 21 7v3a2 2 0 0 0 0 4v3a2.5 2.5 0 0 1-2.5 2.5H11a1 1 0 0 1-.84-.46L9 17H5.5A2.5 2.5 0 0 1 3 14.5v-5Z" /><path d="M14 7v10" /><path d="M14 10h.01" /><path d="M14 14h.01" /></svg>
+                                                                </div>
+                                                                <div>
+                                                                    <label style={{ ...getLabelStyle(), marginBottom: 2, fontSize: `${Math.max((formStyles?.labelFontSize || formStyles?.textSize || 14), 15)}px` } as any}>Coupon Code</label>
+                                                                    <div style={{ fontSize: '12px', lineHeight: 1.4, color: '#6b7280' }}>Apply your exclusive offer before placing the order</div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '8px', alignItems: 'stretch' }}>
+                                                            <div style={{ position: 'relative', minWidth: 0 }}>
+                                                                <FieldIconSvg field={field} />
+                                                                <input
+                                                                    disabled
+                                                                    value=""
+                                                                    placeholder={field.placeholder || 'Enter Coupon Code'}
+                                                                    style={{
+                                                                        ...getInputStyle(),
+                                                                        paddingLeft: 40,
+                                                                        paddingRight: 12,
+                                                                        height: '44px',
+                                                                        background: 'rgba(255,255,255,0.94)',
+                                                                        cursor: 'not-allowed',
+                                                                        opacity: 1,
+                                                                        letterSpacing: '0.02em',
+                                                                        fontWeight: 700,
+                                                                        boxShadow: '0 6px 18px rgba(15,23,42,0.05)',
+                                                                        border: `1px solid ${formThemeColor}33`,
+                                                                        borderRadius: `${couponControlRadius}px`,
+                                                                    } as any}
+                                                                />
+                                                            </div>
+                                                            <button
+                                                                type="button"
+                                                                style={{
+                                                                    border: `1px solid ${formThemeColor}`,
+                                                                    color: formThemeColor,
+                                                                    background: `linear-gradient(135deg, ${formThemeColor}18 0%, ${formThemeColor}10 100%)`,
+                                                                    borderRadius: couponControlRadius,
+                                                                    padding: '0 10px',
+                                                                    minWidth: 76,
+                                                                    height: 38,
+                                                                    fontSize: 11,
+                                                                    fontWeight: 700,
+                                                                    letterSpacing: '0.02em',
+                                                                    boxShadow: `0 10px 20px ${formThemeColor}1a`,
+                                                                    whiteSpace: 'nowrap'
+                                                                }}
+                                                            >
+                                                                Apply
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            }
+
+                                            // Regular form fields
+                                            const isCityVisible = visibleFields.some((f: FormField) => f.id === 'city');
+                                            const isZipVisible = visibleFields.some((f: FormField) => f.id === 'zip' || f.id === 'zipcode');
+                                            const isSideBySide = (field.id === 'city' || field.id === 'zip' || field.id === 'zipcode') && isCityVisible && isZipVisible;
+
+                                            return (
+                                                <div key={field.id} style={{
+                                                    marginBottom: '8px',
+                                                    display: isSideBySide ? 'inline-block' : 'block',
+                                                    width: isSideBySide ? 'calc(50% - 6px)' : '100%',
+                                                    verticalAlign: 'top',
+                                                    marginRight: isSideBySide && field.id === 'city' ? '12px' : '0px',
+                                                    boxSizing: 'border-box'
+                                                }}>
+                                                    <label style={getLabelStyle() as any}>
+                                                        {field.label} {field.required && <span style={{ color: '#ef4444' }}>*</span>}
+                                                    </label>
+                                                    {field.type === 'textarea' ? (
+                                                        <div style={{ position: 'relative' }}>
+                                                            <FieldIconSvg field={field} isTextarea />
+                                                            <textarea
                                                                 disabled
-                                                                value=""
-                                                                placeholder={field.placeholder || 'Enter Coupon Code'}
+                                                                placeholder={field.id === 'address' ? (addressPlaceholder || 'Enter address') :
+                                                                    field.id === 'notes' ? (notesPlaceholder || 'Any notes...') :
+                                                                        `Enter ${field.label.toLowerCase()}`}
                                                                 style={{
                                                                     ...getInputStyle(),
+                                                                    height: '50px',
                                                                     paddingLeft: 40,
-                                                                    paddingRight: 12,
-                                                                    height: '44px',
-                                                                    background: 'rgba(255,255,255,0.94)',
+                                                                    resize: 'none',
+                                                                    backgroundColor: formStyles?.fieldBackgroundColor || '#ffffff',
                                                                     cursor: 'not-allowed',
-                                                                    opacity: 1,
-                                                                    letterSpacing: '0.02em',
-                                                                    fontWeight: 700,
-                                                                    boxShadow: '0 6px 18px rgba(15,23,42,0.05)',
-                                                                    border: `1px solid ${formThemeColor}33`,
-                                                                    borderRadius: `${couponControlRadius}px`,
+                                                                    opacity: 1
                                                                 } as any}
                                                             />
                                                         </div>
-                                                        <button
-                                                            type="button"
-                                                            style={{
-                                                                border: `1px solid ${formThemeColor}`,
-                                                                color: formThemeColor,
-                                                                background: `linear-gradient(135deg, ${formThemeColor}18 0%, ${formThemeColor}10 100%)`,
-                                                                borderRadius: couponControlRadius,
-                                                                padding: '0 10px',
-                                                                minWidth: 76,
-                                                                height: 38,
-                                                                fontSize: 11,
-                                                                fontWeight: 700,
-                                                                letterSpacing: '0.02em',
-                                                                boxShadow: `0 10px 20px ${formThemeColor}1a`,
-                                                                whiteSpace: 'nowrap'
-                                                            }}
-                                                        >
-                                                            Apply
-                                                        </button>
-                                                    </div>
+                                                    ) : field.type === 'checkbox' ? (
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                                                            <input type="checkbox" disabled style={{ width: '16px', height: '16px' }} />
+                                                            <span style={{ fontSize: '11px', color: '#6b7280' }}>{field.label}</span>
+                                                        </div>
+                                                    ) : (
+                                                        <div style={{ position: 'relative' }}>
+                                                            <FieldIconSvg field={field} />
+                                                            <input
+                                                                type={field.type === 'tel' ? 'tel' : field.type === 'email' ? 'email' : 'text'}
+                                                                disabled
+                                                                placeholder={field.id === 'name' ? (namePlaceholder || 'John Doe') :
+                                                                    field.id === 'phone' ? (phonePlaceholder || '+91 98765 43210') :
+                                                                        field.id === 'email' ? 'email@example.com' :
+                                                                            `Enter ${field.label.toLowerCase()}`}
+                                                                style={{
+                                                                    ...getInputStyle(),
+                                                                    paddingLeft: 40,
+                                                                    height: '42px',
+                                                                    backgroundColor: formStyles?.fieldBackgroundColor || '#ffffff',
+                                                                    cursor: 'not-allowed',
+                                                                    opacity: 1
+                                                                } as any}
+                                                            />
+                                                        </div>
+                                                    )}
                                                 </div>
                                             );
-                                        }
+                                        })}
 
-                                        // Regular form fields
-                                        const isCityVisible = visibleFields.some((f: FormField) => f.id === 'city');
-                                        const isZipVisible = visibleFields.some((f: FormField) => f.id === 'zip' || f.id === 'zipcode');
-                                        const isSideBySide = (field.id === 'city' || field.id === 'zip' || field.id === 'zipcode') && isCityVisible && isZipVisible;
-
-                                        return (
-                                            <div key={field.id} style={{
-                                                marginBottom: '8px',
-                                                display: isSideBySide ? 'inline-block' : 'block',
-                                                width: isSideBySide ? 'calc(50% - 6px)' : '100%',
-                                                verticalAlign: 'top',
-                                                marginRight: isSideBySide && field.id === 'city' ? '12px' : '0px',
-                                                boxSizing: 'border-box'
-                                            }}>
-                                                <label style={getLabelStyle() as any}>
-                                                    {field.label} {field.required && <span style={{ color: '#ef4444' }}>*</span>}
-                                                </label>
-                                                {field.type === 'textarea' ? (
-                                                    <div style={{ position: 'relative' }}>
-                                                        <FieldIconSvg field={field} isTextarea />
-                                                        <textarea
-                                                            disabled
-                                                            placeholder={field.id === 'address' ? (addressPlaceholder || 'Enter address') :
-                                                                field.id === 'notes' ? (notesPlaceholder || 'Any notes...') :
-                                                                    `Enter ${field.label.toLowerCase()}`}
-                                                            style={{
-                                                                ...getInputStyle(),
-                                                                height: '50px',
-                                                                paddingLeft: 40,
-                                                                resize: 'none',
-                                                                backgroundColor: formStyles?.fieldBackgroundColor || '#ffffff',
-                                                                cursor: 'not-allowed',
-                                                                opacity: 1
-                                                            } as any}
-                                                        />
-                                                    </div>
-                                                ) : field.type === 'checkbox' ? (
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                                                        <input type="checkbox" disabled style={{ width: '16px', height: '16px' }} />
-                                                        <span style={{ fontSize: '11px', color: '#6b7280' }}>{field.label}</span>
-                                                    </div>
-                                                ) : (
-                                                    <div style={{ position: 'relative' }}>
-                                                        <FieldIconSvg field={field} />
-                                                        <input
-                                                            type={field.type === 'tel' ? 'tel' : field.type === 'email' ? 'email' : 'text'}
-                                                            disabled
-                                                            placeholder={field.id === 'name' ? (namePlaceholder || 'John Doe') :
-                                                                field.id === 'phone' ? (phonePlaceholder || '+91 98765 43210') :
-                                                                    field.id === 'email' ? 'email@example.com' :
-                                                                        `Enter ${field.label.toLowerCase()}`}
-                                                            style={{
-                                                                ...getInputStyle(),
-                                                                paddingLeft: 40,
-                                                                height: '42px',
-                                                                backgroundColor: formStyles?.fieldBackgroundColor || '#ffffff',
-                                                                cursor: 'not-allowed',
-                                                                opacity: 1
-                                                            } as any}
-                                                        />
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-
-                                    <button className="preview-submit" style={getSubmitButtonStyle()}>
-                                        {submitButtonText || 'Place Order'}
-                                    </button>
-                                </div>
-                            )}
+                                        <button className="preview-submit" style={getSubmitButtonStyle()}>
+                                            {submitButtonText || 'Place Order'}
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
@@ -4592,7 +4592,7 @@ export default function SettingsPage() {
                                             ];
 
                                             const presetMap: Record<string, any> = {
-                                                default: { styles: { themeKey: 'default', textColor: '#333333', textSize: 14, fontStyle: 'normal' as const, borderColor: '#333333', borderWidth: 1, background: '#ffffff', backgroundColor: '#ffffff', labelAlignment: 'left' as const, iconColor: '#333333', iconBackground: '#ffffff', borderRadius: 5, shadow: true, fieldBackgroundColor: '#FFFFFF', labelColor: '#333333', labelFontSize: 14, priceColor: '#333333' }, buttonColor: '#000000' },
+                                                default: { styles: { themeKey: 'default', textColor: '#333333', textSize: 14, fontStyle: 'normal' as const, borderColor: '#333333', borderWidth: 1, background: '#ffffff', backgroundColor: '#ffffff', labelAlignment: 'left' as const, iconColor: '#333333', iconBackground: '#ffffff', borderRadius: 9, shadow: true, fieldBackgroundColor: '#FFFFFF', labelColor: '#333333', labelFontSize: 14, priceColor: '#333333' }, buttonColor: '#000000' },
                                                 modern_slate: { styles: { themeKey: 'modern_slate', textColor: '#1e293b', textSize: 14, fontStyle: 'normal' as const, borderColor: '#f97316', borderWidth: 2, backgroundColor: '#fff7ed', labelAlignment: 'left' as const, iconColor: '#ea580c', iconBackground: '#fed7aa', borderRadius: 16, shadow: true, fieldBackgroundColor: '#fff7ed', labelColor: '#9a3412', labelFontSize: 14, priceColor: '#ea580c' }, buttonColor: '#ea580c' },
                                                 dark_mode: { styles: { themeKey: 'dark_mode', textColor: '#f8fafc', textSize: 14, fontStyle: 'normal' as const, borderColor: '#475569', borderWidth: 1, backgroundColor: '#1f2a3a', labelAlignment: 'left' as const, iconColor: '#cbd5f5', iconBackground: '#1f2a3a', borderRadius: 12, shadow: true, fieldBackgroundColor: '#0f172a', labelColor: '#f8fafc', labelFontSize: 14, priceColor: '#f8fafc' }, buttonColor: '#6366f1' },
                                                 eastern_gold: { styles: { themeKey: 'eastern_gold', textColor: '#78350f', textSize: 14, fontStyle: 'normal' as const, borderColor: '#d4a574', borderWidth: 1, backgroundColor: '#fffbeb', labelAlignment: 'left' as const, iconColor: '#b45309', iconBackground: '#fef3c7', borderRadius: 10, shadow: true, fieldBackgroundColor: '#fef9c3', labelColor: '#713f12', labelFontSize: 14, priceColor: '#b45309' }, buttonColor: '#b45309' },
@@ -4655,20 +4655,20 @@ export default function SettingsPage() {
                                                         </div>
 
                                                         {/* Scrollable preset cards */}
-                                                        <div 
-                                                            className="presets-scroll-container" 
+                                                        <div
+                                                            className="presets-scroll-container"
                                                             ref={presetsScrollRef}
                                                             onMouseDown={onMouseDownPresets}
                                                             onMouseLeave={onMouseLeaveOrUpPresets}
                                                             onMouseUp={onMouseLeaveOrUpPresets}
                                                             onMouseMove={onMouseMovePresets}
                                                             style={{
-                                                            display: 'flex',
-                                                            gap: 10,
-                                                            overflowX: 'auto',
-                                                            padding: '4px 2px 16px',
-                                                            scrollSnapType: 'x mandatory',
-                                                        } as React.CSSProperties}>
+                                                                display: 'flex',
+                                                                gap: 10,
+                                                                overflowX: 'auto',
+                                                                padding: '4px 2px 16px',
+                                                                scrollSnapType: 'x mandatory',
+                                                            } as React.CSSProperties}>
                                                             {visiblePresets.map(preset => {
                                                                 const isSelected = selectedPreset === preset.key;
                                                                 return (

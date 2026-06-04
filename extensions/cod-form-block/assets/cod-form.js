@@ -2854,7 +2854,7 @@
             couponLabel.style.display = 'block';
             couponLabel.style.fontWeight = fontStyle === 'bold' ? '700' : '500';
             couponLabel.style.fontStyle = fontStyle === 'italic' ? 'italic' : 'normal';
-            couponLabel.style.marginBottom = '2px';
+            couponLabel.style.setProperty('margin-bottom', '2px', 'important');
             couponLabel.style.fontSize = Math.max((styles.labelFontSize || textSize), 15) + 'px';
             couponLabel.style.color = styles.labelColor || textColor;
             couponLabel.style.textAlign = labelAlignment;
@@ -2904,7 +2904,7 @@
             couponInput.placeholder = field.placeholder || 'Enter Coupon Code';
             couponInput.setAttribute('autocomplete', 'off');
             couponInput.style.width = '100%';
-            couponInput.style.padding = '12px 12px 12px 40px';
+            couponInput.style.padding = '10px 12px 10px 40px';
             couponInput.style.border = '1px solid ' + (hexToRgba(primaryThemeColor, 0.2) || borderColor);
             couponInput.style.borderRadius = Math.max(borderRadius + 1, 13) + 'px';
             var minCouponFontSize = (window.matchMedia && window.matchMedia('(max-width: 768px)').matches) ? 16 : 14;
@@ -3014,9 +3014,9 @@
             wrapper.style.verticalAlign = 'top';
             wrapper.style.marginRight = field.id === 'city' ? '12px' : '0px';
             wrapper.style.boxSizing = 'border-box';
-            wrapper.style.marginBottom = '6px';
+            wrapper.style.marginBottom = '0px';
         } else {
-            wrapper.style.marginBottom = '6px';
+            wrapper.style.marginBottom = '0px';
             wrapper.style.display = 'block';
             wrapper.style.width = '100%';
         }
@@ -3025,7 +3025,7 @@
         label.style.display = 'block';
         label.style.fontWeight = fontStyle === 'bold' ? '700' : '500';
         label.style.fontStyle = fontStyle === 'italic' ? 'italic' : 'normal';
-        label.style.marginBottom = '0px';
+        label.style.setProperty('margin-bottom', '2px', 'important');
         label.style.fontSize = (styles.labelFontSize || textSize) + 'px';
         label.style.color = styles.labelColor || textColor;
         label.style.textAlign = labelAlignment;
@@ -3183,7 +3183,7 @@
         
         
         input.style.width = '100%';
-        input.style.padding = field.type === 'textarea' ? '14px 12px 14px 40px' : '14px 12px 14px 40px';
+        input.style.padding = field.type === 'textarea' ? '10px 12px 10px 40px' : '10px 12px 10px 40px';
         input.style.border = borderWidth + 'px solid ' + borderColor;
         input.style.borderRadius = borderRadius + 'px';
         input.style.fontSize = Math.max(textSize, 16) + 'px'; // minimum 16px to prevent iOS auto-zoom
@@ -4375,7 +4375,7 @@ function darkenColor(hex, percent) {
           html += '</div>';
           html += '<input type="radio" name="payment_method_visual" class="pm-pill" ' + (!showFullPrepaid ? 'checked' : '') + ' style="width: 18px; height: 18px; accent-color: #2563eb; margin: 0; pointer-events: none;">';
           html += '</div></div>';
-          html += '<div style="background: #dbeafe; padding: 10px 12px; font-size: 10px; color: #1e40af; display: flex; justify-content: center; align-items: center; font-weight: 500; width: 100%; box-sizing: border-box; margin: 0;">Secure your order • Priority dispatch • Avoid fake cancellations</div>';
+          html += '<div style="background: #dbeafe; padding: 10px 12px; font-size: 10px; color: #1e40af; display: flex; justify-content: center; align-items: center; font-weight: 500; width: 100%; box-sizing: border-box; margin: 0;">Secure your order • Avoid fake cancellations </div>';
           html += '</label>';
       }
 

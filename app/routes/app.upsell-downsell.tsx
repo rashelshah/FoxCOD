@@ -877,7 +877,7 @@ export default function UpsellDownsellPage() {
                                                                 .sort((a: any, b: any) => a.order - b.order)
                                                                 .map((field: any) => {
                                                                     // Shipping section field
-                                                                        if (field.id === 'shipping') {
+                                                                    if (field.id === 'shipping') {
                                                                         const fsAny: any = formSettings?.styles || {};
                                                                         const themeKey = fsAny.themeKey || 'custom';
                                                                         let formThemeColor = formSettings?.primary_color || '#6366f1';
@@ -1040,13 +1040,13 @@ export default function UpsellDownsellPage() {
                                                                                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '24px', height: '24px', borderRadius: '6px', color: '#16a34a', backgroundColor: '#dcfce7' }}>
                                                                                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4" /><path d="M4 6v12c0 1.1.9 2 2 2h14v-4" /><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z" /></svg>
                                                                                                 </div>
-                                                                                                
+
                                                                                                 {/* Center text */}
                                                                                                 <div style={{ flex: 1, minWidth: 0 }}>
                                                                                                     <div style={{ fontWeight: 700, fontSize: '11px', color: '#166534', lineHeight: 1.1 }}>Full Prepaid</div>
                                                                                                     <div style={{ color: '#4ade80', fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>Pay now & get fastest delivery</div>
                                                                                                 </div>
-                                                                                                
+
                                                                                                 {/* Right side pricing */}
                                                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                                                                                                     <span style={{ fontWeight: 800, fontSize: '12px', color: '#166534' }}>{fmtCurrency(total)}</span>
@@ -1067,16 +1067,16 @@ export default function UpsellDownsellPage() {
                                                                                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '24px', height: '24px', borderRadius: '6px', color: '#2563eb', backgroundColor: '#dbeafe' }}>
                                                                                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>
                                                                                                 </div>
-                                                                                                
+
                                                                                                 {/* Center text */}
                                                                                                 <div style={{ flex: 1, minWidth: 0 }}>
                                                                                                     <div style={{ fontWeight: 700, fontSize: '11px', color: '#1e3a8a', lineHeight: 1.1, display: 'flex', alignItems: 'center', gap: '3px' }}>
                                                                                                         Partial Payment
-                                                                                                        <svg width="10" height="10" viewBox="0 0 24 24" fill="#2563eb" stroke="#eff6ff" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/></svg>
+                                                                                                        <svg width="10" height="10" viewBox="0 0 24 24" fill="#2563eb" stroke="#eff6ff" strokeWidth="2.5"><circle cx="12" cy="12" r="10" /><path d="M9 12l2 2 4-4" /></svg>
                                                                                                     </div>
                                                                                                     <div style={{ color: '#60a5fa', fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>Pay {fmtCurrency(partialCodAdvanceAmount)} now • Rest on delivery</div>
                                                                                                 </div>
-                                                                                                
+
                                                                                                 {/* Right side pricing */}
                                                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                                                                                                     <span style={{ fontWeight: 800, fontSize: '12px', color: '#1e3a8a' }}>{fmtCurrency(partialCodAdvanceAmount)}</span>
@@ -1085,7 +1085,7 @@ export default function UpsellDownsellPage() {
                                                                                             </div>
                                                                                             {/* Info Bar */}
                                                                                             <div style={{ background: '#dbeafe', padding: '5px 8px', borderBottomLeftRadius: '8px', borderBottomRightRadius: '8px', fontSize: '8.5px', color: '#1e40af', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500 }}>
-                                                                                                🛡️ Secure your order • Priority dispatch • Avoid fake cancellations
+                                                                                                🛡️ Secure your order • Priority dispatch
                                                                                             </div>
                                                                                         </label>
                                                                                     )}
@@ -1100,13 +1100,13 @@ export default function UpsellDownsellPage() {
                                                                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '24px', height: '24px', borderRadius: '6px', color: '#ea580c', backgroundColor: '#ffedd5' }}>
                                                                                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1" ry="1" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
                                                                                             </div>
-                                                                                            
+
                                                                                             {/* Center text */}
                                                                                             <div style={{ flex: 1, minWidth: 0 }}>
                                                                                                 <div style={{ fontWeight: 700, fontSize: '11px', color: '#9a3412', lineHeight: 1.1 }}>Cash on Delivery</div>
                                                                                                 <div style={{ color: '#fb923c', fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>Pay when you receive</div>
                                                                                             </div>
-                                                                                            
+
                                                                                             {/* Right side pricing */}
                                                                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                                                                                                 <span style={{ fontWeight: 800, fontSize: '12px', color: '#9a3412' }}>{fmtCurrency(total)}</span>
@@ -1156,9 +1156,9 @@ export default function UpsellDownsellPage() {
                                                                         notes: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14,2 14,8 20,8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>,
                                                                         state: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>,
                                                                         city: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>,
-                                                                        zip: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>,
-                                                                        zipcode: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>,
-                                                                        hash: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>,
+                                                                        zip: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="9" x2="20" y2="9" /><line x1="4" y1="15" x2="20" y2="15" /><line x1="10" y1="3" x2="8" y2="21" /><line x1="16" y1="3" x2="14" y2="21" /></svg>,
+                                                                        zipcode: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="9" x2="20" y2="9" /><line x1="4" y1="15" x2="20" y2="15" /><line x1="10" y1="3" x2="8" y2="21" /><line x1="16" y1="3" x2="14" y2="21" /></svg>,
+                                                                        hash: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="9" x2="20" y2="9" /><line x1="4" y1="15" x2="20" y2="15" /><line x1="10" y1="3" x2="8" y2="21" /><line x1="16" y1="3" x2="14" y2="21" /></svg>,
                                                                         user: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>,
                                                                         text: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 7 4 4 20 4 20 7" /><line x1="9" y1="20" x2="15" y2="20" /><line x1="12" y1="4" x2="12" y2="20" /></svg>,
                                                                         list: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg>,
@@ -1507,25 +1507,25 @@ export default function UpsellDownsellPage() {
                                     {/* Section 6 — Discount Badge */}
                                     <AccordionSection id="down-badge" tab="down" title="Discount Badge" helperText="Customize the discount badge appearance." expandedSection={expandedSection} toggleSection={toggleSection}>
                                         <div className="sec">
-                                        <div className="fr">
-                                            <div className="fg"><label>Title</label><input value={editing.design.discountBadgeTitle} placeholder="" onChange={e => updDesign({ discountBadgeTitle: e.target.value })} /></div>
-                                            <ColorSelector label="Background color" value={editing.design.discountBadgeBgColor.startsWith('#') ? editing.design.discountBadgeBgColor : '#ff4500'} onChange={c => updDesign({ discountBadgeBgColor: c })} />
-                                        </div>
-                                        <ColorSelector label="Discount color" value={editing.design.discountBadgeDiscountColor} onChange={c => updDesign({ discountBadgeDiscountColor: c })} />
-                                        <div className="fr">
-                                            <div className="fg">
-                                                <label>Badge size</label>
-                                                <div style={{ padding: '0 8px', width: '100%' }}>
-                                                    <RangeSlider labelHidden label="Badge size" min={20} max={80} value={editing.design.discountBadgeSize} onChange={val => updDesign({ discountBadgeSize: Number(val) })} output />
+                                            <div className="fr">
+                                                <div className="fg"><label>Title</label><input value={editing.design.discountBadgeTitle} placeholder="" onChange={e => updDesign({ discountBadgeTitle: e.target.value })} /></div>
+                                                <ColorSelector label="Background color" value={editing.design.discountBadgeBgColor.startsWith('#') ? editing.design.discountBadgeBgColor : '#ff4500'} onChange={c => updDesign({ discountBadgeBgColor: c })} />
+                                            </div>
+                                            <ColorSelector label="Discount color" value={editing.design.discountBadgeDiscountColor} onChange={c => updDesign({ discountBadgeDiscountColor: c })} />
+                                            <div className="fr">
+                                                <div className="fg">
+                                                    <label>Badge size</label>
+                                                    <div style={{ padding: '0 8px', width: '100%' }}>
+                                                        <RangeSlider labelHidden label="Badge size" min={20} max={80} value={editing.design.discountBadgeSize} onChange={val => updDesign({ discountBadgeSize: Number(val) })} output />
+                                                    </div>
+                                                </div>
+                                                <div className="fg">
+                                                    <label>Text size</label>
+                                                    <div style={{ padding: '0 8px', width: '100%' }}>
+                                                        <RangeSlider labelHidden label="Text size" min={10} max={40} value={editing.design.discountBadgeTextSize} onChange={val => updDesign({ discountBadgeTextSize: Number(val) })} output />
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <div className="fg">
-                                                <label>Text size</label>
-                                                <div style={{ padding: '0 8px', width: '100%' }}>
-                                                    <RangeSlider labelHidden label="Text size" min={10} max={40} value={editing.design.discountBadgeTextSize} onChange={val => updDesign({ discountBadgeTextSize: Number(val) })} output />
-                                                </div>
-                                            </div>
-                                        </div>
                                         </div>
                                     </AccordionSection>
 
