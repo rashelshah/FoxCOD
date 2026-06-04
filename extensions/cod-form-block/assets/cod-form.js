@@ -4367,8 +4367,9 @@ function darkenColor(hex, percent) {
           html += '</div>';
           html += '<div style="display: flex; align-items: center; gap: 12px; flex-shrink: 0;">';
           html += '<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">';
-          if (codFeeAmount > 0) {
-              html += '<div style="background: #dbeafe; color: #1e3a8a; font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 99px; line-height: 1;">+ ' + formatMoney(codFeeAmount) + ' COD fee</div>';
+          if (ppSettings && ppSettings.cod_fee_enabled && ppSettings.cod_fee_amount) {
+              var displayStyle = codFeeAmount > 0 ? 'block' : 'none';
+              html += '<div class="pm-cod-fee-pill" style="display: ' + displayStyle + '; background: #dbeafe; color: #1e3a8a; font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 99px; line-height: 1;">+ ' + formatMoney(codFeeAmount) + ' COD fee</div>';
           }
           html += '<span class="pm-amt-partial" style="font-weight: 800; font-size: 15px; color: #1e3a8a;">' + depositText + '</span>';
           html += '</div>';
@@ -4535,9 +4536,44 @@ function darkenColor(hex, percent) {
 
       // Update Partial COD
       var pmPartial = paymentContainer.querySelector('.pm-partial');
+      var depositText = '';
       if (pmPartial) {
+          var ppSettings = config.partialPaymentSettings;
+          var depositAmount = partialAdvance;
+          var codFeeAmount = 0;
+          if (ppSettings && ppSettings.payment_options && ppSettings.payment_options.length > 0) {
+              var opt = ppSettings.payment_options[0];
+              if (opt.type === 'percentage' || opt.type === 'remaining_percentage') {
+                  depositAmount = (orderTotal * opt.value) / 100;
+              } else {
+                  depositAmount = Math.min(opt.value, orderTotal);
+              }
+              
+              if (ppSettings.cod_fee_enabled && ppSettings.cod_fee_amount) {
+                  if (ppSettings.cod_fee_type === 'percentage') {
+                      codFeeAmount = (depositAmount * ppSettings.cod_fee_amount) / 100;
+                  } else {
+                      codFeeAmount = ppSettings.cod_fee_amount;
+                  }
+              }
+          }
+          depositText = formatMoney(depositAmount);
+
           var descEl = pmPartial.querySelector('.pm-desc-partial');
-          if (descEl) descEl.textContent = 'Pay a small amount now • Rest on delivery';
+          if (descEl) descEl.textContent = 'Pay ' + depositText + ' now • Rest on delivery';
+
+          var amtEl = pmPartial.querySelector('.pm-amt-partial');
+          if (amtEl) amtEl.textContent = depositText;
+
+          var feePill = pmPartial.querySelector('.pm-cod-fee-pill');
+          if (feePill) {
+              if (codFeeAmount > 0) {
+                  feePill.style.display = 'block';
+                  feePill.textContent = '+ ' + formatMoney(codFeeAmount) + ' COD fee';
+              } else {
+                  feePill.style.display = 'none';
+              }
+          }
       }
 
       // Update Full COD
@@ -4545,6 +4581,26 @@ function darkenColor(hex, percent) {
       if (pmCod) {
           var amtCodEl = pmCod.querySelector('.pm-amt-cod');
           if (amtCodEl) amtCodEl.textContent = formatMoney(orderTotal);
+      }
+
+      // Update submit button text if selected
+      var submitBtn = form.querySelector('button[type="submit"]');
+      if (submitBtn) {
+          var selectedRadio = paymentContainer.querySelector('input[name="payment_method"]:checked');
+          if (selectedRadio) {
+              if (!submitBtn.getAttribute('data-original-text')) {
+                  submitBtn.setAttribute('data-original-text', submitBtn.textContent || 'Place Order');
+              }
+              var originalText = submitBtn.getAttribute('data-original-text');
+
+              if (selectedRadio.value === 'partial_cod') {
+                  submitBtn.textContent = depositText ? 'Pay ' + depositText + ' now' : 'Continue with Partial Payment';
+              } else if (selectedRadio.value === 'full_prepaid') {
+                  submitBtn.textContent = 'Proceed to Payment';
+              } else {
+                  submitBtn.textContent = originalText;
+              }
+          }
       }
   }
 
