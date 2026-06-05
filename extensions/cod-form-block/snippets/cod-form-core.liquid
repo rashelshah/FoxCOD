@@ -7,7 +7,7 @@
 
 
 {% comment %} Read COD settings from metafields (synced from app dashboard) {% endcomment %}
-{% assign cod_enabled = shop.metafields.fox_cod.enabled | default: 'false' %}
+{% assign cod_enabled = shop.metafields.fox_cod.enabled | default: 'true' %}
 {% assign cod_button_text = shop.metafields.fox_cod.button_text | default: 'Buy with COD' %}
 {% assign cod_primary_color = shop.metafields.fox_cod.primary_color.value | default: shop.metafields.fox_cod.primary_color | default: '#667eea' %}
 {% assign cod_app_url = shop.metafields.fox_cod.app_url | default: '' %}
@@ -119,7 +119,7 @@
 {% comment %} Only render COD functionality if enabled in the app {% endcomment %}
 {% assign is_enabled = false %}
 {% assign cod_enabled_str = cod_enabled | downcase | strip %}
-{% if cod_enabled_str == 'true' or shop.metafields.fox_cod.enabled.value == 'true' or shop.metafields.fox_cod.enabled.value == true %}
+{% if cod_enabled_str == 'true' or shop.metafields.fox_cod.enabled.value == 'true' or shop.metafields.fox_cod.enabled.value == true or request.design_mode %}
   {% assign is_enabled = true %}
 {% endif %}
 
