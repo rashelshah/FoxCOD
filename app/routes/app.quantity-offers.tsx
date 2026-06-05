@@ -1588,8 +1588,8 @@ export default function QuantityOffersPage() {
 
                                                                 // Payment Mode section field
                                                                 if (field.id === 'payment_mode') {
-                                                                    const showFullPrepaid = formSettings?.styles?.fullPrepaidEnabled;
-                                                                    const showPartial = formSettings?.partial_cod_enabled;
+                                                                    const showFullPrepaid = true;
+                                                                    const showPartial = true;
                                                                     const partialCodAdvanceAmount = formSettings?.partial_cod_advance_amount || 100;
 
                                                                     const selectedOffer = activeGroup?.offers?.find((o: any) => o.preselect) || activeGroup?.offers?.[0];

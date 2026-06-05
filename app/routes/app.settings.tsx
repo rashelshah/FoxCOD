@@ -1388,8 +1388,8 @@ const PreviewDisplay = memo(({
 
                                             // Payment Mode section field
                                             if (field.id === 'payment_mode') {
-                                                const showFullPrepaid = formStyles?.fullPrepaidEnabled;
-                                                const showPartial = partialCodEnabled;
+                                                const showFullPrepaid = true;
+                                                const showPartial = true;
                                                 const remainingCod = Math.max(0, total - (partialCodAdvanceAmount || 0));
 
                                                 return (

@@ -8,12 +8,12 @@
 
 {% comment %} Read COD settings from metafields (synced from app dashboard) {% endcomment %}
 {% assign cod_enabled = shop.metafields.fox_cod.enabled | default: 'true' %}
-{% assign cod_button_text = shop.metafields.fox_cod.button_text | default: 'Buy Now - Cash on Delivery' %}
+{% assign cod_button_text = shop.metafields.fox_cod.button_text.value | default: shop.metafields.fox_cod.button_text | default: 'Buy Now - Cash on Delivery' %}
 {% assign cod_primary_color = shop.metafields.fox_cod.primary_color.value | default: shop.metafields.fox_cod.primary_color | default: '#667eea' %}
 {% assign cod_app_url = shop.metafields.fox_cod.app_url | default: '' %}
 {% assign cod_max_quantity = shop.metafields.fox_cod.max_quantity | default: 10 %}
-{% assign cod_form_title = shop.metafields.fox_cod.form_title | default: 'Enter your Details' %}
-{% assign cod_form_subtitle = shop.metafields.fox_cod.form_subtitle | default: 'Fill in your details to place a COD orders.' %}
+{% assign cod_form_title = shop.metafields.fox_cod.form_title.value | default: shop.metafields.fox_cod.form_title | default: 'Enter your Details' %}
+{% assign cod_form_subtitle = shop.metafields.fox_cod.form_subtitle.value | default: shop.metafields.fox_cod.form_subtitle | default: 'Fill in your details to place a COD orders.' %}
 {% assign cod_button_style = shop.metafields.fox_cod.button_style.value | default: shop.metafields.fox_cod.button_style | default: 'solid' | downcase | strip %}
 {% unless cod_button_style == 'solid' or cod_button_style == 'outline' or cod_button_style == 'gradient' %}
   {% assign cod_button_style = 'solid' %}
