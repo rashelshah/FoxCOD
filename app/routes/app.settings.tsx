@@ -596,7 +596,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
         console.log('[Settings] Saving metafields for shop:', shopGid);
 
-        const batch1Promise = admin.graphql(`
+        // ── Batch 1A: core user-visible text + color + state settings (13 items) ──
+        // NOTE: Shopify metafieldsSet allows max 25 items per call.
+        // We previously had 26 in one batch which caused a silent total failure.
+        // Split into 1A (13) + 1B (13) + batch2 (11), all fired in parallel.
+        const batch1aPromise = admin.graphql(`
             mutation SetMetafields($metafields: [MetafieldsSetInput!]!) {
                 metafieldsSet(metafields: $metafields) {
                     metafields { key }
@@ -608,16 +612,32 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 metafields: [
                     { ownerId: shopGid, namespace: "fox_cod", key: "enabled", value: settings.enabled.toString(), type: "single_line_text_field" },
                     { ownerId: shopGid, namespace: "fox_cod", key: "button_text", value: settings.button_text, type: "single_line_text_field" },
+                    { ownerId: shopGid, namespace: "fox_cod", key: "form_title", value: settings.form_title || "", type: "single_line_text_field" },
+                    { ownerId: shopGid, namespace: "fox_cod", key: "form_subtitle", value: settings.form_subtitle || "", type: "single_line_text_field" },
+                    { ownerId: shopGid, namespace: "fox_cod", key: "submit_button_text", value: settings.submit_button_text || "Place COD Order", type: "single_line_text_field" },
                     { ownerId: shopGid, namespace: "fox_cod", key: "primary_color", value: settings.primary_color, type: "single_line_text_field" },
                     { ownerId: shopGid, namespace: "fox_cod", key: "max_quantity", value: settings.max_quantity.toString(), type: "single_line_text_field" },
                     { ownerId: shopGid, namespace: "fox_cod", key: "app_url", value: appUrl, type: "single_line_text_field" },
-                    { ownerId: shopGid, namespace: "fox_cod", key: "form_title", value: settings.form_title || "", type: "single_line_text_field" },
-                    { ownerId: shopGid, namespace: "fox_cod", key: "submit_button_text", value: settings.submit_button_text || "", type: "single_line_text_field" },
+                    { ownerId: shopGid, namespace: "fox_cod", key: "success_message", value: settings.success_message || "", type: "single_line_text_field" },
                     { ownerId: shopGid, namespace: "fox_cod", key: "button_style", value: settings.button_style || "solid", type: "single_line_text_field" },
                     { ownerId: shopGid, namespace: "fox_cod", key: "button_size", value: settings.button_size || "large", type: "single_line_text_field" },
                     { ownerId: shopGid, namespace: "fox_cod", key: "button_position", value: settings.button_position || "below_atc", type: "single_line_text_field" },
-                    { ownerId: shopGid, namespace: "fox_cod", key: "form_subtitle", value: settings.form_subtitle || "", type: "single_line_text_field" },
-                    { ownerId: shopGid, namespace: "fox_cod", key: "success_message", value: settings.success_message || "", type: "single_line_text_field" },
+                    { ownerId: shopGid, namespace: "fox_cod", key: "form_type", value: settings.form_type || "popup", type: "single_line_text_field" },
+                ]
+            }
+        });
+
+        // ── Batch 1B: display / field visibility settings (13 items) ──
+        const batch1bPromise = admin.graphql(`
+            mutation SetMetafields($metafields: [MetafieldsSetInput!]!) {
+                metafieldsSet(metafields: $metafields) {
+                    metafields { key }
+                    userErrors { field message }
+                }
+            }
+        `, {
+            variables: {
+                metafields: [
                     { ownerId: shopGid, namespace: "fox_cod", key: "show_product_image", value: String(settings.show_product_image), type: "single_line_text_field" },
                     { ownerId: shopGid, namespace: "fox_cod", key: "show_price", value: String(settings.show_price), type: "single_line_text_field" },
                     { ownerId: shopGid, namespace: "fox_cod", key: "show_quantity_selector", value: String(settings.show_quantity_selector), type: "single_line_text_field" },
@@ -629,13 +649,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     { ownerId: shopGid, namespace: "fox_cod", key: "modal_style", value: settings.modal_style || "modern", type: "single_line_text_field" },
                     { ownerId: shopGid, namespace: "fox_cod", key: "animation_style", value: settings.animation_style || "fade", type: "single_line_text_field" },
                     { ownerId: shopGid, namespace: "fox_cod", key: "border_radius", value: (settings.border_radius ?? 12).toString(), type: "single_line_text_field" },
-                    { ownerId: shopGid, namespace: "fox_cod", key: "form_type", value: settings.form_type || "popup", type: "single_line_text_field" },
                     { ownerId: shopGid, namespace: "fox_cod", key: "enable_coupon_field", value: String(settings.enable_coupon_field ?? false), type: "single_line_text_field" },
                     { ownerId: shopGid, namespace: "fox_cod", key: "coupon_field_position", value: String(settings.coupon_field_position ?? 13), type: "single_line_text_field" },
                 ]
             }
         });
 
+        // ── Batch 2: JSON / Partial COD / shipping settings (11 items) ──
         const batch2Promise = admin.graphql(`
             mutation SetMetafields($metafields: [MetafieldsSetInput!]!) {
                 metafieldsSet(metafields: $metafields) {
@@ -666,15 +686,22 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
         console.log('[Settings] Saving button_styles to metafield:', JSON.stringify(settings.button_styles || DEFAULT_BUTTON_STYLES, null, 2));
 
-        const [batch1Res, batch2Res] = await Promise.all([batch1Promise, batch2Promise]);
-        const batch1Json = await batch1Res.json();
+        // Fire all three batches in parallel (all ≤ 13 items each — well within the 25-item limit)
+        const [batch1aRes, batch1bRes, batch2Res] = await Promise.all([batch1aPromise, batch1bPromise, batch2Promise]);
+        const batch1aJson = await batch1aRes.json();
+        const batch1bJson = await batch1bRes.json();
         const batch2Json = await batch2Res.json();
 
-        if (batch1Json.data?.metafieldsSet?.userErrors?.length > 0) {
-            console.error('[Settings] Batch 1 errors:', batch1Json.data.metafieldsSet.userErrors);
+        if (batch1aJson.data?.metafieldsSet?.userErrors?.length > 0) {
+            console.error('[Settings] Batch 1A errors:', batch1aJson.data.metafieldsSet.userErrors);
         } else {
-            console.log('[Settings] Batch 1 saved:',
-                batch1Json.data?.metafieldsSet?.metafields?.length || 0, 'fields');
+            console.log('[Settings] Batch 1A saved:', batch1aJson.data?.metafieldsSet?.metafields?.length || 0, 'fields');
+        }
+
+        if (batch1bJson.data?.metafieldsSet?.userErrors?.length > 0) {
+            console.error('[Settings] Batch 1B errors:', batch1bJson.data.metafieldsSet.userErrors);
+        } else {
+            console.log('[Settings] Batch 1B saved:', batch1bJson.data?.metafieldsSet?.metafields?.length || 0, 'fields');
         }
 
         if (batch2Json.data?.metafieldsSet?.userErrors?.length > 0) {
