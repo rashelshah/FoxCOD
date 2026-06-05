@@ -34,7 +34,7 @@ const shopify = shopifyApp({
             shop_domain: session.shop,
             enabled: true,
             button_text: "Buy Now - Cash on Delivery",
-            primary_color: "#6366f1",
+            primary_color: "#000000",
             required_fields: ["phone", "name", "address"],
             max_quantity: 10,
             button_styles: {

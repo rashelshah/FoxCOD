@@ -82,7 +82,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
             } : {
                 enabled: false,
                 button_text: "Buy Now - Cash on Delivery",
-                primary_color: "#6366f1",
+                primary_color: "#000000",
                 button_style: "solid",
                 button_size: "large",
                 button_styles: { showAddToCart: true },
