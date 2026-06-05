@@ -46,7 +46,7 @@ const shopify = shopifyApp({
             fields: [
               { id: 'phone', label: 'Phone Number', type: 'tel', visible: true, required: true, order: 1 },
               { id: 'name', label: 'Full Name', type: 'text', visible: true, required: true, order: 2 },
-              { id: 'address', label: 'Address', type: 'textarea', visible: true, required: true, order: 3 },
+              { id: 'address', label: 'Address', type: 'text', visible: true, required: true, order: 3 },
               { id: 'state', label: 'State', type: 'text', visible: true, required: false, order: 4 },
               { id: 'city', label: 'City', type: 'text', visible: true, required: false, order: 5 },
               { id: 'zip', label: 'ZIP Code', type: 'text', visible: true, required: false, order: 6 },

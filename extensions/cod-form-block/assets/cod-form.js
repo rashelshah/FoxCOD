@@ -1123,7 +1123,7 @@
       var DEFAULT_FIELDS = [
           { id: 'name', label: 'Full Name', type: 'text', visible: true, required: true, order: 1 },
           { id: 'phone', label: 'Phone Number', type: 'tel', visible: true, required: true, order: 2 },
-          { id: 'address', label: 'Address', type: 'textarea', visible: true, required: true, order: 3 }
+          { id: 'address', label: 'Address', type: 'text', visible: true, required: true, order: 3 }
       ];
 
       // Debug: Log raw data attribute
