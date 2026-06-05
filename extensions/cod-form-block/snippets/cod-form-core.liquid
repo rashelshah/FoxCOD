@@ -242,6 +242,7 @@
      data-show-price="{{ cod_show_price }}"
      data-form-title="{{ cod_form_title }}"
      data-form-subtitle="{{ cod_form_subtitle }}"
+     data-submit-text="{{ shop.metafields.fox_cod.submit_button_text.value | default: shop.metafields.fox_cod.submit_button_text | default: 'Place COD Order' }}"
      data-partial-cod-enabled="{{ cod_partial_enabled }}"
      data-partial-cod-advance="{{ cod_partial_advance }}"
      data-animation-preset="{{ btn_styles.animationPreset | default: 'none' }}"
@@ -447,7 +448,7 @@
             class="cod-submit-btn"
             data-primary-color="{{ cod_primary_color }}"
             style="width:100%; padding:13px; border-radius:12px; border:none; cursor:pointer; font-size:15px; font-weight:700; color:#fff; background-color:{{ cod_primary_color }}; transition:all 0.2s ease;">
-      {{ shop.metafields.fox_cod.submit_button_text | default: 'Place Order (COD)' }}
+      {{ shop.metafields.fox_cod.submit_button_text.value | default: shop.metafields.fox_cod.submit_button_text | default: 'Place COD Order' }}
     </button>
 
     {% comment %} Status Messages {% endcomment %}

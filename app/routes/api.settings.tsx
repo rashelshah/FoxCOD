@@ -81,6 +81,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             settings: {
                 enabled: settings.enabled,
                 button_text: settings.button_text,
+                form_title: settings.form_title,
+                form_subtitle: settings.form_subtitle,
+                submit_button_text: settings.submit_button_text,
                 primary_color: settings.primary_color,
                 button_style: settings.button_style,
                 button_size: settings.button_size,
@@ -91,6 +94,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         }, {
             headers: corsHeaders,
         });
+
     } catch (error: any) {
         console.error("Error fetching settings:", error);
 
