@@ -8,7 +8,7 @@
 
 {% comment %} Read COD settings from metafields (synced from app dashboard) {% endcomment %}
 {% assign cod_enabled = shop.metafields.fox_cod.enabled | default: 'true' %}
-{% assign cod_button_text = shop.metafields.fox_cod.button_text | default: 'Buy with COD' %}
+{% assign cod_button_text = shop.metafields.fox_cod.button_text | default: 'Buy Now - Cash on Delivery' %}
 {% assign cod_primary_color = shop.metafields.fox_cod.primary_color.value | default: shop.metafields.fox_cod.primary_color | default: '#667eea' %}
 {% assign cod_app_url = shop.metafields.fox_cod.app_url | default: '' %}
 {% assign cod_max_quantity = shop.metafields.fox_cod.max_quantity | default: 10 %}
@@ -191,7 +191,7 @@
         {% endif %}
       "
     >
-      {{ cod_button_text | default: 'Buy with COD' }}
+      {{ cod_button_text | default: 'Buy Now - Cash on Delivery' }}
     </button>
     <p class="foxcod-block-status" data-foxcod-status hidden></p>
   </div>

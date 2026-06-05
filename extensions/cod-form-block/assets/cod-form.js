@@ -404,7 +404,7 @@
 
     var isLoading = !!(state && state.loading);
     var isDisabled = !!(state && state.disabled);
-    var buttonText = (state && state.buttonText) || (isDisabled ? 'Out of Stock' : (config.buttonText || 'Buy with COD'));
+    var buttonText = (state && state.buttonText) || (isDisabled ? 'Out of Stock' : (config.buttonText || 'Buy Now - Cash on Delivery'));
 
     if (isDisabled) {
       buttonEl.textContent = buttonText;
@@ -444,7 +444,7 @@
     var buttonState = {
       loading: false,
       disabled: !!config._isSoldOut,
-      buttonText: config._isSoldOut ? 'Out of Stock' : (config.buttonText || 'Buy with COD')
+      buttonText: config._isSoldOut ? 'Out of Stock' : (config.buttonText || 'Buy Now - Cash on Delivery')
     };
 
     if (config.triggerElement) {
@@ -825,7 +825,7 @@
 
     var trigger = config.triggerElement;
     var isLoading = !!(state && state.loading);
-    var buttonText = (state && state.buttonText) || (config._isSoldOut ? 'Out of Stock' : (config.buttonText || 'Buy with COD'));
+    var buttonText = (state && state.buttonText) || (config._isSoldOut ? 'Out of Stock' : (config.buttonText || 'Buy Now - Cash on Delivery'));
     var isDisabled = !!((state && state.disabled) || config._isSoldOut);
 
     trigger.type = 'button';
@@ -1069,7 +1069,7 @@
       if (!trigger) return;
 
       var dataContainer = rootElement.querySelector('.cod-form-data');
-      var initialButtonText = (dataContainer && dataContainer.dataset.buttonText) || trigger.textContent || 'Buy with COD';
+      var initialButtonText = (dataContainer && dataContainer.dataset.buttonText) || trigger.textContent || 'Buy Now - Cash on Delivery';
       trigger.textContent = initialButtonText;
       trigger.disabled = false;
       trigger.setAttribute('aria-busy', 'false');
@@ -1145,7 +1145,7 @@
         shop: shop,
         proxyUrl: dataContainer.dataset.proxyBase || '/apps/fox-cod',
         maxQuantity: parseInt(dataContainer.dataset.maxQuantity) || 10,
-        buttonText: dataContainer.dataset.buttonText || 'Buy with COD',
+        buttonText: dataContainer.dataset.buttonText || 'Buy Now - Cash on Delivery',
         primaryColor: dataContainer.dataset.primaryColor || '#667eea',
         accentColor: dataContainer.dataset.accentColor || '#111827',
         priceColor: dataContainer.dataset.priceColor || dataContainer.dataset.accentColor || '#111827',

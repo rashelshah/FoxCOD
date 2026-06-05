@@ -107,7 +107,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       orderLogEntry.advance_amount = advanceAmount;
       orderLogEntry.remaining_cod_amount = remainingAmount; // Should be 0
     } else {
-      orderLogEntry.payment_method = 'partial_payment';
+      orderLogEntry.payment_method = 'partial_cod';
       orderLogEntry.is_partial_cod = true;
       orderLogEntry.advance_amount = advanceAmount;
       orderLogEntry.remaining_cod_amount = remainingAmount;

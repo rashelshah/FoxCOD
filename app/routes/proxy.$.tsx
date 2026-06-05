@@ -81,12 +81,12 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
                 max_quantity: settings.max_quantity,
             } : {
                 enabled: false,
-                button_text: "Buy with COD",
-                primary_color: "#667eea",
+                button_text: "Buy Now - Cash on Delivery",
+                primary_color: "#6366f1",
                 button_style: "solid",
                 button_size: "large",
-                button_styles: {},
-                required_fields: ["name", "phone", "address"],
+                button_styles: { showAddToCart: true },
+                required_fields: ["phone", "name", "address"],
                 max_quantity: 10,
             },
         }), { headers: corsHeaders });

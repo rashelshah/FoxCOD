@@ -57,9 +57,9 @@ import { ColorSelector, colorSelectorStyles } from "./ColorSelector";
 // Default settings for new shops
 const defaultSettings: Omit<FormSettings, "shop_domain"> = {
     enabled: false,
-    button_text: "Buy with COD",
+    button_text: "Buy Now - Cash on Delivery",
     primary_color: "#6366f1",
-    required_fields: ["name", "phone", "address"],
+    required_fields: ["phone", "name", "address"],
     max_quantity: 10,
     button_style: "solid",
     button_size: "large",
@@ -83,12 +83,27 @@ const defaultSettings: Omit<FormSettings, "shop_domain"> = {
     border_radius: 12,
     // New advanced features
     form_type: "popup",
-    fields: DEFAULT_FIELDS,
+    fields: [
+        { id: 'phone', label: 'Phone Number', type: 'tel', visible: true, required: true, order: 1 },
+        { id: 'name', label: 'Full Name', type: 'text', visible: true, required: true, order: 2 },
+        { id: 'address', label: 'Address', type: 'textarea', visible: true, required: true, order: 3 },
+        { id: 'state', label: 'State', type: 'text', visible: true, required: false, order: 4 },
+        { id: 'city', label: 'City', type: 'text', visible: true, required: false, order: 5 },
+        { id: 'zip', label: 'ZIP Code', type: 'text', visible: true, required: false, order: 6 },
+        { id: 'email', label: 'Email', type: 'email', visible: false, required: false, order: 7 },
+        { id: 'shipping', label: 'Shipping', type: 'text', visible: true, required: false, order: 8 },
+        { id: 'payment_mode', label: 'Payment Mode', type: 'text', visible: true, required: false, order: 9 },
+        { id: 'order_summary', label: 'Order Summary', type: 'text', visible: true, required: false, order: 10 },
+        { id: 'coupon', label: 'Coupon Code', type: 'text', visible: false, required: false, order: 11 },
+    ],
 
     blocks: DEFAULT_BLOCKS,
     custom_fields: [],
     styles: DEFAULT_STYLES,
-    button_styles: DEFAULT_BUTTON_STYLES,
+    button_styles: {
+        ...DEFAULT_BUTTON_STYLES,
+        showAddToCart: true,
+    },
     shipping_options: DEFAULT_SHIPPING_OPTIONS,
     // Partial COD settings
     partial_cod_enabled: false,
