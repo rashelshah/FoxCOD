@@ -82,6 +82,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
             } : {
                 enabled: false,
                 button_text: "Buy Now - Cash on Delivery",
+                form_title: "Enter your Details",
+                form_subtitle: "Fill in your details to place a COD orders.",
                 primary_color: "#000000",
                 button_style: "solid",
                 button_size: "large",

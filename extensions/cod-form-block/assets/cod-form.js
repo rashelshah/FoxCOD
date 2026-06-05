@@ -2367,7 +2367,7 @@
     var ppSettings = config.partialPaymentSettings;
     var partialEnabled = (ppSettings && typeof ppSettings.enabled !== 'undefined') ? !!ppSettings.enabled : config.partialCodEnabled;
     var prepaidEnabled = !!(config.styles && config.styles.fullPrepaidEnabled);
-    if ((partialEnabled || prepaidEnabled) && paymentModeVisible) {
+    if (paymentModeVisible) {
         try { renderPaymentMethodOptions(form, config); } catch(e) { console.error('[COD Form] Error rendering payment options:', e); }
     }
 

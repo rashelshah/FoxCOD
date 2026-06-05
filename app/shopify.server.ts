@@ -34,6 +34,8 @@ const shopify = shopifyApp({
             shop_domain: session.shop,
             enabled: true,
             button_text: "Buy Now - Cash on Delivery",
+            form_title: "Enter your Details",
+            form_subtitle: "Fill in your details to place a COD orders.",
             primary_color: "#000000",
             required_fields: ["phone", "name", "address"],
             max_quantity: 10,
