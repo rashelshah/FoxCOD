@@ -1462,7 +1462,10 @@ const PreviewDisplay = memo(({
 
                                                                         {/* Right side pricing */}
                                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                                                                            <span style={{ fontWeight: 800, fontSize: '12px', color: '#166534' }}>{fmtCurrency(total)}</span>
+                                                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                                                                                <div style={{ background: '#dcfce7', color: '#166534', fontSize: '9px', fontWeight: 600, padding: '2px 6px', borderRadius: '99px', lineHeight: 1 }}>Save $20</div>
+                                                                                <span style={{ fontWeight: 800, fontSize: '12px', color: '#166534' }}>{fmtCurrency(total)}</span>
+                                                                            </div>
                                                                             <input type="radio" name="preview-payment" checked readOnly style={{ width: '14px', height: '14px', accentColor: '#22c55e', margin: 0, cursor: 'pointer' }} />
                                                                         </div>
                                                                     </div>
@@ -1522,7 +1525,10 @@ const PreviewDisplay = memo(({
 
                                                                     {/* Right side pricing */}
                                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                                                                        <span style={{ fontWeight: 800, fontSize: '12px', color: '#9a3412' }}>{fmtCurrency(total)}</span>
+                                                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                                                                            <div style={{ background: '#ffedd5', color: '#9a3412', fontSize: '9px', fontWeight: 600, padding: '2px 6px', borderRadius: '99px', lineHeight: 1 }}>+ {fmtCurrency(20)} COD fee</div>
+                                                                            <span style={{ fontWeight: 800, fontSize: '12px', color: '#9a3412' }}>{fmtCurrency(total)}</span>
+                                                                        </div>
                                                                         <input type="radio" name="preview-payment" disabled style={{ width: '14px', height: '14px', margin: 0 }} />
                                                                     </div>
                                                                 </div>

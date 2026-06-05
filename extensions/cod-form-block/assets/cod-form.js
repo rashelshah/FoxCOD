@@ -4348,7 +4348,8 @@ function darkenColor(hex, percent) {
           html += '<div style="color: #4ade80; font-size: 11px; margin-top: 4px; line-height: 1.3;">Pay now & get fastest delivery</div>';
           html += '</div>';
           html += '<div style="display: flex; align-items: center; gap: 12px; flex-shrink: 0;">';
-          html += '<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">';
+          html += '<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">';
+          html += '<div class="pm-prepaid-save-pill" style="background: #dcfce7; color: #166534; font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 99px; line-height: 1;">Save $20</div>';
           html += '<span class="pm-amt-prepaid" style="font-weight: 800; font-size: 15px; color: #166534;">' + formatMoney(orderTotal) + '</span>';
           html += '</div>';
           html += '<input type="radio" name="payment_method_visual" class="pm-pill" checked style="width: 18px; height: 18px; accent-color: #22c55e; margin: 0; pointer-events: none;">';
@@ -4407,7 +4408,8 @@ function darkenColor(hex, percent) {
       html += '<div style="color: #fb923c; font-size: 11px; margin-top: 4px; line-height: 1.3;">Pay when you receive</div>';
       html += '</div>';
       html += '<div style="display: flex; align-items: center; gap: 12px; flex-shrink: 0;">';
-      html += '<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">';
+      html += '<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">';
+      html += '<div class="pm-cod-fee-pill-static" style="background: #ffedd5; color: #9a3412; font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 99px; line-height: 1;">+ $20 COD fee</div>';
       html += '<span class="pm-amt-cod" style="font-weight: 800; font-size: 15px; color: #9a3412;">' + formatMoney(orderTotal) + '</span>';
       html += '</div>';
       html += '<input type="radio" name="payment_method_visual" class="pm-pill" ' + (!showFullPrepaid && !showPartial ? 'checked' : '') + ' style="width: 18px; height: 18px; accent-color: #ea580c; margin: 0; pointer-events: none;">';
