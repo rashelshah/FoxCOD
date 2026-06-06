@@ -4980,6 +4980,7 @@ function darkenColor(hex, percent) {
 
       var selectedRadio = form.querySelector('input[name="payment_method"]:checked');
       var isFullPrepaidSelected = selectedRadio && selectedRadio.value === 'full_prepaid';
+      var isPartialSelected = selectedRadio && selectedRadio.value === 'partial_cod';
 
       var ppSettings = config.partialPaymentSettings;
       var prepaidDiscountAmount = 0;
@@ -4993,19 +4994,40 @@ function darkenColor(hex, percent) {
       }
 
       var finalSummaryTotal = state.total;
+      var dueOnDelivery = 0;
+
       if (isFullPrepaidSelected && prepaidDiscountAmount > 0) {
           finalSummaryTotal -= prepaidDiscountAmount;
           html += '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#10b981;">' +
               '   <span>Prepaid Discount</span>' +
               '   <span>-' + formatMoney(prepaidDiscountAmount) + '</span>' +
               '</div>';
+      } else if (isPartialSelected) {
+          var depositAmount = config.partialCodAdvance || 0;
+          if (ppSettings && ppSettings.payment_options && ppSettings.payment_options.length > 0) {
+              var opt = ppSettings.payment_options[0];
+              if (opt.type === 'percentage' || opt.type === 'remaining_percentage') {
+                  depositAmount = (state.total * opt.value) / 100;
+              } else {
+                  depositAmount = Math.min(opt.value, state.total);
+              }
+          }
+          finalSummaryTotal = depositAmount;
+          dueOnDelivery = state.total - depositAmount;
       }
 
       // Total
       html += '<div style="display:flex; justify-content:space-between; margin-top:8px; padding-top:8px; border-top:1px dashed #d1d5db; font-weight:700; color:#111827;">' +
-          '   <span>Total</span>' +
+          '   <span>Total' + (isPartialSelected ? ' (Due Now)' : '') + '</span>' +
           '   <span id="cod-summary-total" data-raw-total="' + state.total + '" style="color:' + (config.priceColor || config.accentColor) + '">' + formatMoney(finalSummaryTotal) + '</span>' +
           '</div>';
+
+      if (isPartialSelected && dueOnDelivery > 0) {
+          html += '<div style="display:flex; justify-content:space-between; margin-top:4px; font-weight:600; font-size:13px; color:#4b5563;">' +
+              '   <span>Due on Delivery</span>' +
+              '   <span>' + formatMoney(dueOnDelivery) + '</span>' +
+              '</div>';
+      }
 
       summaryEl.innerHTML = html;
 

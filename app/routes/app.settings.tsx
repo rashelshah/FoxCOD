@@ -1464,7 +1464,7 @@ const PreviewDisplay = memo(({
                                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                                                                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
                                                                                 <div style={{ background: '#dcfce7', color: '#166534', fontSize: '11px', fontWeight: 700, padding: '3px 8px', borderRadius: '99px', lineHeight: 1 }}>Save $20</div>
-                                                                                <span style={{ fontWeight: 800, fontSize: '12px', color: '#166534' }}>{fmtCurrency(total)}</span>
+                                                                                <span style={{ fontWeight: 800, fontSize: '12px', color: '#166534' }}>{fmtCurrency(total - 20)}</span>
                                                                             </div>
                                                                             <input type="radio" name="preview-payment" checked readOnly style={{ width: '14px', height: '14px', accentColor: '#22c55e', margin: 0, cursor: 'pointer' }} />
                                                                         </div>

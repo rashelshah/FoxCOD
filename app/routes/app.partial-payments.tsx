@@ -1692,18 +1692,41 @@ export default function PartialPaymentsPage() {
                     <BlockStack gap="200">
                       <Text as="h3" variant="headingSm">Storefront Preview</Text>
                       <Text as="p" variant="bodySm" tone="subdued">Preview uses 500 as example cart total</Text>
-                      <div style={{ background: '#fff', border: '2px solid #22c55e', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px', maxWidth: '300px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Text as="span" variant="bodyMd" fontWeight="bold" tone="success">Full Prepaid</Text>
-                          <div style={{ background: '#dcfce7', color: '#166534', fontSize: '11px', fontWeight: 700, padding: '3px 8px', borderRadius: '99px', textTransform: 'uppercase' }}>
-                            Save {settings.prepaid_discount_type === 'percentage' ? fmt(500 * (settings.prepaid_discount_value / 100)) : fmt(settings.prepaid_discount_value)}
+                      <div style={{
+                          display: 'flex', flexDirection: 'column', background: '#f0fdf4', borderRadius: '12px',
+                          border: '2px solid #22c55e', position: 'relative', overflow: 'visible',
+                          padding: '16px 12px 12px 12px', maxWidth: '400px'
+                      }}>
+                          <div style={{
+                              position: 'absolute', top: '-10px', left: '16px', background: '#22c55e', color: 'white',
+                              fontSize: '9px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', letterSpacing: '0.05em',
+                              display: 'flex', alignItems: 'center', gap: '4px', textTransform: 'uppercase'
+                          }}>
+                              ★ MOST POPULAR
                           </div>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                          <Text as="span" variant="headingLg" tone="success">
-                            {settings.prepaid_discount_type === 'percentage' ? fmt(500 - (500 * (settings.prepaid_discount_value / 100))) : fmt(500 - settings.prepaid_discount_value)}
-                          </Text>
-                        </div>
+
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', width: '100%', boxSizing: 'border-box' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '32px', height: '32px', borderRadius: '8px', color: '#16a34a', backgroundColor: '#dcfce7' }}>
+                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4" /><path d="M4 6v12c0 1.1.9 2 2 2h14v-4" /><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z" /></svg>
+                              </div>
+
+                              <div style={{ flex: 1, minWidth: 0, paddingTop: '2px' }}>
+                                  <div style={{ fontWeight: 700, fontSize: '14px', color: '#166534', lineHeight: 1.2 }}>Full Prepaid</div>
+                                  <div style={{ color: '#4ade80', fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>Pay now &amp; get fastest delivery</div>
+                              </div>
+
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                                      <div style={{ background: '#dcfce7', color: '#166534', fontSize: '11px', fontWeight: 700, padding: '3px 8px', borderRadius: '99px', lineHeight: 1 }}>
+                                          Save {settings.prepaid_discount_type === 'percentage' ? fmt(500 * (settings.prepaid_discount_value / 100)) : fmt(settings.prepaid_discount_value)}
+                                      </div>
+                                      <span style={{ fontWeight: 800, fontSize: '15px', color: '#166534' }}>
+                                          {settings.prepaid_discount_type === 'percentage' ? fmt(500 - (500 * (settings.prepaid_discount_value / 100))) : fmt(500 - settings.prepaid_discount_value)}
+                                      </span>
+                                  </div>
+                                  <input type="radio" checked readOnly style={{ width: '18px', height: '18px', accentColor: '#22c55e', margin: 0, pointerEvents: 'none' }} />
+                              </div>
+                          </div>
                       </div>
                     </BlockStack>
                   </BlockStack>
