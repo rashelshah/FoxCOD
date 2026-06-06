@@ -144,8 +144,12 @@ export async function syncPartialPaymentToMetafield(
         full_prepaid_maximum_order_total: settings.full_prepaid_maximum_order_total ?? 0,
         full_prepaid_allowed_product_ids: settings.full_prepaid_allowed_product_ids ?? [],
         full_prepaid_allowed_collection_ids: settings.full_prepaid_allowed_collection_ids ?? [],
+        // Prepaid Discount fields
+        prepaid_discount_enabled: settings.prepaid_discount_enabled ?? false,
+        prepaid_discount_type: settings.prepaid_discount_type ?? 'percentage',
+        prepaid_discount_value: settings.prepaid_discount_value ?? 0,
       }
-    : { enabled: false, full_prepaid_enabled: false };
+    : { enabled: false, full_prepaid_enabled: false, prepaid_discount_enabled: false };
 
   // Get shop GID
   const shopRes = await admin.graphql(`{ shop { id } }`);
@@ -358,4 +362,40 @@ export function calculateDepositAmounts(
   const remainingCod = Math.max(Math.round((orderTotal - depositAmount) * 100) / 100, 0);
 
   return { depositAmount, codFeeAmount, payNow, remainingCod };
+}
+
+// ── Prepaid Discount ───────────────────────────────────────────────────────
+
+/**
+ * Calculate the prepaid discount amount, assuming Full Prepaid is already eligible.
+ * Called by checkout creation logic to determine final discount to apply.
+ */
+export function getPrepaidDiscount(
+  settings: PartialPaymentSettings,
+  cartTotal: number
+): {
+  eligible: boolean;
+  discountType?: 'percentage' | 'fixed';
+  discountValue?: number;
+  discountAmount?: number;
+  finalPrice?: number;
+} {
+  if (!settings.prepaid_discount_enabled) return { eligible: false };
+  if (!settings.prepaid_discount_value || settings.prepaid_discount_value <= 0) return { eligible: false };
+
+  let discountAmount =
+    settings.prepaid_discount_type === 'percentage'
+      ? (cartTotal * settings.prepaid_discount_value) / 100
+      : settings.prepaid_discount_value;
+
+  // Safety: never exceed cart total
+  discountAmount = Math.min(Math.round(discountAmount * 100) / 100, cartTotal);
+
+  return {
+    eligible: true,
+    discountType: settings.prepaid_discount_type,
+    discountValue: settings.prepaid_discount_value,
+    discountAmount,
+    finalPrice: Math.round((cartTotal - discountAmount) * 100) / 100,
+  };
 }

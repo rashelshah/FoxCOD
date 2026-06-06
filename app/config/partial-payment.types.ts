@@ -63,6 +63,10 @@ export interface PartialPaymentSettings {
   full_prepaid_maximum_order_total: number;
   full_prepaid_allowed_product_ids: string[];
   full_prepaid_allowed_collection_ids: string[];
+  // Prepaid Discount (inherits Full Prepaid eligibility)
+  prepaid_discount_enabled: boolean;
+  prepaid_discount_type: 'percentage' | 'fixed';
+  prepaid_discount_value: number;
   created_at?: string;
   updated_at?: string;
 }

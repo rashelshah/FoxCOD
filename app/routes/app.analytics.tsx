@@ -10,6 +10,7 @@ import { useState, useCallback } from "react";
 import type { LoaderFunctionArgs } from "react-router";
 import { useLoaderData, useNavigate, useSearchParams } from "react-router";
 import { authenticate } from "../shopify.server";
+import { supabase } from "../config/supabase.server";
 import {
     Page,
     Layout,
@@ -58,6 +59,9 @@ interface AnalyticsData {
     remainingCodValue: number;
     fullPrepaidOrdersCount: number;
     fullPrepaidRevenue: number;
+    prepaidDiscountOrdersCount: number;
+    prepaidDiscountsTotal: number;
+    prepaidAvgDiscount: number;
 }
 
 // ─── Fetch ALL orders from Shopify via SDK RestClient with pagination ──
@@ -225,6 +229,9 @@ function computeMetrics(orders: ShopifyOrder[]): AnalyticsData {
         remainingCodValue,
         fullPrepaidOrdersCount,
         fullPrepaidRevenue,
+        prepaidDiscountOrdersCount: 0,
+        prepaidDiscountsTotal: 0,
+        prepaidAvgDiscount: 0,
     };
 }
 
@@ -262,11 +269,54 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         }
     }
 
+    // Fetch prepaid discount analytics from Supabase
+    let prepaidDiscountOrdersCount = 0;
+    let prepaidDiscountsTotal = 0;
+    let prepaidAvgDiscount = 0;
+
+    try {
+        let query = supabase
+            .from('order_logs')
+            .select('order_payload')
+            .eq('shop_domain', shop)
+            .eq('payment_method', 'full_prepaid')
+            .gt('order_payload->>prepaid_discount_amount', '0');
+
+        if (createdAtMin) {
+            query = query.gte('created_at', createdAtMin);
+        }
+
+        const { data: prepaidDiscountLogs, error } = await query;
+        
+        if (error) {
+            console.error("[Analytics] Supabase prepaid discount query error:", error);
+        }
+
+        if (prepaidDiscountLogs) {
+            prepaidDiscountOrdersCount = prepaidDiscountLogs.length;
+            prepaidDiscountsTotal = prepaidDiscountLogs.reduce((sum: number, row: any) => {
+                const payload = row.order_payload as any;
+                const amt = payload?.prepaid_discount_amount;
+                return sum + (typeof amt === 'string' ? parseFloat(amt) : (typeof amt === 'number' ? amt : 0));
+            }, 0);
+            prepaidAvgDiscount = prepaidDiscountOrdersCount > 0
+                ? prepaidDiscountsTotal / prepaidDiscountOrdersCount
+                : 0;
+        }
+    } catch (e) {
+        console.error("[Analytics] Error fetching Supabase prepaid discounts:", e);
+    }
+
     // Fetch fresh data from Shopify on every request (no caching)
     let metrics: AnalyticsData;
     try {
         const orders = await fetchAllShopifyOrders(restClient, createdAtMin);
-        metrics = computeMetrics(orders);
+        metrics = {
+            ...computeMetrics(orders),
+            prepaidDiscountOrdersCount,
+            prepaidDiscountsTotal,
+            prepaidAvgDiscount
+        };
     } catch (error) {
         console.error("[Analytics] Error fetching Shopify orders:", error);
         metrics = {
@@ -288,6 +338,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             remainingCodValue: 0,
             fullPrepaidOrdersCount: 0,
             fullPrepaidRevenue: 0,
+            prepaidDiscountOrdersCount: 0,
+            prepaidDiscountsTotal: 0,
+            prepaidAvgDiscount: 0,
         };
     }
 
@@ -325,6 +378,9 @@ export default function AnalyticsPage() {
         remainingCodValue,
         fullPrepaidOrdersCount,
         fullPrepaidRevenue,
+        prepaidDiscountOrdersCount,
+        prepaidDiscountsTotal,
+        prepaidAvgDiscount,
     } = data;
 
     // Currency formatter
@@ -688,6 +744,50 @@ export default function AnalyticsPage() {
                                         {formatCurrency(fullPrepaidRevenue)}
                                     </Text>
                                     <Text as="p" variant="bodySm" tone="subdued">100% paid online</Text>
+                                </BlockStack>
+                            </Box>
+                        </InlineGrid>
+                    </BlockStack>
+                </Card>
+
+                {/* ─── Prepaid Discounts Section ─── */}
+                <Card>
+                    <BlockStack gap="400">
+                        <InlineStack align="space-between" blockAlign="center">
+                            <Text as="h2" variant="headingMd">
+                                Prepaid Discounts
+                            </Text>
+                            <Badge tone="attention">Incentive</Badge>
+                        </InlineStack>
+                        <Text as="p" variant="bodySm" tone="subdued">
+                            Discount given to customers who chose Full Prepaid.
+                        </Text>
+                        <InlineGrid columns={3} gap="400">
+                            <Box background="bg-surface-secondary" padding="400" borderRadius="200">
+                                <BlockStack gap="200">
+                                    <Text as="p" variant="bodySm" tone="subdued">Discounted Orders</Text>
+                                    <Text as="p" variant="heading2xl" fontWeight="bold">{prepaidDiscountOrdersCount}</Text>
+                                    <Text as="p" variant="bodySm" tone="subdued">
+                                        {selectedDays === "all" ? "All time" : `Last ${selectedDays} days`}
+                                    </Text>
+                                </BlockStack>
+                            </Box>
+                            <Box background="bg-surface-secondary" padding="400" borderRadius="200">
+                                <BlockStack gap="200">
+                                    <Text as="p" variant="bodySm" tone="subdued">Total Given</Text>
+                                    <Text as="p" variant="heading2xl" fontWeight="bold">
+                                        {formatCurrency(prepaidDiscountsTotal)}
+                                    </Text>
+                                    <Text as="p" variant="bodySm" tone="subdued">Total discount value</Text>
+                                </BlockStack>
+                            </Box>
+                            <Box background="bg-surface-secondary" padding="400" borderRadius="200">
+                                <BlockStack gap="200">
+                                    <Text as="p" variant="bodySm" tone="subdued">Avg Discount Per Order</Text>
+                                    <Text as="p" variant="heading2xl" fontWeight="bold">
+                                        {formatCurrency(prepaidAvgDiscount)}
+                                    </Text>
+                                    <Text as="p" variant="bodySm" tone="subdued">Per discounted order</Text>
                                 </BlockStack>
                             </Box>
                         </InlineGrid>

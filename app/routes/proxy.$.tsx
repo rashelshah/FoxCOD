@@ -22,6 +22,7 @@ import {
 } from "../services/shopify-sync.server";
 import { getRestClient } from "../shopify/rest-client.server";
 import { createPartialPaymentCheckout, createFullPrepaidCheckout } from "../services/shopify-partial-payment.server";
+import { getPartialPaymentSettings, isPaymentMethodEligible, getPrepaidDiscount } from "../services/partial-payment-settings.server";
 
 // ── In-process caches to avoid repeated DB/session round-trips ──
 // REST clients and fraud settings are stable per shop for minutes at a time.
@@ -585,6 +586,33 @@ async function handleFullPrepaidCheckout(request: Request, data: any) {
 
         console.log('[Proxy Full Prepaid] Pricing — total:', totalOrderValue);
 
+        // ── Prepaid Discount (after coupon) ─────────────────────────────────────────
+        const ppSettings = await getPartialPaymentSettings(shop);
+        let prepaidDiscountAmount = 0;
+        let prepaidDiscountType: 'percentage' | 'fixed' | undefined;
+        let prepaidDiscountValue: number | undefined;
+        const originalTotalBeforeDiscount = totalOrderValue; // post-coupon
+
+        if (ppSettings) {
+            // Only calculate if Full Prepaid itself is eligible
+            const fpEligible = isPaymentMethodEligible(ppSettings, 'full_prepaid', {
+                orderTotal: totalOrderValue,
+                productId,
+                collectionIds: data.productCollectionIds || data.collectionIds || [],
+            });
+
+            if (fpEligible.eligible) {
+                const discountResult = getPrepaidDiscount(ppSettings, totalOrderValue);
+                if (discountResult.eligible && discountResult.discountAmount && discountResult.discountAmount > 0) {
+                    prepaidDiscountAmount = discountResult.discountAmount;
+                    prepaidDiscountType = discountResult.discountType;
+                    prepaidDiscountValue = discountResult.discountValue;
+                    totalOrderValue = discountResult.finalPrice!;
+                    console.log('[Proxy Full Prepaid] Prepaid discount applied:', prepaidDiscountAmount);
+                }
+            }
+        }
+
         // ── Normalize customer name ──────────────────────────────────────────
         const nameStr = (customerName || 'Customer').trim();
         const nameParts = nameStr.split(/\s+/);
@@ -636,6 +664,10 @@ async function handleFullPrepaidCheckout(request: Request, data: any) {
             couponCode: normalizedCouponCode || undefined,
             shippingPrice: pricing.shippingPrice,
             shippingTitle: pricing.shippingTitle,
+            prepaidDiscountAmount,
+            prepaidDiscountType,
+            prepaidDiscountValue,
+            originalTotalBeforeDiscount,
         });
 
         const fullPrepaidRef = checkoutResult.partialPaymentReference; // FPAID-* reference
@@ -677,6 +709,9 @@ async function handleFullPrepaidCheckout(request: Request, data: any) {
                     discountAmount: couponDiscount,
                     originalTotal: pricing.originalTotal,
                     finalTotal: totalOrderValue,
+                    prepaid_discount_type: prepaidDiscountType || null,
+                    prepaid_discount_value: prepaidDiscountValue || null,
+                    prepaid_discount_amount: prepaidDiscountAmount || 0,
                 },
             })
         ).then(() => {

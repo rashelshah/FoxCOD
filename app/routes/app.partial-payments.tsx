@@ -78,6 +78,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       full_prepaid_maximum_order_total: 0,
       full_prepaid_allowed_product_ids: [],
       full_prepaid_allowed_collection_ids: [],
+      prepaid_discount_enabled: false,
+      prepaid_discount_type: 'percentage',
+      prepaid_discount_value: 0,
     };
   }
 
@@ -119,6 +122,18 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     // Validate COD fee
     if (incoming.cod_fee_enabled && incoming.cod_fee_amount < 0) {
       return { success: false, error: 'COD fee amount must be 0 or greater.' };
+    }
+
+    // Validate Prepaid Discount
+    if (incoming.prepaid_discount_enabled) {
+      const v = incoming.prepaid_discount_value;
+      if (incoming.prepaid_discount_type === 'percentage') {
+        if (v < 0.01 || v > 100)
+          return { success: false, error: 'Percentage discount must be between 0.01% and 100%.' };
+      } else {
+        if (v < 0.01)
+          return { success: false, error: 'Fixed discount must be at least 0.01.' };
+      }
     }
 
     const toSave: PartialPaymentSettings = {
@@ -1630,6 +1645,70 @@ export default function PartialPaymentsPage() {
                 checked={settings.full_prepaid_enabled}
                 onChange={(v) => upd('full_prepaid_enabled', v)}
               />
+            </BlockStack>
+          </Card>
+
+          <Card>
+            <BlockStack gap="400">
+              <BlockStack gap="100">
+                <Text as="h2" variant="headingMd">Prepaid Discount</Text>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  Offer a discount when customers choose Full Prepaid.
+                </Text>
+              </BlockStack>
+
+              <ToggleRow
+                label="Enable Prepaid Discount"
+                sub="Offer a discount to customers who choose Full Prepaid."
+                checked={settings.prepaid_discount_enabled}
+                onChange={(v) => upd('prepaid_discount_enabled', v)}
+              />
+
+              {settings.prepaid_discount_enabled && (
+                <div style={{ padding: '16px', background: '#f9fafb', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
+                  <BlockStack gap="400">
+                    <InlineGrid columns={2} gap="400">
+                      <Select
+                        label="Discount Type"
+                        options={[
+                          { label: 'Percentage', value: 'percentage' },
+                          { label: 'Fixed Amount', value: 'fixed' },
+                        ]}
+                        value={settings.prepaid_discount_type}
+                        onChange={(v) => upd('prepaid_discount_type', v as 'percentage' | 'fixed')}
+                      />
+                      <TextField
+                        label="Discount Value"
+                        type="number"
+                        min="0"
+                        suffix={settings.prepaid_discount_type === 'percentage' ? '%' : shopCurrency}
+                        value={String(settings.prepaid_discount_value)}
+                        onChange={(v) => upd('prepaid_discount_value', parseFloat(v) || 0)}
+                        autoComplete="off"
+                      />
+                    </InlineGrid>
+
+                    <Divider />
+                    <BlockStack gap="200">
+                      <Text as="h3" variant="headingSm">Storefront Preview</Text>
+                      <Text as="p" variant="bodySm" tone="subdued">Preview uses 500 as example cart total</Text>
+                      <div style={{ background: '#fff', border: '2px solid #22c55e', borderRadius: '12px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '8px', maxWidth: '300px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Text as="span" variant="bodyMd" fontWeight="bold" tone="success">Full Prepaid</Text>
+                          <div style={{ background: '#dcfce7', color: '#166534', fontSize: '11px', fontWeight: 700, padding: '3px 8px', borderRadius: '99px', textTransform: 'uppercase' }}>
+                            Save {settings.prepaid_discount_type === 'percentage' ? fmt(500 * (settings.prepaid_discount_value / 100)) : fmt(settings.prepaid_discount_value)}
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                          <Text as="span" variant="headingLg" tone="success">
+                            {settings.prepaid_discount_type === 'percentage' ? fmt(500 - (500 * (settings.prepaid_discount_value / 100))) : fmt(500 - settings.prepaid_discount_value)}
+                          </Text>
+                        </div>
+                      </div>
+                    </BlockStack>
+                  </BlockStack>
+                </div>
+              )}
             </BlockStack>
           </Card>
 

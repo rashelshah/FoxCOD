@@ -39,6 +39,10 @@ export interface PartialPaymentCheckoutParams {
   shippingTitle?: string;
   codFeeAmount?: number;
   isFullPrepaid?: boolean;
+  prepaidDiscountAmount?: number;
+  prepaidDiscountType?: 'percentage' | 'fixed';
+  prepaidDiscountValue?: number;
+  originalTotalBeforeDiscount?: number;
 }
 
 export interface PartialPaymentCheckoutResult {
@@ -391,6 +395,10 @@ async function createDraftOrderCheckout(
 
   const cartNote = [
     params.isFullPrepaid ? `FULL PREPAID ORDER [${partialPaymentReference}]` : `PARTIAL COD ORDER [${partialPaymentReference}]`,
+    params.prepaidDiscountAmount && params.prepaidDiscountAmount > 0 ? `Prepaid Discount Type: ${params.prepaidDiscountType}` : '',
+    params.prepaidDiscountAmount && params.prepaidDiscountAmount > 0 ? `Prepaid Discount Value: ${params.prepaidDiscountValue}${params.prepaidDiscountType === 'percentage' ? '%' : ''}` : '',
+    params.prepaidDiscountAmount && params.prepaidDiscountAmount > 0 ? `Prepaid Discount Amount: ${params.currency} ${params.prepaidDiscountAmount.toFixed(2)}` : '',
+    params.originalTotalBeforeDiscount && params.originalTotalBeforeDiscount > 0 ? `Original Total: ${params.currency} ${params.originalTotalBeforeDiscount.toFixed(2)}` : '',
     !params.isFullPrepaid ? `Advance: ${params.currency} ${advanceAmount.toFixed(2)}` : '',
     !params.isFullPrepaid ? `Remaining (COD): ${params.currency} ${remainingAmount.toFixed(2)}` : '',
     codFeeAmount > 0 ? `Includes COD Fee: ${params.currency} ${codFeeAmount.toFixed(2)}` : '',
@@ -442,7 +450,9 @@ async function createDraftOrderCheckout(
     applied_discount: appliedDiscount,
     note: cartNote,
     note_attributes: customAttributes,
-    tags: params.isFullPrepaid ? "FoxCOD, Full Prepaid" : "FoxCOD, Partial COD, Pending Advance",
+    tags: params.isFullPrepaid
+      ? (params.prepaidDiscountAmount && params.prepaidDiscountAmount > 0 ? "FoxCOD, Full Prepaid, Prepaid Discount" : "FoxCOD, Full Prepaid")
+      : "FoxCOD, Partial COD, Pending Advance",
   };
 
   if (Object.keys(addressInput).length > 0) {

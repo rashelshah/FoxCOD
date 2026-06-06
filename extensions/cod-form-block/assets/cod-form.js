@@ -4329,6 +4329,21 @@ function darkenColor(hex, percent) {
           ? isPaymentMethodEligible('full_prepaid', orderTotal)
           : !!(config.styles && config.styles.fullPrepaidEnabled); // legacy fallback
 
+      var prepaidDiscountAmount = 0;
+      var prepaidDiscountText = '';
+      var finalPrepaidTotal = orderTotal;
+
+      if (showFullPrepaid && ppSettings && ppSettings.prepaid_discount_enabled && ppSettings.prepaid_discount_value > 0) {
+          if (ppSettings.prepaid_discount_type === 'percentage') {
+              prepaidDiscountAmount = (orderTotal * ppSettings.prepaid_discount_value) / 100;
+          } else {
+              prepaidDiscountAmount = ppSettings.prepaid_discount_value;
+          }
+          prepaidDiscountAmount = Math.min(prepaidDiscountAmount, orderTotal);
+          finalPrepaidTotal = orderTotal - prepaidDiscountAmount;
+          prepaidDiscountText = 'Save ' + formatMoney(prepaidDiscountAmount);
+      }
+
       var html = '<div style="margin-bottom: 16px;">';
       html += '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">';
       html += '<div style="font-size: 13px; font-weight: 700; color: #1f2937;">Choose Payment Option</div>';
@@ -4349,9 +4364,14 @@ function darkenColor(hex, percent) {
           html += '</div>';
           html += '<div style="display: flex; align-items: center; gap: 12px; flex-shrink: 0;">';
           html += '<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">';
-          html += '<div class="pm-prepaid-save-pill" style="background: #dcfce7; color: #166534; font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 99px; line-height: 1;">Save $20</div>';
-          html += '<span class="pm-amt-prepaid" style="font-weight: 800; font-size: 15px; color: #166534;">' + formatMoney(orderTotal) + '</span>';
-          html += '</div>';
+          if (prepaidDiscountAmount > 0) {
+              html += '<div class="pm-prepaid-save-pill" style="background: #dcfce7; color: #166534; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 99px; line-height: 1;">' + prepaidDiscountText + '</div>';
+          } else {
+              html += '<div class="pm-prepaid-save-pill" style="background: #dcfce7; color: #166534; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 99px; line-height: 1; display: none;"></div>';
+          }
+          html += '<div style="display: flex; align-items: baseline; gap: 6px;">';
+          html += '<span class="pm-amt-prepaid" style="font-weight: 800; font-size: 15px; color: #166534;">' + formatMoney(finalPrepaidTotal) + '</span>';
+          html += '</div></div>';
           html += '<input type="radio" name="payment_method_visual" class="pm-pill" checked style="width: 18px; height: 18px; accent-color: #22c55e; margin: 0; pointer-events: none;">';
           html += '</div></div></label>';
       }
@@ -4468,6 +4488,9 @@ function darkenColor(hex, percent) {
                       submitBtn.textContent = originalButtonText;
                   }
               }
+
+              // Re-render the order summary to reflect the discount (or lack thereof)
+              updateTotalHelper(form, config, form.getAttribute('data-shipping-price'));
           });
       });
 
@@ -4532,12 +4555,21 @@ function darkenColor(hex, percent) {
    * Update payment method amounts to match the order summary total
    * Called after order summary is updated so Full COD / Partial COD text stays in sync
    */
-  function updatePaymentMethodAmounts(form, config) {
-      var summaryTotalEl = form.querySelector('#cod-summary-total');
-      if (!summaryTotalEl) return;
-      
-      var totalText = summaryTotalEl.textContent;
-      var orderTotal = parseFloat(totalText.replace(/[^0-9.]/g, '')) || 0;
+  function updatePaymentMethodAmounts(form, config, state) {
+      var orderTotal = 0;
+      if (state && typeof state.total !== 'undefined') {
+          orderTotal = state.total;
+      } else {
+          var summaryTotalEl = form.querySelector('#cod-summary-total');
+          if (!summaryTotalEl) return;
+          var rawTotal = summaryTotalEl.getAttribute('data-raw-total');
+          if (rawTotal) {
+              orderTotal = parseFloat(rawTotal);
+          } else {
+              var totalText = summaryTotalEl.textContent;
+              orderTotal = parseFloat(totalText.replace(/[^0-9.]/g, '')) || 0;
+          }
+      }
       if (orderTotal <= 0) return;
       
       var partialAdvance = config.partialCodAdvance || 0;
@@ -4551,8 +4583,30 @@ function darkenColor(hex, percent) {
       // Update Full Prepaid
       var pmPrepaid = paymentContainer.querySelector('.pm-prepaid');
       if (pmPrepaid) {
+          var ppSettings = config.partialPaymentSettings;
+          var prepaidDiscountAmount = 0;
+          if (ppSettings && ppSettings.prepaid_discount_enabled && ppSettings.prepaid_discount_value > 0) {
+              if (ppSettings.prepaid_discount_type === 'percentage') {
+                  prepaidDiscountAmount = (orderTotal * ppSettings.prepaid_discount_value) / 100;
+              } else {
+                  prepaidDiscountAmount = ppSettings.prepaid_discount_value;
+              }
+              prepaidDiscountAmount = Math.min(prepaidDiscountAmount, orderTotal);
+          }
+          var finalPrepaidTotal = orderTotal - prepaidDiscountAmount;
+
           var amtEl = pmPrepaid.querySelector('.pm-amt-prepaid');
-          if (amtEl) amtEl.textContent = formatMoney(orderTotal);
+          if (amtEl) amtEl.textContent = formatMoney(finalPrepaidTotal);
+          
+          var savePill = pmPrepaid.querySelector('.pm-prepaid-save-pill');
+          if (savePill) {
+              if (prepaidDiscountAmount > 0) {
+                  savePill.style.display = 'block';
+                  savePill.textContent = 'Save ' + formatMoney(prepaidDiscountAmount);
+              } else {
+                  savePill.style.display = 'none';
+              }
+          }
       }
 
       // Update Partial COD
@@ -4924,10 +4978,33 @@ function darkenColor(hex, percent) {
               '</div>';
       }
 
+      var selectedRadio = form.querySelector('input[name="payment_method"]:checked');
+      var isFullPrepaidSelected = selectedRadio && selectedRadio.value === 'full_prepaid';
+
+      var ppSettings = config.partialPaymentSettings;
+      var prepaidDiscountAmount = 0;
+      if (ppSettings && ppSettings.prepaid_discount_enabled && ppSettings.prepaid_discount_value > 0) {
+          if (ppSettings.prepaid_discount_type === 'percentage') {
+              prepaidDiscountAmount = (state.total * ppSettings.prepaid_discount_value) / 100;
+          } else {
+              prepaidDiscountAmount = ppSettings.prepaid_discount_value;
+          }
+          prepaidDiscountAmount = Math.min(prepaidDiscountAmount, state.total);
+      }
+
+      var finalSummaryTotal = state.total;
+      if (isFullPrepaidSelected && prepaidDiscountAmount > 0) {
+          finalSummaryTotal -= prepaidDiscountAmount;
+          html += '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#10b981;">' +
+              '   <span>Prepaid Discount</span>' +
+              '   <span>-' + formatMoney(prepaidDiscountAmount) + '</span>' +
+              '</div>';
+      }
+
       // Total
       html += '<div style="display:flex; justify-content:space-between; margin-top:8px; padding-top:8px; border-top:1px dashed #d1d5db; font-weight:700; color:#111827;">' +
           '   <span>Total</span>' +
-          '   <span id="cod-summary-total" style="color:' + (config.priceColor || config.accentColor) + '">' + formatMoney(state.total) + '</span>' +
+          '   <span id="cod-summary-total" data-raw-total="' + state.total + '" style="color:' + (config.priceColor || config.accentColor) + '">' + formatMoney(finalSummaryTotal) + '</span>' +
           '</div>';
 
       summaryEl.innerHTML = html;
@@ -4935,11 +5012,11 @@ function darkenColor(hex, percent) {
       // Also update the Liquid-rendered total price if it exists
       var codTotalPrice = form ? form.querySelector('.cod-total-price') : null;
       if (codTotalPrice) {
-          codTotalPrice.textContent = formatMoney(state.total);
+          codTotalPrice.textContent = formatMoney(finalSummaryTotal);
       }
 
       // Sync payment method amounts with updated total
-      updatePaymentMethodAmounts(form, config);
+      updatePaymentMethodAmounts(form, config, state);
       syncCouponUi(form, config);
   }
 
