@@ -1457,7 +1457,7 @@ const PreviewDisplay = memo(({
                                                                         {/* Center text */}
                                                                         <div style={{ flex: 1, minWidth: 0 }}>
                                                                             <div style={{ fontWeight: 700, fontSize: '11px', color: '#166534', lineHeight: 1.1 }}>Full Prepaid</div>
-                                                                            <div style={{ color: '#4ade80', fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>Pay now & get fastest delivery</div>
+                                                                            <div style={{ color: '#16a34a', fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>Pay now & get fastest delivery</div>
                                                                         </div>
 
                                                                         {/* Right side pricing */}
@@ -1490,7 +1490,7 @@ const PreviewDisplay = memo(({
                                                                                 Partial Payment
                                                                                 <svg width="10" height="10" viewBox="0 0 24 24" fill="#2563eb" stroke="#eff6ff" strokeWidth="2.5"><circle cx="12" cy="12" r="10" /><path d="M9 12l2 2 4-4" /></svg>
                                                                             </div>
-                                                                            <div style={{ color: '#60a5fa', fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>Pay {fmtCurrency(partialCodAdvanceAmount || 0)} now • Rest on delivery</div>
+                                                                            <div style={{ color: '#2563eb', fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>Pay {fmtCurrency(partialCodAdvanceAmount || 0)} now • Rest on delivery</div>
                                                                         </div>
 
                                                                         {/* Right side pricing */}
@@ -1520,7 +1520,7 @@ const PreviewDisplay = memo(({
                                                                     {/* Center text */}
                                                                     <div style={{ flex: 1, minWidth: 0 }}>
                                                                         <div style={{ fontWeight: 700, fontSize: '11px', color: '#9a3412', lineHeight: 1.1 }}>Cash on Delivery</div>
-                                                                        <div style={{ color: '#fb923c', fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>Pay when you receive</div>
+                                                                        <div style={{ color: '#ea580c', fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>Pay when you receive</div>
                                                                     </div>
 
                                                                     {/* Right side pricing */}

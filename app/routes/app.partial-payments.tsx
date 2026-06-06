@@ -1712,7 +1712,7 @@ export default function PartialPaymentsPage() {
 
                               <div style={{ flex: 1, minWidth: 0, paddingTop: '2px' }}>
                                   <div style={{ fontWeight: 700, fontSize: '14px', color: '#166534', lineHeight: 1.2 }}>Full Prepaid</div>
-                                  <div style={{ color: '#4ade80', fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>Pay now &amp; get fastest delivery</div>
+                                  <div style={{ color: '#16a34a', fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>Pay now &amp; get fastest delivery</div>
                               </div>
 
                               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
