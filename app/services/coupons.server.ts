@@ -981,6 +981,14 @@ export function calculateOrderPricing(body: any, formSettings?: any): OrderPrici
     codFeeAmount = roundCurrency(codFeeAmount);
     const originalTotal = roundCurrency(merchandiseTotal + shippingPrice + codFeeAmount);
 
+    console.log('[COD DEBUG] Pricing Result', {
+        codFeeAmount,
+        codFeeName,
+        merchandiseTotal,
+        shippingPrice,
+        originalTotal,
+    });
+
     return {
         mainItemsSubtotal,
         bundleDiscountAmount,

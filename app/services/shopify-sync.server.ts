@@ -217,6 +217,17 @@ export async function createShopifyOrderBackground(orderId: string): Promise<Sho
             lineItems.map((li) => ({ variant_id: li.variant_id || null, title: li.title || null, requires_shipping: li.requires_shipping === true }))
         );
 
+        const codFee = Number(body?.pureCodFeeAmount) || Number(body?.codFeeAmount) || 0;
+        if (codFee > 0) {
+            lineItems.push({
+                title: body?.codFeeName || 'COD Fee',
+                price: codFee.toFixed(2),
+                quantity: 1,
+                requires_shipping: false,
+                taxable: false,
+            });
+        }
+
         // ── 7. Build Shopify payload ──
         const shippingLabel: string = order.shipping_label || (shippingPrice > 0 ? 'Shipping' : 'Free Shipping');
         const orderNotes: string = order.customer_notes || '';
@@ -309,7 +320,6 @@ export async function createShopifyOrderBackground(orderId: string): Promise<Sho
             }
         }
 
-        // ── 9. Write result to DB ──
         const shopifyOrderId = String(shopifyOrder.id);
         const shopifyOrderName = shopifyOrder.name;
 

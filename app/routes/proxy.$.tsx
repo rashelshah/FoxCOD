@@ -826,7 +826,7 @@ async function handleRegularOrder(request: Request, data: any) {
     const upsellItems = data.upsell_items || [];
     const shippingPrice = parseFloat(data.shippingPrice) || 0;
     const discountPercent = parseFloat(data.discountPercent) || 0;
-    const pricing = calculateOrderPricing(data);
+    const pricing = calculateOrderPricing(data, ppSettings);
     let totalPrice = pricing.originalTotal;
     let couponDiscount = 0;
     let couponType: "percentage" | "fixed" | null = null;
@@ -850,6 +850,7 @@ async function handleRegularOrder(request: Request, data: any) {
 
     // pure cod logic
     let pureCodFeeAmount = 0;
+    console.log('[COD DEBUG] Payment Method:', data.paymentMethod);
     if (data.paymentMethod === 'full_cod' && ppSettings && ppSettings.pure_cod_enabled) {
         const eligibility = isPaymentMethodEligible(ppSettings, 'pure_cod', {
             orderTotal: pricing.originalTotal,
@@ -932,17 +933,17 @@ async function handleRegularOrder(request: Request, data: any) {
         }));
     }
 
-    if (pureCodFeeAmount > 0) {
-        lineItems.push(buildCatalogOrCustomLineItem({
-            variantId: mainVariantId, // Using main variant id as dummy since we need something, or just custom item
-            title: ppSettings?.pure_cod_fee_name || 'COD Fee',
+    if (pricing.codFeeAmount > 0) {
+        lineItems.push({
+            title: pricing.codFeeName || 'COD Fee',
+            price: pricing.codFeeAmount.toFixed(2),
             quantity: 1,
-            price: pureCodFeeAmount.toFixed(2),
-            
-        }));
+            requires_shipping: false,
+            taxable: false,
+        });
         orderNotes = orderNotes ? orderNotes + '\n' : '';
-        orderNotes += `COD FEE: ${fmtPrice(pureCodFeeAmount)}`;
-        data.pureCodFeeAmount = pureCodFeeAmount;
+        orderNotes += `COD FEE: ${fmtPrice(pricing.codFeeAmount)}`;
+        data.pureCodFeeAmount = pricing.codFeeAmount;
     }
 
     if (Array.isArray(data.upsell_items)) {
@@ -1053,10 +1054,11 @@ async function handleRegularOrder(request: Request, data: any) {
     // Retry with sanitized line items if first attempt fails (e.g. variant price mismatch)
     if (!shopifyOrder) {
         console.warn('[Proxy] Primary Shopify call failed, retrying with sanitized line items');
+        const sanitizedItems = sanitizeVariantPricedLineItems(lineItems);
         const fallbackPayload = {
             order: {
                 ...shopifyPayload.order,
-                line_items: sanitizeVariantPricedLineItems(lineItems),
+                line_items: sanitizedItems,
             },
         };
 

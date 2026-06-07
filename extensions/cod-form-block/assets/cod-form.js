@@ -4674,6 +4674,16 @@ function darkenColor(hex, percent) {
               pureCodFeeAmt = ppS.pure_cod_fee_type === "percentage" ? (orderTotal * ppS.pure_cod_fee_amount) / 100 : ppS.pure_cod_fee_amount;
           }
           if (amtCodEl) amtCodEl.textContent = formatMoney(parseFloat(orderTotal || 0) + parseFloat(pureCodFeeAmt || 0));
+
+          var codFeePill = pmCod.querySelector('.pm-cod-fee-pill');
+          if (codFeePill) {
+              if (pureCodFeeAmt > 0) {
+                  codFeePill.style.display = 'block';
+                  codFeePill.textContent = formatMoney(pureCodFeeAmt) + ' COD fee';
+              } else {
+                  codFeePill.style.display = 'none';
+              }
+          }
       }
 
       // Update submit button text if selected

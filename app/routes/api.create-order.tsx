@@ -346,7 +346,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             couponType = couponResult.coupon.type;
             couponValue = couponResult.coupon.value;
             couponCode = normalizeCouponCode(body.couponCode);
-            console.log('🎟 [COD Order] Coupon validated:', { code: couponCode, type: couponType, value: couponValue, discount: couponDiscount, originalTotal: pricing.originalTotal, finalTotal: totalPrice });
         }
 
         // Build notes
@@ -484,7 +483,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         // ── 4. CALL SHOPIFY API via SDK — automatic token refresh ──
         const idempotencyKey = `foxcod-api-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-        console.log("🚀 [COD Order] Sending payload to Shopify:", JSON.stringify(shopifyPayload.order.line_items, null, 2));
         let shopifyResponse = await restClient.post({
             path: "orders",
             data: shopifyPayload,
@@ -494,17 +492,18 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         });
 
         let shopifyOrder = shopifyResponse?.body?.order;
-        console.log("⏱ [COD Order] Shopify responded:", Date.now() - start, "ms");
+        console.log('⏱ Shopify API responded:', Date.now() - start, 'ms');
 
         // Retry with sanitized line items if first attempt fails (e.g. variant price mismatch)
         if (!shopifyOrder) {
-            console.warn('[COD Order] Primary call failed, retrying with sanitized line items');
+            console.warn('⚠️ Primary Shopify call failed, retrying with sanitized line items');
+            const sanitizedItems = sanitizeVariantPricedLineItems(lineItems);
             shopifyResponse = await restClient.post({
                 path: "orders",
                 data: {
                     order: {
                         ...shopifyPayload.order,
-                        line_items: sanitizeVariantPricedLineItems(lineItems),
+                        line_items: sanitizedItems,
                     },
                 },
                 extraHeaders: {
