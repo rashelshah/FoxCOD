@@ -148,8 +148,18 @@ export async function syncPartialPaymentToMetafield(
         prepaid_discount_enabled: settings.prepaid_discount_enabled ?? false,
         prepaid_discount_type: settings.prepaid_discount_type ?? 'percentage',
         prepaid_discount_value: settings.prepaid_discount_value ?? 0,
+        // Pure COD fields
+        pure_cod_enabled: settings.pure_cod_enabled ?? false,
+        pure_cod_fee_enabled: settings.pure_cod_fee_enabled ?? false,
+        pure_cod_fee_name: settings.pure_cod_fee_name ?? 'COD Fee',
+        pure_cod_fee_type: settings.pure_cod_fee_type ?? 'fixed',
+        pure_cod_fee_amount: settings.pure_cod_fee_amount ?? 0,
+        pure_cod_minimum_order_total: settings.pure_cod_minimum_order_total ?? 0,
+        pure_cod_maximum_order_total: settings.pure_cod_maximum_order_total ?? 0,
+        pure_cod_allowed_product_ids: settings.pure_cod_allowed_product_ids ?? [],
+        pure_cod_allowed_collection_ids: settings.pure_cod_allowed_collection_ids ?? [],
       }
-    : { enabled: false, full_prepaid_enabled: false, prepaid_discount_enabled: false };
+    : { enabled: false, full_prepaid_enabled: false, prepaid_discount_enabled: false, pure_cod_enabled: false, pure_cod_fee_enabled: false };
 
   // Get shop GID
   const shopRes = await admin.graphql(`{ shop { id } }`);
@@ -208,7 +218,7 @@ export async function syncPartialPaymentToMetafield(
  */
 export function isPaymentMethodEligible(
   settings: PartialPaymentSettings,
-  method: 'partial_payment' | 'full_prepaid',
+  method: 'partial_payment' | 'full_prepaid' | 'pure_cod',
   params: {
     orderTotal: number;
     productId?: string;
@@ -217,7 +227,11 @@ export function isPaymentMethodEligible(
   }
 ): { eligible: boolean; reason?: string } {
   // ── 1. enabled check ──
-  const enabled = method === 'full_prepaid' ? settings.full_prepaid_enabled : settings.enabled;
+  const enabled = method === 'full_prepaid' 
+    ? settings.full_prepaid_enabled 
+    : method === 'pure_cod' 
+      ? settings.pure_cod_enabled 
+      : settings.enabled;
   if (!enabled) {
     return { eligible: false, reason: `${method.replace('_', ' ')} is disabled` };
   }
@@ -227,10 +241,14 @@ export function isPaymentMethodEligible(
   // ── 2. Order total restrictions ──
   const min = method === 'full_prepaid'
     ? (settings.full_prepaid_minimum_order_total ?? 0)
-    : (settings.minimum_order_total ?? 0);
+    : method === 'pure_cod'
+      ? (settings.pure_cod_minimum_order_total ?? 0)
+      : (settings.minimum_order_total ?? 0);
   const max = method === 'full_prepaid'
     ? (settings.full_prepaid_maximum_order_total ?? 0)
-    : (settings.maximum_order_total ?? 0);
+    : method === 'pure_cod'
+      ? (settings.pure_cod_maximum_order_total ?? 0)
+      : (settings.maximum_order_total ?? 0);
 
   if (min > 0 && orderTotal < min) {
     return { eligible: false, reason: `Order total must be at least ${min}` };
@@ -256,10 +274,14 @@ export function isPaymentMethodEligible(
   // ── 4. Product / Collection restrictions ──
   const allowedProducts = method === 'full_prepaid'
     ? (settings.full_prepaid_allowed_product_ids ?? [])
-    : (settings.allowed_product_ids ?? []);
+    : method === 'pure_cod'
+      ? (settings.pure_cod_allowed_product_ids ?? [])
+      : (settings.allowed_product_ids ?? []);
   const allowedCollections = method === 'full_prepaid'
     ? (settings.full_prepaid_allowed_collection_ids ?? [])
-    : (settings.allowed_collection_ids ?? []);
+    : method === 'pure_cod'
+      ? (settings.pure_cod_allowed_collection_ids ?? [])
+      : (settings.allowed_collection_ids ?? []);
 
   const hasProductFilter = allowedProducts.length > 0;
   const hasCollectionFilter = allowedCollections.length > 0;

@@ -22,6 +22,8 @@ export interface CouponValidationSuccess {
     discount: number;
     finalTotal: number;
     originalTotal: number;
+    codFeeAmount: number;
+    codFeeName: string;
     message: string;
 }
 
@@ -47,6 +49,8 @@ export interface OrderPricingSummary {
     shippingTitle: string;
     upsellTotal: number;
     originalTotal: number;
+    codFeeAmount: number;
+    codFeeName: string;
     discountItems: OrderDiscountItem[];
 }
 
@@ -564,6 +568,8 @@ async function getShopifyGraphqlCoupon(
             endsAt: discountNode?.endsAt,
             merchandiseTotal: pricing.merchandiseTotal,
             originalTotal: pricing.originalTotal,
+        codFeeAmount,
+        codFeeName,
         });
 
         if (status && status !== "ACTIVE") {
@@ -875,6 +881,8 @@ export async function validateCouponForShop(shop: string, couponCode: string, ca
         cartTotal: normalizedCartTotal,
         merchandiseTotal: pricing.merchandiseTotal,
         originalTotal: pricing.originalTotal,
+        codFeeAmount,
+        codFeeName,
         itemCount: pricing.discountItems.length,
         items: pricing.discountItems.map(i => ({ productId: i.productId, variantId: i.variantId, price: i.price, qty: i.quantity })),
     });
@@ -913,7 +921,7 @@ export async function validateCouponForShop(shop: string, couponCode: string, ca
     return { valid: false, message: "Invalid or expired coupon" };
 }
 
-export function calculateOrderPricing(body: any): OrderPricingSummary {
+export function calculateOrderPricing(body: any, formSettings?: any): OrderPricingSummary {
     const discountItems = buildOrderDiscountItems(body);
     const shippingPrice = roundCurrency(Number(body?.shippingPrice) || 0);
     const shippingTitle = String(body?.shippingTitle || body?.shippingLabel || "Shipping");
@@ -952,7 +960,26 @@ export function calculateOrderPricing(body: any): OrderPricingSummary {
     );
 
     const merchandiseTotal = roundCurrency(mainItemsSubtotal - bundleDiscountAmount + upsellTotal);
-    const originalTotal = roundCurrency(merchandiseTotal + shippingPrice);
+    
+    let codFeeAmount = 0;
+    let codFeeName = "COD Fee";
+
+    if (formSettings?.pure_cod_fee_enabled && formSettings?.pure_cod_fee_amount > 0) {
+        if (formSettings.pure_cod_fee_type === "percentage") {
+            // Note: COD fee is applied to the final merchandise total after bundle discounts, plus upsells.
+            codFeeAmount = ((merchandiseTotal + shippingPrice) * formSettings.pure_cod_fee_amount) / 100;
+        } else {
+            codFeeAmount = formSettings.pure_cod_fee_amount;
+        }
+        codFeeName = formSettings.pure_cod_fee_name || "COD Fee";
+    } else {
+        // Fallback to body (if provided by newer frontend)
+        codFeeAmount = Number(body?.codFeeAmount) || 0;
+        codFeeName = String(body?.codFeeName || "COD Fee");
+    }
+    
+    codFeeAmount = roundCurrency(codFeeAmount);
+    const originalTotal = roundCurrency(merchandiseTotal + shippingPrice + codFeeAmount);
 
     return {
         mainItemsSubtotal,
@@ -962,6 +989,8 @@ export function calculateOrderPricing(body: any): OrderPricingSummary {
         shippingTitle,
         upsellTotal,
         originalTotal,
+        codFeeAmount,
+        codFeeName,
         discountItems,
     };
 }

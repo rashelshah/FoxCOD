@@ -67,6 +67,16 @@ export interface PartialPaymentSettings {
   prepaid_discount_enabled: boolean;
   prepaid_discount_type: 'percentage' | 'fixed';
   prepaid_discount_value: number;
+  // Pure COD settings
+  pure_cod_enabled: boolean;
+  pure_cod_fee_enabled: boolean;
+  pure_cod_fee_name: string;
+  pure_cod_fee_type: 'percentage' | 'fixed';
+  pure_cod_fee_amount: number;
+  pure_cod_minimum_order_total: number;
+  pure_cod_maximum_order_total: number;
+  pure_cod_allowed_product_ids: string[];
+  pure_cod_allowed_collection_ids: string[];
   created_at?: string;
   updated_at?: string;
 }

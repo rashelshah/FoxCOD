@@ -786,9 +786,10 @@ async function handleRegularOrder(request: Request, data: any) {
 
     // ── 1. PARALLEL: Load Shopify SDK REST client + fraud settings (cached) ──
     // Cache eliminates 200-400ms of DB/session round-trips on warm requests.
-    const [restClient, fraudSettings] = await Promise.all([
+    const [restClient, fraudSettings, ppSettings] = await Promise.all([
         getCachedRestClient(data.shop),
         getCachedFraudSettings(data.shop),
+        getPartialPaymentSettings(data.shop),
     ]);
     console.log('⏱ [Proxy] REST client + fraud settings ready:', Date.now() - start, 'ms');
 
@@ -847,6 +848,29 @@ async function handleRegularOrder(request: Request, data: any) {
         console.log('🎟 [Proxy] Coupon validated for order:', { code: couponCode, type: couponType, value: couponValue, discount: couponDiscount, originalTotal: pricing.originalTotal, finalTotal: totalPrice });
     }
 
+    // pure cod logic
+    let pureCodFeeAmount = 0;
+    if (data.paymentMethod === 'full_cod' && ppSettings && ppSettings.pure_cod_enabled) {
+        const eligibility = isPaymentMethodEligible(ppSettings, 'pure_cod', {
+            orderTotal: pricing.originalTotal,
+            productId: normalizedProductId,
+            collectionIds: data.collectionIds || [],
+            country: data.customerCountry || 'IN',
+        });
+        if (!eligibility.eligible) {
+            return new Response(JSON.stringify({ success: false, error: eligibility.reason }), { status: 400, headers: corsHeaders });
+        }
+
+        if (ppSettings.pure_cod_fee_enabled && ppSettings.pure_cod_fee_amount) {
+            if (ppSettings.pure_cod_fee_type === 'percentage') {
+                pureCodFeeAmount = (totalPrice * ppSettings.pure_cod_fee_amount) / 100;
+            } else {
+                pureCodFeeAmount = ppSettings.pure_cod_fee_amount;
+            }
+            totalPrice += pureCodFeeAmount;
+        }
+    }
+    
     // Build notes
     let orderNotes = data.notes || data.customerNotes || '';
     const currencyCode = data.currency || 'USD';
@@ -906,6 +930,19 @@ async function handleRegularOrder(request: Request, data: any) {
             quantity: parseInt(data.quantity) || 1,
             price: discountedPrice,
         }));
+    }
+
+    if (pureCodFeeAmount > 0) {
+        lineItems.push(buildCatalogOrCustomLineItem({
+            variantId: mainVariantId, // Using main variant id as dummy since we need something, or just custom item
+            title: ppSettings?.pure_cod_fee_name || 'COD Fee',
+            quantity: 1,
+            price: pureCodFeeAmount.toFixed(2),
+            
+        }));
+        orderNotes = orderNotes ? orderNotes + '\n' : '';
+        orderNotes += `COD FEE: ${fmtPrice(pureCodFeeAmount)}`;
+        data.pureCodFeeAmount = pureCodFeeAmount;
     }
 
     if (Array.isArray(data.upsell_items)) {

@@ -4281,37 +4281,30 @@ function darkenColor(hex, percent) {
           var ppSet = config.partialPaymentSettings;
           if (!ppSet) return false;
 
-          var enabled = method === 'full_prepaid' ? ppSet.full_prepaid_enabled : ppSet.enabled;
+          var enabled = method === 'full_prepaid' ? ppSet.full_prepaid_enabled : method === 'pure_cod' ? ppSet.pure_cod_enabled : ppSet.enabled;
           if (!enabled) return false;
 
-          var min = method === 'full_prepaid'
-              ? (ppSet.full_prepaid_minimum_order_total || 0)
-              : (ppSet.minimum_order_total || 0);
-          var max = method === 'full_prepaid'
-              ? (ppSet.full_prepaid_maximum_order_total || 0)
-              : (ppSet.maximum_order_total || 0);
+          var min = method === 'full_prepaid' ? parseFloat(ppSet.full_prepaid_minimum_order_total || 0) : method === 'pure_cod' ? parseFloat(ppSet.pure_cod_minimum_order_total || 0) : parseFloat(ppSet.minimum_order_total || 0);
+          var max = method === 'full_prepaid' ? parseFloat(ppSet.full_prepaid_maximum_order_total || 0) : method === 'pure_cod' ? parseFloat(ppSet.pure_cod_maximum_order_total || 0) : parseFloat(ppSet.maximum_order_total || 0);
+          orderTotalAmt = parseFloat(orderTotalAmt) || 0;
           if (min > 0 && orderTotalAmt < min) return false;
           if (max > 0 && orderTotalAmt > max) return false;
 
-          var allowedProds = method === 'full_prepaid'
-              ? (ppSet.full_prepaid_allowed_product_ids || [])
-              : (ppSet.allowed_product_ids || []);
-          var allowedColls = method === 'full_prepaid'
-              ? (ppSet.full_prepaid_allowed_collection_ids || [])
-              : (ppSet.allowed_collection_ids || []);
+          var allowedProds = method === 'full_prepaid' ? (ppSet.full_prepaid_allowed_product_ids || []) : method === 'pure_cod' ? (ppSet.pure_cod_allowed_product_ids || []) : (ppSet.allowed_product_ids || []);
+          var allowedColls = method === 'full_prepaid' ? (ppSet.full_prepaid_allowed_collection_ids || []) : method === 'pure_cod' ? (ppSet.pure_cod_allowed_collection_ids || []) : (ppSet.allowed_collection_ids || []);
 
           var hasProdF = allowedProds.length > 0;
           var hasCollF = allowedColls.length > 0;
           if (hasProdF || hasCollF) {
-              var pId = String(config.productId || '');
+              var pId = String(config.productId || '').replace(/[^0-9]/g, '');
               var prodOk = false;
               if (hasProdF) {
-                  prodOk = allowedProds.some(function(id) { return String(id) === pId; });
+                  prodOk = allowedProds.some(function(id) { return String(id).replace(/[^0-9]/g, '') === pId; });
               }
               if (!prodOk && hasCollF) {
-                  var cIds = (config.productCollectionIds || []).map(String);
+                  var cIds = (config.productCollectionIds || []).map(function(cid) { return String(cid).replace(/[^0-9]/g, ''); });
                   prodOk = cIds.some(function(cid) {
-                      return allowedColls.some(function(aid) { return String(aid) === cid; });
+                      return allowedColls.some(function(aid) { return String(aid).replace(/[^0-9]/g, '') === cid; });
                   });
               }
               if (!prodOk) return false;
@@ -4328,6 +4321,10 @@ function darkenColor(hex, percent) {
       var showFullPrepaid = ppSettings
           ? isPaymentMethodEligible('full_prepaid', orderTotal)
           : !!(config.styles && config.styles.fullPrepaidEnabled); // legacy fallback
+
+      var showFullCod = ppSettings
+          ? isPaymentMethodEligible('pure_cod', orderTotal)
+          : true;
 
       var prepaidDiscountAmount = 0;
       var prepaidDiscountText = '';
@@ -4365,9 +4362,9 @@ function darkenColor(hex, percent) {
           html += '<div style="display: flex; align-items: center; gap: 12px; flex-shrink: 0;">';
           html += '<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">';
           if (prepaidDiscountAmount > 0) {
-              html += '<div class="pm-prepaid-save-pill" style="background: #dcfce7; color: #166534; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 99px; line-height: 1;">' + prepaidDiscountText + '</div>';
+              html += '<div class="pm-prepaid-save-pill" style="background: #dcfce7; color: #166534; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 99px; line-height: 1; white-space: nowrap;">' + prepaidDiscountText + '</div>';
           } else {
-              html += '<div class="pm-prepaid-save-pill" style="background: #dcfce7; color: #166534; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 99px; line-height: 1; display: none;"></div>';
+              html += '<div class="pm-prepaid-save-pill" style="background: #dcfce7; color: #166534; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 99px; line-height: 1; display: none; white-space: nowrap;"></div>';
           }
           html += '<div style="display: flex; align-items: baseline; gap: 6px;">';
           html += '<span class="pm-amt-prepaid" style="font-weight: 800; font-size: 15px; color: #166534;">' + formatMoney(finalPrepaidTotal) + '</span>';
@@ -4409,7 +4406,7 @@ function darkenColor(hex, percent) {
           html += '<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">';
           if (ppSettings && ppSettings.cod_fee_enabled && ppSettings.cod_fee_amount) {
               var displayStyle = codFeeAmount > 0 ? 'block' : 'none';
-              html += '<div class="pm-cod-fee-pill" style="display: ' + displayStyle + '; background: #dbeafe; color: #1e3a8a; font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 99px; line-height: 1;">+ ' + formatMoney(codFeeAmount) + ' COD fee</div>';
+              html += '<div class="pm-cod-fee-pill" style="display: ' + displayStyle + '; background: #dbeafe; color: #1e3a8a; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 99px; line-height: 1; white-space: nowrap;">' + formatMoney(codFeeAmount) + ' COD fee</div>';
           }
           html += '<span class="pm-amt-partial" style="font-weight: 800; font-size: 15px; color: #1e3a8a;">' + depositText + '</span>';
           html += '</div>';
@@ -4419,23 +4416,39 @@ function darkenColor(hex, percent) {
           html += '</label>';
       }
 
-      html += '<label class="pm-row pm-cod" style="display: flex; flex-direction: column; background: #fff7ed; border-radius: 12px; border: 2px solid ' + (!showFullPrepaid && !showPartial ? '#ea580c' : '#fed7aa') + '; cursor: pointer; position: relative; padding: 0 !important; margin: 0 !important; box-sizing: border-box; overflow: hidden !important;">';
-      html += '<input type="radio" name="payment_method" value="full_cod" ' + (!showFullPrepaid && !showPartial ? 'checked' : '') + ' style="position:absolute; opacity:0; pointer-events:none; margin:0; padding:0;">';
-      html += '<div style="display: flex; align-items: flex-start; gap: 12px; padding: 16px 12px 12px 12px; box-sizing: border-box; width: 100%; margin: 0;">';
-      html += '<div style="display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px; color: #ea580c; background-color: #ffedd5;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="1" ry="1" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg></div>';
-      html += '<div style="flex: 1; min-width: 0; padding-top: 2px;">';
-      html += '<div style="font-weight: 700; font-size: 14px; color: #9a3412; line-height: 1.2;">Cash on Delivery</div>';
-      html += '<div style="color: #ea580c; font-size: 11px; margin-top: 4px; line-height: 1.3;">Pay when you receive</div>';
-      html += '</div>';
-      html += '<div style="display: flex; align-items: center; gap: 12px; flex-shrink: 0;">';
-      html += '<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">';
-      html += '<div class="pm-cod-fee-pill-static" style="background: #ffedd5; color: #9a3412; font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 99px; line-height: 1;">+ $20 COD fee</div>';
-      html += '<span class="pm-amt-cod" style="font-weight: 800; font-size: 15px; color: #9a3412;">' + formatMoney(orderTotal) + '</span>';
-      html += '</div>';
-      html += '<input type="radio" name="payment_method_visual" class="pm-pill" ' + (!showFullPrepaid && !showPartial ? 'checked' : '') + ' style="width: 18px; height: 18px; accent-color: #ea580c; margin: 0; pointer-events: none;">';
-      html += '</div></div>';
-      html += '<div style="background: #ffedd5; padding: 10px 12px; font-size: 10px; color: #9a3412; display: flex; justify-content: center; align-items: center; font-weight: 500; width: 100%; box-sizing: border-box; margin: 0;"><span style="margin-right: 4px;">ℹ️</span> Higher return risk • Slightly slower processing</div>';
-      html += '</label>';
+      
+      if (showFullCod) {
+          var pureCodFeeAmount = 0;
+          if (ppSettings && ppSettings.pure_cod_fee_enabled && ppSettings.pure_cod_fee_amount) {
+              if (ppSettings.pure_cod_fee_type === 'percentage') {
+                  pureCodFeeAmount = (orderTotal * ppSettings.pure_cod_fee_amount) / 100;
+              } else {
+                  pureCodFeeAmount = ppSettings.pure_cod_fee_amount;
+              }
+          }
+          
+          html += '<label class="pm-row pm-cod" style="display: flex; flex-direction: column; background: #fff7ed; border-radius: 12px; border: 2px solid ' + (!showFullPrepaid && !showPartial ? '#ea580c' : '#fed7aa') + '; cursor: pointer; position: relative; padding: 0 !important; margin: 0 !important; box-sizing: border-box; overflow: hidden !important;">';
+          html += '<input type="radio" name="payment_method" value="full_cod" ' + (!showFullPrepaid && !showPartial ? 'checked' : '') + ' style="position:absolute; opacity:0; pointer-events:none; margin:0; padding:0;">';
+          html += '<div style="display: flex; align-items: flex-start; gap: 12px; padding: 16px 12px 12px 12px; box-sizing: border-box; width: 100%; margin: 0;">';
+          html += '<div style="display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px; color: #ea580c; background-color: #ffedd5;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="1" ry="1" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg></div>';
+          html += '<div style="flex: 1; min-width: 0; padding-top: 2px;">';
+          html += '<div style="font-weight: 700; font-size: 14px; color: #9a3412; line-height: 1.2;">Cash on Delivery</div>';
+          html += '<div style="color: #ea580c; font-size: 11px; margin-top: 4px; line-height: 1.3;">Pay when you receive</div>';
+          html += '</div>';
+          html += '<div style="display: flex; align-items: center; gap: 12px; flex-shrink: 0;">';
+          html += '<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">';
+          if (ppSettings && ppSettings.pure_cod_fee_enabled && ppSettings.pure_cod_fee_amount) {
+              var displayStyle = pureCodFeeAmount > 0 ? 'block' : 'none';
+              html += '<div class="pm-cod-fee-pill" style="display: ' + displayStyle + '; background: #ffedd5; color: #9a3412; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 99px; line-height: 1; white-space: nowrap;">' + formatMoney(pureCodFeeAmount) + ' COD fee</div>';
+          }
+          html += '<span class="pm-amt-cod" style="font-weight: 800; font-size: 15px; color: #9a3412;">' + formatMoney(parseFloat(orderTotal || 0) + parseFloat(pureCodFeeAmount || 0)) + '</span>';
+          html += '</div>';
+          html += '<input type="radio" name="payment_method_visual" class="pm-pill" ' + (!showFullPrepaid && !showPartial ? 'checked' : '') + ' style="width: 18px; height: 18px; accent-color: #ea580c; margin: 0; pointer-events: none;">';
+          html += '</div></div>';
+          html += '<div style="background: #ffedd5; padding: 10px 12px; font-size: 10px; color: #9a3412; display: flex; justify-content: center; align-items: center; font-weight: 500; width: 100%; box-sizing: border-box; margin: 0;"><span style="margin-right: 4px;">ℹ️</span> Higher return risk • Slightly slower processing</div>';
+          html += '</label>';
+      }
+
 
       html += '</div></div>';
       container.innerHTML = html;
@@ -4644,7 +4657,7 @@ function darkenColor(hex, percent) {
           if (feePill) {
               if (codFeeAmount > 0) {
                   feePill.style.display = 'block';
-                  feePill.textContent = '+ ' + formatMoney(codFeeAmount) + ' COD fee';
+                  feePill.textContent = formatMoney(codFeeAmount) + ' COD fee';
               } else {
                   feePill.style.display = 'none';
               }
@@ -4655,7 +4668,12 @@ function darkenColor(hex, percent) {
       var pmCod = paymentContainer.querySelector('.pm-cod');
       if (pmCod) {
           var amtCodEl = pmCod.querySelector('.pm-amt-cod');
-          if (amtCodEl) amtCodEl.textContent = formatMoney(orderTotal);
+          var pureCodFeeAmt = 0;
+          var ppS = window.FoxCod && window.FoxCod.partialPaymentSettings;
+          if (ppS && ppS.pure_cod_fee_enabled && ppS.pure_cod_fee_amount) {
+              pureCodFeeAmt = ppS.pure_cod_fee_type === "percentage" ? (orderTotal * ppS.pure_cod_fee_amount) / 100 : ppS.pure_cod_fee_amount;
+          }
+          if (amtCodEl) amtCodEl.textContent = formatMoney(parseFloat(orderTotal || 0) + parseFloat(pureCodFeeAmt || 0));
       }
 
       // Update submit button text if selected
@@ -4981,6 +4999,7 @@ function darkenColor(hex, percent) {
       var selectedRadio = form.querySelector('input[name="payment_method"]:checked');
       var isFullPrepaidSelected = selectedRadio && selectedRadio.value === 'full_prepaid';
       var isPartialSelected = selectedRadio && selectedRadio.value === 'partial_cod';
+      var isPureCodSelected = selectedRadio && selectedRadio.value === 'full_cod';
 
       var ppSettings = config.partialPaymentSettings;
       var prepaidDiscountAmount = 0;
@@ -4993,7 +5012,43 @@ function darkenColor(hex, percent) {
           prepaidDiscountAmount = Math.min(prepaidDiscountAmount, state.total);
       }
 
-      var finalSummaryTotal = state.total;
+      var depositAmount = config.partialCodAdvance || 0;
+      if (isPartialSelected && ppSettings && ppSettings.payment_options && ppSettings.payment_options.length > 0) {
+          var opt = ppSettings.payment_options[0];
+          if (opt.type === 'percentage' || opt.type === 'remaining_percentage') {
+              depositAmount = (state.total * opt.value) / 100;
+          } else {
+              depositAmount = Math.min(opt.value, state.total);
+          }
+      }
+
+      var codFeeDisplayAmount = 0;
+      var codFeeDisplayName = '';
+      
+      if (isPartialSelected && ppSettings && ppSettings.cod_fee_enabled && ppSettings.cod_fee_amount) {
+          if (ppSettings.cod_fee_type === 'percentage') {
+              codFeeDisplayAmount = (depositAmount * ppSettings.cod_fee_amount) / 100;
+          } else {
+              codFeeDisplayAmount = ppSettings.cod_fee_amount;
+          }
+          codFeeDisplayName = ppSettings.cod_fee_name || 'Partial COD Fee';
+      } else if (isPureCodSelected && ppSettings && ppSettings.pure_cod_fee_enabled && ppSettings.pure_cod_fee_amount) {
+          if (ppSettings.pure_cod_fee_type === 'percentage') {
+              codFeeDisplayAmount = (state.total * ppSettings.pure_cod_fee_amount) / 100;
+          } else {
+              codFeeDisplayAmount = ppSettings.pure_cod_fee_amount;
+          }
+          codFeeDisplayName = ppSettings.pure_cod_fee_name || 'COD Fee';
+      }
+
+      if (codFeeDisplayAmount > 0) {
+          html += '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#ea580c;">' +
+              '   <span>' + codFeeDisplayName + '</span>' +
+              '   <span id="cod-summary-fee">+' + formatMoney(codFeeDisplayAmount) + '</span>' +
+              '</div>';
+      }
+
+      var finalSummaryTotal = parseFloat(state.total || 0) + parseFloat(codFeeDisplayAmount || 0);
       var dueOnDelivery = 0;
 
       if (isFullPrepaidSelected && prepaidDiscountAmount > 0) {
@@ -5013,7 +5068,7 @@ function darkenColor(hex, percent) {
               }
           }
           finalSummaryTotal = depositAmount;
-          dueOnDelivery = state.total - depositAmount;
+          dueOnDelivery = parseFloat(state.total || 0) + parseFloat(codFeeDisplayAmount || 0) - parseFloat(depositAmount || 0);
       }
 
       // Total
@@ -6565,6 +6620,15 @@ function darkenColor(hex, percent) {
       var paymentMethodRadio = form.querySelector('input[name="payment_method"]:checked');
       var selectedPaymentMethod = paymentMethodRadio ? paymentMethodRadio.value : 'full_cod';
       var isPartialCod = selectedPaymentMethod === 'partial_cod';
+
+      if (selectedPaymentMethod === "full_cod") {
+          var ppS = window.FoxCod && window.FoxCod.partialPaymentSettings;
+          if (ppS && ppS.pure_cod_fee_enabled && ppS.pure_cod_fee_amount) {
+              payload.codFeeAmount = ppS.pure_cod_fee_type === "percentage" ? (payload.finalTotal * ppS.pure_cod_fee_amount) / 100 : ppS.pure_cod_fee_amount;
+              payload.codFeeName = ppS.pure_cod_fee_name || "COD Fee";
+              payload.finalTotal = parseFloat(payload.finalTotal || 0) + parseFloat(payload.codFeeAmount || 0);
+          }
+      }
 
       console.log('[COD Form] Preparing order:', payload, 'Payment method:', selectedPaymentMethod);
 

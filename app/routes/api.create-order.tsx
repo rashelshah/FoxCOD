@@ -21,6 +21,7 @@ import {
 } from "../services/shopify-sync.server";
 import { getRestClient } from "../shopify/rest-client.server";
 import { calculateOrderPricing, normalizeCouponCode, validateCouponForShop } from "../services/coupons.server";
+import { getPartialPaymentSettings } from "../services/partial-payment-settings.server";
 
 // CORS headers for storefront requests
 const corsHeaders = {
@@ -274,11 +275,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             );
         }
 
-        // ── 1. PARALLEL: Load SDK REST client + fraud settings + form settings ──
-        const [restClient, fraudSettings, formSettings] = await Promise.all([
+        // ── 1. PARALLEL: Load SDK REST client + fraud settings + form settings + partial payment settings ──
+        const [restClient, fraudSettings, formSettings, partialPaymentSettings] = await Promise.all([
             getRestClient(body.shop),
             getFraudProtectionSettings(body.shop),
             getFormSettings(body.shop),
+            getPartialPaymentSettings(body.shop),
         ]);
         console.log("⏱ [COD Order] Parallel fetch done:", Date.now() - start, "ms");
 
@@ -325,7 +327,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         // ── 3. BUILD SHOPIFY PAYLOAD ──
         const shippingPrice = body.shippingPrice || 0;
         const discountPercent = body.discountPercent || 0;
-        const pricing = calculateOrderPricing(body);
+        const pricing = calculateOrderPricing(body, partialPaymentSettings);
         let totalPrice = pricing.originalTotal;
         let couponDiscount = 0;
         let couponType: "percentage" | "fixed" | null = null;
@@ -397,6 +399,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     quantity: item.quantity || 1,
                     price: parseFloat(String(item.price || 0)).toFixed(2),
                 }));
+            });
+        }
+
+        if (pricing.codFeeAmount > 0) {
+            lineItems.push({
+                title: pricing.codFeeName || 'COD Fee',
+                price: pricing.codFeeAmount.toFixed(2),
+                quantity: 1,
+                requires_shipping: false,
+                taxable: false,
             });
         }
 
@@ -472,6 +484,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         // ── 4. CALL SHOPIFY API via SDK — automatic token refresh ──
         const idempotencyKey = `foxcod-api-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
+        console.log("🚀 [COD Order] Sending payload to Shopify:", JSON.stringify(shopifyPayload.order.line_items, null, 2));
         let shopifyResponse = await restClient.post({
             path: "orders",
             data: shopifyPayload,

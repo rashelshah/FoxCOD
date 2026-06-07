@@ -73,6 +73,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       excluded_countries: [],
       modal_settings: DEFAULT_MODAL_SETTINGS,
       module_flags: DEFAULT_MODULE_FLAGS,
+      pure_cod_enabled: false,
+      pure_cod_fee_enabled: false,
+      pure_cod_fee_name: 'COD Fee',
+      pure_cod_fee_type: 'fixed',
+      pure_cod_fee_amount: 0,
+      pure_cod_minimum_order_total: 0,
+      pure_cod_maximum_order_total: 0,
+      pure_cod_allowed_product_ids: [],
+      pure_cod_allowed_collection_ids: [],
       full_prepaid_enabled: false,
       full_prepaid_minimum_order_total: 0,
       full_prepaid_maximum_order_total: 0,
@@ -1156,12 +1165,18 @@ export default function PartialPaymentsPage() {
               <p>Configure partial payments and prepaid options for your customers.</p>
             </div>
           </div>
-          <Badge tone={(selectedTab === 0 ? settings.enabled : settings.full_prepaid_enabled) ? 'success' : 'critical'}>
-            {(selectedTab === 0 ? settings.enabled : settings.full_prepaid_enabled) ? 'Active' : 'Inactive'}
+          <Badge tone={(selectedTab === 0 ? settings.enabled : selectedTab === 1 ? settings.full_prepaid_enabled : settings.pure_cod_enabled) ? 'success' : 'critical'}>
+            {(selectedTab === 0 ? settings.enabled : selectedTab === 1 ? settings.full_prepaid_enabled : settings.pure_cod_enabled) ? 'Active' : 'Inactive'}
           </Badge>
         </div>
 
         <div className="tabs">
+          <button
+            className={`tab ${selectedTab === 1 ? 'active' : ''}`}
+            onClick={() => setSelectedTab(1)}
+          >
+            Full Prepaid
+          </button>
           <button
             className={`tab ${selectedTab === 0 ? 'active' : ''}`}
             onClick={() => setSelectedTab(0)}
@@ -1169,10 +1184,10 @@ export default function PartialPaymentsPage() {
             Partial Payments
           </button>
           <button
-            className={`tab ${selectedTab === 1 ? 'active' : ''}`}
-            onClick={() => setSelectedTab(1)}
+            className={`tab ${selectedTab === 2 ? 'active' : ''}`}
+            onClick={() => setSelectedTab(2)}
           >
-            Full Prepaid
+            Cash on Delivery
           </button>
         </div>
         <Box paddingBlockStart="400">
@@ -1623,7 +1638,7 @@ export default function PartialPaymentsPage() {
 
           <Box paddingBlockEnd="800" />
         </BlockStack>
-      ) : (
+      ) : selectedTab === 1 ? (
         <BlockStack gap="500">
           {/* ════════════════════════════════════════════════
               FULL PREPAID CARDS
@@ -1873,7 +1888,207 @@ export default function PartialPaymentsPage() {
 
           <Box paddingBlockEnd="800" />
         </BlockStack>
-      )}
+
+      ) : selectedTab === 2 ? (
+        <BlockStack gap="500">
+          <Card>
+            <BlockStack gap="400">
+              <InlineStack align="space-between" blockAlign="center">
+                <BlockStack gap="100">
+                  <Text as="h2" variant="headingMd">Cash on Delivery Settings</Text>
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    Enable standard Cash on Delivery orders.
+                  </Text>
+                </BlockStack>
+              </InlineStack>
+
+              <ToggleRow
+                label="COD Status"
+                sub={settings.pure_cod_enabled ? 'Customers can choose Cash on Delivery.' : 'COD option is hidden.'}
+                checked={settings.pure_cod_enabled}
+                onChange={(v) => upd('pure_cod_enabled', v)}
+              />
+            </BlockStack>
+          </Card>
+
+          {/* COD Fee UI matched to Partial Payment style */}
+          <div className="pp-cod-fee-box">
+            <div className={`pp-cod-fee-card ${settings.pure_cod_fee_enabled ? 'expanded' : ''}`}>
+              <div className="pp-cod-fee-left">
+                <div className="pp-cod-fee-icon-wrap">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="1" y="3" width="15" height="13" rx="2" ry="2" />
+                    <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
+                    <circle cx="5.5" cy="18.5" r="2.5" />
+                    <circle cx="18.5" cy="18.5" r="2.5" />
+                  </svg>
+                </div>
+                <div className="pp-cod-fee-details">
+                  <div className="pp-cod-fee-title">COD Fee</div>
+                  <div className="pp-cod-fee-sub">Apply one fee to all Cash on Delivery orders</div>
+                </div>
+              </div>
+              <div
+                className={`pp-toggle-track ${settings.pure_cod_fee_enabled ? 'on' : ''}`}
+                onClick={() => upd('pure_cod_fee_enabled', !settings.pure_cod_fee_enabled)}
+                style={{ cursor: 'pointer' }}
+              >
+                <div className="pp-toggle-thumb" />
+              </div>
+            </div>
+
+            {settings.pure_cod_fee_enabled && (
+              <div className="pp-cod-fee-body">
+                <div className="pp-option-box-body">
+                  <div className="pp-fg">
+                    <label>FEE NAME</label>
+                    <input
+                      type="text"
+                      value={settings.pure_cod_fee_name}
+                      placeholder="COD Fee"
+                      onChange={(e) => upd('pure_cod_fee_name', e.target.value)}
+                    />
+                  </div>
+                  <div className="pp-fg">
+                    <label>FEE TYPE</label>
+                    <select
+                      value={settings.pure_cod_fee_type}
+                      onChange={(e) => upd('pure_cod_fee_type', e.target.value as 'fixed' | 'percentage')}
+                    >
+                      <option value="fixed">Fixed Amount</option>
+                      <option value="percentage">Percentage</option>
+                    </select>
+                  </div>
+                  <div className="pp-fg">
+                    <label>AMOUNT</label>
+                    <div className="pp-input-suffix-wrap">
+                      <input
+                        type="number"
+                        value={settings.pure_cod_fee_amount}
+                        min={0}
+                        step={0.5}
+                        onChange={(e) => upd('pure_cod_fee_amount', parseFloat(e.target.value) || 0)}
+                      />
+                      <span className="pp-input-suffix">
+                        {settings.pure_cod_fee_type === 'percentage' ? '%' : shopCurrency}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <Card>
+            <BlockStack gap="400">
+              <Text as="h2" variant="headingMd">COD Restrictions</Text>
+              <Text as="p" variant="bodySm" tone="subdued">
+                Set minimum or maximum order totals and restrict by product/collection for Cash on Delivery.
+              </Text>
+
+              <InlineGrid columns={{ xs: 1, sm: 2 }} gap="400">
+                <TextField
+                  label="Minimum Order Total"
+                  type="number"
+                  value={settings.pure_cod_minimum_order_total.toString()}
+                  onChange={(v) => upd('pure_cod_minimum_order_total', parseFloat(v) || 0)}
+                  autoComplete="off"
+                  prefix={shopCurrency}
+                  min={0}
+                />
+                <TextField
+                  label="Maximum Order Total"
+                  type="number"
+                  value={settings.pure_cod_maximum_order_total.toString()}
+                  onChange={(v) => upd('pure_cod_maximum_order_total', parseFloat(v) || 0)}
+                  autoComplete="off"
+                  prefix={shopCurrency}
+                  min={0}
+                  helpText="Leave as 0 for no maximum."
+                />
+              </InlineGrid>
+
+              <Divider />
+              
+              <InlineStack align="space-between" blockAlign="center">
+                <BlockStack gap="100">
+                  <Text as="h3" variant="headingSm">Specific Products</Text>
+                  <Text as="p" variant="bodySm" tone="subdued">Only allow COD for selected products.</Text>
+                </BlockStack>
+                <Button variant="secondary" onClick={async () => {
+                  try {
+                    const selected = await shopify.resourcePicker({
+                      type: 'product',
+                      multiple: true,
+                      selectionIds: settings.pure_cod_allowed_product_ids.map(id => ({ id })),
+                    });
+                    if (selected) {
+                      const ids = selected.map((p) => p.id);
+                      upd('pure_cod_allowed_product_ids', ids);
+                      const titles = selected.reduce((acc, p) => ({ ...acc, [p.id]: p.title }), {});
+                      setProductTitles((prev) => ({ ...prev, ...titles }));
+                    }
+                  } catch (_e) {}
+                }}>
+                  {settings.pure_cod_allowed_product_ids.length === 0 ? 'Add Products' : `Edit Products (${settings.pure_cod_allowed_product_ids.length})`}
+                </Button>
+              </InlineStack>
+              {settings.pure_cod_allowed_product_ids.length > 0 && (
+                <div style={{ marginTop: '12px' }}>
+                  <InlineStack gap="200">
+                    {settings.pure_cod_allowed_product_ids.map((id) => (
+                      <Tag key={id} onRemove={() => upd('pure_cod_allowed_product_ids', settings.pure_cod_allowed_product_ids.filter(x => x !== id))}>
+                        {productTitles[id] || `Product …${id.slice(-6)}`}
+                      </Tag>
+                    ))}
+                  </InlineStack>
+                </div>
+              )}
+
+              <Divider />
+
+              <InlineStack align="space-between" blockAlign="center">
+                <BlockStack gap="100">
+                  <Text as="h3" variant="headingSm">Specific Collections</Text>
+                  <Text as="p" variant="bodySm" tone="subdued">Only allow COD for selected collections.</Text>
+                </BlockStack>
+                <Button variant="secondary" onClick={async () => {
+                  try {
+                    const selected = await shopify.resourcePicker({
+                      type: 'collection',
+                      multiple: true,
+                      selectionIds: settings.pure_cod_allowed_collection_ids.map(id => ({ id })),
+                    });
+                    if (selected) {
+                      const ids = selected.map((c) => c.id);
+                      upd('pure_cod_allowed_collection_ids', ids);
+                      const titles = selected.reduce((acc, c) => ({ ...acc, [c.id]: c.title }), {});
+                      setCollectionTitles((prev) => ({ ...prev, ...titles }));
+                    }
+                  } catch (_e) {}
+                }}>
+                  {settings.pure_cod_allowed_collection_ids.length === 0 ? 'Add Collections' : `Edit Collections (${settings.pure_cod_allowed_collection_ids.length})`}
+                </Button>
+              </InlineStack>
+              {settings.pure_cod_allowed_collection_ids.length > 0 && (
+                <div style={{ marginTop: '12px' }}>
+                  <InlineStack gap="200">
+                    {settings.pure_cod_allowed_collection_ids.map((id) => (
+                      <Tag key={id} onRemove={() => upd('pure_cod_allowed_collection_ids', settings.pure_cod_allowed_collection_ids.filter(x => x !== id))}>
+                        {collectionTitles[id] || `Collection …${id.slice(-6)}`}
+                      </Tag>
+                    ))}
+                  </InlineStack>
+                </div>
+              )}
+            </BlockStack>
+          </Card>
+
+          
+          <Box paddingBlockEnd="800" />
+        </BlockStack>
+      ) : null}
+
       </Box>
       </div>
     </>

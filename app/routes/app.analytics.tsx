@@ -30,6 +30,7 @@ import {
 
 // ─── Types ──────────────────────────────────────────
 interface ShopifyOrder {
+    order_payload?: any;
     id: number;
     created_at: string;
     total_price: string;
@@ -59,6 +60,9 @@ interface AnalyticsData {
     remainingCodValue: number;
     fullPrepaidOrdersCount: number;
     fullPrepaidRevenue: number;
+    pureCodOrdersCount: number;
+    pureCodFeeRevenue: number;
+    partialCodFeeRevenue: number;
     prepaidDiscountOrdersCount: number;
     prepaidDiscountsTotal: number;
     prepaidAvgDiscount: number;
@@ -146,6 +150,9 @@ function computeMetrics(orders: ShopifyOrder[]): AnalyticsData {
     let remainingCodValue = 0;
     let fullPrepaidOrdersCount = 0;
     let fullPrepaidRevenue = 0;
+    let pureCodOrdersCount = 0;
+    let pureCodFeeRevenue = 0;
+    let partialCodFeeRevenue = 0;
 
     for (const order of orders) {
         const createdAt = new Date(order.created_at);
@@ -195,6 +202,20 @@ function computeMetrics(orders: ShopifyOrder[]): AnalyticsData {
             const remainingAttr = order.note_attributes?.find(a => a.name === "remaining_amount");
             if (advanceAttr) advanceCollected += parseFloat(advanceAttr.value) || 0;
             if (remainingAttr) remainingCodValue += parseFloat(remainingAttr.value) || 0;
+            
+            const payload = typeof order.order_payload === 'string' ? JSON.parse(order.order_payload) : order.order_payload || {};
+            if (payload.codFeeAmount) {
+                partialCodFeeRevenue += parseFloat(payload.codFeeAmount);
+            }
+        }
+        
+        // Pure COD calculations
+        const payload = typeof order.order_payload === 'string' ? JSON.parse(order.order_payload) : order.order_payload || {};
+        if (payload.paymentMethod === 'full_cod') {
+            pureCodOrdersCount++;
+            if (!isCancelled && order.financial_status !== "refunded" && payload.pureCodFeeAmount) {
+                pureCodFeeRevenue += parseFloat(payload.pureCodFeeAmount);
+            }
         }
 
         // Full Prepaid calculations
@@ -229,6 +250,9 @@ function computeMetrics(orders: ShopifyOrder[]): AnalyticsData {
         remainingCodValue,
         fullPrepaidOrdersCount,
         fullPrepaidRevenue,
+        pureCodOrdersCount,
+        pureCodFeeRevenue,
+        partialCodFeeRevenue,
         prepaidDiscountOrdersCount: 0,
         prepaidDiscountsTotal: 0,
         prepaidAvgDiscount: 0,
@@ -338,6 +362,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             remainingCodValue: 0,
             fullPrepaidOrdersCount: 0,
             fullPrepaidRevenue: 0,
+            pureCodOrdersCount: 0,
+            pureCodFeeRevenue: 0,
+            partialCodFeeRevenue: 0,
             prepaidDiscountOrdersCount: 0,
             prepaidDiscountsTotal: 0,
             prepaidAvgDiscount: 0,
