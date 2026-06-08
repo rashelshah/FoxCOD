@@ -257,6 +257,29 @@ async function handlePartialCodCheckout(request: Request, data: any) {
             }), { status: 400, headers: corsHeaders });
         }
 
+        const [fraudSettings, ppSettings] = await Promise.all([
+            getCachedFraudSettings(shop),
+            getPartialPaymentSettings(shop),
+        ]);
+
+        if (ppSettings) {
+            const pricing = calculateOrderPricing(data);
+            const eligibility = isPaymentMethodEligible(ppSettings, 'partial_payment', {
+                orderTotal: pricing.originalTotal,
+                productId,
+                collectionIds: data.productCollectionIds || data.collectionIds || [],
+                country: data.detectedCountry || null,
+            });
+
+            if (!eligibility.eligible) {
+                console.warn('[Proxy Partial COD v2] Blocked by partial payment eligibility:', eligibility.reason);
+                return new Response(JSON.stringify({
+                    success: false,
+                    error: eligibility.reason || "Partial payments are not available in your country."
+                }), { status: 403, headers: corsHeaders });
+            }
+        }
+
         // ── Fraud Protection (was missing in v1) ────────────────────────────
         const clientIp =
             request.headers.get('x-shopify-client-ip')
@@ -264,10 +287,6 @@ async function handlePartialCodCheckout(request: Request, data: any) {
             || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
             || request.headers.get('x-real-ip')
             || 'unknown';
-
-        const [fraudSettings] = await Promise.all([
-            getCachedFraudSettings(shop),
-        ]);
 
         try {
             const fraudResult = await validateOrderAgainstFraudRulesWithSettings({

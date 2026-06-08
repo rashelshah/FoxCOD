@@ -219,6 +219,168 @@
       }, 1000);
   }
 
+  // =============================================
+  // COUNTRY RESTRICTION ENGINE
+  // =============================================
+  window.FoxCod.CountryRestrictionEngine = {
+    currentCountry: null,
+    currentSource: null,
+
+    /**
+     * Determines the customer's country based on priority:
+     * 1. Form Input
+     * 2. Shopify Window Variable
+     * 3. Phone Number (via bundled libphonenumber-js)
+     */
+    getCustomerCountry: function(form) {
+      var detectedCountry = null;
+      var source = 'unknown';
+
+      var countryMap = {
+        "AFGHANISTAN":"AF","ALBANIA":"AL","ALGERIA":"DZ","ANDORRA":"AD","ANGOLA":"AO","ARGENTINA":"AR","ARMENIA":"AM","AUSTRALIA":"AU",
+        "AUSTRIA":"AT","AZERBAIJAN":"AZ","BAHAMAS":"BS","BAHRAIN":"BH","BANGLADESH":"BD","BARBADOS":"BB","BELARUS":"BY","BELGIUM":"BE",
+        "BELIZE":"BZ","BENIN":"BJ","BHUTAN":"BT","BOLIVIA":"BO","BOSNIA":"BA","BOTSWANA":"BW","BRAZIL":"BR","BRUNEI":"BN","BULGARIA":"BG",
+        "BURKINA FASO":"BF","BURUNDI":"BI","CAMBODIA":"KH","CAMEROON":"CM","CANADA":"CA","CHAD":"TD","CHILE":"CL","CHINA":"CN","COLOMBIA":"CO",
+        "COMOROS":"KM","CONGO":"CG","COSTA RICA":"CR","CROATIA":"HR","CUBA":"CU","CYPRUS":"CY","CZECHIA":"CZ","DENMARK":"DK","DJIBOUTI":"DJ",
+        "DOMINICA":"DM","ECUADOR":"EC","EGYPT":"EG","EL SALVADOR":"SV","ERITREA":"ER","ESTONIA":"EE","ESWATINI":"SZ","ETHIOPIA":"ET","FIJI":"FJ",
+        "FINLAND":"FI","FRANCE":"FR","GABON":"GA","GAMBIA":"GM","GEORGIA":"GE","GERMANY":"DE","GHANA":"GH","GREECE":"GR","GRENADA":"GD",
+        "GUATEMALA":"GT","GUINEA":"GN","GUYANA":"GY","HAITI":"HT","HONDURAS":"HN","HUNGARY":"HU","ICELAND":"IS","INDIA":"IN","INDONESIA":"ID",
+        "IRAN":"IR","IRAQ":"IQ","IRELAND":"IE","ISRAEL":"IL","ITALY":"IT","JAMAICA":"JM","JAPAN":"JP","JORDAN":"JO","KAZAKHSTAN":"KZ",
+        "KENYA":"KE","KIRIBATI":"KI","KUWAIT":"KW","KYRGYZSTAN":"KG","LAOS":"LA","LATVIA":"LV","LEBANON":"LB","LESOTHO":"LS","LIBERIA":"LR",
+        "LIBYA":"LY","LIECHTENSTEIN":"LI","LITHUANIA":"LT","LUXEMBOURG":"LU","MADAGASCAR":"MG","MALAWI":"MW","MALAYSIA":"MY","MALDIVES":"MV",
+        "MALI":"ML","MALTA":"MT","MAURITANIA":"MR","MAURITIUS":"MU","MEXICO":"MX","MICRONESIA":"FM","MOLDOVA":"MD","MONACO":"MC","MONGOLIA":"MN",
+        "MONTENEGRO":"ME","MOROCCO":"MA","MOZAMBIQUE":"MZ","MYANMAR":"MM","NAMIBIA":"NA","NAURU":"NR","NEPAL":"NP","NETHERLANDS":"NL",
+        "NEW ZEALAND":"NZ","NICARAGUA":"NI","NIGER":"NE","NIGERIA":"NG","NORTH KOREA":"KP","NORWAY":"NO","OMAN":"OM","PAKISTAN":"PK",
+        "PALAU":"PW","PALESTINE":"PS","PANAMA":"PA","PAPUA NEW GUINEA":"PG","PARAGUAY":"PY","PERU":"PE","PHILIPPINES":"PH","POLAND":"PL",
+        "PORTUGAL":"PT","QATAR":"QA","ROMANIA":"RO","RUSSIA":"RU","RWANDA":"RW","SAMOA":"WS","SAN MARINO":"SM","SAUDI ARABIA":"SA","SENEGAL":"SN",
+        "SERBIA":"RS","SEYCHELLES":"SC","SIERRA LEONE":"SL","SINGAPORE":"SG","SLOVAKIA":"SK","SLOVENIA":"SI","SOMALIA":"SO","SOUTH AFRICA":"ZA",
+        "SOUTH KOREA":"KR","SOUTH SUDAN":"SS","SPAIN":"ES","SRI LANKA":"LK","SUDAN":"SD","SURINAME":"SR","SWEDEN":"SE","SWITZERLAND":"CH",
+        "SYRIA":"SY","TAIWAN":"TW","TAJIKISTAN":"TJ","TANZANIA":"TZ","THAILAND":"TH","TOGO":"TG","TONGA":"TO","TRINIDAD AND TOBAGO":"TT",
+        "TUNISIA":"TN","TURKEY":"TR","TURKMENISTAN":"TM","TUVALU":"TV","UGANDA":"UG","UKRAINE":"UA","UNITED ARAB EMIRATES":"AE","UAE":"AE",
+        "UNITED KINGDOM":"GB","UK":"GB","UNITED STATES":"US","USA":"US","URUGUAY":"UY","UZBEKISTAN":"UZ","VANUATU":"VU","VATICAN CITY":"VA",
+        "VENEZUELA":"VE","VIETNAM":"VN","YEMEN":"YE","ZAMBIA":"ZM","ZIMBABWE":"ZW"
+      };
+
+      // Priority 1: Form Input
+      if (form) {
+        // findInputByCanonicalKey might not be initialized yet, so use querySelector fallback primarily 
+        // if called too early, but it's hoisted so it should be fine.
+        var countryInput = (typeof findInputByCanonicalKey === 'function' ? findInputByCanonicalKey(form, 'country') : null) || form.querySelector('input[name="country"]') || form.querySelector('select[name="country"]');
+        if (countryInput && countryInput.value) {
+          var rawVal = countryInput.value.trim().toUpperCase();
+          detectedCountry = countryMap[rawVal] || rawVal;
+          source = 'form';
+        }
+      }
+
+      // Priority 2: Phone Number
+      if (!detectedCountry && form) {
+        var phoneInput = (typeof findInputByCanonicalKey === 'function' ? findInputByCanonicalKey(form, 'phone') : null) || form.querySelector('input[name="phone"]');
+        if (phoneInput && phoneInput.value) {
+          var phone = phoneInput.value.trim();
+          if (phone.indexOf('+') === 0) {
+            var digits = phone.replace(/\D/g, '');
+            var phonePrefixMap = {
+              "1": "US", "20": "EG", "27": "ZA", "30": "GR", "31": "NL", "32": "BE", "33": "FR", "34": "ES", "36": "HU", "39": "IT",
+              "40": "RO", "41": "CH", "43": "AT", "44": "GB", "45": "DK", "46": "SE", "47": "NO", "48": "PL", "49": "DE", "51": "PE",
+              "52": "MX", "53": "CU", "54": "AR", "55": "BR", "56": "CL", "57": "CO", "58": "VE", "60": "MY", "61": "AU", "62": "ID",
+              "63": "PH", "64": "NZ", "65": "SG", "66": "TH", "81": "JP", "82": "KR", "84": "VN", "86": "CN", "90": "TR", "91": "IN",
+              "92": "PK", "93": "AF", "94": "LK", "95": "MM", "98": "IR", "211": "SS", "212": "MA", "213": "DZ", "216": "TN", "218": "LY",
+              "220": "GM", "221": "SN", "222": "MR", "223": "ML", "224": "GN", "225": "CI", "226": "BF", "227": "NE", "228": "TG",
+              "229": "BJ", "230": "MU", "231": "LR", "232": "SL", "233": "GH", "234": "NG", "235": "TD", "236": "CF", "237": "CM",
+              "238": "CV", "239": "ST", "240": "GQ", "241": "GA", "242": "CG", "243": "CD", "244": "AO", "245": "GW", "246": "IO",
+              "248": "SC", "249": "SD", "250": "RW", "251": "ET", "252": "SO", "253": "DJ", "254": "KE", "255": "TZ", "256": "UG",
+              "257": "BI", "258": "MZ", "260": "ZM", "261": "MG", "262": "RE", "263": "ZW", "264": "NA", "265": "MW", "266": "LS",
+              "267": "BW", "268": "SZ", "269": "KM", "290": "SH", "291": "ER", "297": "AW", "298": "FO", "299": "GL", "350": "GI",
+              "351": "PT", "352": "LU", "353": "IE", "354": "IS", "355": "AL", "356": "MT", "357": "CY", "358": "FI", "359": "BG",
+              "370": "LT", "371": "LV", "372": "EE", "373": "MD", "374": "AM", "375": "BY", "376": "AD", "377": "MC", "378": "SM",
+              "379": "VA", "380": "UA", "381": "RS", "382": "ME", "383": "XK", "385": "HR", "386": "SI", "387": "BA", "389": "MK",
+              "420": "CZ", "421": "SK", "423": "LI", "500": "FK", "501": "BZ", "502": "GT", "503": "SV", "504": "HN", "505": "NI",
+              "506": "CR", "507": "PA", "508": "PM", "509": "HT", "590": "BL", "591": "BO", "592": "GY", "593": "EC", "594": "GF",
+              "595": "PY", "596": "MQ", "597": "SR", "598": "UY", "599": "CW", "670": "TL", "672": "NF", "673": "BN", "674": "NR",
+              "675": "PG", "676": "TO", "677": "SB", "678": "VU", "679": "FJ", "680": "PW", "681": "WF", "682": "CK", "683": "NU",
+              "685": "WS", "686": "KI", "687": "NC", "688": "TV", "689": "PF", "690": "TK", "691": "FM", "692": "MH", "850": "KP",
+              "852": "HK", "853": "MO", "855": "KH", "856": "LA", "880": "BD", "886": "TW", "960": "MV", "961": "LB", "962": "JO",
+              "963": "SY", "964": "IQ", "965": "KW", "966": "SA", "967": "YE", "968": "OM", "970": "PS", "971": "AE", "972": "IL",
+              "973": "BH", "974": "QA", "975": "BT", "976": "MN", "977": "NP", "992": "TJ", "993": "TM", "994": "AZ", "995": "GE",
+              "996": "KG", "998": "UZ"
+            };
+            
+            for (var i = 4; i >= 1; i--) {
+              var prefix = digits.substring(0, i);
+              if (phonePrefixMap[prefix]) {
+                detectedCountry = phonePrefixMap[prefix];
+                source = 'phone';
+                break;
+              }
+            }
+          } else if (window.libphonenumber && typeof window.libphonenumber.parsePhoneNumberFromString === 'function') {
+            // Fallback to libphonenumber if it happens to exist and phone doesn't start with '+'
+            try {
+              var parsed = window.libphonenumber.parsePhoneNumberFromString(phone);
+              if (parsed && parsed.country) {
+                detectedCountry = parsed.country.toUpperCase();
+                source = 'phone';
+              }
+            } catch (e) {
+              console.warn('[FoxCod] Phone number parsing failed', e);
+            }
+          }
+        }
+      }
+
+      // Priority 3: Shopify Window Variable
+      if (!detectedCountry) {
+        var shopifyCountry = (window.Shopify && window.Shopify.country) || null;
+        if (shopifyCountry) {
+          detectedCountry = String(shopifyCountry).trim().toUpperCase();
+          source = 'shopify';
+        }
+      }
+
+      this.currentCountry = detectedCountry;
+      this.currentSource = source;
+
+      return {
+        country: this.currentCountry,
+        source: this.currentSource
+      };
+    },
+
+    isPartialPaymentAllowed: function(country, settings) {
+      var allowed = settings.allowed_countries || [];
+      var excluded = settings.excluded_countries || [];
+      
+      console.log("[PP DEBUG] Country:", country);
+      console.log("[PP DEBUG] Source:", this.currentSource);
+      console.log("[PP DEBUG] Allowed Countries:", allowed);
+      console.log("[PP DEBUG] Excluded Countries:", excluded);
+
+      if (!country) {
+        console.log("[PP DEBUG] Partial Payment Allowed: true (unknown country)");
+        return true;
+      }
+
+      var c = country.toUpperCase();
+
+      // Rule 1: Excluded
+      if (excluded.indexOf(c) !== -1) {
+        console.log("[PP DEBUG] Partial Payment Allowed: false (excluded)");
+        return false;
+      }
+
+      // Rule 2 & 3: Allowed
+      if (allowed.length > 0) {
+        var isOk = allowed.indexOf(c) !== -1;
+        console.log("[PP DEBUG] Partial Payment Allowed:", isOk);
+        return isOk;
+      }
+
+      console.log("[PP DEBUG] Partial Payment Allowed: true (no rules blocked)");
+      return true;
+    }
+  };
+
   function scheduleFoxCodBoot() {
     waitForStableDOM();
   }
@@ -237,6 +399,7 @@
 
   // Clear checkout state on page load/refresh so form starts fresh
   try { localStorage.removeItem('foxcod_checkout_state'); } catch(e) {}
+
 
   /**
    * Helper to decode HTML entities (from Liquid escape filter)
@@ -2425,6 +2588,28 @@
         saveFoxCodCheckoutState(form);
     });
 
+    // Real-time country/phone change listeners to update payment eligibility immediately
+    form.addEventListener('change', function(e) {
+        var target = e.target;
+        if (target) {
+            var canonical = (typeof getCanonicalCustomerKeyForInput === 'function') ? getCanonicalCustomerKeyForInput(target) : '';
+            if (canonical === 'country' || canonical === 'phone') {
+                console.log('[FoxCod] Country/Phone field changed (change event), rechecking payment eligibility...');
+                try { renderPaymentMethodOptions(form, config); } catch(err) { console.error('[COD Form] Error updating payment options on country change:', err); }
+            }
+        }
+    });
+    form.addEventListener('input', function(e) {
+        var target = e.target;
+        if (target) {
+            var canonical = (typeof getCanonicalCustomerKeyForInput === 'function') ? getCanonicalCustomerKeyForInput(target) : '';
+            if (canonical === 'country' || canonical === 'phone') {
+                console.log('[FoxCod] Country/Phone field input updated, rechecking payment eligibility...');
+                try { renderPaymentMethodOptions(form, config); } catch(err) { console.error('[COD Form] Error updating payment options on phone/country input:', err); }
+            }
+        }
+    });
+
     // Always apply submit button styles (product button styles or custom override)
     var submitBtnEl = form.querySelector('.cod-submit-btn');
     applySubmitButtonStyles(submitBtnEl, config);
@@ -2465,6 +2650,7 @@
       if (['city', 'town'].indexOf(token) !== -1) return 'city';
       if (['state', 'province', 'region'].indexOf(token) !== -1) return 'state';
       if (['zip', 'zipcode', 'postalcode', 'pincode', 'postcode'].indexOf(token) !== -1) return 'zipcode';
+      if (['country', 'countrycode'].indexOf(token) !== -1) return 'country';
       return '';
   }
 
@@ -4257,7 +4443,8 @@ function darkenColor(hex, percent) {
    * Render Payment Method Selection (Full Prepaid, Partial COD, Full COD)
    */
   function renderPaymentMethodOptions(form, config) {
-      var container = document.createElement('div');
+      var existing = form.querySelector('.cod-payment-method-options');
+      var container = existing || document.createElement('div');
       container.className = 'cod-payment-method-options';
       container.style.marginBottom = '20px';
       container.style.marginTop = '16px';
@@ -4283,6 +4470,13 @@ function darkenColor(hex, percent) {
 
           var enabled = method === 'full_prepaid' ? ppSet.full_prepaid_enabled : method === 'pure_cod' ? ppSet.pure_cod_enabled : ppSet.enabled;
           if (!enabled) return false;
+
+          if (method === 'partial_payment') {
+              var countryInfo = window.FoxCod.CountryRestrictionEngine.getCustomerCountry(form);
+              if (!window.FoxCod.CountryRestrictionEngine.isPartialPaymentAllowed(countryInfo.country, ppSet)) {
+                  return false;
+              }
+          }
 
           var min = method === 'full_prepaid' ? parseFloat(ppSet.full_prepaid_minimum_order_total || 0) : method === 'pure_cod' ? parseFloat(ppSet.pure_cod_minimum_order_total || 0) : parseFloat(ppSet.minimum_order_total || 0);
           var max = method === 'full_prepaid' ? parseFloat(ppSet.full_prepaid_maximum_order_total || 0) : method === 'pure_cod' ? parseFloat(ppSet.pure_cod_maximum_order_total || 0) : parseFloat(ppSet.maximum_order_total || 0);
@@ -4507,15 +4701,17 @@ function darkenColor(hex, percent) {
           });
       });
 
-      // Insert into the form
-      var marker = form.querySelector('.cod-section-marker[data-section="payment_mode"]');
-      if (marker) {
-          form.appendChild(container);
-      } else {
-          if (submitBtn) {
-              form.insertBefore(container, submitBtn);
-          } else {
+      // Insert into the form only if not already present
+      if (!existing) {
+          var marker = form.querySelector('.cod-section-marker[data-section="payment_mode"]');
+          if (marker) {
               form.appendChild(container);
+          } else {
+              if (submitBtn) {
+                  form.insertBefore(container, submitBtn);
+              } else {
+                  form.appendChild(container);
+              }
           }
       }
       
@@ -6487,6 +6683,8 @@ function darkenColor(hex, percent) {
       var normalizedCustomer = collectNormalizedCustomerFromForm(form);
       
       // Build payload with proper field mapping
+      var countryInfo = window.FoxCod.CountryRestrictionEngine.getCustomerCountry(form);
+      
       var payload = {
           shop: config.shop,
           customerName: normalizedCustomer.name || formData.get('name') || '',
@@ -6507,7 +6705,9 @@ function darkenColor(hex, percent) {
           shippingPrice: 0,
           discountPercent: 0,
           finalTotal: 0,
-          upsell_items: getCheckedTickUpsells(form, config)
+          upsell_items: getCheckedTickUpsells(form, config),
+          detectedCountry: countryInfo.country,
+          countryDetectionSource: countryInfo.source
       };
 
       // Bundle variant items — when customer selected different variants per item
