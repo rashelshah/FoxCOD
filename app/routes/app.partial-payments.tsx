@@ -2009,6 +2009,45 @@ export default function PartialPaymentsPage() {
                     </div>
                   </div>
                 </div>
+
+                <Divider />
+                <BlockStack gap="200">
+                  <Text as="h3" variant="headingSm">Storefront Preview</Text>
+                  <Text as="p" variant="bodySm" tone="subdued">Preview uses 500 as example cart total</Text>
+                  <div style={{
+                      display: 'flex', flexDirection: 'column', background: '#fff7ed', borderRadius: '12px',
+                      border: '2px solid #ea580c', position: 'relative', overflow: 'hidden',
+                      maxWidth: '400px', marginTop: '8px'
+                  }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '16px 12px 12px 12px', boxSizing: 'border-box', width: '100%', margin: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '32px', height: '32px', borderRadius: '8px', color: '#ea580c', backgroundColor: '#ffedd5' }}>
+                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1" ry="1" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
+                          </div>
+
+                          <div style={{ flex: 1, minWidth: 0, paddingTop: '2px' }}>
+                              <div style={{ fontWeight: 700, fontSize: '14px', color: '#9a3412', lineHeight: 1.2 }}>Cash on Delivery</div>
+                              <div style={{ color: '#ea580c', fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>Pay when you receive</div>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                                  {settings.pure_cod_fee_amount > 0 && (
+                                    <div style={{ background: '#ffedd5', color: '#9a3412', fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '99px', lineHeight: 1, whiteSpace: 'nowrap' }}>
+                                        {settings.pure_cod_fee_type === 'percentage' ? fmt(500 * (settings.pure_cod_fee_amount / 100)) : fmt(settings.pure_cod_fee_amount)} COD fee
+                                    </div>
+                                  )}
+                                  <span style={{ fontWeight: 800, fontSize: '15px', color: '#9a3412' }}>
+                                      {settings.pure_cod_fee_type === 'percentage' ? fmt(500 + (500 * (settings.pure_cod_fee_amount / 100))) : fmt(500 + settings.pure_cod_fee_amount)}
+                                  </span>
+                              </div>
+                              <input type="radio" checked readOnly style={{ width: '18px', height: '18px', accentColor: '#ea580c', margin: 0, pointerEvents: 'none' }} />
+                          </div>
+                      </div>
+                      <div style={{ background: '#ffedd5', padding: '10px 12px', fontSize: '10px', color: '#9a3412', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500, width: '100%', boxSizing: 'border-box', margin: 0 }}>
+                          <span style={{ marginRight: '4px' }}>ℹ️</span> Higher return risk • Slightly slower processing
+                      </div>
+                  </div>
+                </BlockStack>
               </div>
             )}
           </div>
