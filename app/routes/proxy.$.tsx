@@ -618,6 +618,7 @@ async function handleFullPrepaidCheckout(request: Request, data: any) {
                 orderTotal: totalOrderValue,
                 productId,
                 collectionIds: data.productCollectionIds || data.collectionIds || [],
+                country: data.detectedCountry || data.customerCountry || null,
             });
 
             if (fpEligible.eligible) {
@@ -875,7 +876,7 @@ async function handleRegularOrder(request: Request, data: any) {
             orderTotal: pricing.originalTotal,
             productId: normalizedProductId,
             collectionIds: data.collectionIds || [],
-            country: data.customerCountry || 'IN',
+            country: data.detectedCountry || data.customerCountry || null,
         });
         if (!eligibility.eligible) {
             return new Response(JSON.stringify({ success: false, error: eligibility.reason }), { status: 400, headers: corsHeaders });

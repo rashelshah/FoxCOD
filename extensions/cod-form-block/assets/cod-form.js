@@ -347,17 +347,29 @@
       };
     },
 
-    isPartialPaymentAllowed: function(country, settings) {
-      var allowed = settings.allowed_countries || [];
-      var excluded = settings.excluded_countries || [];
+    isPaymentMethodCountryAllowed: function(paymentMethod, country, settings) {
+      var allowed = [];
+      var excluded = [];
+
+      var restrictionKey = paymentMethod === 'pure_cod' ? 'full_cod' : paymentMethod;
+      if (settings && settings.country_restrictions && settings.country_restrictions[restrictionKey]) {
+        var config = settings.country_restrictions[restrictionKey];
+        allowed = config.allowedCountries || [];
+        excluded = config.excludedCountries || [];
+      } else if (paymentMethod === 'partial_payment') {
+        // Legacy fallback
+        allowed = (settings && settings.allowed_countries) ? settings.allowed_countries : [];
+        excluded = (settings && settings.excluded_countries) ? settings.excluded_countries : [];
+      }
       
-      console.log("[PP DEBUG] Country:", country);
-      console.log("[PP DEBUG] Source:", this.currentSource);
-      console.log("[PP DEBUG] Allowed Countries:", allowed);
-      console.log("[PP DEBUG] Excluded Countries:", excluded);
+      console.log("[COUNTRY RESTRICTION]", {
+        paymentMethod: paymentMethod,
+        country: country,
+        allowedCountries: allowed,
+        excludedCountries: excluded
+      });
 
       if (!country) {
-        console.log("[PP DEBUG] Partial Payment Allowed: true (unknown country)");
         return true;
       }
 
@@ -365,18 +377,14 @@
 
       // Rule 1: Excluded
       if (excluded.indexOf(c) !== -1) {
-        console.log("[PP DEBUG] Partial Payment Allowed: false (excluded)");
         return false;
       }
 
       // Rule 2 & 3: Allowed
       if (allowed.length > 0) {
-        var isOk = allowed.indexOf(c) !== -1;
-        console.log("[PP DEBUG] Partial Payment Allowed:", isOk);
-        return isOk;
+        return allowed.indexOf(c) !== -1;
       }
 
-      console.log("[PP DEBUG] Partial Payment Allowed: true (no rules blocked)");
       return true;
     }
   };
@@ -4471,11 +4479,9 @@ function darkenColor(hex, percent) {
           var enabled = method === 'full_prepaid' ? ppSet.full_prepaid_enabled : method === 'pure_cod' ? ppSet.pure_cod_enabled : ppSet.enabled;
           if (!enabled) return false;
 
-          if (method === 'partial_payment') {
-              var countryInfo = window.FoxCod.CountryRestrictionEngine.getCustomerCountry(form);
-              if (!window.FoxCod.CountryRestrictionEngine.isPartialPaymentAllowed(countryInfo.country, ppSet)) {
-                  return false;
-              }
+          var countryInfo = window.FoxCod.CountryRestrictionEngine.getCustomerCountry(form);
+          if (!window.FoxCod.CountryRestrictionEngine.isPaymentMethodCountryAllowed(method, countryInfo.country, ppSet)) {
+              return false;
           }
 
           var min = method === 'full_prepaid' ? parseFloat(ppSet.full_prepaid_minimum_order_total || 0) : method === 'pure_cod' ? parseFloat(ppSet.pure_cod_minimum_order_total || 0) : parseFloat(ppSet.minimum_order_total || 0);
@@ -4535,6 +4541,25 @@ function darkenColor(hex, percent) {
           prepaidDiscountText = 'Save ' + formatMoney(prepaidDiscountAmount);
       }
 
+      var existingSelected = null;
+      var existingRadios = form.querySelectorAll('input[name="payment_method"]:checked');
+      if (existingRadios && existingRadios.length > 0) {
+          existingSelected = existingRadios[0].value;
+      }
+
+      var defaultMethod = null;
+      if (existingSelected === 'full_cod' && showFullCod) defaultMethod = 'full_cod';
+      else if (existingSelected === 'partial_cod' && showPartial) defaultMethod = 'partial_cod';
+      else if (existingSelected === 'full_prepaid' && showFullPrepaid) defaultMethod = 'full_prepaid';
+
+      if (!defaultMethod) {
+          if (showFullCod) defaultMethod = 'full_cod';
+          else if (showPartial) defaultMethod = 'partial_cod';
+          else if (showFullPrepaid) defaultMethod = 'full_prepaid';
+      }
+
+      var allBlocked = (!showFullCod && !showPartial && !showFullPrepaid);
+
       var html = '<div style="margin-bottom: 16px;">';
       html += '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">';
       html += '<div style="font-size: 13px; font-weight: 700; color: #1f2937;">Choose Payment Option</div>';
@@ -4543,9 +4568,17 @@ function darkenColor(hex, percent) {
 
       html += '<div style="display: flex; flex-direction: column; gap: 10px;">';
 
+      if (allBlocked) {
+          html += '<div style="background: #fee2e2; color: #991b1b; padding: 16px; border-radius: 12px; border: 1px solid #f87171; font-size: 13px; text-align: center;">';
+          html += '<strong>No payment methods are available for your country.</strong><br>Please enter a different shipping address to proceed.';
+          html += '<input type="radio" name="payment_method" value="none_available" checked style="display:none;">';
+          html += '</div>';
+      }
+
       if (showFullPrepaid) {
           html += '<label class="pm-row pm-prepaid" style="display: flex; flex-direction: column; background: #f0fdf4; border-radius: 12px; border: 2px solid #22c55e; cursor: pointer; position: relative; overflow: visible; padding: 0 !important; margin: 0 !important; box-sizing: border-box; opacity: 1;">';
-          html += '<input type="radio" name="payment_method" value="full_prepaid" checked style="position:absolute; opacity:0; pointer-events:none; margin:0; padding:0;">';
+          var isPrepaidChecked = (defaultMethod === 'full_prepaid') ? 'checked' : '';
+          html += '<input type="radio" name="payment_method" value="full_prepaid" ' + isPrepaidChecked + ' style="position:absolute; opacity:0; pointer-events:none; margin:0; padding:0;">';
           html += '<div style="position: absolute; top: -10px; left: 16px; background: #22c55e; color: white; font-size: 9px; font-weight: 700; padding: 3px 8px; border-radius: 6px; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px; text-transform: uppercase;">★ MOST POPULAR</div>';
           html += '<div style="display: flex; align-items: flex-start; gap: 12px; padding: 16px 12px 12px 12px; box-sizing: border-box; width: 100%; margin: 0;">';
           html += '<div style="display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px; color: #16a34a; background-color: #dcfce7;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4" /><path d="M4 6v12c0 1.1.9 2 2 2h14v-4" /><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z" /></svg></div>';
@@ -4563,7 +4596,8 @@ function darkenColor(hex, percent) {
           html += '<div style="display: flex; align-items: baseline; gap: 6px;">';
           html += '<span class="pm-amt-prepaid" style="font-weight: 800; font-size: 15px; color: #166534;">' + formatMoney(finalPrepaidTotal) + '</span>';
           html += '</div></div>';
-          html += '<input type="radio" name="payment_method_visual" class="pm-pill" checked style="width: 18px; height: 18px; accent-color: #22c55e; margin: 0; pointer-events: none;">';
+          var isPrepaidChecked = (defaultMethod === 'full_prepaid') ? 'checked' : '';
+          html += '<input type="radio" name="payment_method_visual" class="pm-pill" ' + isPrepaidChecked + ' style="width: 18px; height: 18px; accent-color: #22c55e; margin: 0; pointer-events: none;">';
           html += '</div></div></label>';
       }
 
@@ -4588,8 +4622,9 @@ function darkenColor(hex, percent) {
           }
           var depositText = formatMoney(depositAmount);
 
-          html += '<label class="pm-row pm-partial" style="display: flex; flex-direction: column; background: #eff6ff; border-radius: 12px; border: 2px solid ' + (showFullPrepaid ? '#bfdbfe' : '#2563eb') + '; cursor: pointer; position: relative; padding: 0 !important; margin: 0 !important; box-sizing: border-box; overflow: hidden !important;">';
-          html += '<input type="radio" name="payment_method" value="partial_cod" ' + (!showFullPrepaid ? 'checked' : '') + ' style="position:absolute; opacity:0; pointer-events:none; margin:0; padding:0;">';
+          html += '<label class="pm-row pm-partial" style="display: flex; flex-direction: column; background: #eff6ff; border-radius: 12px; border: 2px solid #2563eb; cursor: pointer; position: relative; padding: 0 !important; margin: 0 !important; box-sizing: border-box; overflow: hidden !important;">';
+          var isPartialChecked = (defaultMethod === 'partial_cod') ? 'checked' : '';
+          html += '<input type="radio" name="payment_method" value="partial_cod" ' + isPartialChecked + ' style="position:absolute; opacity:0; pointer-events:none; margin:0; padding:0;">';
           html += '<div style="display: flex; align-items: flex-start; gap: 12px; padding: 16px 12px 12px 12px; box-sizing: border-box; width: 100%; margin: 0;">';
           html += '<div style="display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px; color: #2563eb; background-color: #dbeafe;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg></div>';
           html += '<div style="flex: 1; min-width: 0; padding-top: 2px;">';
@@ -4604,7 +4639,8 @@ function darkenColor(hex, percent) {
           }
           html += '<span class="pm-amt-partial" style="font-weight: 800; font-size: 15px; color: #1e3a8a;">' + depositText + '</span>';
           html += '</div>';
-          html += '<input type="radio" name="payment_method_visual" class="pm-pill" ' + (!showFullPrepaid ? 'checked' : '') + ' style="width: 18px; height: 18px; accent-color: #2563eb; margin: 0; pointer-events: none;">';
+          var isPartialChecked = (defaultMethod === 'partial_cod') ? 'checked' : '';
+          html += '<input type="radio" name="payment_method_visual" class="pm-pill" ' + isPartialChecked + ' style="width: 18px; height: 18px; accent-color: #2563eb; margin: 0; pointer-events: none;">';
           html += '</div></div>';
           html += '<div style="background: #dbeafe; padding: 10px 12px; font-size: 10px; color: #1e40af; display: flex; justify-content: center; align-items: center; font-weight: 500; width: 100%; box-sizing: border-box; margin: 0;">Secure your order • Avoid fake cancellations </div>';
           html += '</label>';
@@ -4621,8 +4657,9 @@ function darkenColor(hex, percent) {
               }
           }
           
-          html += '<label class="pm-row pm-cod" style="display: flex; flex-direction: column; background: #fff7ed; border-radius: 12px; border: 2px solid ' + (!showFullPrepaid && !showPartial ? '#ea580c' : '#fed7aa') + '; cursor: pointer; position: relative; padding: 0 !important; margin: 0 !important; box-sizing: border-box; overflow: hidden !important;">';
-          html += '<input type="radio" name="payment_method" value="full_cod" ' + (!showFullPrepaid && !showPartial ? 'checked' : '') + ' style="position:absolute; opacity:0; pointer-events:none; margin:0; padding:0;">';
+          html += '<label class="pm-row pm-cod" style="display: flex; flex-direction: column; background: #fff7ed; border-radius: 12px; border: 2px solid #ea580c; cursor: pointer; position: relative; padding: 0 !important; margin: 0 !important; box-sizing: border-box; overflow: hidden !important;">';
+          var isCodChecked = (defaultMethod === 'full_cod') ? 'checked' : '';
+          html += '<input type="radio" name="payment_method" value="full_cod" ' + isCodChecked + ' style="position:absolute; opacity:0; pointer-events:none; margin:0; padding:0;">';
           html += '<div style="display: flex; align-items: flex-start; gap: 12px; padding: 16px 12px 12px 12px; box-sizing: border-box; width: 100%; margin: 0;">';
           html += '<div style="display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px; color: #ea580c; background-color: #ffedd5;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="1" ry="1" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg></div>';
           html += '<div style="flex: 1; min-width: 0; padding-top: 2px;">';
@@ -4637,7 +4674,8 @@ function darkenColor(hex, percent) {
           }
           html += '<span class="pm-amt-cod" style="font-weight: 800; font-size: 15px; color: #9a3412;">' + formatMoney(parseFloat(orderTotal || 0) + parseFloat(pureCodFeeAmount || 0)) + '</span>';
           html += '</div>';
-          html += '<input type="radio" name="payment_method_visual" class="pm-pill" ' + (!showFullPrepaid && !showPartial ? 'checked' : '') + ' style="width: 18px; height: 18px; accent-color: #ea580c; margin: 0; pointer-events: none;">';
+          var isCodChecked = (defaultMethod === 'full_cod') ? 'checked' : '';
+          html += '<input type="radio" name="payment_method_visual" class="pm-pill" ' + isCodChecked + ' style="width: 18px; height: 18px; accent-color: #ea580c; margin: 0; pointer-events: none;">';
           html += '</div></div>';
           html += '<div style="background: #ffedd5; padding: 10px 12px; font-size: 10px; color: #9a3412; display: flex; justify-content: center; align-items: center; font-weight: 500; width: 100%; box-sizing: border-box; margin: 0;"><span style="margin-right: 4px;">ℹ️</span> Higher return risk • Slightly slower processing</div>';
           html += '</label>';
@@ -4687,12 +4725,23 @@ function darkenColor(hex, percent) {
 
               if (submitBtn) {
                   applySubmitButtonStyles(submitBtn, config);
-                  if (radio.value === 'partial_cod') {
-                      submitBtn.textContent = typeof depositText !== 'undefined' ? 'Pay ' + depositText + ' now' : 'Continue with Partial Payment';
-                  } else if (radio.value === 'full_prepaid') {
-                      submitBtn.textContent = 'Proceed to Payment';
+                  if (radio.value === 'none_available') {
+                      submitBtn.textContent = 'Not Available';
+                      submitBtn.disabled = true;
+                      submitBtn.style.opacity = '0.5';
+                      submitBtn.style.cursor = 'not-allowed';
                   } else {
-                      submitBtn.textContent = originalButtonText;
+                      submitBtn.disabled = false;
+                      submitBtn.style.opacity = '1';
+                      submitBtn.style.cursor = 'pointer';
+                      
+                      if (radio.value === 'partial_cod') {
+                          submitBtn.textContent = typeof depositText !== 'undefined' ? 'Pay ' + depositText + ' now' : 'Continue with Partial Payment';
+                      } else if (radio.value === 'full_prepaid') {
+                          submitBtn.textContent = 'Proceed to Payment';
+                      } else {
+                          submitBtn.textContent = originalButtonText;
+                      }
                   }
               }
 

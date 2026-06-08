@@ -40,6 +40,17 @@ export interface ModuleFlags {
   apply_upsells_to_partial: boolean;
 }
 
+export interface CountryRestriction {
+  allowedCountries: string[];
+  excludedCountries: string[];
+}
+
+export interface CountryRestrictionsConfig {
+  full_cod: CountryRestriction;
+  partial_payment: CountryRestriction;
+  full_prepaid: CountryRestriction;
+}
+
 export interface PartialPaymentSettings {
   id?: number;
   shop_domain: string;
@@ -77,6 +88,7 @@ export interface PartialPaymentSettings {
   pure_cod_maximum_order_total: number;
   pure_cod_allowed_product_ids: string[];
   pure_cod_allowed_collection_ids: string[];
+  country_restrictions?: CountryRestrictionsConfig;
   created_at?: string;
   updated_at?: string;
 }

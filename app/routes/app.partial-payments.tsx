@@ -1143,6 +1143,129 @@ export default function PartialPaymentsPage() {
   // ── Modal ─────────────────────────────────────────────────────────────────
   const ms = settings.modal_settings ?? DEFAULT_MODAL_SETTINGS;
 
+  // ── Country Restrictions Helpers ──────────────────────────────────────────
+  const updCountryRestrictions = useCallback((method: 'full_cod' | 'partial_payment' | 'full_prepaid', type: 'allowed' | 'excluded', val: string[]) => {
+    setSettings((prev) => {
+      const cr = prev.country_restrictions || {
+        full_cod: { allowedCountries: [], excludedCountries: [] },
+        partial_payment: { allowedCountries: prev.allowed_countries || [], excludedCountries: prev.excluded_countries || [] },
+        full_prepaid: { allowedCountries: [], excludedCountries: [] }
+      };
+      const methodCr = { ...(cr[method] || { allowedCountries: [], excludedCountries: [] }) };
+      if (type === 'allowed') methodCr.allowedCountries = val;
+      else methodCr.excludedCountries = val;
+      
+      return {
+        ...prev,
+        country_restrictions: { ...cr, [method]: methodCr }
+      };
+    });
+  }, []);
+
+  const renderCountryRestrictions = (method: 'full_cod' | 'partial_payment' | 'full_prepaid', methodLabel: string) => {
+    const cr = settings.country_restrictions?.[method] || (method === 'partial_payment' ? { allowedCountries: settings.allowed_countries || [], excludedCountries: settings.excluded_countries || [] } : { allowedCountries: [], excludedCountries: [] });
+    const allowed = cr.allowedCountries || [];
+    const excluded = cr.excludedCountries || [];
+
+    return (
+      <>
+        <Text as="h3" variant="headingSm">Country Restrictions</Text>
+
+        <BlockStack gap="300">
+          <BlockStack gap="100">
+            <Text as="p" variant="bodySm" fontWeight="semibold">Allowed Countries</Text>
+            <Text as="p" variant="bodySm" tone="subdued">
+              Leave empty to allow all countries. Use the dropdown to select countries.
+            </Text>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px', alignItems: 'end' }}>
+              <Select
+                label="Allowed Country"
+                labelHidden
+                options={COUNTRY_OPTIONS}
+                value={allowedCountrySelect}
+                onChange={setAllowedCountrySelect}
+              />
+              <Button
+                variant="primary"
+                disabled={!allowedCountrySelect}
+                onClick={() => {
+                  if (allowedCountrySelect && !allowed.includes(allowedCountrySelect)) {
+                    updCountryRestrictions(method, 'allowed', [...allowed, allowedCountrySelect]);
+                  }
+                  setAllowedCountrySelect('');
+                }}
+              >
+                Add
+              </Button>
+            </div>
+            {allowed.length > 0 && (
+              <div style={{ marginTop: '8px' }}>
+                <InlineStack gap="200">
+                  {allowed.map((c) => {
+                    const countryLabel = COUNTRY_OPTIONS.find((o) => o.value === c)?.label || c;
+                    return (
+                      <Tag
+                        key={c}
+                        onRemove={() => updCountryRestrictions(method, 'allowed', allowed.filter((x) => x !== c))}
+                      >
+                        {countryLabel}
+                      </Tag>
+                    );
+                  })}
+                </InlineStack>
+              </div>
+            )}
+          </BlockStack>
+
+          <BlockStack gap="100">
+            <Text as="p" variant="bodySm" fontWeight="semibold">Excluded Countries</Text>
+            <Text as="p" variant="bodySm" tone="subdued">
+              Block {methodLabel} from specific countries even if "allowed" is empty.
+            </Text>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px', alignItems: 'end' }}>
+              <Select
+                label="Excluded Country"
+                labelHidden
+                options={COUNTRY_OPTIONS}
+                value={excludedCountrySelect}
+                onChange={setExcludedCountrySelect}
+              />
+              <Button
+                variant="primary"
+                disabled={!excludedCountrySelect}
+                onClick={() => {
+                  if (excludedCountrySelect && !excluded.includes(excludedCountrySelect)) {
+                    updCountryRestrictions(method, 'excluded', [...excluded, excludedCountrySelect]);
+                  }
+                  setExcludedCountrySelect('');
+                }}
+              >
+                Add
+              </Button>
+            </div>
+            {excluded.length > 0 && (
+              <div style={{ marginTop: '8px' }}>
+                <InlineStack gap="200">
+                  {excluded.map((c) => {
+                    const countryLabel = COUNTRY_OPTIONS.find((o) => o.value === c)?.label || c;
+                    return (
+                      <Tag
+                        key={c}
+                        onRemove={() => updCountryRestrictions(method, 'excluded', excluded.filter((x) => x !== c))}
+                      >
+                        {countryLabel}
+                      </Tag>
+                    );
+                  })}
+                </InlineStack>
+              </div>
+            )}
+          </BlockStack>
+        </BlockStack>
+      </>
+    );
+  };
+
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: S }} />
@@ -1540,99 +1663,7 @@ export default function PartialPaymentsPage() {
               <Divider />
 
               {/* Country Restrictions */}
-              <Text as="h3" variant="headingSm">Country Restrictions</Text>
-
-              <BlockStack gap="300">
-                <BlockStack gap="100">
-                  <Text as="p" variant="bodySm" fontWeight="semibold">Allowed Countries</Text>
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    Leave empty to allow all countries. Use the dropdown to select countries.
-                  </Text>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px', alignItems: 'end' }}>
-                    <Select
-                      label="Allowed Country"
-                      labelHidden
-                      options={COUNTRY_OPTIONS}
-                      value={allowedCountrySelect}
-                      onChange={setAllowedCountrySelect}
-                    />
-                    <Button
-                      variant="primary"
-                      disabled={!allowedCountrySelect}
-                      onClick={() => {
-                        if (allowedCountrySelect && !settings.allowed_countries.includes(allowedCountrySelect)) {
-                          upd('allowed_countries', [...settings.allowed_countries, allowedCountrySelect]);
-                        }
-                        setAllowedCountrySelect('');
-                      }}
-                    >
-                      Add
-                    </Button>
-                  </div>
-                  {settings.allowed_countries.length > 0 && (
-                    <div style={{ marginTop: '8px' }}>
-                      <InlineStack gap="200">
-                        {settings.allowed_countries.map((c) => {
-                          const countryLabel = COUNTRY_OPTIONS.find((o) => o.value === c)?.label || c;
-                          return (
-                            <Tag
-                              key={c}
-                              onRemove={() => upd('allowed_countries', settings.allowed_countries.filter((x) => x !== c))}
-                            >
-                              {countryLabel}
-                            </Tag>
-                          );
-                        })}
-                      </InlineStack>
-                    </div>
-                  )}
-                </BlockStack>
-
-                <BlockStack gap="100">
-                  <Text as="p" variant="bodySm" fontWeight="semibold">Excluded Countries</Text>
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    Block partial payments from specific countries even if "allowed" is empty.
-                  </Text>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '8px', alignItems: 'end' }}>
-                    <Select
-                      label="Excluded Country"
-                      labelHidden
-                      options={COUNTRY_OPTIONS}
-                      value={excludedCountrySelect}
-                      onChange={setExcludedCountrySelect}
-                    />
-                    <Button
-                      variant="primary"
-                      disabled={!excludedCountrySelect}
-                      onClick={() => {
-                        if (excludedCountrySelect && !settings.excluded_countries.includes(excludedCountrySelect)) {
-                          upd('excluded_countries', [...settings.excluded_countries, excludedCountrySelect]);
-                        }
-                        setExcludedCountrySelect('');
-                      }}
-                    >
-                      Add
-                    </Button>
-                  </div>
-                  {settings.excluded_countries.length > 0 && (
-                    <div style={{ marginTop: '8px' }}>
-                      <InlineStack gap="200">
-                        {settings.excluded_countries.map((c) => {
-                          const countryLabel = COUNTRY_OPTIONS.find((o) => o.value === c)?.label || c;
-                          return (
-                            <Tag
-                              key={c}
-                              onRemove={() => upd('excluded_countries', settings.excluded_countries.filter((x) => x !== c))}
-                            >
-                              {countryLabel}
-                            </Tag>
-                          );
-                        })}
-                      </InlineStack>
-                    </div>
-                  )}
-                </BlockStack>
-              </BlockStack>
+              {renderCountryRestrictions('partial_payment', 'partial payments')}
             </BlockStack>
           </Card>
 
@@ -1883,6 +1914,9 @@ export default function PartialPaymentsPage() {
                   </InlineStack>
                 </div>
               )}
+              
+              <Divider />
+              {renderCountryRestrictions('full_prepaid', 'full prepaid')}
             </BlockStack>
           </Card>
 
@@ -2081,6 +2115,9 @@ export default function PartialPaymentsPage() {
                   </InlineStack>
                 </div>
               )}
+
+              <Divider />
+              {renderCountryRestrictions('full_cod', 'Cash on Delivery')}
             </BlockStack>
           </Card>
 

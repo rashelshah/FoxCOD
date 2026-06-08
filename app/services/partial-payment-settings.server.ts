@@ -158,6 +158,7 @@ export async function syncPartialPaymentToMetafield(
         pure_cod_maximum_order_total: settings.pure_cod_maximum_order_total ?? 0,
         pure_cod_allowed_product_ids: settings.pure_cod_allowed_product_ids ?? [],
         pure_cod_allowed_collection_ids: settings.pure_cod_allowed_collection_ids ?? [],
+        country_restrictions: settings.country_restrictions,
       }
     : { enabled: false, full_prepaid_enabled: false, prepaid_discount_enabled: false, pure_cod_enabled: false, pure_cod_fee_enabled: false };
 
@@ -257,18 +258,38 @@ export function isPaymentMethodEligible(
     return { eligible: false, reason: `Order total exceeds maximum of ${max}` };
   }
 
-  // ── 3. Country restrictions (partial payment only) ──
-  if (method === 'partial_payment') {
-    if ((settings.excluded_countries ?? []).length > 0 && country) {
-      if (settings.excluded_countries.includes(country)) {
-        return { eligible: false, reason: 'Partial payments not available in your country' };
+  // ── 3. Country restrictions ──
+  const isCountryAllowed = (method: string, country?: string) => {
+    if (!country) return true; // Rule 4
+    
+    let allowed: string[] = [];
+    let excluded: string[] = [];
+
+    const restrictionKey = method === 'pure_cod' ? 'full_cod' : method;
+
+    if (settings.country_restrictions) {
+      const config = (settings.country_restrictions as any)[restrictionKey];
+      if (config) {
+        allowed = config.allowedCountries || [];
+        excluded = config.excludedCountries || [];
       }
+    } else if (method === 'partial_payment') {
+      // Legacy fallback
+      allowed = settings.allowed_countries || [];
+      excluded = settings.excluded_countries || [];
     }
-    if ((settings.allowed_countries ?? []).length > 0 && country) {
-      if (!settings.allowed_countries.includes(country)) {
-        return { eligible: false, reason: 'Partial payments not available in your country' };
-      }
-    }
+
+    if (excluded.length > 0 && excluded.includes(country)) return false; // Rule 1
+    if (allowed.length > 0 && !allowed.includes(country)) return false; // Rule 2
+    return true; // Rule 3
+  };
+
+  if (!isCountryAllowed(method, country)) {
+    let methodLabel = 'This payment method is';
+    if (method === 'partial_payment') methodLabel = 'Partial payments are';
+    if (method === 'full_prepaid') methodLabel = 'Prepaid orders are';
+    if (method === 'pure_cod') methodLabel = 'Cash on Delivery is';
+    return { eligible: false, reason: `${methodLabel} not available in your country` };
   }
 
   // ── 4. Product / Collection restrictions ──
