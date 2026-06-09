@@ -1521,6 +1521,51 @@ export default function PartialPaymentsPage() {
                 )}
               </div>
 
+              <Divider />
+              {firstOpt && (
+                <BlockStack gap="200">
+                  <Text as="h3" variant="headingSm">Storefront Preview</Text>
+                  <Text as="p" variant="bodySm" tone="subdued">Preview uses {fmt(previewOrderTotal)} as example cart total</Text>
+                  <div style={{
+                      display: 'flex', flexDirection: 'column', background: '#eff6ff', borderRadius: '12px',
+                      border: '2px solid #2563eb', position: 'relative', overflow: 'hidden',
+                      maxWidth: '400px', marginTop: '8px'
+                  }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '16px 12px 12px 12px', boxSizing: 'border-box', width: '100%', margin: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '32px', height: '32px', borderRadius: '8px', color: '#2563eb', backgroundColor: '#dbeafe' }}>
+                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>
+                          </div>
+
+                          <div style={{ flex: 1, minWidth: 0, paddingTop: '2px' }}>
+                              <div style={{ fontWeight: 700, fontSize: '14px', color: '#1e3a8a', lineHeight: 1.2, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                Partial Payment <svg width="14" height="14" viewBox="0 0 24 24" fill="#2563eb" stroke="#eff6ff" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/></svg>
+                              </div>
+                              <div style={{ color: '#2563eb', fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>Pay {fmt(previewDeposit)} now • Rest on delivery</div>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                                  {settings.cod_fee_enabled && previewCodFee > 0 && (
+                                    <div style={{ background: '#dbeafe', color: '#1e3a8a', fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '99px', lineHeight: 1, whiteSpace: 'nowrap' }}>
+                                        {fmt(previewCodFee)} {settings.cod_fee_name || 'COD Fee'}
+                                    </div>
+                                  )}
+                                  <span style={{ fontWeight: 800, fontSize: '15px', color: '#1e3a8a' }}>
+                                      {fmt(previewDeposit)}
+                                  </span>
+                              </div>
+                              <input type="radio" checked readOnly style={{ width: '18px', height: '18px', accentColor: '#2563eb', margin: 0, pointerEvents: 'none' }} />
+                          </div>
+                      </div>
+                      <div style={{ background: '#dbeafe', padding: '10px 12px', fontSize: '10px', color: '#1e40af', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500, width: '100%', boxSizing: 'border-box', margin: 0 }}>
+                          Secure your order • Avoid fake cancellations
+                      </div>
+                  </div>
+                </BlockStack>
+              )}
+
+              <br />
+
               {/* Live calculation preview */}
               {firstOpt && (
                 <div className="pp-calc-preview">
@@ -2033,7 +2078,7 @@ export default function PartialPaymentsPage() {
                               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
                                   {settings.pure_cod_fee_amount > 0 && (
                                     <div style={{ background: '#ffedd5', color: '#9a3412', fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '99px', lineHeight: 1, whiteSpace: 'nowrap' }}>
-                                        {settings.pure_cod_fee_type === 'percentage' ? fmt(500 * (settings.pure_cod_fee_amount / 100)) : fmt(settings.pure_cod_fee_amount)} COD fee
+                                        {settings.pure_cod_fee_type === 'percentage' ? fmt(500 * (settings.pure_cod_fee_amount / 100)) : fmt(settings.pure_cod_fee_amount)} {settings.pure_cod_fee_name || 'COD Fee'}
                                     </div>
                                   )}
                                   <span style={{ fontWeight: 800, fontSize: '15px', color: '#9a3412' }}>

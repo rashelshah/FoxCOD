@@ -4635,7 +4635,7 @@ function darkenColor(hex, percent) {
           html += '<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">';
           if (ppSettings && ppSettings.cod_fee_enabled && ppSettings.cod_fee_amount) {
               var displayStyle = codFeeAmount > 0 ? 'block' : 'none';
-              html += '<div class="pm-cod-fee-pill" style="display: ' + displayStyle + '; background: #dbeafe; color: #1e3a8a; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 99px; line-height: 1; white-space: nowrap;">' + formatMoney(codFeeAmount) + ' COD fee</div>';
+              html += '<div class="pm-cod-fee-pill" style="display: ' + displayStyle + '; background: #dbeafe; color: #1e3a8a; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 99px; line-height: 1; white-space: nowrap;">' + formatMoney(codFeeAmount) + ' ' + (ppSettings.cod_fee_name || 'COD fee') + '</div>';
           }
           html += '<span class="pm-amt-partial" style="font-weight: 800; font-size: 15px; color: #1e3a8a;">' + depositText + '</span>';
           html += '</div>';
@@ -4670,7 +4670,7 @@ function darkenColor(hex, percent) {
           html += '<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">';
           if (ppSettings && ppSettings.pure_cod_fee_enabled && ppSettings.pure_cod_fee_amount) {
               var displayStyle = pureCodFeeAmount > 0 ? 'block' : 'none';
-              html += '<div class="pm-cod-fee-pill" style="display: ' + displayStyle + '; background: #ffedd5; color: #9a3412; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 99px; line-height: 1; white-space: nowrap;">' + formatMoney(pureCodFeeAmount) + ' COD fee</div>';
+              html += '<div class="pm-cod-fee-pill" style="display: ' + displayStyle + '; background: #ffedd5; color: #9a3412; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 99px; line-height: 1; white-space: nowrap;">' + formatMoney(pureCodFeeAmount) + ' ' + (ppSettings.pure_cod_fee_name || 'COD fee') + '</div>';
           }
           html += '<span class="pm-amt-cod" style="font-weight: 800; font-size: 15px; color: #9a3412;">' + formatMoney(parseFloat(orderTotal || 0) + parseFloat(pureCodFeeAmount || 0)) + '</span>';
           html += '</div>';
@@ -4902,7 +4902,7 @@ function darkenColor(hex, percent) {
           if (feePill) {
               if (codFeeAmount > 0) {
                   feePill.style.display = 'block';
-                  feePill.textContent = formatMoney(codFeeAmount) + ' COD fee';
+                  feePill.textContent = formatMoney(codFeeAmount) + ' ' + (ppSettings.cod_fee_name || 'COD fee');
               } else {
                   feePill.style.display = 'none';
               }
@@ -4924,7 +4924,7 @@ function darkenColor(hex, percent) {
           if (codFeePill) {
               if (pureCodFeeAmt > 0) {
                   codFeePill.style.display = 'block';
-                  codFeePill.textContent = formatMoney(pureCodFeeAmt) + ' COD fee';
+                  codFeePill.textContent = formatMoney(pureCodFeeAmt) + ' ' + (ppS.pure_cod_fee_name || 'COD fee');
               } else {
                   codFeePill.style.display = 'none';
               }
