@@ -198,7 +198,8 @@ async function createCartPermalinkCheckout(
   let discountExpiresAt = '';
 
   if (requiredDiscount > 0.01) {
-    const code = `${DISCOUNT_PREFIX}${randomSuffix(8)}`;
+    const prefix = params.couponCode ? `${params.couponCode.toUpperCase().replace(/[^A-Z0-9]/g, '').substring(0, 8)}-` : DISCOUNT_PREFIX;
+    const code = `${prefix}${randomSuffix(6)}`;
     const expiresAt = new Date(Date.now() + DISCOUNT_TTL_MINUTES * 60 * 1000).toISOString();
 
     const graphql = await getAdminGraphql(shop);
@@ -320,8 +321,9 @@ async function createDraftOrderCheckout(
     if (nativePrice > item.price + 0.01) {
       const unitDiscount = nativePrice - item.price;
       const totalDiscount = (unitDiscount * item.quantity).toFixed(2);
+      const discountTitle = params.couponCode ? params.couponCode : "Offer Applied";
       applied_discount = {
-        title: "Fox COD Offer",
+        title: discountTitle,
         value: unitDiscount.toFixed(2),
         value_type: "fixed_amount",
         amount: totalDiscount
@@ -424,9 +426,15 @@ async function createDraftOrderCheckout(
 
   let appliedDiscount = undefined;
   if (finalAppliedDiscountValue > 0.01) {
+    let discountTitle = params.isFullPrepaid ? "Discount" : "COD Balance";
+    if (params.couponCode && params.isFullPrepaid) {
+        // Only Full Prepaid needs to show coupon code here if there's an extra order-level discount (though usually it'll be 0)
+        discountTitle = params.couponCode;
+    }
+
     appliedDiscount = {
-      title: "Partial Payment Remaining",
-      description: "Remaining amount to be collected on delivery.",
+      title: discountTitle,
+      description: params.isFullPrepaid ? "Order Discount" : "Remaining amount to be collected on delivery.",
       value: finalAppliedDiscountValue.toFixed(2),
       value_type: "fixed_amount"
     };

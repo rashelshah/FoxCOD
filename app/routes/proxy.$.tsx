@@ -370,6 +370,24 @@ async function handlePartialCodCheckout(request: Request, data: any) {
             };
         });
 
+        // ── Distribute coupon discount across line items so Shopify Checkout shows it properly
+        if (couponDiscount > 0) {
+            let remainingCoupon = couponDiscount;
+            const totalItemsPrice = storefrontLineItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            if (totalItemsPrice > 0) {
+                storefrontLineItems.forEach((item, index) => {
+                    if (index === storefrontLineItems.length - 1) {
+                        item.price = Math.max(0, item.price - (remainingCoupon / item.quantity));
+                    } else {
+                        const proportion = (item.price * item.quantity) / totalItemsPrice;
+                        const discountForItem = Number((couponDiscount * proportion).toFixed(2));
+                        remainingCoupon -= discountForItem;
+                        item.price = Math.max(0, item.price - (discountForItem / item.quantity));
+                    }
+                });
+            }
+        }
+
         // ── Build notes ────────────────────────────────────────────────────
         const fmtAmt = (amt: number) => {
             try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: currencyCode }).format(amt); }
@@ -869,7 +887,6 @@ async function handleRegularOrder(request: Request, data: any) {
     }
 
     // pure cod logic
-    let pureCodFeeAmount = 0;
     console.log('[COD DEBUG] Payment Method:', data.paymentMethod);
     if (data.paymentMethod === 'full_cod' && ppSettings && ppSettings.pure_cod_enabled) {
         const eligibility = isPaymentMethodEligible(ppSettings, 'pure_cod', {
@@ -880,15 +897,6 @@ async function handleRegularOrder(request: Request, data: any) {
         });
         if (!eligibility.eligible) {
             return new Response(JSON.stringify({ success: false, error: eligibility.reason }), { status: 400, headers: corsHeaders });
-        }
-
-        if (ppSettings.pure_cod_fee_enabled && ppSettings.pure_cod_fee_amount) {
-            if (ppSettings.pure_cod_fee_type === 'percentage') {
-                pureCodFeeAmount = (totalPrice * ppSettings.pure_cod_fee_amount) / 100;
-            } else {
-                pureCodFeeAmount = ppSettings.pure_cod_fee_amount;
-            }
-            totalPrice += pureCodFeeAmount;
         }
     }
     

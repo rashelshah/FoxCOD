@@ -568,8 +568,8 @@ async function getShopifyGraphqlCoupon(
             endsAt: discountNode?.endsAt,
             merchandiseTotal: pricing.merchandiseTotal,
             originalTotal: pricing.originalTotal,
-        codFeeAmount,
-        codFeeName,
+            codFeeAmount: pricing.codFeeAmount,
+            codFeeName: pricing.codFeeName,
         });
 
         if (status && status !== "ACTIVE") {
@@ -881,8 +881,8 @@ export async function validateCouponForShop(shop: string, couponCode: string, ca
         cartTotal: normalizedCartTotal,
         merchandiseTotal: pricing.merchandiseTotal,
         originalTotal: pricing.originalTotal,
-        codFeeAmount,
-        codFeeName,
+        codFeeAmount: pricing.codFeeAmount,
+        codFeeName: pricing.codFeeName,
         itemCount: pricing.discountItems.length,
         items: pricing.discountItems.map(i => ({ productId: i.productId, variantId: i.variantId, price: i.price, qty: i.quantity })),
     });
@@ -961,21 +961,17 @@ export function calculateOrderPricing(body: any, formSettings?: any): OrderPrici
 
     const merchandiseTotal = roundCurrency(mainItemsSubtotal - bundleDiscountAmount + upsellTotal);
     
-    let codFeeAmount = 0;
-    let codFeeName = "COD Fee";
+    // Rely on the frontend's calculation for COD fee to ensure it matches checkout exact amounts post-coupon
+    let codFeeAmount = Number(body?.codFeeAmount) || Number(body?.pureCodFeeAmount) || 0;
+    let codFeeName = String(body?.codFeeName || formSettings?.pure_cod_fee_name || "COD Fee");
 
-    if (formSettings?.pure_cod_fee_enabled && formSettings?.pure_cod_fee_amount > 0) {
+    // Fallback if frontend didn't pass it (older clients)
+    if (codFeeAmount === 0 && formSettings?.pure_cod_fee_enabled && formSettings?.pure_cod_fee_amount > 0) {
         if (formSettings.pure_cod_fee_type === "percentage") {
-            // Note: COD fee is applied to the final merchandise total after bundle discounts, plus upsells.
             codFeeAmount = ((merchandiseTotal + shippingPrice) * formSettings.pure_cod_fee_amount) / 100;
         } else {
             codFeeAmount = formSettings.pure_cod_fee_amount;
         }
-        codFeeName = formSettings.pure_cod_fee_name || "COD Fee";
-    } else {
-        // Fallback to body (if provided by newer frontend)
-        codFeeAmount = Number(body?.codFeeAmount) || 0;
-        codFeeName = String(body?.codFeeName || "COD Fee");
     }
     
     codFeeAmount = roundCurrency(codFeeAmount);
