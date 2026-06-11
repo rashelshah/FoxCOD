@@ -50,26 +50,31 @@ async function findOrCreateCustomer(graphql: any, customerData: { firstName?: st
   const email = customerData.email?.trim();
   const phone = customerData.phone?.trim();
 
-  if (!email && !phone) return null;
+  const firstName = customerData.firstName?.trim();
+  const lastName = customerData.lastName?.trim();
+
+  if (!email && !phone && !firstName && !lastName) return null;
 
   try {
-    // 1. Search for existing customer
-    let queryStr = '';
-    if (email) queryStr += `email:${email}`;
-    if (phone) queryStr += (queryStr ? ' OR ' : '') + `phone:${phone}`;
-    
-    const searchRes = await graphql(`
-      query findCustomer($query: String!) {
-        customers(first: 1, query: $query) {
-          edges { node { id } }
+    // 1. Search for existing customer (only if email or phone is provided)
+    if (email || phone) {
+      let queryStr = '';
+      if (email) queryStr += `email:${email}`;
+      if (phone) queryStr += (queryStr ? ' OR ' : '') + `phone:${phone}`;
+      
+      const searchRes = await graphql(`
+        query findCustomer($query: String!) {
+          customers(first: 1, query: $query) {
+            edges { node { id } }
+          }
         }
+      `, { variables: { query: queryStr } });
+      
+      const searchData = await searchRes.json();
+      const edges = searchData?.data?.customers?.edges || [];
+      if (edges.length > 0) {
+        return edges[0].node.id;
       }
-    `, { variables: { query: queryStr } });
-    
-    const searchData = await searchRes.json();
-    const edges = searchData?.data?.customers?.edges || [];
-    if (edges.length > 0) {
-      return edges[0].node.id;
     }
 
     // 2. Create customer if not found
@@ -83,8 +88,8 @@ async function findOrCreateCustomer(graphql: any, customerData: { firstName?: st
     `, {
       variables: {
         input: {
-          firstName: customerData.firstName || '',
-          lastName: customerData.lastName || '',
+          firstName: firstName || '',
+          lastName: lastName || '',
           email: email || undefined,
           phone: phone || undefined,
         }
