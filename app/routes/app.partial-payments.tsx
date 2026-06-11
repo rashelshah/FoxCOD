@@ -59,7 +59,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (!settings) {
     settings = {
       shop_domain: shopDomain,
-      enabled: false,
+      enabled: true,
       payment_options: DEFAULT_PAYMENT_OPTIONS,
       cod_fee_enabled: false,
       cod_fee_name: 'COD Fee',
@@ -73,7 +73,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       excluded_countries: [],
       modal_settings: DEFAULT_MODAL_SETTINGS,
       module_flags: DEFAULT_MODULE_FLAGS,
-      pure_cod_enabled: false,
+      pure_cod_enabled: true,
       pure_cod_fee_enabled: false,
       pure_cod_fee_name: 'COD Fee',
       pure_cod_fee_type: 'fixed',
@@ -82,7 +82,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       pure_cod_maximum_order_total: 0,
       pure_cod_allowed_product_ids: [],
       pure_cod_allowed_collection_ids: [],
-      full_prepaid_enabled: false,
+      full_prepaid_enabled: true,
       full_prepaid_minimum_order_total: 0,
       full_prepaid_maximum_order_total: 0,
       full_prepaid_allowed_product_ids: [],

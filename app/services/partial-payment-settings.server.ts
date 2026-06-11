@@ -160,7 +160,7 @@ export async function syncPartialPaymentToMetafield(
         pure_cod_allowed_collection_ids: settings.pure_cod_allowed_collection_ids ?? [],
         country_restrictions: settings.country_restrictions,
       }
-    : { enabled: false, full_prepaid_enabled: false, prepaid_discount_enabled: false, pure_cod_enabled: false, pure_cod_fee_enabled: false };
+    : { enabled: true, full_prepaid_enabled: true, prepaid_discount_enabled: false, pure_cod_enabled: true, pure_cod_fee_enabled: false };
 
   // Get shop GID
   const shopRes = await admin.graphql(`{ shop { id } }`);
