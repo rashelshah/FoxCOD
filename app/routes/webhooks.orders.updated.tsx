@@ -56,7 +56,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     const { data, error } = await supabase
       .from("order_logs")
-      .update({ status: newStatus })
+      .update({ 
+        status: newStatus,
+        shopify_financial_status: payload.financial_status || null,
+        shopify_fulfillment_status: payload.fulfillment_status || null,
+        shopify_cancelled_at: payload.cancelled_at || null,
+        shopify_tags: payload.tags ? payload.tags.split(',').map((t: string) => t.trim()) : [],
+        shopify_updated_at: payload.updated_at || null,
+        shopify_order_name: payload.name || null
+      })
       .or(`shopify_order_id.eq.${numericId},shopify_order_id.eq.gid://shopify/Order/${numericId}`)
       .select("id, status, shopify_order_id");
 

@@ -843,3 +843,159 @@ export async function disconnectIntegration(
 
     console.log('[Supabase] Integration disconnected:', integrationId);
 }
+
+/**
+ * Get comprehensive analytics stats directly from Supabase
+ */
+export async function getAnalyticsStats(shopDomain: string, createdAtMin?: string) {
+    let query = supabase
+        .from('order_logs')
+        .select('*')
+        .eq('shop_domain', shopDomain);
+
+    if (createdAtMin) {
+        query = query.gte('created_at', createdAtMin);
+    }
+
+    const { data: orders, error } = await query;
+
+    if (error) {
+        console.error('Error fetching analytics orders from Supabase:', error);
+        throw error;
+    }
+
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    let totalRevenue = 0;
+    let todayOrders = 0;
+    let todayRevenue = 0;
+    let weekOrders = 0;
+    let pendingOrders = 0;
+    let fulfilledOrders = 0;
+    let cancelledOrders = 0;
+    let refundedOrders = 0;
+    let partiallyRefundedOrders = 0;
+    let paidOrders = 0;
+    let pendingRevenue = 0;
+    let partialOrdersCount = 0;
+    let advanceCollected = 0;
+    let remainingCodValue = 0;
+    let fullPrepaidOrdersCount = 0;
+    let fullPrepaidRevenue = 0;
+    let pureCodOrdersCount = 0;
+    let pureCodFeeRevenue = 0;
+    let partialCodFeeRevenue = 0;
+    let prepaidDiscountsTotal = 0;
+    let prepaidDiscountOrdersCount = 0;
+
+    for (const order of (orders || [])) {
+        const createdAt = new Date(order.created_at);
+        const price = order.total_price || 0;
+        const isCancelled = order.status === 'cancelled' || order.shopify_cancelled_at !== null;
+        const finStatus = (order.shopify_financial_status || '').toLowerCase();
+        const fulfillStatus = (order.shopify_fulfillment_status || '').toLowerCase();
+
+        // Revenue: exclude cancelled and fully refunded
+        if (!isCancelled && finStatus !== "refunded") {
+            totalRevenue += price;
+        }
+
+        // Time-based counts
+        if (createdAt >= todayStart) {
+            todayOrders++;
+            if (!isCancelled && finStatus !== "refunded") {
+                todayRevenue += price;
+            }
+        }
+        if (createdAt >= weekStart) {
+            weekOrders++;
+        }
+
+        // Status breakdowns
+        if (isCancelled) {
+            cancelledOrders++;
+        } else if (finStatus === "refunded") {
+            refundedOrders++;
+        } else if (finStatus === "partially_refunded") {
+            partiallyRefundedOrders++;
+        } else if (finStatus === "pending") {
+            pendingOrders++;
+            pendingRevenue += price;
+        } else if (finStatus === "paid" || finStatus === "authorized") {
+            paidOrders++;
+        }
+
+        // Fulfillment
+        if (!isCancelled && fulfillStatus === "fulfilled") {
+            fulfilledOrders++;
+        }
+
+        // Partial COD calculations
+        if (order.payment_method === 'partial_cod') {
+            partialOrdersCount++;
+            advanceCollected += (order.advance_amount || 0);
+            remainingCodValue += (order.remaining_cod_amount || 0);
+            
+            const payload = order.order_payload || {};
+            if (payload.codFeeAmount) {
+                partialCodFeeRevenue += parseFloat(payload.codFeeAmount);
+            }
+        }
+        
+        // Pure COD calculations
+        if (order.payment_method === 'cod') {
+            pureCodOrdersCount++;
+            const payload = order.order_payload || {};
+            if (!isCancelled && finStatus !== "refunded" && payload.pureCodFeeAmount) {
+                pureCodFeeRevenue += parseFloat(payload.pureCodFeeAmount);
+            }
+        }
+
+        // Full Prepaid calculations
+        if (order.payment_method === 'full_prepaid') {
+            fullPrepaidOrdersCount++;
+            if (!isCancelled && finStatus !== "refunded") {
+                fullPrepaidRevenue += price;
+            }
+            
+            const payload = order.order_payload || {};
+            if (payload.prepaid_discount_amount && parseFloat(payload.prepaid_discount_amount) > 0) {
+                prepaidDiscountOrdersCount++;
+                prepaidDiscountsTotal += parseFloat(payload.prepaid_discount_amount);
+            }
+        }
+    }
+
+    const totalOrders = (orders || []).length;
+    const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+    const prepaidAvgDiscount = prepaidDiscountOrdersCount > 0 ? prepaidDiscountsTotal / prepaidDiscountOrdersCount : 0;
+
+    return {
+        totalOrders,
+        totalRevenue,
+        avgOrderValue,
+        todayOrders,
+        weekOrders,
+        pendingOrders,
+        fulfilledOrders,
+        cancelledOrders,
+        refundedOrders,
+        partiallyRefundedOrders,
+        paidOrders,
+        todayRevenue,
+        pendingRevenue,
+        partialOrdersCount,
+        advanceCollected,
+        remainingCodValue,
+        fullPrepaidOrdersCount,
+        fullPrepaidRevenue,
+        pureCodOrdersCount,
+        pureCodFeeRevenue,
+        partialCodFeeRevenue,
+        prepaidDiscountOrdersCount,
+        prepaidDiscountsTotal,
+        prepaidAvgDiscount,
+    };
+}

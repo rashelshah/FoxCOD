@@ -10,7 +10,7 @@ import { useState, useCallback } from "react";
 import type { LoaderFunctionArgs } from "react-router";
 import { useLoaderData, useNavigate, useSearchParams } from "react-router";
 import { authenticate } from "../shopify.server";
-import { supabase } from "../config/supabase.server";
+import { supabase, getAnalyticsStats } from "../config/supabase.server";
 import {
     Page,
     Layout,
@@ -68,196 +68,7 @@ interface AnalyticsData {
     prepaidAvgDiscount: number;
 }
 
-// ─── Fetch ALL orders from Shopify via SDK RestClient with pagination ──
-// Uses getRestClient(shop) which gets session from unauthenticated.admin(shop)
-// — guarantees a fresh token via SDK auto-refresh.
-import { getRestClient } from "../shopify/rest-client.server";
 
-async function fetchAllShopifyOrders(
-    restClient: any,
-    createdAtMin?: string,
-): Promise<ShopifyOrder[]> {
-    const fields = "id,created_at,total_price,financial_status,fulfillment_status,cancelled_at,tags,note_attributes";
-
-    const query: Record<string, string> = {
-        status: "any",
-        limit: "250",
-        fields,
-    };
-    if (createdAtMin) {
-        query.created_at_min = createdAtMin;
-    }
-
-    const allOrders: ShopifyOrder[] = [];
-
-    // First page via SDK RestClient
-    let response = await restClient.get({
-        path: "orders",
-        query,
-    });
-
-    if (response?.body?.orders) {
-        allOrders.push(...response.body.orders);
-    }
-
-    // Paginate using Link header
-    while (response?.headers?.get?.("link") || response?.headers?.link) {
-        const linkHeader = typeof response.headers.get === 'function'
-            ? response.headers.get("link")
-            : response.headers.link;
-
-        if (!linkHeader || !linkHeader.includes('rel="next"')) break;
-
-        const nextPageInfo = linkHeader
-            .split(",")
-            .find((l: string) => l.includes('rel="next"'))
-            ?.match(/<[^>]*page_info=([^&>]+)/)?.[1];
-
-        if (!nextPageInfo) break;
-
-        response = await restClient.get({
-            path: "orders",
-            query: { ...query, page_info: nextPageInfo },
-        });
-
-        if (response?.body?.orders) {
-            allOrders.push(...response.body.orders);
-        }
-    }
-
-    return allOrders;
-}
-
-// ─── Compute analytics metrics from orders ──────────
-function computeMetrics(orders: ShopifyOrder[]): AnalyticsData {
-    const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-
-    let totalRevenue = 0;
-    let todayOrders = 0;
-    let todayRevenue = 0;
-    let weekOrders = 0;
-    let pendingOrders = 0;
-    let fulfilledOrders = 0;
-    let cancelledOrders = 0;
-    let refundedOrders = 0;
-    let partiallyRefundedOrders = 0;
-    let paidOrders = 0;
-    let pendingRevenue = 0;
-    let partialOrdersCount = 0;
-    let advanceCollected = 0;
-    let remainingCodValue = 0;
-    let fullPrepaidOrdersCount = 0;
-    let fullPrepaidRevenue = 0;
-    let pureCodOrdersCount = 0;
-    let pureCodFeeRevenue = 0;
-    let partialCodFeeRevenue = 0;
-
-    for (const order of orders) {
-        const createdAt = new Date(order.created_at);
-        const price = parseFloat(order.total_price) || 0;
-        const isCancelled = order.cancelled_at !== null;
-
-        // Revenue: exclude cancelled and fully refunded
-        if (!isCancelled && order.financial_status !== "refunded") {
-            totalRevenue += price;
-        }
-
-        // Time-based counts
-        if (createdAt >= todayStart) {
-            todayOrders++;
-            if (!isCancelled && order.financial_status !== "refunded") {
-                todayRevenue += price;
-            }
-        }
-        if (createdAt >= weekStart) {
-            weekOrders++;
-        }
-
-        // Status breakdowns
-        if (isCancelled) {
-            cancelledOrders++;
-        } else if (order.financial_status === "refunded") {
-            refundedOrders++;
-        } else if (order.financial_status === "partially_refunded") {
-            partiallyRefundedOrders++;
-        } else if (order.financial_status === "pending") {
-            pendingOrders++;
-            pendingRevenue += price;
-        } else if (order.financial_status === "paid" || order.financial_status === "authorized") {
-            paidOrders++;
-        }
-
-        // Fulfillment
-        if (!isCancelled && order.fulfillment_status === "fulfilled") {
-            fulfilledOrders++;
-        }
-
-        // Partial COD calculations
-        const isPartial = order.tags?.includes("Partial COD") || order.note_attributes?.some(attr => attr.name === "partial_cod" && attr.value === "true");
-        if (isPartial) {
-            partialOrdersCount++;
-            const advanceAttr = order.note_attributes?.find(a => a.name === "advance_amount");
-            const remainingAttr = order.note_attributes?.find(a => a.name === "remaining_amount");
-            if (advanceAttr) advanceCollected += parseFloat(advanceAttr.value) || 0;
-            if (remainingAttr) remainingCodValue += parseFloat(remainingAttr.value) || 0;
-            
-            const payload = typeof order.order_payload === 'string' ? JSON.parse(order.order_payload) : order.order_payload || {};
-            if (payload.codFeeAmount) {
-                partialCodFeeRevenue += parseFloat(payload.codFeeAmount);
-            }
-        }
-        
-        // Pure COD calculations
-        const payload = typeof order.order_payload === 'string' ? JSON.parse(order.order_payload) : order.order_payload || {};
-        if (payload.paymentMethod === 'full_cod') {
-            pureCodOrdersCount++;
-            if (!isCancelled && order.financial_status !== "refunded" && payload.pureCodFeeAmount) {
-                pureCodFeeRevenue += parseFloat(payload.pureCodFeeAmount);
-            }
-        }
-
-        // Full Prepaid calculations
-        const isFullPrepaid = order.tags?.includes("Full Prepaid") || order.note_attributes?.some(attr => attr.name === "full_prepaid" && attr.value === "true");
-        if (isFullPrepaid) {
-            fullPrepaidOrdersCount++;
-            if (!isCancelled && order.financial_status !== "refunded") {
-                fullPrepaidRevenue += price;
-            }
-        }
-    }
-
-    const totalOrders = orders.length;
-    const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
-
-    return {
-        totalOrders,
-        totalRevenue,
-        avgOrderValue,
-        todayOrders,
-        weekOrders,
-        pendingOrders,
-        fulfilledOrders,
-        cancelledOrders,
-        refundedOrders,
-        partiallyRefundedOrders,
-        paidOrders,
-        todayRevenue,
-        pendingRevenue,
-        partialOrdersCount,
-        advanceCollected,
-        remainingCodValue,
-        fullPrepaidOrdersCount,
-        fullPrepaidRevenue,
-        pureCodOrdersCount,
-        pureCodFeeRevenue,
-        partialCodFeeRevenue,
-        prepaidDiscountOrdersCount: 0,
-        prepaidDiscountsTotal: 0,
-        prepaidAvgDiscount: 0,
-    };
-}
 
 // ─── Loader ─────────────────────────────────────────
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -265,8 +76,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const { admin, session } = await authenticate.admin(request);
     const shop = session.shop;
 
-    // Get REST client — session always from unauthenticated.admin(shop)
-    const restClient = await getRestClient(shop);
+
 
     // Get shop currency
     let shopCurrency = "USD";
@@ -293,54 +103,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         }
     }
 
-    // Fetch prepaid discount analytics from Supabase
-    let prepaidDiscountOrdersCount = 0;
-    let prepaidDiscountsTotal = 0;
-    let prepaidAvgDiscount = 0;
-
-    try {
-        let query = supabase
-            .from('order_logs')
-            .select('order_payload')
-            .eq('shop_domain', shop)
-            .eq('payment_method', 'full_prepaid')
-            .gt('order_payload->>prepaid_discount_amount', '0');
-
-        if (createdAtMin) {
-            query = query.gte('created_at', createdAtMin);
-        }
-
-        const { data: prepaidDiscountLogs, error } = await query;
-        
-        if (error) {
-            console.error("[Analytics] Supabase prepaid discount query error:", error);
-        }
-
-        if (prepaidDiscountLogs) {
-            prepaidDiscountOrdersCount = prepaidDiscountLogs.length;
-            prepaidDiscountsTotal = prepaidDiscountLogs.reduce((sum: number, row: any) => {
-                const payload = row.order_payload as any;
-                const amt = payload?.prepaid_discount_amount;
-                return sum + (typeof amt === 'string' ? parseFloat(amt) : (typeof amt === 'number' ? amt : 0));
-            }, 0);
-            prepaidAvgDiscount = prepaidDiscountOrdersCount > 0
-                ? prepaidDiscountsTotal / prepaidDiscountOrdersCount
-                : 0;
-        }
-    } catch (e) {
-        console.error("[Analytics] Error fetching Supabase prepaid discounts:", e);
-    }
-
-    // Fetch fresh data from Shopify on every request (no caching)
+    // Fetch fresh data from Supabase
     let metrics: AnalyticsData;
     try {
-        const orders = await fetchAllShopifyOrders(restClient, createdAtMin);
-        metrics = {
-            ...computeMetrics(orders),
-            prepaidDiscountOrdersCount,
-            prepaidDiscountsTotal,
-            prepaidAvgDiscount
-        };
+        metrics = await getAnalyticsStats(shop, createdAtMin);
     } catch (error) {
         console.error("[Analytics] Error fetching Shopify orders:", error);
         metrics = {

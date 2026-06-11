@@ -8,30 +8,12 @@ import type { LoaderFunctionArgs } from "react-router";
 import { useLoaderData, Link, useNavigate } from "react-router";
 import { Button, InlineStack } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
-import { getFormSettings, saveShop } from "../config/supabase.server";
-import { getRestClient } from "../shopify/rest-client.server";
+import { getFormSettings, saveShop, getOrderStats } from "../config/supabase.server";
 
 const FOX_COD_EXTENSION_UID = "87e0c6dc-4f49-e6ce-990c-7f93eadc93f862473f7f";
 const FOX_COD_EMBED_HANDLE = "cod-form-embed";
 
-type ShopifyOrder = {
-  created_at: string;
-  total_price: string;
-  financial_status: string;
-  cancelled_at: string | null;
-};
 
-type ShopifyOrderStatsResponse = {
-  body?: { orders?: ShopifyOrder[] };
-  headers?: {
-    get?: (name: string) => string | null;
-    link?: string;
-  };
-};
-
-type ShopifyRestClient = {
-  get: (args: { path: string; query: Record<string, string> }) => Promise<ShopifyOrderStatsResponse>;
-};
 
 /**
  * Returns the theme editor URL using the App Embed approach.
@@ -51,77 +33,7 @@ function getCodThemeEditorUrl(shop: string) {
   return `https://${shop}/admin/themes/current/editor?context=apps&template=product&activateAppEmbed=${extensionId}/${handle}`;
 }
 
-async function fetchShopifyOrderStats(restClient: ShopifyRestClient) {
-  const fields = "id,created_at,total_price,financial_status,cancelled_at";
 
-  const allOrders: ShopifyOrder[] = [];
-
-  // First page via SDK RestClient
-  let response = await restClient.get({
-    path: "orders",
-    query: { status: "any", limit: "250", fields },
-  });
-
-  if (response?.body?.orders) {
-    allOrders.push(...response.body.orders);
-  }
-
-  // Paginate using Link header
-  while (response?.headers?.get?.("link") || response?.headers?.link) {
-    const linkHeader = typeof response.headers.get === 'function'
-      ? response.headers.get("link")
-      : response.headers.link;
-
-    if (!linkHeader || !linkHeader.includes('rel="next"')) break;
-
-    const nextPageInfo = linkHeader
-      .split(",")
-      .find((l: string) => l.includes('rel="next"'))
-      ?.match(/<[^>]*page_info=([^&>]+)/)?.[1];
-
-    if (!nextPageInfo) break;
-
-    response = await restClient.get({
-      path: "orders",
-      query: { status: "any", limit: "250", fields, page_info: nextPageInfo },
-    });
-
-    if (response?.body?.orders) {
-      allOrders.push(...response.body.orders);
-    }
-  }
-
-  const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-
-  let totalRevenue = 0;
-  let todayOrders = 0;
-  let weekOrders = 0;
-  let pendingOrders = 0;
-
-  for (const order of allOrders) {
-    const createdAt = new Date(order.created_at);
-    const price = parseFloat(order.total_price) || 0;
-    const isCancelled = order.cancelled_at !== null;
-
-    if (!isCancelled && order.financial_status !== "refunded") totalRevenue += price;
-    if (createdAt >= todayStart) todayOrders++;
-    if (createdAt >= weekStart) weekOrders++;
-    if (!isCancelled && order.financial_status === "pending") pendingOrders++;
-  }
-
-  return {
-    totalOrders: allOrders.length,
-    totalRevenue,
-    todayOrders,
-    weekOrders,
-    pendingOrders,
-    todayRevenue: 0,
-    recentOrders: [] as unknown[],
-    ordersByStatus: {} as Record<string, number>,
-  };
-}
 
 /**
  * Loader: Fetch dashboard data from Supabase
@@ -131,9 +43,6 @@ async function fetchShopifyOrderStats(restClient: ShopifyRestClient) {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
   const shopDomain = session.shop;
-
-  // Get REST client — session always from unauthenticated.admin(shop)
-  const restClient = await getRestClient(shopDomain);
 
   // Query shop currency from Shopify Admin API
   let shopCurrency = 'USD';
@@ -168,10 +77,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   };
 
   try {
-    const shopifyStats = await fetchShopifyOrderStats(restClient);
-    stats = { ...stats, ...shopifyStats };
+    const supabaseStats = await getOrderStats(shopDomain);
+    stats = { ...stats, ...supabaseStats };
   } catch (error) {
-    console.log("Error fetching Shopify order stats:", error);
+    console.log("Error fetching Supabase order stats:", error);
   }
 
   return {
