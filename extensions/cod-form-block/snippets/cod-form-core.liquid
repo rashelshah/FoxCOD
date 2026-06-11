@@ -314,6 +314,14 @@
     // Read from shop metafield synced by the admin on every save.
     // No App Proxy round-trip needed on the storefront.
     var ppRaw = {{ shop.metafields.fox_cod.partial_payment_settings_json.value | json | default: 'null' }};
+    if (!ppRaw) {
+      ppRaw = {
+        enabled: true,
+        full_prepaid_enabled: true,
+        pure_cod_enabled: true,
+        payment_options: [{ id: 'opt_10pct', label: 'Pay 10% Now', type: 'percentage', value: 10 }]
+      };
+    }
     if (typeof ppRaw === 'string') {
       try { ppRaw = JSON.parse(ppRaw); } catch (e) {}
     }

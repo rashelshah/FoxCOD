@@ -3748,9 +3748,13 @@
             });
     }
 
+    var autoFillTimeout;
     phoneInput.addEventListener('input', function() {
         var digits = this.value.replace(/\D/g, '');
-        if (digits.length === 10) triggerAutoFill();
+        if (digits.length >= 8) {
+            clearTimeout(autoFillTimeout);
+            autoFillTimeout = setTimeout(triggerAutoFill, 600);
+        }
     });
   }
 

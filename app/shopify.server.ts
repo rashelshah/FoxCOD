@@ -27,6 +27,8 @@ const shopify = shopifyApp({
 
       try {
         const { getFormSettings, saveFormSettings, DEFAULT_BLOCKS, DEFAULT_STYLES, DEFAULT_BUTTON_STYLES } = await import("./config/supabase.server");
+        const { getPartialPaymentSettings, savePartialPaymentSettings } = await import("./services/partial-payment-settings.server");
+        const { DEFAULT_MODAL_SETTINGS, DEFAULT_MODULE_FLAGS, DEFAULT_PAYMENT_OPTIONS } = await import("./config/partial-payment.types");
         
         const existingSettings = await getFormSettings(session.shop);
         if (!existingSettings) {
@@ -59,7 +61,46 @@ const shopify = shopifyApp({
             blocks: DEFAULT_BLOCKS,
             styles: DEFAULT_STYLES,
           });
-          console.log(`[Install] Initialized default settings for ${session.shop}`);
+          console.log(`[Install] Initialized default form settings for ${session.shop}`);
+        }
+
+        const existingPartialSettings = await getPartialPaymentSettings(session.shop);
+        if (!existingPartialSettings) {
+          await savePartialPaymentSettings({
+            shop_domain: session.shop,
+            enabled: true,
+            payment_options: DEFAULT_PAYMENT_OPTIONS,
+            cod_fee_enabled: false,
+            cod_fee_name: 'COD Fee',
+            cod_fee_type: 'fixed',
+            cod_fee_amount: 0,
+            minimum_order_total: 0,
+            maximum_order_total: 0,
+            allowed_product_ids: [],
+            allowed_collection_ids: [],
+            allowed_countries: [],
+            excluded_countries: [],
+            modal_settings: DEFAULT_MODAL_SETTINGS,
+            module_flags: DEFAULT_MODULE_FLAGS,
+            pure_cod_enabled: true,
+            pure_cod_fee_enabled: false,
+            pure_cod_fee_name: 'COD Fee',
+            pure_cod_fee_type: 'fixed',
+            pure_cod_fee_amount: 0,
+            pure_cod_minimum_order_total: 0,
+            pure_cod_maximum_order_total: 0,
+            pure_cod_allowed_product_ids: [],
+            pure_cod_allowed_collection_ids: [],
+            full_prepaid_enabled: true,
+            full_prepaid_minimum_order_total: 0,
+            full_prepaid_maximum_order_total: 0,
+            full_prepaid_allowed_product_ids: [],
+            full_prepaid_allowed_collection_ids: [],
+            prepaid_discount_enabled: false,
+            prepaid_discount_type: 'percentage',
+            prepaid_discount_value: 0,
+          });
+          console.log(`[Install] Initialized default partial payment settings for ${session.shop}`);
         }
       } catch (error) {
         console.error(`[Install] Error initializing settings for ${session.shop}:`, error);

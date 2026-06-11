@@ -33,25 +33,25 @@ export async function lookupCustomerByPhone(phone: string, shop: string): Promis
         return { found: false, error: "Invalid phone number format" };
     }
 
-    // First, try customers table
+    // First, try customers table with ilike to match numbers with country codes like +91
     const { data: customerData, error: customerError } = await supabase
         .from('customers')
         .select('name, phone, address, state, city, zipcode, email')
         .eq('shop_domain', shop)
-        .eq('phone', phone)
+        .ilike('phone', `%${phone}%`)
         .order('updated_at', { ascending: false })
-        .limit(1)
-        .single();
+        .limit(1);
 
-    if (customerData && !customerError) {
+    if (customerData && customerData.length > 0 && !customerError) {
+        const customer = customerData[0];
         return {
             found: true,
-            name: customerData.name,
-            address: customerData.address,
-            state: customerData.state || '',
-            city: customerData.city || '',
-            zipcode: customerData.zipcode || '',
-            email: customerData.email || '',
+            name: customer.name,
+            address: customer.address,
+            state: customer.state || '',
+            city: customer.city || '',
+            zipcode: customer.zipcode || '',
+            email: customer.email || '',
         };
     }
 
@@ -60,20 +60,20 @@ export async function lookupCustomerByPhone(phone: string, shop: string): Promis
         .from('order_logs')
         .select('customer_name, customer_address, customer_phone, customer_email, city, state, pincode')
         .eq('shop_domain', shop)
-        .eq('customer_phone', phone)
+        .ilike('customer_phone', `%${phone}%`)
         .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
+        .limit(1);
 
-    if (orderData && !orderError) {
+    if (orderData && orderData.length > 0 && !orderError) {
+        const order = orderData[0];
         return {
             found: true,
-            name: orderData.customer_name,
-            address: orderData.customer_address,
-            email: orderData.customer_email || '',
-            state: orderData.state || '',
-            city: orderData.city || '',
-            zipcode: orderData.pincode || '',
+            name: order.customer_name,
+            address: order.customer_address,
+            email: order.customer_email || '',
+            state: order.state || '',
+            city: order.city || '',
+            zipcode: order.pincode || '',
         };
     }
 
@@ -87,7 +87,10 @@ export async function lookupCustomerByPhone(phone: string, shop: string): Promis
         .limit(50);
 
     if (normalizedCustomers) {
-        const matched = normalizedCustomers.find(c => normalizePhone(c.phone) === normalizedPhone);
+        const matched = normalizedCustomers.find(c => {
+            const dbPhone = normalizePhone(c.phone);
+            return dbPhone === normalizedPhone || dbPhone.endsWith(normalizedPhone) || normalizedPhone.endsWith(dbPhone);
+        });
         if (matched) {
             return {
                 found: true,
@@ -109,7 +112,10 @@ export async function lookupCustomerByPhone(phone: string, shop: string): Promis
         .limit(50);
 
     if (normalizedOrders) {
-        const match = normalizedOrders.find(o => normalizePhone(o.customer_phone) === normalizedPhone);
+        const match = normalizedOrders.find(o => {
+            const dbPhone = normalizePhone(o.customer_phone);
+            return dbPhone === normalizedPhone || dbPhone.endsWith(normalizedPhone) || normalizedPhone.endsWith(dbPhone);
+        });
         if (match) {
             return {
                 found: true,
