@@ -960,7 +960,7 @@ export function calculateOrderPricing(body: any, formSettings?: any): OrderPrici
     );
 
     const merchandiseTotal = roundCurrency(mainItemsSubtotal - bundleDiscountAmount + upsellTotal);
-    
+
     // Rely on the frontend's calculation for COD fee to ensure it matches checkout exact amounts post-coupon
     let codFeeAmount = Number(body?.codFeeAmount) || Number(body?.pureCodFeeAmount) || 0;
     let codFeeName = String(body?.codFeeName || formSettings?.pure_cod_fee_name || "COD Fee");
@@ -973,7 +973,7 @@ export function calculateOrderPricing(body: any, formSettings?: any): OrderPrici
             codFeeAmount = formSettings.pure_cod_fee_amount;
         }
     }
-    
+
     codFeeAmount = roundCurrency(codFeeAmount);
     const originalTotal = roundCurrency(merchandiseTotal + shippingPrice + codFeeAmount);
 

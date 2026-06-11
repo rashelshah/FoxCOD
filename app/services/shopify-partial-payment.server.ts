@@ -307,26 +307,28 @@ async function createDraftOrderCheckout(
   const { shop, advanceAmount, totalOrderValue, partialPaymentReference, currency, customer, lineItems, notes, shippingPrice = 0, codFeeAmount = 0 } = params;
   const remainingAmount = totalOrderValue - advanceAmount + codFeeAmount;
 
-  const { session } = await unauthenticated.admin(shop);
-
   let actualDiscountableSubtotal = 0;
+
+  const graphqlInput: any = {
+    lineItems: [],
+    customAttributes: [],
+    tags: []
+  };
 
   const draftLineItems = lineItems.map(item => {
     const numericId = String(item.variantId || '').replace(/[^0-9]/g, '');
     const nativePrice = numericId ? (nativePrices[numericId] || item.price) : item.price;
     
-    let applied_discount = undefined;
+    let appliedDiscount = undefined;
     let effectivePrice = nativePrice;
     
     if (nativePrice > item.price + 0.01) {
       const unitDiscount = nativePrice - item.price;
-      const totalDiscount = (unitDiscount * item.quantity).toFixed(2);
       const discountTitle = params.couponCode ? params.couponCode : "Offer Applied";
-      applied_discount = {
+      appliedDiscount = {
         title: discountTitle,
-        value: unitDiscount.toFixed(2),
-        value_type: "fixed_amount",
-        amount: totalDiscount
+        value: parseFloat(unitDiscount.toFixed(2)),
+        valueType: "FIXED_AMOUNT"
       };
       effectivePrice = item.price;
     }
@@ -335,31 +337,27 @@ async function createDraftOrderCheckout(
 
     if (numericId) {
       return {
-        variant_id: Number(numericId),
+        variantId: `gid://shopify/ProductVariant/${numericId}`,
         quantity: item.quantity,
-        price: nativePrice.toFixed(2), // We MUST pass native price, Shopify ignores price overrides
-        applied_discount
+        originalUnitPrice: nativePrice.toFixed(2),
+        ...(appliedDiscount ? { appliedDiscount } : {})
       };
     } else {
       return {
         title: item.title || "Custom Item",
         quantity: item.quantity,
-        price: nativePrice.toFixed(2),
-        custom: true
+        originalUnitPrice: nativePrice.toFixed(2)
       };
     }
   });
 
-
   // Add COD Fee as a custom line item so it formally appears in the draft order
   if (codFeeAmount > 0) {
     draftLineItems.push({
-      variant_id: undefined,
-      quantity: 1,
-      price: codFeeAmount.toFixed(2),
       title: "COD Fee",
-      custom: true
-    } as any);
+      quantity: 1,
+      originalUnitPrice: codFeeAmount.toFixed(2)
+    });
     actualDiscountableSubtotal += codFeeAmount;
   }
 
@@ -376,23 +374,19 @@ async function createDraftOrderCheckout(
   // we move the shipping cost into a line item, which increases the subtotal and allows the full discount.
   if (neededDiscount > discountableSubtotal && shippingPrice > 0) {
     draftLineItems.push({
-      variant_id: undefined,
-      quantity: 1,
-      price: shippingPrice.toFixed(2),
       title: "Shipping Cost",
-      custom: true
-    } as any);
+      quantity: 1,
+      originalUnitPrice: shippingPrice.toFixed(2)
+    });
     finalShippingPrice = 0;
   }
 
   const finalShippingLine = finalShippingPrice > 0 ? {
     title: params.shippingTitle || "Shipping",
-    price: finalShippingPrice.toFixed(2),
-    custom: true
+    price: finalShippingPrice.toFixed(2)
   } : {
     title: params.shippingTitle || "Free Shipping",
-    price: "0.00",
-    custom: true
+    price: "0.00"
   };
 
   const cartNote = [
@@ -408,14 +402,14 @@ async function createDraftOrderCheckout(
   ].filter(Boolean).join('\n');
 
   const customAttributes = [
-    { name: params.isFullPrepaid ? 'full_prepaid' : 'partial_cod', value: 'true' },
-    !params.isFullPrepaid ? { name: 'advance_amount', value: advanceAmount.toFixed(2) } : null,
-    !params.isFullPrepaid ? { name: 'remaining_amount', value: remainingAmount.toFixed(2) } : null,
-    { name: 'original_total', value: totalOrderValue.toFixed(2) },
-    { name: 'partial_payment_reference', value: partialPaymentReference },
-    { name: 'order_source', value: 'FoxCOD' },
-    { name: 'checkout_type', value: 'draft_order' }
-  ].filter(Boolean);
+    { key: params.isFullPrepaid ? 'full_prepaid' : 'partial_cod', value: 'true' },
+    !params.isFullPrepaid ? { key: 'advance_amount', value: advanceAmount.toFixed(2) } : null,
+    !params.isFullPrepaid ? { key: 'remaining_amount', value: remainingAmount.toFixed(2) } : null,
+    { key: 'original_total', value: totalOrderValue.toFixed(2) },
+    { key: 'partial_payment_reference', value: partialPaymentReference },
+    { key: 'order_source', value: 'FoxCOD' },
+    { key: 'checkout_type', value: 'draft_order' }
+  ].filter(Boolean) as { key: string; value: string }[];
 
   // Recompute the discount based on final line items + final shipping line,
   // so the checkout grand total is exactly advanceAmount regardless of how
@@ -435,67 +429,87 @@ async function createDraftOrderCheckout(
     appliedDiscount = {
       title: discountTitle,
       description: params.isFullPrepaid ? "Order Discount" : "Remaining amount to be collected on delivery.",
-      value: finalAppliedDiscountValue.toFixed(2),
-      value_type: "fixed_amount"
+      value: parseFloat(finalAppliedDiscountValue.toFixed(2)),
+      valueType: "FIXED_AMOUNT"
     };
   }
 
   const addressInput = {
-    first_name: customer.firstName || undefined,
-    last_name: customer.lastName || undefined,
+    firstName: customer.firstName || undefined,
+    lastName: customer.lastName || undefined,
     address1: customer.address1 || undefined,
     address2: customer.address2 || undefined,
     city: customer.city || undefined,
     province: customer.province || undefined,
     zip: customer.zip || undefined,
-    country_code: customer.country ? customer.country.toUpperCase().slice(0, 2) : undefined,
+    countryCode: customer.country ? customer.country.toUpperCase().slice(0, 2) : undefined,
     phone: customer.phone || undefined
   };
+  
+  const cleanAddressInput = Object.fromEntries(Object.entries(addressInput).filter(([_, v]) => v !== undefined));
 
-  const draftOrderPayload: any = {
-    line_items: draftLineItems,
-    shipping_line: finalShippingLine,
-    applied_discount: appliedDiscount,
-    note: cartNote,
-    note_attributes: customAttributes,
-    tags: params.isFullPrepaid
-      ? (params.prepaidDiscountAmount && params.prepaidDiscountAmount > 0 ? "FoxCOD, Full Prepaid, Prepaid Discount" : "FoxCOD, Full Prepaid")
-      : "FoxCOD, Partial COD, Pending Advance",
-  };
+  graphqlInput.lineItems = draftLineItems;
+  graphqlInput.shippingLine = finalShippingLine;
+  if (appliedDiscount) graphqlInput.appliedDiscount = appliedDiscount;
+  graphqlInput.note = cartNote;
+  graphqlInput.customAttributes = customAttributes;
+  graphqlInput.tags = params.isFullPrepaid
+    ? (params.prepaidDiscountAmount && params.prepaidDiscountAmount > 0 ? ["FoxCOD", "Full Prepaid", "Prepaid Discount"] : ["FoxCOD", "Full Prepaid"])
+    : ["FoxCOD", "Partial COD", "Pending Advance"];
 
-  if (Object.keys(addressInput).length > 0) {
-    draftOrderPayload.shipping_address = addressInput;
-    draftOrderPayload.billing_address = addressInput;
+  if (Object.keys(cleanAddressInput).length > 0) {
+    graphqlInput.shippingAddress = cleanAddressInput;
+    graphqlInput.billingAddress = cleanAddressInput;
   }
 
   if (customer.email) {
-    draftOrderPayload.email = customer.email;
+    graphqlInput.email = customer.email;
   }
 
-  const url = `https://${shop}/admin/api/2024-01/draft_orders.json`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Shopify-Access-Token': session.accessToken as string,
-    },
-    body: JSON.stringify({ draft_order: draftOrderPayload }),
+  const graphql = await getAdminGraphql(shop);
+  
+  const query = `
+    mutation draftOrderCreate($input: DraftOrderInput!) {
+      draftOrderCreate(input: $input) {
+        draftOrder {
+          id
+          invoiceUrl
+        }
+        userErrors {
+          field
+          message
+        }
+      }
+    }
+  `;
+
+  console.log('[PartialPayment] Executing draftOrderCreate GraphQL mutation...', JSON.stringify(graphqlInput, null, 2));
+  
+  const res = await graphql(query, {
+    variables: { input: graphqlInput }
   });
 
   const data = await res.json();
+  const mutationResult = data?.data?.draftOrderCreate;
 
-  if (!res.ok) {
-    throw new Error(`Draft Order creation failed: ${JSON.stringify(data.errors)}`);
+  if (data.errors) {
+    console.error('[PartialPayment] GraphQL Network/Parse Errors:', JSON.stringify(data.errors, null, 2));
+    throw new Error(`GraphQL Errors: ${data.errors.map((e: any) => e.message).join(', ')}`);
   }
 
-  const draftOrder = data.draft_order;
-  if (!draftOrder || !draftOrder.invoice_url) {
-    throw new Error(`Draft Order created but no invoice_url returned.`);
+  if (mutationResult?.userErrors && mutationResult.userErrors.length > 0) {
+    console.error('[PartialPayment] GraphQL User Errors during draftOrderCreate:', JSON.stringify(mutationResult.userErrors, null, 2));
+    throw new Error(`Draft Order creation failed: ${mutationResult.userErrors.map((e: any) => e.message).join(', ')}`);
+  }
+
+  const draftOrder = mutationResult?.draftOrder;
+  if (!draftOrder || !draftOrder.invoiceUrl) {
+    throw new Error(`Draft Order created but no invoiceUrl returned. Full response: ${JSON.stringify(data)}`);
   }
 
   return {
-    checkoutId: String(draftOrder.id),
-    checkoutUrl: draftOrder.invoice_url,
+    checkoutId: draftOrder.id.split('/').pop() as string,
+    checkoutUrl: draftOrder.invoiceUrl,
     partialPaymentReference,
     checkoutType: 'draft_order',
   };
