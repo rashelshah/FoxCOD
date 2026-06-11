@@ -73,7 +73,28 @@ async function findOrCreateCustomer(graphql: any, customerData: { firstName?: st
       const searchData = await searchRes.json();
       const edges = searchData?.data?.customers?.edges || [];
       if (edges.length > 0) {
-        return edges[0].node.id;
+        const existingId = edges[0].node.id;
+        
+        // Update the existing customer with the name from the form
+        if (firstName || lastName) {
+          await graphql(`
+            mutation customerUpdate($input: CustomerInput!) {
+              customerUpdate(input: $input) {
+                customer { id }
+              }
+            }
+          `, {
+            variables: {
+              input: {
+                id: existingId,
+                firstName: firstName || '',
+                lastName: lastName || ''
+              }
+            }
+          });
+        }
+        
+        return existingId;
       }
     }
 
