@@ -46,6 +46,62 @@ export interface GraphQLOrderResult {
  * 2. Permits exact variant price overrides via originalUnitPrice (unlike orderCreate).
  * 3. Safely reserves inventory and fires standard webhooks upon completion.
  */
+async function findOrCreateCustomer(graphql: any, customerData: { firstName?: string, lastName?: string, email?: string, phone?: string }) {
+  const email = customerData.email?.trim();
+  const phone = customerData.phone?.trim();
+
+  if (!email && !phone) return null;
+
+  try {
+    // 1. Search for existing customer
+    let queryStr = '';
+    if (email) queryStr += `email:${email}`;
+    if (phone) queryStr += (queryStr ? ' OR ' : '') + `phone:${phone}`;
+    
+    const searchRes = await graphql(`
+      query findCustomer($query: String!) {
+        customers(first: 1, query: $query) {
+          edges { node { id } }
+        }
+      }
+    `, { variables: { query: queryStr } });
+    
+    const searchData = await searchRes.json();
+    const edges = searchData?.data?.customers?.edges || [];
+    if (edges.length > 0) {
+      return edges[0].node.id;
+    }
+
+    // 2. Create customer if not found
+    const createRes = await graphql(`
+      mutation customerCreate($input: CustomerInput!) {
+        customerCreate(input: $input) {
+          customer { id }
+          userErrors { field message }
+        }
+      }
+    `, {
+      variables: {
+        input: {
+          firstName: customerData.firstName || '',
+          lastName: customerData.lastName || '',
+          email: email || undefined,
+          phone: phone || undefined,
+        }
+      }
+    });
+    
+    const createData = await createRes.json();
+    const customer = createData?.data?.customerCreate?.customer;
+    if (customer) {
+      return customer.id;
+    }
+  } catch (err) {
+    console.warn("[GraphQL Order] Error finding or creating customer (scopes might be missing):", err);
+  }
+  return null;
+}
+
 export async function createPendingOrder(params: GraphQLOrderParams): Promise<GraphQLOrderResult> {
   const { shop } = params;
   const { admin } = await unauthenticated.admin(shop);
@@ -107,7 +163,15 @@ export async function createPendingOrder(params: GraphQLOrderParams): Promise<Gr
     };
   }
 
-  // 4. Build Draft Order Input
+  // 4. Find or Create Customer to ensure it is linked in the Shopify Admin UI
+  const customerId = await findOrCreateCustomer(graphql, {
+    firstName: params.customer.firstName || params.billingAddress?.firstName || params.shippingAddress?.firstName,
+    lastName: params.customer.lastName || params.billingAddress?.lastName || params.shippingAddress?.lastName,
+    email: params.customer.email,
+    phone: params.customer.phone
+  });
+
+  // 5. Build Draft Order Input
   const draftOrderInput: Record<string, any> = {
     lineItems: draftLineItems,
     tags: params.tags || [],
@@ -115,6 +179,10 @@ export async function createPendingOrder(params: GraphQLOrderParams): Promise<Gr
     customAttributes: params.noteAttributes || [],
     email: params.customer.email || undefined,
   };
+
+  if (customerId) {
+    draftOrderInput.purchasingEntity = { customerId };
+  }
 
   if (params.shippingLine) {
     draftOrderInput.shippingLine = {
