@@ -19,7 +19,6 @@ import {
     buildCatalogOrCustomLineItem,
     sanitizeVariantPricedLineItems,
 } from "../services/shopify-sync.server";
-import { getRestClient } from "../shopify/rest-client.server";
 import { calculateOrderPricing, normalizeCouponCode, validateCouponForShop } from "../services/coupons.server";
 import { getPartialPaymentSettings } from "../services/partial-payment-settings.server";
 import { createPendingOrder } from "../services/shopify-graphql-orders.server";
@@ -276,9 +275,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             );
         }
 
-        // ── 1. PARALLEL: Load SDK REST client + fraud settings + form settings + partial payment settings ──
-        const [restClient, fraudSettings, formSettings, partialPaymentSettings] = await Promise.all([
-            getRestClient(body.shop),
+        // ── 1. PARALLEL: Load fraud settings + form settings + partial payment settings ──
+        const [fraudSettings, formSettings, partialPaymentSettings] = await Promise.all([
             getFraudProtectionSettings(body.shop),
             getFormSettings(body.shop),
             getPartialPaymentSettings(body.shop),

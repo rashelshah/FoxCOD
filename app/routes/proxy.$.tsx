@@ -20,7 +20,6 @@ import {
     buildCatalogOrCustomLineItem,
     sanitizeVariantPricedLineItems,
 } from "../services/shopify-sync.server";
-import { getRestClient } from "../shopify/rest-client.server";
 import { createPartialPaymentCheckout, createFullPrepaidCheckout } from "../services/shopify-partial-payment.server";
 import { getPartialPaymentSettings, isPaymentMethodEligible, getPrepaidDiscount } from "../services/partial-payment-settings.server";
 import { createPendingOrder } from "../services/shopify-graphql-orders.server";
@@ -31,17 +30,7 @@ import { createPendingOrder } from "../services/shopify-graphql-orders.server";
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 interface CacheEntry<T> { value: T; expiresAt: number; }
-const _restClientCache = new Map<string, CacheEntry<any>>();
 const _fraudSettingsCache = new Map<string, CacheEntry<any>>();
-
-async function getCachedRestClient(shop: string) {
-    const now = Date.now();
-    const cached = _restClientCache.get(shop);
-    if (cached && cached.expiresAt > now) return cached.value;
-    const client = await getRestClient(shop);
-    _restClientCache.set(shop, { value: client, expiresAt: now + CACHE_TTL_MS });
-    return client;
-}
 
 async function getCachedFraudSettings(shop: string) {
     const now = Date.now();
@@ -823,14 +812,13 @@ async function handleRegularOrder(request: Request, data: any) {
         }), { status: 400, headers: corsHeaders });
     }
 
-    // ── 1. PARALLEL: Load Shopify SDK REST client + fraud settings (cached) ──
+    // ── 1. PARALLEL: Load fraud settings (cached) ──
     // Cache eliminates 200-400ms of DB/session round-trips on warm requests.
-    const [restClient, fraudSettings, ppSettings] = await Promise.all([
-        getCachedRestClient(data.shop),
+    const [fraudSettings, ppSettings] = await Promise.all([
         getCachedFraudSettings(data.shop),
         getPartialPaymentSettings(data.shop),
     ]);
-    console.log('⏱ [Proxy] REST client + fraud settings ready:', Date.now() - start, 'ms');
+    console.log('⏱ [Proxy] Fraud settings ready:', Date.now() - start, 'ms');
 
     // ── 2. FRAUD CHECKS ──
     const clientIp =

@@ -16,7 +16,6 @@ import {
     markSyncFailed,
     supabase,
 } from '../config/supabase.server';
-import { getRestClient } from '../shopify/rest-client.server';
 import { createPendingOrder } from './shopify-graphql-orders.server';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -129,8 +128,6 @@ export async function createShopifyOrderBackground(orderId: string): Promise<Sho
     const currentAttempt: number = order.sync_attempts || 0;
 
     try {
-        // ── 4. Load SDK REST client (handles session + token refresh automatically) ──
-        const restClient = await getRestClient(order.shop_domain);
         console.log('[SYNC] Creating Shopify order for', id, '(attempt', currentAttempt + 1, ')');
 
         // ── 5. Reconstruct payload from stored order_payload ──

@@ -1,5 +1,4 @@
 import { getFormSettings, supabase } from "../config/supabase.server";
-import { getRestClient } from "../shopify/rest-client.server";
 import { unauthenticated } from "../shopify.server";
 
 export interface ResolvedCoupon {
@@ -207,21 +206,6 @@ function buildOrderDiscountItems(body: any): OrderDiscountItem[] {
     });
 
     return items;
-}
-
-function getEligibleSubtotalForShopifyRule(priceRule: any, discountItems: OrderDiscountItem[]) {
-    const entitledProductIds = Array.isArray(priceRule?.entitled_product_ids) ? priceRule.entitled_product_ids : [];
-    const entitledVariantIds = Array.isArray(priceRule?.entitled_variant_ids) ? priceRule.entitled_variant_ids : [];
-
-    if (entitledProductIds.length === 0 && entitledVariantIds.length === 0) {
-        return roundCurrency(discountItems.reduce((sum, item) => sum + (item.price * item.quantity), 0));
-    }
-
-    return roundCurrency(discountItems.reduce((sum, item) => {
-        const matchesProduct = entitledProductIds.some((id: unknown) => idsMatch(id, item.productId));
-        const matchesVariant = entitledVariantIds.some((id: unknown) => idsMatch(id, item.variantId));
-        return matchesProduct || matchesVariant ? sum + (item.price * item.quantity) : sum;
-    }, 0));
 }
 
 const SHOPIFY_CODE_DISCOUNT_QUERY = `#graphql
@@ -627,6 +611,8 @@ async function getShopifyGraphqlCoupon(
                 discount: shippingDiscount,
                 originalTotal: roundCurrency(pricing.originalTotal),
                 finalTotal: roundCurrency(pricing.originalTotal - shippingDiscount),
+                codFeeAmount: pricing.codFeeAmount,
+                codFeeName: pricing.codFeeName,
                 message: shippingDiscount > 0 ? "Free shipping applied" : "Coupon applied",
             };
         }
@@ -726,6 +712,8 @@ async function getShopifyGraphqlCoupon(
             discount,
             originalTotal: roundCurrency(pricing.originalTotal),
             finalTotal: roundCurrency(pricing.originalTotal - discount),
+            codFeeAmount: pricing.codFeeAmount,
+            codFeeName: pricing.codFeeName,
             message: "Coupon applied",
         };
     } catch (error: any) {
@@ -734,124 +722,6 @@ async function getShopifyGraphqlCoupon(
             throw error;
         }
         console.error("❌ [Coupons] GraphQL discount lookup failed:", error?.message, error);
-        return null;
-    }
-}
-
-async function getShopifyCoupon(shop: string, couponCode: string, cartTotal: number, discountItems: OrderDiscountItem[]): Promise<CouponValidationResult | null> {
-    try {
-        const restClient = await getRestClient(shop);
-        const lookupResponse = await restClient.get({
-            path: "discount_codes/lookup",
-            query: { code: couponCode },
-        });
-
-        const discountCode = lookupResponse?.body?.discount_code;
-        if (!discountCode?.price_rule_id) {
-            return null;
-        }
-
-        const priceRuleResponse = await restClient.get({
-            path: `price_rules/${discountCode.price_rule_id}`,
-        });
-
-        const priceRule = priceRuleResponse?.body?.price_rule;
-        if (!priceRule) {
-            return null;
-        }
-
-        const now = Date.now();
-        const startsAt = priceRule.starts_at ? new Date(priceRule.starts_at).getTime() : null;
-        const endsAt = priceRule.ends_at ? new Date(priceRule.ends_at).getTime() : null;
-        if (startsAt && now < startsAt) {
-            return { valid: false, message: "Coupon is not active yet" };
-        }
-        if (endsAt && now > endsAt) {
-            return { valid: false, message: "Coupon has expired" };
-        }
-
-        if (priceRule.target_type && priceRule.target_type !== "line_item") {
-            return { valid: false, message: "This Shopify discount is not supported in COD" };
-        }
-
-        const normalizedCartTotal = roundCurrency(cartTotal);
-        const minOrderValue = Number(priceRule?.prerequisite_subtotal_range?.greater_than_or_equal_to || 0);
-        if (minOrderValue > 0 && normalizedCartTotal < minOrderValue) {
-            return {
-                valid: false,
-                message: `Minimum order value is ${roundCurrency(minOrderValue).toFixed(2)}`,
-            };
-        }
-
-        if (priceRule.usage_limit != null && Number(priceRule.usage_limit) >= 0) {
-            const usageCount = Number(discountCode.usage_count || 0);
-            if (usageCount >= Number(priceRule.usage_limit)) {
-                return { valid: false, message: "Coupon usage limit reached" };
-            }
-        }
-
-        const eligibleSubtotal = getEligibleSubtotalForShopifyRule(priceRule, discountItems);
-        if (eligibleSubtotal <= 0) {
-            return { valid: false, message: "This coupon does not apply to items in the cart" };
-        }
-
-        let discount = 0;
-        let resolvedCoupon: ResolvedCoupon;
-        if (priceRule.value_type === "percentage") {
-            const percentage = Math.abs(Number(priceRule.value || 0));
-            discount = (eligibleSubtotal * percentage) / 100;
-            resolvedCoupon = {
-                code: couponCode,
-                type: "percentage",
-                value: percentage,
-                enabled: true,
-                min_order_value: minOrderValue || undefined,
-                usage_limit: priceRule.usage_limit != null ? Number(priceRule.usage_limit) : undefined,
-                source: "shopify",
-                applies_to_entitled_items_only: true,
-                eligible_subtotal: eligibleSubtotal,
-                shopify_price_rule_id: String(priceRule.id),
-            };
-        } else if (priceRule.value_type === "fixed_amount") {
-            const amount = Math.abs(Number(priceRule.value || 0));
-            discount = amount;
-            resolvedCoupon = {
-                code: couponCode,
-                type: "fixed",
-                value: amount,
-                enabled: true,
-                min_order_value: minOrderValue || undefined,
-                usage_limit: priceRule.usage_limit != null ? Number(priceRule.usage_limit) : undefined,
-                source: "shopify",
-                applies_to_entitled_items_only: true,
-                eligible_subtotal: eligibleSubtotal,
-                shopify_price_rule_id: String(priceRule.id),
-            };
-        } else {
-            return { valid: false, message: "This Shopify discount type is not supported in COD" };
-        }
-
-        discount = Math.min(roundCurrency(discount), eligibleSubtotal, normalizedCartTotal);
-
-        return {
-            valid: true,
-            coupon: resolvedCoupon,
-            discount,
-            originalTotal: normalizedCartTotal,
-            finalTotal: roundCurrency(normalizedCartTotal - discount),
-            message: "Coupon applied",
-        };
-    } catch (error: any) {
-        const errorMessage = String(error?.message || "");
-        if (
-            errorMessage.includes("404") ||
-            errorMessage.includes("Not Found") ||
-            errorMessage.includes("discount_codes/lookup")
-        ) {
-            return null;
-        }
-
-        console.error("[Coupons] Shopify discount lookup failed:", error);
         return null;
     }
 }
@@ -906,18 +776,18 @@ export async function validateCouponForShop(shop: string, couponCode: string, ca
         console.error("❌ [Coupons] Unexpected error in GraphQL coupon lookup:", error?.message);
     }
 
-    // ── Try REST API fallback (legacy price rules) ──
-    const shopifyCoupon = await getShopifyCoupon(
-        shop,
-        normalizedCode,
-        normalizedCartTotal,
-        pricing.discountItems,
-    );
-    if (shopifyCoupon) {
-        return shopifyCoupon;
-    }
 
-    console.log("🎟 [Coupons] ❌ Coupon not found in any source:", normalizedCode);
+
+
+
+
+
+
+
+
+
+
+    console.log("🎟 [Coupons] ❌ Coupon not found in GraphQL:", normalizedCode);
     return { valid: false, message: "Invalid or expired coupon" };
 }
 
