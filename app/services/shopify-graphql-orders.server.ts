@@ -128,10 +128,11 @@ export async function createPendingOrder(params: GraphQLOrderParams): Promise<Gr
   }
 
   const shippingAddr = formatAddress(params.shippingAddress);
-  if (shippingAddr) {
-    draftOrderInput.shippingAddress = shippingAddr;
-    draftOrderInput.billingAddress = formatAddress(params.billingAddress) || shippingAddr;
-  }
+  const billingAddr = formatAddress(params.billingAddress) || shippingAddr;
+  
+  // NOTE: For COD, we intentionally OMIT shippingAddress during draftOrderCreate
+  // to bypass Shopify's strict shipping zone validations during draftOrderComplete.
+  // We will append it via orderUpdate immediately after the order is completed.
 
   // 5. Execute draftOrderCreate
   const createRes = await graphql(`
@@ -200,6 +201,33 @@ export async function createPendingOrder(params: GraphQLOrderParams): Promise<Gr
 
   // Extract the raw numeric ID to preserve backward compatibility across the app
   const numericOrderId = String(finalOrder.id).split('/').pop() || '';
+
+  // 7. Apply shipping/billing address via orderUpdate
+  if (shippingAddr) {
+    const updateRes = await graphql(`
+      mutation orderUpdate($input: OrderInput!) {
+        orderUpdate(input: $input) {
+          order { id }
+          userErrors { field message }
+        }
+      }
+    `, {
+      variables: {
+        input: {
+          id: finalOrder.id,
+          shippingAddress: shippingAddr,
+          billingAddress: billingAddr
+        }
+      }
+    });
+    
+    const updateData = await updateRes.json();
+    const updateErrors = updateData?.data?.orderUpdate?.userErrors || [];
+    if (updateErrors.length > 0) {
+      console.warn(`[GraphQL Order] orderUpdate (address bypass) failed:`, updateErrors.map((e: any) => e.message).join(', '));
+      // Non-fatal, the order is already created successfully.
+    }
+  }
 
   return {
     success: true,
