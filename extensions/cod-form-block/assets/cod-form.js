@@ -4556,11 +4556,7 @@ function darkenColor(hex, percent) {
       else if (existingSelected === 'partial_cod' && showPartial) defaultMethod = 'partial_cod';
       else if (existingSelected === 'full_prepaid' && showFullPrepaid) defaultMethod = 'full_prepaid';
 
-      if (!defaultMethod) {
-          if (showFullCod) defaultMethod = 'full_cod';
-          else if (showPartial) defaultMethod = 'partial_cod';
-          else if (showFullPrepaid) defaultMethod = 'full_prepaid';
-      }
+      // Do not auto-select any payment method if none is provided.
 
       var allBlocked = (!showFullCod && !showPartial && !showFullPrepaid);
 
