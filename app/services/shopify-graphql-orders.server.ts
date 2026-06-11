@@ -130,6 +130,10 @@ export async function createPendingOrder(params: GraphQLOrderParams): Promise<Gr
   const shippingAddr = formatAddress(params.shippingAddress);
   const billingAddr = formatAddress(params.billingAddress) || shippingAddr;
   
+  if (billingAddr) {
+    draftOrderInput.billingAddress = billingAddr;
+  }
+  
   // NOTE: For COD, we intentionally OMIT shippingAddress during draftOrderCreate
   // to bypass Shopify's strict shipping zone validations during draftOrderComplete.
   // We will append it via orderUpdate immediately after the order is completed.
@@ -215,8 +219,7 @@ export async function createPendingOrder(params: GraphQLOrderParams): Promise<Gr
       variables: {
         input: {
           id: finalOrder.id,
-          shippingAddress: shippingAddr,
-          billingAddress: billingAddr
+          shippingAddress: shippingAddr
         }
       }
     });
