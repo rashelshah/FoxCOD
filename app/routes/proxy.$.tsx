@@ -201,7 +201,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
             success: false,
             error: error.message || "Failed to process request"
         }), {
-            status: 500,
+            status: 200, // Return 200 so Shopify proxy doesn't block JSON
             headers: corsHeaders
         });
     }
@@ -521,7 +521,7 @@ async function handlePartialCodCheckout(request: Request, data: any) {
             success: false,
             error: error.message || 'Unable to create checkout. Please try again.',
             _debug: process.env.NODE_ENV !== 'production' ? error?.stack?.slice(0, 500) : undefined,
-        }), { status: 500, headers: corsHeaders });
+        }), { status: 200, headers: corsHeaders });
     }
 }
 
@@ -794,7 +794,7 @@ async function handleFullPrepaidCheckout(request: Request, data: any) {
             success: false,
             error: error.message || 'Unable to create Full Prepaid checkout. Please try again.',
             _debug: process.env.NODE_ENV !== 'production' ? error?.stack?.slice(0, 500) : undefined,
-        }), { status: 500, headers: corsHeaders });
+        }), { status: 200, headers: corsHeaders });
     }
 }
 
@@ -1056,11 +1056,11 @@ async function handleRegularOrder(request: Request, data: any) {
     console.log('⏱ [Proxy] Shopify API responded:', Date.now() - start, 'ms');
 
     if (!graphqlResult.success) {
-        console.error('[Proxy] ❌ Shopify order creation failed');
+        console.error('[Proxy] ❌ Shopify order creation failed:', graphqlResult.error);
         return new Response(JSON.stringify({
             success: false,
             error: graphqlResult.error || 'Failed to create order. Please try again.',
-        }), { status: 500, headers: corsHeaders });
+        }), { status: 200, headers: corsHeaders }); // Status 200 so UI gets the error message
     }
 
     const shopifyOrderId = graphqlResult.orderId!;
