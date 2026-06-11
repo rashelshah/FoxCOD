@@ -17,6 +17,7 @@ import {
     supabase,
 } from '../config/supabase.server';
 import { getRestClient } from '../shopify/rest-client.server';
+import { createPendingOrder } from './shopify-graphql-orders.server';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -173,7 +174,7 @@ export async function createShopifyOrderBackground(orderId: string): Promise<Sho
                 const originalPrice = parseFloat(String(bv.price || 0));
                 const discountedPrice = (originalPrice * discountMultiplier).toFixed(2);
                 const bvQty = bv.quantity || 1;
-
+                
                 lineItems.push(buildCatalogOrCustomLineItem({
                     variantId: bvVariantId,
                     title: bv.title || 'Bundle Item',
@@ -185,7 +186,7 @@ export async function createShopifyOrderBackground(orderId: string): Promise<Sho
             // Standard order: single line item with discounted price
             const originalPrice = parseFloat(String(body?.price || order.total_price || 0));
             const discountedPrice = (originalPrice * discountMultiplier).toFixed(2);
-
+            
             lineItems.push(buildCatalogOrCustomLineItem({
                 variantId: mainVariantId,
                 title: order.product_title || body?.productTitle || 'Product',
@@ -228,100 +229,48 @@ export async function createShopifyOrderBackground(orderId: string): Promise<Sho
             });
         }
 
-        // ── 7. Build Shopify payload ──
+        // ── 7. CALL SHOPIFY GRAPHQL API via centralized service ──
         const shippingLabel: string = order.shipping_label || (shippingPrice > 0 ? 'Shipping' : 'Free Shipping');
         const orderNotes: string = order.customer_notes || '';
 
-        const shopifyPayload: Record<string, any> = {
-            order: {
-                line_items: lineItems,
-                customer: {
-                    first_name: firstName,
-                    last_name: lastName,
-                    email: order.customer_email || undefined,
-                },
+        const paramsForGraphql = {
+            shop: order.shop_domain,
+            lineItems: lineItems.map((li: any) => ({
+                variantId: li.variant_id,
+                title: li.title,
+                quantity: li.quantity,
+                price: li.price
+            })),
+            customer: {
+                firstName: firstName,
+                lastName: lastName,
+                email: order.customer_email || undefined,
                 phone: formattedPhone || undefined,
-                financial_status: 'pending',
-                fulfillment_status: null,
-                tags: 'FoxCOD, COD',
-                note: orderNotes || `Order placed via FoxCOD COD Form`,
-                inventory_behavior: 'decrement_obeying_policy',
-                source_name: 'FoxCOD',
-                shipping_lines: [{
-                    title: shippingLabel,
-                    price: shippingPrice.toFixed(2),
-                    code: 'COD_SHIPPING',
-                }],
             },
+            shippingAddress: (order.customer_name || customerAddress) ? {
+                firstName: firstName,
+                lastName: lastName,
+                address1: customerAddress,
+                city: customerCity,
+                province: customerState,
+                zip: customerZip,
+                country: orderCountry,
+                phone: formattedPhone || '',
+            } : undefined,
+            tags: ['FoxCOD', 'COD'],
+            note: orderNotes || `Order placed via FoxCOD COD Form`,
+            shippingLine: { title: shippingLabel, price: shippingPrice.toFixed(2) }
         };
 
-        // Removed discount_codes block because discounts are now directly applied to line item unit prices.
-
-        if (order.customer_name || customerAddress) {
-            shopifyPayload.order.shipping_address = {
-                first_name: firstName,
-                last_name: lastName,
-                address1: customerAddress,
-                city: customerCity,
-                province: customerState,
-                zip: customerZip,
-                country: orderCountry,
-                phone: formattedPhone || '',
-            };
-            shopifyPayload.order.billing_address = {
-                first_name: firstName,
-                last_name: lastName,
-                address1: customerAddress,
-                city: customerCity,
-                province: customerState,
-                zip: customerZip,
-                country: orderCountry,
-                phone: formattedPhone || '',
-            };
-        }
-
-        // ── 8. Call Shopify Admin API via SDK — automatic token refresh ──
-        const idempotencyKey = `foxcod-${id}`;
-
-        let shopifyResponse = await restClient.post({
-            path: "orders",
-            data: shopifyPayload,
-            extraHeaders: {
-                'Idempotency-Key': idempotencyKey,
-            },
-        });
-
-        let shopifyOrder = shopifyResponse?.body?.order;
+        const graphqlResult = await createPendingOrder(paramsForGraphql);
         console.log('[SYNC] Shopify response received for order', id);
 
-        // Retry with sanitized line items if first attempt fails (e.g. variant price mismatch)
-        if (!shopifyOrder) {
-            console.warn('[SYNC] Primary order create failed, retrying with sanitized line items');
-            const fallbackPayload = {
-                order: {
-                    ...shopifyPayload.order,
-                    line_items: sanitizeVariantPricedLineItems(lineItems),
-                },
-            };
-
-            shopifyResponse = await restClient.post({
-                path: "orders",
-                data: fallbackPayload,
-                extraHeaders: {
-                    'Idempotency-Key': `${idempotencyKey}-fallback`,
-                },
-            });
-
-            shopifyOrder = shopifyResponse?.body?.order;
-            console.log('[SYNC] Fallback Shopify response received for order', id);
-
-            if (!shopifyOrder) {
-                throw new Error('Shopify order creation failed after fallback');
-            }
+        if (!graphqlResult.success) {
+            throw new Error(graphqlResult.error || 'Shopify order creation failed');
         }
 
-        const shopifyOrderId = String(shopifyOrder.id);
-        const shopifyOrderName = shopifyOrder.name;
+        const shopifyOrderId = graphqlResult.orderId!;
+        const shopifyOrderName = graphqlResult.orderName || '';
 
         console.log('[SYNC] Shopify success:', shopifyOrderName, '— writing to DB...');
 

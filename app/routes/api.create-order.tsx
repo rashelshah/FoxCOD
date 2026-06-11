@@ -22,6 +22,7 @@ import {
 import { getRestClient } from "../shopify/rest-client.server";
 import { calculateOrderPricing, normalizeCouponCode, validateCouponForShop } from "../services/coupons.server";
 import { getPartialPaymentSettings } from "../services/partial-payment-settings.server";
+import { createPendingOrder } from "../services/shopify-graphql-orders.server";
 
 // CORS headers for storefront requests
 const corsHeaders = {
@@ -418,113 +419,69 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         couponDiscount = Math.min(couponDiscount, totalPrice);
         totalPrice = Math.round((totalPrice + Number.EPSILON) * 100) / 100;
 
-        const shopifyPayload: Record<string, any> = {
-            order: {
-                line_items: lineItems,
-                customer: {
-                    first_name: customer.firstName,
-                    last_name: customer.lastName,
-                    email: customer.email || undefined,
-                },
+        // ── 4. CALL SHOPIFY GRAPHQL API via centralized service ──
+        const paramsForGraphql = {
+            shop: body.shop,
+            lineItems: lineItems.map((li: any) => ({
+                variantId: li.variant_id,
+                title: li.title,
+                quantity: li.quantity,
+                price: li.price
+            })),
+            currency: currencyCode,
+            customer: {
+                firstName: customer.firstName,
+                lastName: customer.lastName,
+                email: customer.email || undefined,
                 phone: formattedPhone || undefined,
-                financial_status: 'pending',
-                fulfillment_status: null,
-                tags: 'FoxCOD, COD',
-                note: orderNotes || 'Order placed via FoxCOD COD Form',
-                inventory_behavior: 'decrement_obeying_policy',
-                source_name: 'FoxCOD',
-                shipping_lines: [{
-                    title: shippingLabel,
-                    price: shippingPrice.toFixed(2),
-                    code: 'COD_SHIPPING',
-                }],
-                // IMPORTANT: Always use 'fixed_amount' for discount_codes.
-                // Shopify interprets 'percentage' type's amount as the % value (e.g. 60 = 60% off),
-                // NOT the dollar amount. We compute the exact dollar discount server-side.
-                ...(couponCode && couponDiscount > 0 ? {
-                    total_discounts: couponDiscount.toFixed(2),
-                    discount_codes: [{
-                        code: couponCode,
-                        amount: couponDiscount.toFixed(2),
-                        type: 'fixed_amount',
-                    }],
-                } : {}),
-                // note_attributes for merchant clarity and debugging
-                note_attributes: [
-                    { name: 'Order Source', value: 'FoxCOD' },
-                    ...(couponCode && couponDiscount > 0 ? [
-                        { name: 'Coupon Code', value: couponCode },
-                        { name: 'Coupon Type', value: couponType === 'percentage' ? `${couponValue}% off` : `Fixed ${fmtPrice(couponValue)}` },
-                        { name: 'Discount Applied', value: fmtPrice(couponDiscount) },
-                    ] : []),
-                    ...(discountPercent > 0 ? [
-                        { name: 'Bundle Discount', value: `${discountPercent}%` },
-                    ] : []),
-                    { name: 'Original Total', value: fmtPrice(pricing.originalTotal) },
-                    { name: 'Final Total', value: fmtPrice(totalPrice) },
-                ],
             },
-        };
-
-        if (customer.name || customer.address) {
-            shopifyPayload.order.shipping_address = {
-                first_name: customer.firstName,
-                last_name: customer.lastName,
+            shippingAddress: (customer.name || customer.address) ? {
+                firstName: customer.firstName,
+                lastName: customer.lastName,
                 address1: customer.address || '',
                 city: customer.city || '',
                 province: customer.state || '',
                 zip: customer.zipcode || '',
                 country: body.customerCountry || 'IN',
                 phone: formattedPhone || '',
-            };
-            shopifyPayload.order.billing_address = { ...shopifyPayload.order.shipping_address };
-        }
+            } : undefined,
+            tags: ['FoxCOD', 'COD'],
+            note: orderNotes || 'Order placed via FoxCOD COD Form',
+            shippingLine: { title: shippingLabel, price: shippingPrice.toFixed(2) },
+            discount: (couponCode && couponDiscount > 0) ? {
+                code: couponCode,
+                amount: couponDiscount,
+                valueType: 'FIXED_AMOUNT' as const
+            } : undefined,
+            noteAttributes: [
+                { key: 'Order Source', value: 'FoxCOD' },
+                ...(couponCode && couponDiscount > 0 ? [
+                    { key: 'Coupon Code', value: couponCode },
+                    { key: 'Coupon Type', value: couponType === 'percentage' ? `${couponValue}% off` : `Fixed ${fmtPrice(couponValue)}` },
+                    { key: 'Discount Applied', value: fmtPrice(couponDiscount) },
+                ] : []),
+                ...(discountPercent > 0 ? [
+                    { key: 'Bundle Discount', value: `${discountPercent}%` },
+                ] : []),
+                { key: 'Original Total', value: fmtPrice(pricing.originalTotal) },
+                { key: 'Final Total', value: fmtPrice(totalPrice) },
+            ]
+        };
 
-        // ── 4. CALL SHOPIFY API via SDK — automatic token refresh ──
-        const idempotencyKey = `foxcod-api-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
-        let shopifyResponse = await restClient.post({
-            path: "orders",
-            data: shopifyPayload,
-            extraHeaders: {
-                'Idempotency-Key': idempotencyKey,
-            },
-        });
-
-        let shopifyOrder = shopifyResponse?.body?.order;
+        const graphqlResult = await createPendingOrder(paramsForGraphql);
         console.log('⏱ Shopify API responded:', Date.now() - start, 'ms');
 
-        // Retry with sanitized line items if first attempt fails (e.g. variant price mismatch)
-        if (!shopifyOrder) {
-            console.warn('⚠️ Primary Shopify call failed, retrying with sanitized line items');
-            const sanitizedItems = sanitizeVariantPricedLineItems(lineItems);
-            shopifyResponse = await restClient.post({
-                path: "orders",
-                data: {
-                    order: {
-                        ...shopifyPayload.order,
-                        line_items: sanitizedItems,
-                    },
-                },
-                extraHeaders: {
-                    'Idempotency-Key': `${idempotencyKey}-fallback`,
-                },
-            });
-
-            shopifyOrder = shopifyResponse?.body?.order;
-
-            if (!shopifyOrder) {
-                console.error('[COD Order] ❌ Shopify order creation failed');
-                return Response.json({
-                    success: false,
-                    error: "Failed to create order. Please try again.",
-                }, { status: 500, headers: corsHeaders });
-            }
+        if (!graphqlResult.success) {
+            console.error('[COD Order] ❌ Shopify order creation failed');
+            return Response.json({
+                success: false,
+                error: graphqlResult.error || "Failed to create order. Please try again.",
+            }, { status: 500, headers: corsHeaders });
         }
 
-        const shopifyOrderId = String(shopifyOrder.id);
-        const shopifyOrderName = shopifyOrder.name;
-        const orderStatusUrl: string | null = shopifyOrder.order_status_url || null;
+        const shopifyOrderId = graphqlResult.orderId!;
+        const shopifyOrderName = graphqlResult.orderName || '';
+        const orderStatusUrl = graphqlResult.orderStatusUrl || null;
 
         console.log("[COD] Shopify Order Created:", shopifyOrderName);
         console.log("[COD] Order Status URL:", orderStatusUrl);

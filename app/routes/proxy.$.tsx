@@ -23,6 +23,7 @@ import {
 import { getRestClient } from "../shopify/rest-client.server";
 import { createPartialPaymentCheckout, createFullPrepaidCheckout } from "../services/shopify-partial-payment.server";
 import { getPartialPaymentSettings, isPaymentMethodEligible, getPrepaidDiscount } from "../services/partial-payment-settings.server";
+import { createPendingOrder } from "../services/shopify-graphql-orders.server";
 
 // ── In-process caches to avoid repeated DB/session round-trips ──
 // REST clients and fraud settings are stable per shop for minutes at a time.
@@ -1002,136 +1003,69 @@ async function handleRegularOrder(request: Request, data: any) {
     couponDiscount = Math.min(couponDiscount, totalPrice);
     totalPrice = Math.round((totalPrice + Number.EPSILON) * 100) / 100;
 
-    // Build Shopify order payload
-    const shopifyPayload: Record<string, any> = {
-        order: {
-            line_items: lineItems,
-            customer: {
-                first_name: firstName,
-                last_name: lastName,
-                email: data.customerEmail || undefined,
-            },
+    // ── 4. CALL SHOPIFY GRAPHQL API via centralized service ──
+    const paramsForGraphql = {
+        shop: data.shop,
+        lineItems: lineItems.map((li: any) => ({
+            variantId: li.variant_id,
+            title: li.title,
+            quantity: li.quantity,
+            price: li.price
+        })),
+        currency: currencyCode,
+        customer: {
+            firstName: firstName,
+            lastName: lastName,
+            email: data.customerEmail || undefined,
             phone: formattedPhone || undefined,
-            financial_status: 'pending',
-            fulfillment_status: null,
-            tags: 'FoxCOD, COD',
-            note: orderNotes || 'Order placed via FoxCOD COD Form',
-            inventory_behavior: 'decrement_obeying_policy',
-            source_name: 'FoxCOD',
-            shipping_lines: [{
-                title: shippingLabel,
-                price: shippingPrice.toFixed(2),
-                code: 'COD_SHIPPING',
-            }],
-            // IMPORTANT: Always use 'fixed_amount' for discount_codes.
-            // Shopify interprets 'percentage' type's amount as the % value (e.g. 60 = 60% off),
-            // NOT the dollar amount. We compute the exact dollar discount server-side.
-            ...(couponCode && couponDiscount > 0 ? {
-                total_discounts: couponDiscount.toFixed(2),
-                discount_codes: [{
-                    code: couponCode,
-                    amount: couponDiscount.toFixed(2),
-                    type: 'fixed_amount',
-                }],
-            } : {}),
-            // note_attributes for merchant clarity and debugging
-            note_attributes: [
-                { name: 'Order Source', value: 'FoxCOD' },
-                ...(couponCode && couponDiscount > 0 ? [
-                    { name: 'Coupon Code', value: couponCode },
-                    { name: 'Coupon Type', value: couponType === 'percentage' ? `${couponValue}% off` : `Fixed ${fmtPrice(couponValue)}` },
-                    { name: 'Discount Applied', value: fmtPrice(couponDiscount) },
-                ] : []),
-                ...(discountPercent > 0 ? [
-                    { name: 'Bundle Discount', value: `${discountPercent}%` },
-                ] : []),
-                { name: 'Original Total', value: fmtPrice(pricing.originalTotal) },
-                { name: 'Final Total', value: fmtPrice(totalPrice) },
-            ],
         },
-    };
-
-    if (customerName || data.customerAddress) {
-        shopifyPayload.order.shipping_address = {
-            first_name: firstName,
-            last_name: lastName,
+        shippingAddress: (customerName || data.customerAddress) ? {
+            firstName: firstName,
+            lastName: lastName,
             address1: data.customerAddress || '',
             city: data.customerCity || '',
             province: data.customerState || '',
             zip: data.customerZipcode || '',
             country: orderCountry,
             phone: formattedPhone || '',
-        };
-        shopifyPayload.order.billing_address = { ...shopifyPayload.order.shipping_address };
-    }
+        } : undefined,
+        tags: ['FoxCOD', 'COD'],
+        note: orderNotes || 'Order placed via FoxCOD COD Form',
+        shippingLine: { title: shippingLabel, price: shippingPrice.toFixed(2) },
+        discount: (couponCode && couponDiscount > 0) ? {
+            code: couponCode,
+            amount: couponDiscount,
+            valueType: 'FIXED_AMOUNT' as const
+        } : undefined,
+        noteAttributes: [
+            { key: 'Order Source', value: 'FoxCOD' },
+            ...(couponCode && couponDiscount > 0 ? [
+                { key: 'Coupon Code', value: couponCode },
+                { key: 'Coupon Type', value: couponType === 'percentage' ? `${couponValue}% off` : `Fixed ${fmtPrice(couponValue)}` },
+                { key: 'Discount Applied', value: fmtPrice(couponDiscount) },
+            ] : []),
+            ...(discountPercent > 0 ? [
+                { key: 'Bundle Discount', value: `${discountPercent}%` },
+            ] : []),
+            { key: 'Original Total', value: fmtPrice(pricing.originalTotal) },
+            { key: 'Final Total', value: fmtPrice(totalPrice) },
+        ]
+    };
 
-    // ── 4. CALL SHOPIFY API via SDK — automatic token refresh ──
-    const idempotencyKey = `foxcod-proxy-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
-    let shopifyResponse = await restClient.post({
-        path: "orders",
-        data: shopifyPayload,
-        extraHeaders: {
-            'Idempotency-Key': idempotencyKey,
-        },
-    });
-
-    let shopifyOrder = shopifyResponse?.body?.order;
+    const graphqlResult = await createPendingOrder(paramsForGraphql);
     console.log('⏱ [Proxy] Shopify API responded:', Date.now() - start, 'ms');
 
-    // Retry with sanitized line items if first attempt fails (e.g. variant price mismatch)
-    if (!shopifyOrder) {
-        console.warn('[Proxy] Primary Shopify call failed, retrying with sanitized line items');
-        const sanitizedItems = sanitizeVariantPricedLineItems(lineItems);
-        const fallbackPayload = {
-            order: {
-                ...shopifyPayload.order,
-                line_items: sanitizedItems,
-            },
-        };
-
-        shopifyResponse = await restClient.post({
-            path: "orders",
-            data: fallbackPayload,
-            extraHeaders: {
-                'Idempotency-Key': `${idempotencyKey}-fallback`,
-            },
-        });
-
-        shopifyOrder = shopifyResponse?.body?.order;
-        console.log('⏱ [Proxy] Shopify fallback responded:', Date.now() - start, 'ms');
-
-        if (!shopifyOrder) {
-            console.error('[Proxy] ❌ Shopify order creation failed');
-            return new Response(JSON.stringify({
-                success: false,
-                error: 'Failed to create order. Please try again.',
-            }), { status: 500, headers: corsHeaders });
-        }
+    if (!graphqlResult.success) {
+        console.error('[Proxy] ❌ Shopify order creation failed');
+        return new Response(JSON.stringify({
+            success: false,
+            error: graphqlResult.error || 'Failed to create order. Please try again.',
+        }), { status: 500, headers: corsHeaders });
     }
 
-    const shopifyOrderId = String(shopifyOrder.id);
-    const shopifyOrderName = shopifyOrder.name;
-    const shopifyOrderToken = shopifyOrder.token || '';
-
-    // Build the order status URL.
-    // Shopify's order_status_url for Admin-created orders routes through shop.app
-    // authentication which requires the customer to be logged in — unusable for
-    // guest COD shoppers. Instead we construct the legacy direct URL using the
-    // order token, which bypasses shop.app and works without a customer account.
-    let orderStatusUrl: string | null = null;
-    const rawStatusUrl: string | null = shopifyOrder.order_status_url || null;
-
-    if (rawStatusUrl && !rawStatusUrl.includes('shop.app')) {
-        // Use Shopify's URL directly when it doesn't require shop.app auth
-        orderStatusUrl = rawStatusUrl;
-    } else if (shopifyOrderToken && data.shop) {
-        // Build the direct legacy order status URL (works for guest checkouts)
-        orderStatusUrl = `https://${data.shop}/orders/${shopifyOrderToken}/authenticate?key=${shopifyOrderToken}`;
-    } else if (rawStatusUrl) {
-        // Fallback: use Shopify's URL even if it goes through shop.app
-        orderStatusUrl = rawStatusUrl;
-    }
+    const shopifyOrderId = graphqlResult.orderId!;
+    const shopifyOrderName = graphqlResult.orderName || '';
+    const orderStatusUrl = graphqlResult.orderStatusUrl || null;
 
     console.log('[COD] Shopify Order Created:', shopifyOrderName);
     console.log('[COD] Order Status URL:', orderStatusUrl);
