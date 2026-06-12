@@ -6,7 +6,7 @@
 
 import type { LoaderFunctionArgs } from "react-router";
 import { useLoaderData, Link, useNavigate } from "react-router";
-import { Button, InlineStack } from "@shopify/polaris";
+import { Button, InlineStack, Card, BlockStack, ProgressBar, Text } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import { getFormSettings, saveShop, getOrderStats } from "../config/supabase.server";
 
@@ -557,91 +557,7 @@ export default function Index() {
           margin: 0;
         }
         
-        /* Setup Progress */
-        .setup-card {
-          background: white;
-          border: 1px solid #e5e7eb;
-          border-radius: 16px;
-          padding: 24px;
-          margin-bottom: 28px;
-        }
-        
-        .setup-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          margin-bottom: 16px;
-        }
-        
-        .setup-header h3 {
-          font-size: 16px;
-          font-weight: 600;
-          color: #111827;
-          margin: 0;
-        }
-        
-        .setup-progress-text {
-          font-size: 14px;
-          font-weight: 600;
-          color: #6366f1;
-        }
-        
-        .setup-progress-bar {
-          height: 8px;
-          background: #e5e7eb;
-          border-radius: 4px;
-          overflow: hidden;
-          margin-bottom: 20px;
-        }
-        
-        .setup-progress-fill {
-          height: 100%;
-          background: linear-gradient(90deg, #6366f1, #8b5cf6);
-          border-radius: 4px;
-          transition: width 0.5s ease;
-        }
-        
-        .setup-steps {
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
-        
-        .setup-step {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          font-size: 14px;
-        }
-        
-        .setup-step-icon {
-          width: 24px;
-          height: 24px;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 12px;
-          flex-shrink: 0;
-        }
-        
-        .setup-step-done .setup-step-icon {
-          background: linear-gradient(135deg, #10b981, #059669);
-          color: white;
-        }
-        
-        .setup-step-pending .setup-step-icon {
-          background: #e5e7eb;
-          color: #9ca3af;
-        }
-        
-        .setup-step-done {
-          color: #374151;
-        }
-        
-        .setup-step-pending {
-          color: #9ca3af;
-        }
+        /* Setup Progress styles removed as they now use Polaris components */
         
         /* ==================== RESPONSIVE DESIGN ==================== */
         
@@ -789,24 +705,39 @@ export default function Index() {
 
           {/* Setup Progress (show only if not complete) */}
           {setupProgress < 100 && (
-            <div className="setup-card">
-              <div className="setup-header">
-                <h3>Quick Setup</h3>
-                <span className="setup-progress-text">{setupProgress}% complete</span>
-              </div>
-              <div className="setup-progress-bar">
-                <div className="setup-progress-fill" style={{ width: `${setupProgress}%` }} />
-              </div>
-              <div className="setup-steps">
-                {setupSteps.map((step, index) => (
-                  <div key={index} className={`setup-step ${step.done ? 'setup-step-done' : 'setup-step-pending'}`}>
-                    <span className="setup-step-icon">
-                      {step.done ? '✓' : index + 1}
-                    </span>
-                    {step.label}
-                  </div>
-                ))}
-              </div>
+            <div style={{ marginBottom: "28px" }}>
+              <Card>
+                <BlockStack gap="400">
+                  <InlineStack align="space-between">
+                    <Text variant="headingMd" as="h3">Quick Setup</Text>
+                    <Text variant="bodySm" tone="success" fontWeight="bold">{setupProgress}% complete</Text>
+                  </InlineStack>
+                  <ProgressBar progress={setupProgress} size="small" tone="primary" />
+                  <BlockStack gap="200">
+                    {setupSteps.map((step, index) => (
+                      <InlineStack gap="300" blockAlign="center" key={index}>
+                        <div style={{
+                          width: "24px",
+                          height: "24px",
+                          borderRadius: "50%",
+                          background: step.done ? "#10b981" : "#e5e7eb",
+                          color: step.done ? "white" : "#9ca3af",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: "12px",
+                          fontWeight: "bold",
+                        }}>
+                          {step.done ? '✓' : index + 1}
+                        </div>
+                        <Text variant="bodyMd" as="p" tone={step.done ? "base" : "subdued"}>
+                          {step.label}
+                        </Text>
+                      </InlineStack>
+                    ))}
+                  </BlockStack>
+                </BlockStack>
+              </Card>
             </div>
           )}
 
