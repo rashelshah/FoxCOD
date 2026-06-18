@@ -1122,7 +1122,7 @@ export default function UpsellDownsellPage() {
                                                                                             </div>
                                                                                             {/* Info Bar */}
                                                                                             <div style={{ background: '#dbeafe', padding: '5px 8px', borderBottomLeftRadius: '8px', borderBottomRightRadius: '8px', fontSize: '8.5px', color: '#1e40af', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500 }}>
-                                                                                                🛡️ Secure your order • Priority dispatch
+                                                                                                Secure your order • Avoid fake cancellations
                                                                                             </div>
                                                                                         </label>
                                                                                     )}
