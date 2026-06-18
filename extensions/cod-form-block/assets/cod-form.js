@@ -1340,7 +1340,7 @@
         shippingRatesEnabled: dataContainer.dataset.shippingRatesEnabled === 'true' || (window.FoxCod && window.FoxCod.shippingRatesEnabled) === true,
         
         // Legacy/Direct props
-        modalStyle: dataContainer.dataset.modalStyle || 'modern',
+        modalStyle: dataContainer.dataset.modalStyle === 'modern' ? 'glassmorphism' : (dataContainer.dataset.modalStyle || 'glassmorphism'),
         animStyle: dataContainer.dataset.animStyle || 'fade',
         buttonStyle: dataContainer.dataset.buttonStyle || 'solid',
         buttonSize: dataContainer.dataset.buttonSize || 'large',

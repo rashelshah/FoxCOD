@@ -224,7 +224,7 @@ export async function saveFormSettings(settings: FormSettings) {
                 phone_placeholder: settings.phone_placeholder || '',
                 address_placeholder: settings.address_placeholder || '',
                 notes_placeholder: settings.notes_placeholder || '',
-                modal_style: settings.modal_style || 'modern',
+                modal_style: settings.modal_style === 'modern' ? 'glassmorphism' : (settings.modal_style || 'glassmorphism'),
                 animation_style: settings.animation_style || 'fade',
                 border_radius: settings.border_radius ?? 12,
                 // New JSONB columns for advanced features

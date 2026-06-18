@@ -9,7 +9,7 @@ import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
 import { useLoaderData, useSubmit, useNavigation, Link, useActionData } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
-import { RangeSlider, Button, InlineStack, Modal, Text, Icon, Select, TextField, ColorPicker, Banner, Popover, ActionList } from "@shopify/polaris";
+import { RangeSlider, Button, InlineStack, Modal, Text, Icon, Select, TextField, ColorPicker, Banner, Popover, ActionList, Badge } from "@shopify/polaris";
 import { EditIcon, DeleteIcon, ViewIcon, HideIcon, StarFilledIcon } from "@shopify/polaris-icons";
 import {
     DndContext,
@@ -78,7 +78,7 @@ const defaultSettings: Omit<FormSettings, "shop_domain"> = {
     phone_placeholder: "Enter your phone number",
     address_placeholder: "Enter your delivery address",
     notes_placeholder: "Any special instructions?",
-    modal_style: "modern",
+    modal_style: "glassmorphism",
     animation_style: "fade",
     border_radius: 12,
     // New advanced features
@@ -646,7 +646,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     { ownerId: shopGid, namespace: "fox_cod", key: "require_address", value: String(settings.required_fields.includes("address")), type: "single_line_text_field" },
                     { ownerId: shopGid, namespace: "fox_cod", key: "show_email_field", value: String(settings.show_email_field), type: "single_line_text_field" },
                     { ownerId: shopGid, namespace: "fox_cod", key: "show_notes_field", value: String(settings.show_notes_field), type: "single_line_text_field" },
-                    { ownerId: shopGid, namespace: "fox_cod", key: "modal_style", value: settings.modal_style || "modern", type: "single_line_text_field" },
+                    { ownerId: shopGid, namespace: "fox_cod", key: "modal_style", value: settings.modal_style === 'modern' ? 'glassmorphism' : (settings.modal_style || "glassmorphism"), type: "single_line_text_field" },
                     { ownerId: shopGid, namespace: "fox_cod", key: "animation_style", value: settings.animation_style || "fade", type: "single_line_text_field" },
                     { ownerId: shopGid, namespace: "fox_cod", key: "border_radius", value: (settings.border_radius ?? 12).toString(), type: "single_line_text_field" },
                     { ownerId: shopGid, namespace: "fox_cod", key: "enable_coupon_field", value: String(settings.enable_coupon_field ?? false), type: "single_line_text_field" },
@@ -2322,7 +2322,7 @@ export default function SettingsPage() {
     const [phonePlaceholder, setPhonePlaceholder] = useState(settings.phone_placeholder || '');
     const [addressPlaceholder, setAddressPlaceholder] = useState(settings.address_placeholder || '');
     const [notesPlaceholder, setNotesPlaceholder] = useState(settings.notes_placeholder || '');
-    const [modalStyle, setModalStyle] = useState(settings.modal_style || 'modern');
+    const [modalStyle, setModalStyle] = useState(settings.modal_style === 'modern' ? 'glassmorphism' : (settings.modal_style || 'glassmorphism'));
     const [animationStyle, setAnimationStyle] = useState(settings.animation_style || 'fade');
     const [borderRadius, setBorderRadius] = useState(settings.border_radius || 12);
 
@@ -2559,7 +2559,7 @@ export default function SettingsPage() {
         setPhonePlaceholder(orig.phone_placeholder || '');
         setAddressPlaceholder(orig.address_placeholder || '');
         setNotesPlaceholder(orig.notes_placeholder || '');
-        setModalStyle(orig.modal_style || 'modern');
+        setModalStyle(orig.modal_style === 'modern' ? 'glassmorphism' : (orig.modal_style || 'glassmorphism'));
         setAnimationStyle(orig.animation_style || 'fade');
         setBorderRadius(orig.border_radius || 12);
         setFormType(orig.form_type || 'popup');

@@ -782,7 +782,7 @@ export default function UpsellDownsellPage() {
 
                                                         {/* COD Form Modal - uses real Form Builder settings + modal style */}
                                                         <div style={(() => {
-                                                            const ms = formSettings?.modal_style || 'modern';
+                                                            const ms = formSettings?.modal_style === 'modern' ? 'glassmorphism' : (formSettings?.modal_style || 'glassmorphism');
                                                             const fs: any = formSettings?.styles || {};
                                                             const bg = fs.background || fs.backgroundColor || '#ffffff';
                                                             const br = (fs.borderRadius || 12) + 'px';
