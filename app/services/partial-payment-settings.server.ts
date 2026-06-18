@@ -124,52 +124,58 @@ export async function syncPartialPaymentToMetafield(
   // Build the storefront payload (only what the extension needs)
   const storefrontPayload = settings
     ? {
-        enabled: settings.enabled,
-        payment_options: settings.payment_options ?? [],
-        cod_fee_enabled: settings.cod_fee_enabled,
-        cod_fee_name: settings.cod_fee_name,
-        cod_fee_type: settings.cod_fee_type,
-        cod_fee_amount: settings.cod_fee_amount,
-        minimum_order_total: settings.minimum_order_total,
-        maximum_order_total: settings.maximum_order_total,
-        allowed_product_ids: settings.allowed_product_ids ?? [],
-        allowed_collection_ids: settings.allowed_collection_ids ?? [],
-        allowed_countries: settings.allowed_countries ?? [],
-        excluded_countries: settings.excluded_countries ?? [],
-        modal_settings: settings.modal_settings ?? DEFAULT_MODAL_SETTINGS,
-        module_flags: settings.module_flags ?? DEFAULT_MODULE_FLAGS,
-        // Full Prepaid fields
-        full_prepaid_enabled: settings.full_prepaid_enabled ?? false,
-        full_prepaid_minimum_order_total: settings.full_prepaid_minimum_order_total ?? 0,
-        full_prepaid_maximum_order_total: settings.full_prepaid_maximum_order_total ?? 0,
-        full_prepaid_allowed_product_ids: settings.full_prepaid_allowed_product_ids ?? [],
-        full_prepaid_allowed_collection_ids: settings.full_prepaid_allowed_collection_ids ?? [],
-        // Prepaid Discount fields
-        prepaid_discount_enabled: settings.prepaid_discount_enabled ?? false,
-        prepaid_discount_type: settings.prepaid_discount_type ?? 'percentage',
-        prepaid_discount_value: settings.prepaid_discount_value ?? 0,
-        // Pure COD fields
-        pure_cod_enabled: settings.pure_cod_enabled ?? false,
-        pure_cod_fee_enabled: settings.pure_cod_fee_enabled ?? false,
-        pure_cod_fee_name: settings.pure_cod_fee_name ?? 'COD Fee',
-        pure_cod_fee_type: settings.pure_cod_fee_type ?? 'fixed',
-        pure_cod_fee_amount: settings.pure_cod_fee_amount ?? 0,
-        pure_cod_minimum_order_total: settings.pure_cod_minimum_order_total ?? 0,
-        pure_cod_maximum_order_total: settings.pure_cod_maximum_order_total ?? 0,
-        pure_cod_allowed_product_ids: settings.pure_cod_allowed_product_ids ?? [],
-        pure_cod_allowed_collection_ids: settings.pure_cod_allowed_collection_ids ?? [],
-        country_restrictions: settings.country_restrictions,
-        payment_method_restrictions: settings.payment_method_restrictions,
-        payment_method_tags: settings.payment_method_tags,
+      enabled: settings.enabled,
+      payment_options: settings.payment_options ?? [],
+      cod_fee_enabled: settings.cod_fee_enabled,
+      cod_fee_name: settings.cod_fee_name,
+      cod_fee_type: settings.cod_fee_type,
+      cod_fee_amount: settings.cod_fee_amount,
+      minimum_order_total: settings.minimum_order_total,
+      maximum_order_total: settings.maximum_order_total,
+      allowed_product_ids: settings.allowed_product_ids ?? [],
+      allowed_collection_ids: settings.allowed_collection_ids ?? [],
+      allowed_countries: settings.allowed_countries ?? [],
+      excluded_countries: settings.excluded_countries ?? [],
+      modal_settings: settings.modal_settings ?? DEFAULT_MODAL_SETTINGS,
+      module_flags: settings.module_flags ?? DEFAULT_MODULE_FLAGS,
+      // Full Prepaid fields
+      full_prepaid_enabled: settings.full_prepaid_enabled ?? false,
+      full_prepaid_minimum_order_total: settings.full_prepaid_minimum_order_total ?? 0,
+      full_prepaid_maximum_order_total: settings.full_prepaid_maximum_order_total ?? 0,
+      full_prepaid_allowed_product_ids: settings.full_prepaid_allowed_product_ids ?? [],
+      full_prepaid_allowed_collection_ids: settings.full_prepaid_allowed_collection_ids ?? [],
+      // Prepaid Discount fields
+      prepaid_discount_enabled: settings.prepaid_discount_enabled ?? false,
+      prepaid_discount_type: settings.prepaid_discount_type ?? 'percentage',
+      prepaid_discount_value: settings.prepaid_discount_value ?? 0,
+      // Pure COD fields
+      pure_cod_enabled: settings.pure_cod_enabled ?? false,
+      pure_cod_fee_enabled: settings.pure_cod_fee_enabled ?? false,
+      pure_cod_fee_name: settings.pure_cod_fee_name ?? 'COD Fee',
+      pure_cod_fee_type: settings.pure_cod_fee_type ?? 'fixed',
+      pure_cod_fee_amount: settings.pure_cod_fee_amount ?? 0,
+      pure_cod_minimum_order_total: settings.pure_cod_minimum_order_total ?? 0,
+      pure_cod_maximum_order_total: settings.pure_cod_maximum_order_total ?? 0,
+      pure_cod_allowed_product_ids: settings.pure_cod_allowed_product_ids ?? [],
+      pure_cod_allowed_collection_ids: settings.pure_cod_allowed_collection_ids ?? [],
+      country_restrictions: settings.country_restrictions,
+      payment_method_restrictions: settings.payment_method_restrictions,
+      payment_method_tags: settings.payment_method_tags,
+      payment_method_descriptions: settings.payment_method_descriptions,
+    }
+    : {
+      enabled: true,
+      payment_options: DEFAULT_PAYMENT_OPTIONS,
+      full_prepaid_enabled: true,
+      prepaid_discount_enabled: false,
+      pure_cod_enabled: true,
+      pure_cod_fee_enabled: false,
+      payment_method_descriptions: {
+        partial_payment: { enabled: true, text: 'Secure your order • Avoid fake cancellations' },
+        full_prepaid: { enabled: true, text: 'Pay now, save more, receive sooner' },
+        pure_cod: { enabled: true, text: 'ℹ️ Higher return risk • Slightly slower processing' }
       }
-    : { 
-        enabled: true, 
-        payment_options: DEFAULT_PAYMENT_OPTIONS,
-        full_prepaid_enabled: true, 
-        prepaid_discount_enabled: false, 
-        pure_cod_enabled: true, 
-        pure_cod_fee_enabled: false 
-      };
+    };
 
   // Get shop GID
   const shopRes = await admin.graphql(`{ shop { id } }`);
@@ -237,10 +243,10 @@ export function isPaymentMethodEligible(
   }
 ): { eligible: boolean; reason?: string } {
   // ── 1. enabled check ──
-  const enabled = method === 'full_prepaid' 
-    ? settings.full_prepaid_enabled 
-    : method === 'pure_cod' 
-      ? settings.pure_cod_enabled 
+  const enabled = method === 'full_prepaid'
+    ? settings.full_prepaid_enabled
+    : method === 'pure_cod'
+      ? settings.pure_cod_enabled
       : settings.enabled;
   if (!enabled) {
     return { eligible: false, reason: `${method.replace('_', ' ')} is disabled` };
@@ -270,7 +276,7 @@ export function isPaymentMethodEligible(
   // ── 3. Country restrictions ──
   const isCountryAllowed = (method: string, country?: string) => {
     if (!country) return true; // Rule 4
-    
+
     let allowed: string[] = [];
     let excluded: string[] = [];
 
@@ -303,14 +309,14 @@ export function isPaymentMethodEligible(
 
   // ── 4. Product / Collection restrictions ──
   const methodConfig = settings.payment_method_restrictions?.[method];
-  
+
   // Fallback to legacy flat columns if JSONB is not populated
   const allowedProducts = methodConfig?.allowed_product_ids || (method === 'full_prepaid'
     ? (settings.full_prepaid_allowed_product_ids ?? [])
     : method === 'pure_cod'
       ? (settings.pure_cod_allowed_product_ids ?? [])
       : (settings.allowed_product_ids ?? []));
-      
+
   const allowedCollections = methodConfig?.allowed_collection_ids || (method === 'full_prepaid'
     ? (settings.full_prepaid_allowed_collection_ids ?? [])
     : method === 'pure_cod'
@@ -327,7 +333,7 @@ export function isPaymentMethodEligible(
   if (numericProductId && restrictedProducts.some(id => String(id).replace(/[^0-9]/g, '') === numericProductId)) {
     return { eligible: false, reason: `${method.replace('_', ' ')} is restricted for this product` };
   }
-  
+
   if (numericCollectionIds.length > 0 && restrictedCollections.some(rid => numericCollectionIds.includes(String(rid).replace(/[^0-9]/g, '')))) {
     return { eligible: false, reason: `${method.replace('_', ' ')} is restricted for this collection` };
   }

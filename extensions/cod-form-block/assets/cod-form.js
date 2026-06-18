@@ -4630,7 +4630,12 @@ function darkenColor(hex, percent) {
           html += '</div></div>';
           var isPrepaidChecked = (defaultMethod === 'full_prepaid') ? 'checked' : '';
           html += '<input type="radio" name="payment_method_visual" class="pm-pill" ' + isPrepaidChecked + ' style="width: 18px; height: 18px; accent-color: #22c55e; margin: 0; pointer-events: none;">';
-          html += '</div></div></label>';
+          html += '</div></div>';
+          var prepaidDesc = ppSettings && ppSettings.payment_method_descriptions && ppSettings.payment_method_descriptions.full_prepaid ? ppSettings.payment_method_descriptions.full_prepaid : { enabled: true, text: 'Secure your order • Avoid fake cancellations' };
+          if (prepaidDesc.enabled) {
+              html += '<div style="background: #dcfce7; padding: 10px 12px; font-size: 10px; color: #166534; display: flex; justify-content: center; align-items: center; font-weight: 500; width: 100%; box-sizing: border-box; margin: 0; border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;">' + prepaidDesc.text + '</div>';
+          }
+          html += '</label>';
       }
 
       if (showPartial) {
@@ -4676,7 +4681,10 @@ function darkenColor(hex, percent) {
           var isPartialChecked = (defaultMethod === 'partial_cod') ? 'checked' : '';
           html += '<input type="radio" name="payment_method_visual" class="pm-pill" ' + isPartialChecked + ' style="width: 18px; height: 18px; accent-color: #2563eb; margin: 0; pointer-events: none;">';
           html += '</div></div>';
-          html += '<div style="background: #dbeafe; padding: 10px 12px; font-size: 10px; color: #1e40af; display: flex; justify-content: center; align-items: center; font-weight: 500; width: 100%; box-sizing: border-box; margin: 0; border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;">Secure your order • Avoid fake cancellations </div>';
+          var partialDesc = ppSettings && ppSettings.payment_method_descriptions && ppSettings.payment_method_descriptions.partial_payment ? ppSettings.payment_method_descriptions.partial_payment : { enabled: true, text: 'Secure your order • Avoid fake cancellations' };
+          if (partialDesc.enabled) {
+              html += '<div style="background: #dbeafe; padding: 10px 12px; font-size: 10px; color: #1e40af; display: flex; justify-content: center; align-items: center; font-weight: 500; width: 100%; box-sizing: border-box; margin: 0; border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;">' + partialDesc.text + '</div>';
+          }
           html += '</label>';
       }
 
@@ -4713,7 +4721,10 @@ function darkenColor(hex, percent) {
           var isCodChecked = (defaultMethod === 'full_cod') ? 'checked' : '';
           html += '<input type="radio" name="payment_method_visual" class="pm-pill" ' + isCodChecked + ' style="width: 18px; height: 18px; accent-color: #ea580c; margin: 0; pointer-events: none;">';
           html += '</div></div>';
-          html += '<div style="background: #ffedd5; padding: 10px 12px; font-size: 10px; color: #9a3412; display: flex; justify-content: center; align-items: center; font-weight: 500; width: 100%; box-sizing: border-box; margin: 0; border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;"><span style="margin-right: 4px;">ℹ️</span> Higher return risk • Slightly slower processing</div>';
+          var codDesc = ppSettings && ppSettings.payment_method_descriptions && ppSettings.payment_method_descriptions.pure_cod ? ppSettings.payment_method_descriptions.pure_cod : { enabled: true, text: 'ℹ️ Higher return risk • Slightly slower processing' };
+          if (codDesc.enabled) {
+              html += '<div style="background: #ffedd5; padding: 10px 12px; font-size: 10px; color: #9a3412; display: flex; justify-content: center; align-items: center; font-weight: 500; width: 100%; box-sizing: border-box; margin: 0; border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;">' + codDesc.text + '</div>';
+          }
           html += '</label>';
       }
 

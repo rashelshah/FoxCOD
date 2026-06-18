@@ -104,6 +104,7 @@ export interface PartialPaymentSettings {
   country_restrictions?: CountryRestrictionsConfig;
   payment_method_restrictions?: PaymentMethodRestrictions;
   payment_method_tags?: PaymentMethodTags;
+  payment_method_descriptions?: PaymentMethodDescriptions;
   created_at?: string;
   updated_at?: string;
 }
@@ -114,6 +115,12 @@ export interface TagConfig {
 }
 
 export interface PaymentMethodTags {
+  partial_payment?: TagConfig;
+  full_prepaid?: TagConfig;
+  pure_cod?: TagConfig;
+}
+
+export interface PaymentMethodDescriptions {
   partial_payment?: TagConfig;
   full_prepaid?: TagConfig;
   pure_cod?: TagConfig;

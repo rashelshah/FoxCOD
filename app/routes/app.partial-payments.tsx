@@ -96,9 +96,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         pure_cod: { allowed_product_ids: [], allowed_collection_ids: [], restricted_product_ids: [], restricted_collection_ids: [] }
       },
       payment_method_tags: {
-        partial_payment: { enabled: false, text: 'PARTIAL PAYMENT' },
+        partial_payment: { enabled: false, text: 'SAVE MORE!' },
         full_prepaid: { enabled: true, text: '★ MOST POPULAR' },
-        pure_cod: { enabled: false, text: 'CASH ON DELIVERY' }
+        pure_cod: { enabled: false, text: 'BUY NOW' }
+      },
+      payment_method_descriptions: {
+        partial_payment: { enabled: true, text: 'Secure your order • Avoid fake cancellations' },
+        full_prepaid: { enabled: true, text: 'Secure your order • Avoid fake cancellations' },
+        pure_cod: { enabled: true, text: 'ℹ️ Higher return risk • Slightly slower processing' }
       }
     };
   } else {
@@ -117,8 +122,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         pure_cod: { enabled: false, text: 'CASH ON DELIVERY' }
       };
     }
+    if (!settings.payment_method_descriptions) {
+      settings.payment_method_descriptions = {
+        partial_payment: { enabled: true, text: 'Secure your order • Avoid fake cancellations' },
+        full_prepaid: { enabled: true, text: 'Pay now, save more, receive sooner' },
+        pure_cod: { enabled: true, text: 'ℹ️ Higher return risk • Slightly slower processing' }
+      };
+    }
   }
-
   // Shop currency
   let shopCurrency = 'INR';
   try {
@@ -1152,6 +1163,45 @@ const TagEditor = ({
   );
 };
 
+const DescEditor = ({
+  method,
+  settings,
+  updDesc,
+}: {
+  method: 'partial_payment' | 'full_prepaid' | 'pure_cod';
+  settings: any;
+  updDesc: (m: any, patch: any) => void;
+}) => {
+  const methodTitle = method === 'full_prepaid' ? 'Full Prepaid' : method === 'pure_cod' ? 'Cash on Delivery' : 'Partial Payment';
+  const defaultDesc = method === 'pure_cod' ? 'ℹ️ Higher return risk • Slightly slower processing' : 'Secure your order • Avoid fake cancellations';
+  const descSettings = settings.payment_method_descriptions?.[method] || { enabled: true, text: defaultDesc };
+
+  return (
+    <Box paddingBlockStart="400">
+      <BlockStack gap="400">
+        <ToggleRow
+          label={`Show Bottom Description Info`}
+          sub={`Displays an info bar at the bottom of the ${methodTitle} option.`}
+          checked={descSettings.enabled}
+          onChange={(v) => updDesc(method, { enabled: v })}
+        />
+        {descSettings.enabled && (
+          <div style={{ marginLeft: '12px' }}>
+            <TextField
+              label="Description Text"
+              value={descSettings.text}
+              onChange={(v) => updDesc(method, { text: v })}
+              autoComplete="off"
+              placeholder={defaultDesc}
+              helpText="Short description to appear at the bottom of the payment block"
+            />
+          </div>
+        )}
+      </BlockStack>
+    </Box>
+  );
+};
+
 export default function PartialPaymentsPage() {
   const { settings: initialSettings, shopDomain, shopCurrency } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
@@ -1178,7 +1228,7 @@ export default function PartialPaymentsPage() {
   useEffect(() => {
     try {
       hasChanges ? shopify.saveBar.show('pp-bar') : shopify.saveBar.hide('pp-bar');
-    } catch (_e) {}
+    } catch (_e) { }
   }, [hasChanges, shopify]);
 
   // Toast on save
@@ -1187,9 +1237,9 @@ export default function PartialPaymentsPage() {
       lastActionRef.current = actionData;
       if (actionData.success) {
         setSavedStr(JSON.stringify(settings));
-        try { shopify.toast.show('Saved!', { duration: 3000 }); } catch (_e) {}
+        try { shopify.toast.show('Saved!', { duration: 3000 }); } catch (_e) { }
       } else if ((actionData as any).error) {
-        try { shopify.toast.show(`Error: ${(actionData as any).error}`, { duration: 5000 }); } catch (_e) {}
+        try { shopify.toast.show(`Error: ${(actionData as any).error}`, { duration: 5000 }); } catch (_e) { }
       }
     }
   }, [actionData]);
@@ -1248,6 +1298,23 @@ export default function PartialPaymentsPage() {
     });
   }, []);
 
+  const updDesc = useCallback((
+    method: 'partial_payment' | 'full_prepaid' | 'pure_cod',
+    patch: Partial<{ enabled: boolean; text: string }>
+  ) => {
+    setSettings((p) => {
+      const defaultDesc = method === 'pure_cod' ? 'ℹ️ Higher return risk • Slightly slower processing' : 'Secure your order • Avoid fake cancellations';
+      const currentDesc = p.payment_method_descriptions?.[method] || { enabled: true, text: defaultDesc };
+      return {
+        ...p,
+        payment_method_descriptions: {
+          ...p.payment_method_descriptions,
+          [method]: { ...currentDesc, ...patch }
+        }
+      };
+    });
+  }, []);
+
   // ── Save / Discard ────────────────────────────────────────────────────────
   const handleSave = useCallback(() => {
     const fd = new FormData();
@@ -1292,7 +1359,7 @@ export default function PartialPaymentsPage() {
         allowed_product_ids: [], allowed_collection_ids: [], restricted_product_ids: [], restricted_collection_ids: []
       };
       const currentIds = currentRes[field] || [];
-      
+
       const sel = await shopify.resourcePicker({
         type: type,
         multiple: true,
@@ -1314,7 +1381,7 @@ export default function PartialPaymentsPage() {
           setCollectionTitles((prev) => ({ ...prev, ...titles }));
         }
       }
-    } catch (_e) {}
+    } catch (_e) { }
   };
 
   // Local title maps (ephemeral — just for display, not saved)
@@ -1372,7 +1439,7 @@ export default function PartialPaymentsPage() {
       const methodCr = { ...(cr[method] || { allowedCountries: [], excludedCountries: [] }) };
       if (type === 'allowed') methodCr.allowedCountries = val;
       else methodCr.excludedCountries = val;
-      
+
       return {
         ...prev,
         country_restrictions: { ...cr, [method]: methodCr }
@@ -1533,32 +1600,32 @@ export default function PartialPaymentsPage() {
         </div>
         <Box paddingBlockStart="400">
           {selectedTab === 0 ? (
-              <BlockStack gap="500">
-                {/* ════════════════════════════════════════════════
+            <BlockStack gap="500">
+              {/* ════════════════════════════════════════════════
                     PARTIAL PAYMENTS CARDS
                 ════════════════════════════════════════════════ */}
-                {/* ════════════════════════════════════════════════
+              {/* ════════════════════════════════════════════════
                     CARD 1 — GENERAL SETTINGS
                 ════════════════════════════════════════════════ */}
-          <Card>
-            <BlockStack gap="400">
-              <InlineStack align="space-between" blockAlign="center">
-                <BlockStack gap="100">
-                  <Text as="h2" variant="headingMd">General Settings</Text>
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    Control whether partial payments appear on your storefront.
-                  </Text>
-                </BlockStack>
-              </InlineStack>
+              <Card>
+                <BlockStack gap="400">
+                  <InlineStack align="space-between" blockAlign="center">
+                    <BlockStack gap="100">
+                      <Text as="h2" variant="headingMd">General Settings</Text>
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        Control whether partial payments appear on your storefront.
+                      </Text>
+                    </BlockStack>
+                  </InlineStack>
 
-              <ToggleRow
-                label="Partial Payment Status"
-                sub={settings.enabled ? 'Customers can choose to pay a deposit now.' : 'Partial payment option is hidden from storefront.'}
-                checked={settings.enabled}
-                onChange={(v) => upd('enabled', v)}
-              />
+                  <ToggleRow
+                    label="Partial Payment Status"
+                    sub={settings.enabled ? 'Customers can choose to pay a deposit now.' : 'Partial payment option is hidden from storefront.'}
+                    checked={settings.enabled}
+                    onChange={(v) => upd('enabled', v)}
+                  />
 
-              {/*
+                  {/*
               <Divider />
 
               <Text as="h3" variant="headingSm">Module Compatibility</Text>
@@ -1585,95 +1652,527 @@ export default function PartialPaymentsPage() {
                 onChange={(v) => updFlag('apply_upsells_to_partial', v)}
               />
               */}
-            </BlockStack>
-          </Card>
+                </BlockStack>
+              </Card>
 
-          {/* ════════════════════════════════════════════════
+              {/* ════════════════════════════════════════════════
               CARD 2 — PAYMENT OPTIONS
           ════════════════════════════════════════════════ */}
-          {/* ════════════════════════════════════════════════
+              {/* ════════════════════════════════════════════════
               CARD 2 — PAYMENT OPTIONS
           ════════════════════════════════════════════════ */}
-          <Card>
-            <BlockStack gap="400">
-              <InlineStack align="space-between" blockAlign="center">
-                <Text as="h2" variant="headingMd">Payment Options</Text>
-              </InlineStack>
-              <Text as="p" variant="bodySm" tone="subdued">
-                Configure the partial payment options available to your customers. You can offer different deposit percentages to suit different customer needs.
-              </Text>
+              <Card>
+                <BlockStack gap="400">
+                  <InlineStack align="space-between" blockAlign="center">
+                    <Text as="h2" variant="headingMd">Payment Options</Text>
+                  </InlineStack>
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    Configure the partial payment options available to your customers. You can offer different deposit percentages to suit different customer needs.
+                  </Text>
 
-              {/* Options list */}
-              {settings.payment_options.length === 0 && (
-                <Banner tone="warning">
-                  <p>You have no payment options. Add at least one option for partial payments to work.</p>
-                </Banner>
-              )}
+                  {/* Options list */}
+                  {settings.payment_options.length === 0 && (
+                    <Banner tone="warning">
+                      <p>You have no payment options. Add at least one option for partial payments to work.</p>
+                    </Banner>
+                  )}
 
-              {settings.payment_options.slice(0, 1).map((opt, idx) => {
-                let displayValue = '';
-                if (opt.type === 'percentage' || opt.type === 'remaining_percentage') {
-                  displayValue = `${opt.value}%`;
-                } else {
-                  displayValue = fmt(opt.value);
-                }
+                  {settings.payment_options.slice(0, 1).map((opt, idx) => {
+                    let displayValue = '';
+                    if (opt.type === 'percentage' || opt.type === 'remaining_percentage') {
+                      displayValue = `${opt.value}%`;
+                    } else {
+                      displayValue = fmt(opt.value);
+                    }
 
-                return (
-                  <div key={opt.id} className="pp-option-box">
-                    <div className="pp-option-box-header">
-                      <div className="pp-option-box-title">
-                        <span className="pp-option-title-text">
-                          <strong>{displayValue}</strong> deposit
-                        </span>
+                    return (
+                      <div key={opt.id} className="pp-option-box">
+                        <div className="pp-option-box-header">
+                          <div className="pp-option-box-title">
+                            <span className="pp-option-title-text">
+                              <strong>{displayValue}</strong> deposit
+                            </span>
+                          </div>
+                        </div>
+                        <div className="pp-option-box-body">
+                          <div className="pp-fg">
+                            <label>Label</label>
+                            <input
+                              type="text"
+                              value={opt.label}
+                              placeholder="Pay 10% now"
+                              onChange={(e) => updateOption(opt.id, { label: e.target.value })}
+                            />
+                          </div>
+                          <div className="pp-fg">
+                            <label>Deposit Type</label>
+                            <select
+                              value={opt.type}
+                              onChange={(e) => updateOption(opt.id, { type: e.target.value as PaymentOption['type'] })}
+                            >
+                              <option value="percentage">Percentage (%)</option>
+                              <option value="fixed">Fixed Amount</option>
+                              <option value="remaining_percentage">% of Discounted Total</option>
+                            </select>
+                          </div>
+                          <div className="pp-fg">
+                            <label>{opt.type === 'fixed' ? 'Amount' : 'Percentage'}</label>
+                            <div className="pp-input-suffix-wrap">
+                              <input
+                                type="number"
+                                value={opt.value}
+                                min={0}
+                                max={opt.type === 'fixed' ? undefined : 100}
+                                step={opt.type === 'fixed' ? 1 : 0.1}
+                                onChange={(e) => updateOption(opt.id, { value: parseFloat(e.target.value) || 0 })}
+                              />
+                              <span className="pp-input-suffix">
+                                {opt.type === 'percentage' || opt.type === 'remaining_percentage' ? '%' : shopCurrency}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  <Divider />
+
+                  {/* COD Fee */}
+                  <div className="pp-cod-fee-box">
+                    <div className={`pp-cod-fee-card ${settings.cod_fee_enabled ? 'expanded' : ''}`}>
+                      <div className="pp-cod-fee-left">
+                        <div className="pp-cod-fee-icon-wrap">
+                          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="1" y="3" width="15" height="13" rx="2" ry="2" />
+                            <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
+                            <circle cx="5.5" cy="18.5" r="2.5" />
+                            <circle cx="18.5" cy="18.5" r="2.5" />
+                          </svg>
+                        </div>
+                        <div className="pp-cod-fee-details">
+                          <div className="pp-cod-fee-title">COD Fee</div>
+                          <div className="pp-cod-fee-sub">Apply one fee to all partial payment orders</div>
+                        </div>
+                      </div>
+                      <div
+                        className={`pp-toggle-track ${settings.cod_fee_enabled ? 'on' : ''}`}
+                        onClick={() => upd('cod_fee_enabled', !settings.cod_fee_enabled)}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <div className="pp-toggle-thumb" />
                       </div>
                     </div>
-                    <div className="pp-option-box-body">
-                      <div className="pp-fg">
-                        <label>Label</label>
-                        <input
-                          type="text"
-                          value={opt.label}
-                          placeholder="Pay 10% now"
-                          onChange={(e) => updateOption(opt.id, { label: e.target.value })}
-                        />
+
+                    {settings.cod_fee_enabled && (
+                      <div className="pp-cod-fee-body">
+                        <div className="pp-option-box-body">
+                          <div className="pp-fg">
+                            <label>Fee Name</label>
+                            <input
+                              type="text"
+                              value={settings.cod_fee_name}
+                              placeholder="COD Fee"
+                              onChange={(e) => upd('cod_fee_name', e.target.value)}
+                            />
+                          </div>
+                          <div className="pp-fg">
+                            <label>Fee Type</label>
+                            <select
+                              value={settings.cod_fee_type}
+                              onChange={(e) => upd('cod_fee_type', e.target.value as 'fixed' | 'percentage')}
+                            >
+                              <option value="fixed">Fixed Amount</option>
+                              <option value="percentage">Percentage of Deposit</option>
+                            </select>
+                          </div>
+                          <div className="pp-fg">
+                            <label>Amount</label>
+                            <div className="pp-input-suffix-wrap">
+                              <input
+                                type="number"
+                                value={settings.cod_fee_amount}
+                                min={0}
+                                step={0.5}
+                                onChange={(e) => upd('cod_fee_amount', parseFloat(e.target.value) || 0)}
+                              />
+                              <span className="pp-input-suffix">
+                                {settings.cod_fee_type === 'percentage' ? '%' : shopCurrency}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <div className="pp-fg">
-                        <label>Deposit Type</label>
-                        <select
-                          value={opt.type}
-                          onChange={(e) => updateOption(opt.id, { type: e.target.value as PaymentOption['type'] })}
-                        >
-                          <option value="percentage">Percentage (%)</option>
-                          <option value="fixed">Fixed Amount</option>
-                          <option value="remaining_percentage">% of Discounted Total</option>
-                        </select>
+                    )}
+                  </div>
+
+                  <Divider />
+                  {firstOpt && (
+                    <BlockStack gap="200">
+                      <TagEditor method="partial_payment" settings={settings} updTag={updTag} />
+                      <Divider />
+                      <DescEditor method="partial_payment" settings={settings} updDesc={updDesc} />
+                      <Divider />
+                      <Text as="h3" variant="headingSm">Storefront Preview</Text>
+                      <Text as="p" variant="bodySm" tone="subdued">Preview uses {fmt(previewOrderTotal)} as example cart total</Text>
+                      <div style={{
+                        display: 'flex', flexDirection: 'column', background: '#eff6ff', borderRadius: '12px',
+                        border: '2px solid #2563eb', position: 'relative', overflow: 'visible',
+                        maxWidth: '400px', marginTop: '16px'
+                      }}>
+                        {settings.payment_method_tags?.partial_payment?.enabled && (
+                          <div style={{
+                            position: 'absolute', top: '-10px', left: '16px', background: '#2563eb', color: 'white',
+                            fontSize: '9px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', letterSpacing: '0.05em',
+                            display: 'flex', alignItems: 'center', gap: '4px', textTransform: 'uppercase'
+                          }}>
+                            {settings.payment_method_tags?.partial_payment?.text}
+                          </div>
+                        )}
+
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '16px 12px 12px 12px', boxSizing: 'border-box', width: '100%', margin: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '32px', height: '32px', borderRadius: '8px', color: '#2563eb', backgroundColor: '#dbeafe' }}>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>
+                          </div>
+
+                          <div style={{ flex: 1, minWidth: 0, paddingTop: '2px' }}>
+                            <div style={{ fontWeight: 700, fontSize: '14px', color: '#1e3a8a', lineHeight: 1.2, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              Partial Payment <svg width="14" height="14" viewBox="0 0 24 24" fill="#2563eb" stroke="#eff6ff" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M9 12l2 2 4-4" /></svg>
+                            </div>
+                            <div style={{ color: '#2563eb', fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>Pay {fmt(previewDeposit)} now • Rest on delivery</div>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                              {settings.cod_fee_enabled && previewCodFee > 0 && (
+                                <div style={{ background: '#dbeafe', color: '#1e3a8a', fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '99px', lineHeight: 1, whiteSpace: 'nowrap' }}>
+                                  {fmt(previewCodFee)} {settings.cod_fee_name || 'COD Fee'}
+                                </div>
+                              )}
+                              <span style={{ fontWeight: 800, fontSize: '15px', color: '#1e3a8a' }}>
+                                {fmt(previewDeposit)}
+                              </span>
+                            </div>
+                            <input type="radio" checked readOnly style={{ width: '18px', height: '18px', accentColor: '#2563eb', margin: 0, pointerEvents: 'none' }} />
+                          </div>
+                        </div>
+                        {settings.payment_method_descriptions?.partial_payment?.enabled && (
+                          <div style={{ background: '#dbeafe', padding: '10px 12px', fontSize: '10px', color: '#1e40af', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500, width: '100%', boxSizing: 'border-box', margin: 0, borderBottomLeftRadius: '10px', borderBottomRightRadius: '10px' }}>
+                            {settings.payment_method_descriptions?.partial_payment?.text}
+                          </div>
+                        )}
                       </div>
-                      <div className="pp-fg">
-                        <label>{opt.type === 'fixed' ? 'Amount' : 'Percentage'}</label>
-                        <div className="pp-input-suffix-wrap">
-                          <input
-                            type="number"
-                            value={opt.value}
-                            min={0}
-                            max={opt.type === 'fixed' ? undefined : 100}
-                            step={opt.type === 'fixed' ? 1 : 0.1}
-                            onChange={(e) => updateOption(opt.id, { value: parseFloat(e.target.value) || 0 })}
-                          />
-                          <span className="pp-input-suffix">
-                            {opt.type === 'percentage' || opt.type === 'remaining_percentage' ? '%' : shopCurrency}
+                    </BlockStack>
+                  )}
+
+                  <br />
+
+                  {/* Live calculation preview */}
+                  {firstOpt && (
+                    <div className="pp-calc-preview">
+                      <Text as="p" variant="bodySm" fontWeight="semibold">
+                        Example: Order of {fmt(previewOrderTotal)}
+                      </Text>
+                      <div style={{ marginTop: 8 }}>
+                        <div className="pp-calc-row">
+                          <span>Product Total</span>
+                          <span>{fmt(previewOrderTotal)}</span>
+                        </div>
+                        <div className="pp-calc-row">
+                          <span>
+                            Deposit ({firstOpt.label})
                           </span>
+                          <span>{fmt(previewDeposit)}</span>
+                        </div>
+                        {settings.cod_fee_enabled && previewCodFee > 0 && (
+                          <div className="pp-calc-row">
+                            <span>{settings.cod_fee_name || 'COD Fee'}</span>
+                            <span>+ {fmt(previewCodFee)}</span>
+                          </div>
+                        )}
+                        <div className="pp-calc-row total">
+                          <span>Pay Now (Online)</span>
+                          <span>{fmt(previewPayNow)}</span>
+                        </div>
+                        <div className="pp-calc-row remaining">
+                          <span>Remaining (COD on delivery)</span>
+                          <span>{fmt(previewRemaining)}</span>
                         </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  )}
+                </BlockStack>
+              </Card>
 
-              <Divider />
+              {/* ════════════════════════════════════════════════
+              CARD 3 — RESTRICTIONS
+          ════════════════════════════════════════════════ */}
+              <Card>
+                <BlockStack gap="400">
+                  <BlockStack gap="100">
+                    <Text as="h2" variant="headingMd">Restrictions</Text>
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      Control exactly when the partial payment option appears. All rules must pass for it to show.
+                    </Text>
+                  </BlockStack>
 
-              {/* COD Fee */}
+                  {/* Order Total */}
+                  <Text as="h3" variant="headingSm">Order Total Range</Text>
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    Set to 0 to disable the restriction.
+                  </Text>
+                  <InlineGrid columns={2} gap="400">
+                    <TextField
+                      label="Minimum Order Total"
+                      type="number"
+                      value={String(settings.minimum_order_total)}
+                      prefix={shopCurrency}
+                      min="0"
+                      onChange={(v) => upd('minimum_order_total', parseFloat(v) || 0)}
+                      autoComplete="off"
+                      helpText="0 = no minimum"
+                    />
+                    <TextField
+                      label="Maximum Order Total"
+                      type="number"
+                      value={String(settings.maximum_order_total)}
+                      prefix={shopCurrency}
+                      min="0"
+                      onChange={(v) => upd('maximum_order_total', parseFloat(v) || 0)}
+                      autoComplete="off"
+                      helpText="0 = no maximum"
+                    />
+                  </InlineGrid>
+
+                  <Divider />
+
+                  {/* Item Restrictions */}
+                  <RestrictionsEditor
+                    method="partial_payment"
+                    settings={settings}
+                    pickItemsForMethod={pickItemsForMethod}
+                    updRestrictions={updRestrictions}
+                    productTitles={productTitles}
+                    collectionTitles={collectionTitles}
+                  />
+
+                  {/* Country Restrictions */}
+                  {renderCountryRestrictions('partial_payment', 'partial payments')}
+                </BlockStack>
+              </Card>
+
+              <Box paddingBlockEnd="800" />
+            </BlockStack>
+          ) : selectedTab === 1 ? (
+            <BlockStack gap="500">
+              {/* ════════════════════════════════════════════════
+              FULL PREPAID CARDS
+          ════════════════════════════════════════════════ */}
+              <Card>
+                <BlockStack gap="400">
+                  <InlineStack align="space-between" blockAlign="center">
+                    <BlockStack gap="100">
+                      <Text as="h2" variant="headingMd">Full Prepaid Settings</Text>
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        Offer customers an option to pay the full amount upfront.
+                      </Text>
+                    </BlockStack>
+                  </InlineStack>
+
+                  <ToggleRow
+                    label="Full Prepaid Status"
+                    sub={settings.full_prepaid_enabled ? 'Customers can choose to pay the full amount upfront.' : 'Full prepaid option is hidden.'}
+                    checked={settings.full_prepaid_enabled}
+                    onChange={(v) => upd('full_prepaid_enabled', v)}
+                  />
+                </BlockStack>
+              </Card>
+
+              <Card>
+                <BlockStack gap="400">
+                  <BlockStack gap="100">
+                    <Text as="h2" variant="headingMd">Prepaid Discount</Text>
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      Offer a discount when customers choose Full Prepaid.
+                    </Text>
+                  </BlockStack>
+
+                  <ToggleRow
+                    label="Enable Prepaid Discount"
+                    sub="Offer a discount to customers who choose Full Prepaid."
+                    checked={settings.prepaid_discount_enabled}
+                    onChange={(v) => upd('prepaid_discount_enabled', v)}
+                  />
+
+                  {settings.prepaid_discount_enabled && (
+                    <div style={{ padding: '16px', background: '#f9fafb', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
+                      <BlockStack gap="400">
+                        <InlineGrid columns={2} gap="400">
+                          <Select
+                            label="Discount Type"
+                            options={[
+                              { label: 'Percentage', value: 'percentage' },
+                              { label: 'Fixed Amount', value: 'fixed' },
+                            ]}
+                            value={settings.prepaid_discount_type}
+                            onChange={(v) => upd('prepaid_discount_type', v as 'percentage' | 'fixed')}
+                          />
+                          <TextField
+                            label="Discount Value"
+                            type="number"
+                            min="0"
+                            suffix={settings.prepaid_discount_type === 'percentage' ? '%' : shopCurrency}
+                            value={String(settings.prepaid_discount_value)}
+                            onChange={(v) => upd('prepaid_discount_value', parseFloat(v) || 0)}
+                            autoComplete="off"
+                          />
+                        </InlineGrid>
+
+                      </BlockStack>
+                    </div>
+                  )}
+
+                  <Divider />
+                  <BlockStack gap="200">
+                    <TagEditor method="full_prepaid" settings={settings} updTag={updTag} />
+                    <Divider />
+                    <DescEditor method="full_prepaid" settings={settings} updDesc={updDesc} />
+                    <Divider />
+                    <Text as="h3" variant="headingSm">Storefront Preview</Text>
+                    <Text as="p" variant="bodySm" tone="subdued">Preview uses 500 as example cart total</Text>
+                    <div style={{
+                      display: 'flex', flexDirection: 'column', background: '#f0fdf4', borderRadius: '12px',
+                      border: '2px solid #22c55e', position: 'relative', overflow: 'visible',
+                      maxWidth: '400px', marginTop: '16px'
+                    }}>
+                      {(settings.payment_method_tags?.full_prepaid?.enabled || (!settings.payment_method_tags?.full_prepaid && true)) && (
+                        <div style={{
+                          position: 'absolute', top: '-10px', left: '16px', background: '#22c55e', color: 'white',
+                          fontSize: '9px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', letterSpacing: '0.05em',
+                          display: 'flex', alignItems: 'center', gap: '4px', textTransform: 'uppercase'
+                        }}>
+                          {settings.payment_method_tags?.full_prepaid?.text || '★ MOST POPULAR'}
+                        </div>
+                      )}
+
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '16px 12px 12px 12px', boxSizing: 'border-box', width: '100%', margin: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '32px', height: '32px', borderRadius: '8px', color: '#16a34a', backgroundColor: '#dcfce7' }}>
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4" /><path d="M4 6v12c0 1.1.9 2 2 2h14v-4" /><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z" /></svg>
+                        </div>
+
+                        <div style={{ flex: 1, minWidth: 0, paddingTop: '2px' }}>
+                          <div style={{ fontWeight: 700, fontSize: '14px', color: '#166534', lineHeight: 1.2 }}>Full Prepaid</div>
+                          <div style={{ color: '#16a34a', fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>Pay now &amp; get fastest delivery</div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                            {settings.prepaid_discount_enabled && settings.prepaid_discount_value > 0 && (
+                              <div style={{ background: '#dcfce7', color: '#166534', fontSize: '11px', fontWeight: 700, padding: '3px 8px', borderRadius: '99px', lineHeight: 1 }}>
+                                Save {settings.prepaid_discount_type === 'percentage' ? fmt(500 * (settings.prepaid_discount_value / 100)) : fmt(settings.prepaid_discount_value)}
+                              </div>
+                            )}
+                            <span style={{ fontWeight: 800, fontSize: '15px', color: '#166534' }}>
+                              {settings.prepaid_discount_enabled && settings.prepaid_discount_value > 0 ? (
+                                settings.prepaid_discount_type === 'percentage' ? fmt(500 - (500 * (settings.prepaid_discount_value / 100))) : fmt(500 - settings.prepaid_discount_value)
+                              ) : (
+                                fmt(500)
+                              )}
+                            </span>
+                          </div>
+                          <input type="radio" checked readOnly style={{ width: '18px', height: '18px', accentColor: '#22c55e', margin: 0, pointerEvents: 'none' }} />
+                        </div>
+                      </div>
+                      {settings.payment_method_descriptions?.full_prepaid?.enabled && (
+                        <div style={{ background: '#dcfce7', padding: '10px 12px', fontSize: '10px', color: '#166534', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500, width: '100%', boxSizing: 'border-box', margin: 0, borderBottomLeftRadius: '10px', borderBottomRightRadius: '10px' }}>
+                          {settings.payment_method_descriptions?.full_prepaid?.text}
+                        </div>
+                      )}
+                    </div>
+                  </BlockStack>
+                </BlockStack>
+              </Card>
+
+              <Card>
+                <BlockStack gap="400">
+                  <BlockStack gap="100">
+                    <Text as="h2" variant="headingMd">Restrictions</Text>
+                    <Text as="p" variant="bodySm" tone="subdued">
+                      Control exactly when the full prepaid option appears. All rules must pass for it to show.
+                    </Text>
+                  </BlockStack>
+
+                  <Text as="h3" variant="headingSm">Order Total Range</Text>
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    Set to 0 to disable the restriction.
+                  </Text>
+                  <InlineGrid columns={2} gap="400">
+                    <TextField
+                      label="Minimum Order Total"
+                      type="number"
+                      value={String(settings.full_prepaid_minimum_order_total)}
+                      prefix={shopCurrency}
+                      min="0"
+                      onChange={(v) => upd('full_prepaid_minimum_order_total', parseFloat(v) || 0)}
+                      autoComplete="off"
+                      helpText="0 = no minimum"
+                    />
+                    <TextField
+                      label="Maximum Order Total"
+                      type="number"
+                      value={String(settings.full_prepaid_maximum_order_total)}
+                      prefix={shopCurrency}
+                      min="0"
+                      onChange={(v) => upd('full_prepaid_maximum_order_total', parseFloat(v) || 0)}
+                      autoComplete="off"
+                      helpText="0 = no maximum"
+                    />
+                  </InlineGrid>
+
+                  <Divider />
+
+                  {/* Item Restrictions */}
+                  <RestrictionsEditor
+                    method="full_prepaid"
+                    settings={settings}
+                    pickItemsForMethod={pickItemsForMethod}
+                    updRestrictions={updRestrictions}
+                    productTitles={productTitles}
+                    collectionTitles={collectionTitles}
+                  />
+
+                  {renderCountryRestrictions('full_prepaid', 'full prepaid')}
+                </BlockStack>
+              </Card>
+
+              <Box paddingBlockEnd="800" />
+            </BlockStack>
+
+          ) : selectedTab === 2 ? (
+            <BlockStack gap="500">
+              <Card>
+                <BlockStack gap="400">
+                  <InlineStack align="space-between" blockAlign="center">
+                    <BlockStack gap="100">
+                      <Text as="h2" variant="headingMd">Cash on Delivery Settings</Text>
+                      <Text as="p" variant="bodySm" tone="subdued">
+                        Enable standard Cash on Delivery orders.
+                      </Text>
+                    </BlockStack>
+                  </InlineStack>
+
+                  <ToggleRow
+                    label="COD Status"
+                    sub={settings.pure_cod_enabled ? 'Customers can choose Cash on Delivery.' : 'COD option is hidden.'}
+                    checked={settings.pure_cod_enabled}
+                    onChange={(v) => upd('pure_cod_enabled', v)}
+                  />
+                </BlockStack>
+              </Card>
+
+              {/* COD Fee UI matched to Partial Payment style */}
               <div className="pp-cod-fee-box">
-                <div className={`pp-cod-fee-card ${settings.cod_fee_enabled ? 'expanded' : ''}`}>
+                <div className={`pp-cod-fee-card ${settings.pure_cod_fee_enabled ? 'expanded' : ''}`}>
                   <div className="pp-cod-fee-left">
                     <div className="pp-cod-fee-icon-wrap">
                       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1685,587 +2184,170 @@ export default function PartialPaymentsPage() {
                     </div>
                     <div className="pp-cod-fee-details">
                       <div className="pp-cod-fee-title">COD Fee</div>
-                      <div className="pp-cod-fee-sub">Apply one fee to all partial payment orders</div>
+                      <div className="pp-cod-fee-sub">Apply one fee to all Cash on Delivery orders</div>
                     </div>
                   </div>
                   <div
-                    className={`pp-toggle-track ${settings.cod_fee_enabled ? 'on' : ''}`}
-                    onClick={() => upd('cod_fee_enabled', !settings.cod_fee_enabled)}
+                    className={`pp-toggle-track ${settings.pure_cod_fee_enabled ? 'on' : ''}`}
+                    onClick={() => upd('pure_cod_fee_enabled', !settings.pure_cod_fee_enabled)}
                     style={{ cursor: 'pointer' }}
                   >
                     <div className="pp-toggle-thumb" />
                   </div>
                 </div>
 
-                {settings.cod_fee_enabled && (
+                {settings.pure_cod_fee_enabled && (
                   <div className="pp-cod-fee-body">
                     <div className="pp-option-box-body">
                       <div className="pp-fg">
-                        <label>Fee Name</label>
+                        <label>FEE NAME</label>
                         <input
                           type="text"
-                          value={settings.cod_fee_name}
+                          value={settings.pure_cod_fee_name}
                           placeholder="COD Fee"
-                          onChange={(e) => upd('cod_fee_name', e.target.value)}
+                          onChange={(e) => upd('pure_cod_fee_name', e.target.value)}
                         />
                       </div>
                       <div className="pp-fg">
-                        <label>Fee Type</label>
+                        <label>FEE TYPE</label>
                         <select
-                          value={settings.cod_fee_type}
-                          onChange={(e) => upd('cod_fee_type', e.target.value as 'fixed' | 'percentage')}
+                          value={settings.pure_cod_fee_type}
+                          onChange={(e) => upd('pure_cod_fee_type', e.target.value as 'fixed' | 'percentage')}
                         >
                           <option value="fixed">Fixed Amount</option>
-                          <option value="percentage">Percentage of Deposit</option>
+                          <option value="percentage">Percentage</option>
                         </select>
                       </div>
                       <div className="pp-fg">
-                        <label>Amount</label>
+                        <label>AMOUNT</label>
                         <div className="pp-input-suffix-wrap">
                           <input
                             type="number"
-                            value={settings.cod_fee_amount}
+                            value={settings.pure_cod_fee_amount}
                             min={0}
                             step={0.5}
-                            onChange={(e) => upd('cod_fee_amount', parseFloat(e.target.value) || 0)}
+                            onChange={(e) => upd('pure_cod_fee_amount', parseFloat(e.target.value) || 0)}
                           />
                           <span className="pp-input-suffix">
-                            {settings.cod_fee_type === 'percentage' ? '%' : shopCurrency}
+                            {settings.pure_cod_fee_type === 'percentage' ? '%' : shopCurrency}
                           </span>
                         </div>
                       </div>
                     </div>
                   </div>
                 )}
-              </div>
 
-              <Divider />
-              {firstOpt && (
+                <Divider />
                 <BlockStack gap="200">
-                  <TagEditor method="partial_payment" settings={settings} updTag={updTag} />
+                  <TagEditor method="pure_cod" settings={settings} updTag={updTag} />
+                  <Divider />
+                  <DescEditor method="pure_cod" settings={settings} updDesc={updDesc} />
                   <Divider />
                   <Text as="h3" variant="headingSm">Storefront Preview</Text>
-                  <Text as="p" variant="bodySm" tone="subdued">Preview uses {fmt(previewOrderTotal)} as example cart total</Text>
+                  <Text as="p" variant="bodySm" tone="subdued">Preview uses 500 as example cart total</Text>
                   <div style={{
-                      display: 'flex', flexDirection: 'column', background: '#eff6ff', borderRadius: '12px',
-                      border: '2px solid #2563eb', position: 'relative', overflow: 'visible',
-                      maxWidth: '400px', marginTop: '16px'
-                  }}>
-                      {settings.payment_method_tags?.partial_payment?.enabled && (
-                        <div style={{
-                            position: 'absolute', top: '-10px', left: '16px', background: '#2563eb', color: 'white',
-                            fontSize: '9px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', letterSpacing: '0.05em',
-                            display: 'flex', alignItems: 'center', gap: '4px', textTransform: 'uppercase'
-                        }}>
-                            {settings.payment_method_tags?.partial_payment?.text}
-                        </div>
-                      )}
-
-                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '16px 12px 12px 12px', boxSizing: 'border-box', width: '100%', margin: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '32px', height: '32px', borderRadius: '8px', color: '#2563eb', backgroundColor: '#dbeafe' }}>
-                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>
-                          </div>
-
-                          <div style={{ flex: 1, minWidth: 0, paddingTop: '2px' }}>
-                              <div style={{ fontWeight: 700, fontSize: '14px', color: '#1e3a8a', lineHeight: 1.2, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                Partial Payment <svg width="14" height="14" viewBox="0 0 24 24" fill="#2563eb" stroke="#eff6ff" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/></svg>
-                              </div>
-                              <div style={{ color: '#2563eb', fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>Pay {fmt(previewDeposit)} now • Rest on delivery</div>
-                          </div>
-
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
-                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                                  {settings.cod_fee_enabled && previewCodFee > 0 && (
-                                    <div style={{ background: '#dbeafe', color: '#1e3a8a', fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '99px', lineHeight: 1, whiteSpace: 'nowrap' }}>
-                                        {fmt(previewCodFee)} {settings.cod_fee_name || 'COD Fee'}
-                                    </div>
-                                  )}
-                                  <span style={{ fontWeight: 800, fontSize: '15px', color: '#1e3a8a' }}>
-                                      {fmt(previewDeposit)}
-                                  </span>
-                              </div>
-                              <input type="radio" checked readOnly style={{ width: '18px', height: '18px', accentColor: '#2563eb', margin: 0, pointerEvents: 'none' }} />
-                          </div>
-                      </div>
-                      <div style={{ background: '#dbeafe', padding: '10px 12px', fontSize: '10px', color: '#1e40af', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500, width: '100%', boxSizing: 'border-box', margin: 0, borderBottomLeftRadius: '10px', borderBottomRightRadius: '10px' }}>
-                          Secure your order • Avoid fake cancellations
-                      </div>
-                  </div>
-                </BlockStack>
-              )}
-
-              <br />
-
-              {/* Live calculation preview */}
-              {firstOpt && (
-                <div className="pp-calc-preview">
-                  <Text as="p" variant="bodySm" fontWeight="semibold">
-                    Example: Order of {fmt(previewOrderTotal)}
-                  </Text>
-                  <div style={{ marginTop: 8 }}>
-                    <div className="pp-calc-row">
-                      <span>Product Total</span>
-                      <span>{fmt(previewOrderTotal)}</span>
-                    </div>
-                    <div className="pp-calc-row">
-                      <span>
-                        Deposit ({firstOpt.label})
-                      </span>
-                      <span>{fmt(previewDeposit)}</span>
-                    </div>
-                    {settings.cod_fee_enabled && previewCodFee > 0 && (
-                      <div className="pp-calc-row">
-                        <span>{settings.cod_fee_name || 'COD Fee'}</span>
-                        <span>+ {fmt(previewCodFee)}</span>
-                      </div>
-                    )}
-                    <div className="pp-calc-row total">
-                      <span>Pay Now (Online)</span>
-                      <span>{fmt(previewPayNow)}</span>
-                    </div>
-                    <div className="pp-calc-row remaining">
-                      <span>Remaining (COD on delivery)</span>
-                      <span>{fmt(previewRemaining)}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </BlockStack>
-          </Card>
-
-          {/* ════════════════════════════════════════════════
-              CARD 3 — RESTRICTIONS
-          ════════════════════════════════════════════════ */}
-          <Card>
-            <BlockStack gap="400">
-              <BlockStack gap="100">
-                <Text as="h2" variant="headingMd">Restrictions</Text>
-                <Text as="p" variant="bodySm" tone="subdued">
-                  Control exactly when the partial payment option appears. All rules must pass for it to show.
-                </Text>
-              </BlockStack>
-
-              {/* Order Total */}
-              <Text as="h3" variant="headingSm">Order Total Range</Text>
-              <Text as="p" variant="bodySm" tone="subdued">
-                Set to 0 to disable the restriction.
-              </Text>
-              <InlineGrid columns={2} gap="400">
-                <TextField
-                  label="Minimum Order Total"
-                  type="number"
-                  value={String(settings.minimum_order_total)}
-                  prefix={shopCurrency}
-                  min="0"
-                  onChange={(v) => upd('minimum_order_total', parseFloat(v) || 0)}
-                  autoComplete="off"
-                  helpText="0 = no minimum"
-                />
-                <TextField
-                  label="Maximum Order Total"
-                  type="number"
-                  value={String(settings.maximum_order_total)}
-                  prefix={shopCurrency}
-                  min="0"
-                  onChange={(v) => upd('maximum_order_total', parseFloat(v) || 0)}
-                  autoComplete="off"
-                  helpText="0 = no maximum"
-                />
-              </InlineGrid>
-
-              <Divider />
-
-              {/* Item Restrictions */}
-              <RestrictionsEditor
-                method="partial_payment"
-                settings={settings}
-                pickItemsForMethod={pickItemsForMethod}
-                updRestrictions={updRestrictions}
-                productTitles={productTitles}
-                collectionTitles={collectionTitles}
-              />
-
-              {/* Country Restrictions */}
-              {renderCountryRestrictions('partial_payment', 'partial payments')}
-            </BlockStack>
-          </Card>
-
-          <Box paddingBlockEnd="800" />
-        </BlockStack>
-      ) : selectedTab === 1 ? (
-        <BlockStack gap="500">
-          {/* ════════════════════════════════════════════════
-              FULL PREPAID CARDS
-          ════════════════════════════════════════════════ */}
-          <Card>
-            <BlockStack gap="400">
-              <InlineStack align="space-between" blockAlign="center">
-                <BlockStack gap="100">
-                  <Text as="h2" variant="headingMd">Full Prepaid Settings</Text>
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    Offer customers an option to pay the full amount upfront.
-                  </Text>
-                </BlockStack>
-              </InlineStack>
-
-              <ToggleRow
-                label="Full Prepaid Status"
-                sub={settings.full_prepaid_enabled ? 'Customers can choose to pay the full amount upfront.' : 'Full prepaid option is hidden.'}
-                checked={settings.full_prepaid_enabled}
-                onChange={(v) => upd('full_prepaid_enabled', v)}
-              />
-            </BlockStack>
-          </Card>
-
-          <Card>
-            <BlockStack gap="400">
-              <BlockStack gap="100">
-                <Text as="h2" variant="headingMd">Prepaid Discount</Text>
-                <Text as="p" variant="bodySm" tone="subdued">
-                  Offer a discount when customers choose Full Prepaid.
-                </Text>
-              </BlockStack>
-
-              <ToggleRow
-                label="Enable Prepaid Discount"
-                sub="Offer a discount to customers who choose Full Prepaid."
-                checked={settings.prepaid_discount_enabled}
-                onChange={(v) => upd('prepaid_discount_enabled', v)}
-              />
-
-              {settings.prepaid_discount_enabled && (
-                <div style={{ padding: '16px', background: '#f9fafb', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
-                  <BlockStack gap="400">
-                    <InlineGrid columns={2} gap="400">
-                      <Select
-                        label="Discount Type"
-                        options={[
-                          { label: 'Percentage', value: 'percentage' },
-                          { label: 'Fixed Amount', value: 'fixed' },
-                        ]}
-                        value={settings.prepaid_discount_type}
-                        onChange={(v) => upd('prepaid_discount_type', v as 'percentage' | 'fixed')}
-                      />
-                      <TextField
-                        label="Discount Value"
-                        type="number"
-                        min="0"
-                        suffix={settings.prepaid_discount_type === 'percentage' ? '%' : shopCurrency}
-                        value={String(settings.prepaid_discount_value)}
-                        onChange={(v) => upd('prepaid_discount_value', parseFloat(v) || 0)}
-                        autoComplete="off"
-                      />
-                    </InlineGrid>
-
-                  </BlockStack>
-                </div>
-              )}
-
-              <Divider />
-              <BlockStack gap="200">
-                <TagEditor method="full_prepaid" settings={settings} updTag={updTag} />
-                <Divider />
-                <Text as="h3" variant="headingSm">Storefront Preview</Text>
-                <Text as="p" variant="bodySm" tone="subdued">Preview uses 500 as example cart total</Text>
-                <div style={{
-                    display: 'flex', flexDirection: 'column', background: '#f0fdf4', borderRadius: '12px',
-                    border: '2px solid #22c55e', position: 'relative', overflow: 'visible',
-                    padding: '16px 12px 12px 12px', maxWidth: '400px', marginTop: '16px'
-                }}>
-                    {(settings.payment_method_tags?.full_prepaid?.enabled || (!settings.payment_method_tags?.full_prepaid && true)) && (
-                      <div style={{
-                          position: 'absolute', top: '-10px', left: '16px', background: '#22c55e', color: 'white',
-                          fontSize: '9px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', letterSpacing: '0.05em',
-                          display: 'flex', alignItems: 'center', gap: '4px', textTransform: 'uppercase'
-                      }}>
-                          {settings.payment_method_tags?.full_prepaid?.text || '★ MOST POPULAR'}
-                      </div>
-                    )}
-
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', width: '100%', boxSizing: 'border-box' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '32px', height: '32px', borderRadius: '8px', color: '#16a34a', backgroundColor: '#dcfce7' }}>
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4" /><path d="M4 6v12c0 1.1.9 2 2 2h14v-4" /><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z" /></svg>
-                        </div>
-
-                        <div style={{ flex: 1, minWidth: 0, paddingTop: '2px' }}>
-                            <div style={{ fontWeight: 700, fontSize: '14px', color: '#166534', lineHeight: 1.2 }}>Full Prepaid</div>
-                            <div style={{ color: '#16a34a', fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>Pay now &amp; get fastest delivery</div>
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                                {settings.prepaid_discount_enabled && settings.prepaid_discount_value > 0 && (
-                                  <div style={{ background: '#dcfce7', color: '#166534', fontSize: '11px', fontWeight: 700, padding: '3px 8px', borderRadius: '99px', lineHeight: 1 }}>
-                                      Save {settings.prepaid_discount_type === 'percentage' ? fmt(500 * (settings.prepaid_discount_value / 100)) : fmt(settings.prepaid_discount_value)}
-                                  </div>
-                                )}
-                                <span style={{ fontWeight: 800, fontSize: '15px', color: '#166534' }}>
-                                    {settings.prepaid_discount_enabled && settings.prepaid_discount_value > 0 ? (
-                                      settings.prepaid_discount_type === 'percentage' ? fmt(500 - (500 * (settings.prepaid_discount_value / 100))) : fmt(500 - settings.prepaid_discount_value)
-                                    ) : (
-                                      fmt(500)
-                                    )}
-                                </span>
-                            </div>
-                            <input type="radio" checked readOnly style={{ width: '18px', height: '18px', accentColor: '#22c55e', margin: 0, pointerEvents: 'none' }} />
-                        </div>
-                    </div>
-                </div>
-              </BlockStack>
-            </BlockStack>
-          </Card>
-
-          <Card>
-            <BlockStack gap="400">
-              <BlockStack gap="100">
-                <Text as="h2" variant="headingMd">Restrictions</Text>
-                <Text as="p" variant="bodySm" tone="subdued">
-                  Control exactly when the full prepaid option appears. All rules must pass for it to show.
-                </Text>
-              </BlockStack>
-
-              <Text as="h3" variant="headingSm">Order Total Range</Text>
-              <Text as="p" variant="bodySm" tone="subdued">
-                Set to 0 to disable the restriction.
-              </Text>
-              <InlineGrid columns={2} gap="400">
-                <TextField
-                  label="Minimum Order Total"
-                  type="number"
-                  value={String(settings.full_prepaid_minimum_order_total)}
-                  prefix={shopCurrency}
-                  min="0"
-                  onChange={(v) => upd('full_prepaid_minimum_order_total', parseFloat(v) || 0)}
-                  autoComplete="off"
-                  helpText="0 = no minimum"
-                />
-                <TextField
-                  label="Maximum Order Total"
-                  type="number"
-                  value={String(settings.full_prepaid_maximum_order_total)}
-                  prefix={shopCurrency}
-                  min="0"
-                  onChange={(v) => upd('full_prepaid_maximum_order_total', parseFloat(v) || 0)}
-                  autoComplete="off"
-                  helpText="0 = no maximum"
-                />
-              </InlineGrid>
-
-              <Divider />
-
-              {/* Item Restrictions */}
-              <RestrictionsEditor
-                method="full_prepaid"
-                settings={settings}
-                pickItemsForMethod={pickItemsForMethod}
-                updRestrictions={updRestrictions}
-                productTitles={productTitles}
-                collectionTitles={collectionTitles}
-              />
-              
-              {renderCountryRestrictions('full_prepaid', 'full prepaid')}
-            </BlockStack>
-          </Card>
-
-          <Box paddingBlockEnd="800" />
-        </BlockStack>
-
-      ) : selectedTab === 2 ? (
-        <BlockStack gap="500">
-          <Card>
-            <BlockStack gap="400">
-              <InlineStack align="space-between" blockAlign="center">
-                <BlockStack gap="100">
-                  <Text as="h2" variant="headingMd">Cash on Delivery Settings</Text>
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    Enable standard Cash on Delivery orders.
-                  </Text>
-                </BlockStack>
-              </InlineStack>
-
-              <ToggleRow
-                label="COD Status"
-                sub={settings.pure_cod_enabled ? 'Customers can choose Cash on Delivery.' : 'COD option is hidden.'}
-                checked={settings.pure_cod_enabled}
-                onChange={(v) => upd('pure_cod_enabled', v)}
-              />
-            </BlockStack>
-          </Card>
-
-          {/* COD Fee UI matched to Partial Payment style */}
-          <div className="pp-cod-fee-box">
-            <div className={`pp-cod-fee-card ${settings.pure_cod_fee_enabled ? 'expanded' : ''}`}>
-              <div className="pp-cod-fee-left">
-                <div className="pp-cod-fee-icon-wrap">
-                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="1" y="3" width="15" height="13" rx="2" ry="2" />
-                    <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
-                    <circle cx="5.5" cy="18.5" r="2.5" />
-                    <circle cx="18.5" cy="18.5" r="2.5" />
-                  </svg>
-                </div>
-                <div className="pp-cod-fee-details">
-                  <div className="pp-cod-fee-title">COD Fee</div>
-                  <div className="pp-cod-fee-sub">Apply one fee to all Cash on Delivery orders</div>
-                </div>
-              </div>
-              <div
-                className={`pp-toggle-track ${settings.pure_cod_fee_enabled ? 'on' : ''}`}
-                onClick={() => upd('pure_cod_fee_enabled', !settings.pure_cod_fee_enabled)}
-                style={{ cursor: 'pointer' }}
-              >
-                <div className="pp-toggle-thumb" />
-              </div>
-            </div>
-
-            {settings.pure_cod_fee_enabled && (
-              <div className="pp-cod-fee-body">
-                <div className="pp-option-box-body">
-                  <div className="pp-fg">
-                    <label>FEE NAME</label>
-                    <input
-                      type="text"
-                      value={settings.pure_cod_fee_name}
-                      placeholder="COD Fee"
-                      onChange={(e) => upd('pure_cod_fee_name', e.target.value)}
-                    />
-                  </div>
-                  <div className="pp-fg">
-                    <label>FEE TYPE</label>
-                    <select
-                      value={settings.pure_cod_fee_type}
-                      onChange={(e) => upd('pure_cod_fee_type', e.target.value as 'fixed' | 'percentage')}
-                    >
-                      <option value="fixed">Fixed Amount</option>
-                      <option value="percentage">Percentage</option>
-                    </select>
-                  </div>
-                  <div className="pp-fg">
-                    <label>AMOUNT</label>
-                    <div className="pp-input-suffix-wrap">
-                      <input
-                        type="number"
-                        value={settings.pure_cod_fee_amount}
-                        min={0}
-                        step={0.5}
-                        onChange={(e) => upd('pure_cod_fee_amount', parseFloat(e.target.value) || 0)}
-                      />
-                      <span className="pp-input-suffix">
-                        {settings.pure_cod_fee_type === 'percentage' ? '%' : shopCurrency}
-                      </span>
-                    </div>
-                  </div>
-                  </div>
-                </div>
-              )}
-
-              <Divider />
-              <BlockStack gap="200">
-                <TagEditor method="pure_cod" settings={settings} updTag={updTag} />
-                <Divider />
-                <Text as="h3" variant="headingSm">Storefront Preview</Text>
-                <Text as="p" variant="bodySm" tone="subdued">Preview uses 500 as example cart total</Text>
-                <div style={{
                     display: 'flex', flexDirection: 'column', background: '#fff7ed', borderRadius: '12px',
                     border: '2px solid #ea580c', position: 'relative', overflow: 'visible',
                     maxWidth: '400px', marginTop: '16px'
-                }}>
+                  }}>
                     {settings.payment_method_tags?.pure_cod?.enabled && (
                       <div style={{
-                          position: 'absolute', top: '-10px', left: '16px', background: '#ea580c', color: 'white',
-                          fontSize: '9px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', letterSpacing: '0.05em',
-                          display: 'flex', alignItems: 'center', gap: '4px', textTransform: 'uppercase'
+                        position: 'absolute', top: '-10px', left: '16px', background: '#ea580c', color: 'white',
+                        fontSize: '9px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', letterSpacing: '0.05em',
+                        display: 'flex', alignItems: 'center', gap: '4px', textTransform: 'uppercase'
                       }}>
-                          {settings.payment_method_tags?.pure_cod?.text}
+                        {settings.payment_method_tags?.pure_cod?.text}
                       </div>
                     )}
 
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '16px 12px 12px 12px', boxSizing: 'border-box', width: '100%', margin: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '32px', height: '32px', borderRadius: '8px', color: '#ea580c', backgroundColor: '#ffedd5' }}>
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1" ry="1" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
-                        </div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '32px', height: '32px', borderRadius: '8px', color: '#ea580c', backgroundColor: '#ffedd5' }}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1" ry="1" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
+                      </div>
 
-                        <div style={{ flex: 1, minWidth: 0, paddingTop: '2px' }}>
-                            <div style={{ fontWeight: 700, fontSize: '14px', color: '#9a3412', lineHeight: 1.2 }}>Cash on Delivery</div>
-                            <div style={{ color: '#ea580c', fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>Pay when you receive</div>
-                        </div>
+                      <div style={{ flex: 1, minWidth: 0, paddingTop: '2px' }}>
+                        <div style={{ fontWeight: 700, fontSize: '14px', color: '#9a3412', lineHeight: 1.2 }}>Cash on Delivery</div>
+                        <div style={{ color: '#ea580c', fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>Pay when you receive</div>
+                      </div>
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                                {settings.pure_cod_fee_enabled && settings.pure_cod_fee_amount > 0 && (
-                                  <div style={{ background: '#ffedd5', color: '#9a3412', fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '99px', lineHeight: 1, whiteSpace: 'nowrap' }}>
-                                      {settings.pure_cod_fee_type === 'percentage' ? fmt(500 * (settings.pure_cod_fee_amount / 100)) : fmt(settings.pure_cod_fee_amount)} {settings.pure_cod_fee_name || 'COD Fee'}
-                                  </div>
-                                )}
-                                <span style={{ fontWeight: 800, fontSize: '15px', color: '#9a3412' }}>
-                                    {settings.pure_cod_fee_enabled && settings.pure_cod_fee_amount > 0 ? (
-                                      settings.pure_cod_fee_type === 'percentage' ? fmt(500 + (500 * (settings.pure_cod_fee_amount / 100))) : fmt(500 + settings.pure_cod_fee_amount)
-                                    ) : (
-                                      fmt(500)
-                                    )}
-                                </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                          {settings.pure_cod_fee_enabled && settings.pure_cod_fee_amount > 0 && (
+                            <div style={{ background: '#ffedd5', color: '#9a3412', fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '99px', lineHeight: 1, whiteSpace: 'nowrap' }}>
+                              {settings.pure_cod_fee_type === 'percentage' ? fmt(500 * (settings.pure_cod_fee_amount / 100)) : fmt(settings.pure_cod_fee_amount)} {settings.pure_cod_fee_name || 'COD Fee'}
                             </div>
-                            <input type="radio" checked readOnly style={{ width: '18px', height: '18px', accentColor: '#ea580c', margin: 0, pointerEvents: 'none' }} />
+                          )}
+                          <span style={{ fontWeight: 800, fontSize: '15px', color: '#9a3412' }}>
+                            {settings.pure_cod_fee_enabled && settings.pure_cod_fee_amount > 0 ? (
+                              settings.pure_cod_fee_type === 'percentage' ? fmt(500 + (500 * (settings.pure_cod_fee_amount / 100))) : fmt(500 + settings.pure_cod_fee_amount)
+                            ) : (
+                              fmt(500)
+                            )}
+                          </span>
                         </div>
+                        <input type="radio" checked readOnly style={{ width: '18px', height: '18px', accentColor: '#ea580c', margin: 0, pointerEvents: 'none' }} />
+                      </div>
                     </div>
-                    <div style={{ background: '#ffedd5', padding: '10px 12px', fontSize: '10px', color: '#9a3412', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500, width: '100%', boxSizing: 'border-box', margin: 0, borderBottomLeftRadius: '10px', borderBottomRightRadius: '10px' }}>
-                        <span style={{ marginRight: '4px' }}>ℹ️</span> Higher return risk • Slightly slower processing
-                    </div>
-                </div>
-              </BlockStack>
-          </div>
+                    {settings.payment_method_descriptions?.pure_cod?.enabled && (
+                      <div style={{ background: '#ffedd5', padding: '10px 12px', fontSize: '10px', color: '#9a3412', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500, width: '100%', boxSizing: 'border-box', margin: 0, borderBottomLeftRadius: '10px', borderBottomRightRadius: '10px' }}>
+                        {settings.payment_method_descriptions?.pure_cod?.text}
+                      </div>
+                    )}
+                  </div>
+                </BlockStack>
+              </div>
 
-          <Card>
-            <BlockStack gap="400">
-              <Text as="h2" variant="headingMd">COD Restrictions</Text>
-              <Text as="p" variant="bodySm" tone="subdued">
-                Set minimum or maximum order totals and restrict by product/collection for Cash on Delivery.
-              </Text>
+              <Card>
+                <BlockStack gap="400">
+                  <Text as="h2" variant="headingMd">COD Restrictions</Text>
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    Set minimum or maximum order totals and restrict by product/collection for Cash on Delivery.
+                  </Text>
 
-              <InlineGrid columns={{ xs: 1, sm: 2 }} gap="400">
-                <TextField
-                  label="Minimum Order Total"
-                  type="number"
-                  value={settings.pure_cod_minimum_order_total.toString()}
-                  onChange={(v) => upd('pure_cod_minimum_order_total', parseFloat(v) || 0)}
-                  autoComplete="off"
-                  prefix={shopCurrency}
-                  min={0}
-                />
-                <TextField
-                  label="Maximum Order Total"
-                  type="number"
-                  value={settings.pure_cod_maximum_order_total.toString()}
-                  onChange={(v) => upd('pure_cod_maximum_order_total', parseFloat(v) || 0)}
-                  autoComplete="off"
-                  prefix={shopCurrency}
-                  min={0}
-                  helpText="Leave as 0 for no maximum."
-                />
-              </InlineGrid>
+                  <InlineGrid columns={{ xs: 1, sm: 2 }} gap="400">
+                    <TextField
+                      label="Minimum Order Total"
+                      type="number"
+                      value={settings.pure_cod_minimum_order_total.toString()}
+                      onChange={(v) => upd('pure_cod_minimum_order_total', parseFloat(v) || 0)}
+                      autoComplete="off"
+                      prefix={shopCurrency}
+                      min={0}
+                    />
+                    <TextField
+                      label="Maximum Order Total"
+                      type="number"
+                      value={settings.pure_cod_maximum_order_total.toString()}
+                      onChange={(v) => upd('pure_cod_maximum_order_total', parseFloat(v) || 0)}
+                      autoComplete="off"
+                      prefix={shopCurrency}
+                      min={0}
+                      helpText="Leave as 0 for no maximum."
+                    />
+                  </InlineGrid>
 
-              <Divider />
-              
-              {/* Item Restrictions */}
-              <RestrictionsEditor
-                method="pure_cod"
-                settings={settings}
-                pickItemsForMethod={pickItemsForMethod}
-                updRestrictions={updRestrictions}
-                productTitles={productTitles}
-                collectionTitles={collectionTitles}
-              />
+                  <Divider />
 
-              {renderCountryRestrictions('full_cod', 'Cash on Delivery')}
+                  {/* Item Restrictions */}
+                  <RestrictionsEditor
+                    method="pure_cod"
+                    settings={settings}
+                    pickItemsForMethod={pickItemsForMethod}
+                    updRestrictions={updRestrictions}
+                    productTitles={productTitles}
+                    collectionTitles={collectionTitles}
+                  />
+
+                  {renderCountryRestrictions('full_cod', 'Cash on Delivery')}
+                </BlockStack>
+              </Card>
+
+
+              <Box paddingBlockEnd="800" />
             </BlockStack>
-          </Card>
+          ) : null}
 
-          
-          <Box paddingBlockEnd="800" />
-        </BlockStack>
-      ) : null}
-
-      </Box>
+        </Box>
       </div>
     </>
   );
