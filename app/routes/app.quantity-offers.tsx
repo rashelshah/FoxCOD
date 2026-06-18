@@ -1220,7 +1220,7 @@ export default function QuantityOffersPage() {
                                             </div>
                                         ) : (
                                             <>
-                                               
+
 
                                                 {/* Form Modal Container - Matching Form Builder exactly */}
                                                 <div style={(() => {
@@ -1277,38 +1277,38 @@ export default function QuantityOffersPage() {
                                                         </div>
                                                     )}
                                                     <div className="cod-trust-badge-band" style={{
-                                                         display: 'flex',
-                                                         alignItems: 'center',
-                                                         justifyContent: 'space-between',
-                                                         flexWrap: 'nowrap',
-                                                         backgroundColor: '#EBF8EE',
-                                                         borderRadius: '8px',
-                                                         padding: '6px 8px',
-                                                         margin: '12px 0 16px 0',
-                                                         gap: '4px',
-                                                         fontFamily: formSettings?.styles?.fontFamily || 'Inter',
-                                                         fontSize: 'clamp(5.8px, 1.4vw, 7.8px)',
-                                                         fontWeight: 600,
-                                                         color: '#000000',
-                                                         border: '1px solid #d1fae5',
-                                                         whiteSpace: 'nowrap',
-                                                         overflow: 'hidden',
-                                                         boxSizing: 'border-box',
-                                                         letterSpacing: '-0.1px'
-                                                     }}>
-                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '2px', whiteSpace: 'nowrap' }}>
-                                                             <svg width="8.5" height="8.5" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 11 2 2 4-4"></path></svg>
-                                                             <span style={{ color: '#000000', marginLeft: '2px' }}>100% Secure Order</span>
-                                                         </div>
-                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '2px', whiteSpace: 'nowrap' }}>
-                                                             <svg width="8.5" height="8.5" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
-                                                             <span style={{ color: '#000000', marginLeft: '2px' }}>Instant Confirmation</span>
-                                                         </div>
-                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '2px', whiteSpace: 'nowrap' }}>
-                                                             <svg width="8.5" height="8.5" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
-                                                             <span style={{ color: '#000000', marginLeft: '2px' }}>Free Shipping</span>
-                                                         </div>
-                                                     </div>
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'space-between',
+                                                        flexWrap: 'nowrap',
+                                                        backgroundColor: '#EBF8EE',
+                                                        borderRadius: '8px',
+                                                        padding: '6px 8px',
+                                                        margin: '12px 0 16px 0',
+                                                        gap: '4px',
+                                                        fontFamily: formSettings?.styles?.fontFamily || 'Inter',
+                                                        fontSize: 'clamp(5.8px, 1.4vw, 7.8px)',
+                                                        fontWeight: 600,
+                                                        color: '#000000',
+                                                        border: '1px solid #d1fae5',
+                                                        whiteSpace: 'nowrap',
+                                                        overflow: 'hidden',
+                                                        boxSizing: 'border-box',
+                                                        letterSpacing: '-0.1px'
+                                                    }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '2px', whiteSpace: 'nowrap' }}>
+                                                            <svg width="8.5" height="8.5" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 11 2 2 4-4"></path></svg>
+                                                            <span style={{ color: '#000000', marginLeft: '2px' }}>100% Secure Order</span>
+                                                        </div>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '2px', whiteSpace: 'nowrap' }}>
+                                                            <svg width="8.5" height="8.5" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                                                            <span style={{ color: '#000000', marginLeft: '2px' }}>Instant Confirmation</span>
+                                                        </div>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '2px', whiteSpace: 'nowrap' }}>
+                                                            <svg width="8.5" height="8.5" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+                                                            <span style={{ color: '#000000', marginLeft: '2px' }}>Fast Delivery</span>
+                                                        </div>
+                                                    </div>
 
                                                     {/* Bundle Offers - At Top placement (immediately after subtitle) */}
                                                     {activeGroup && activeGroup.placement === 'at_top' && (
@@ -1520,7 +1520,10 @@ export default function QuantityOffersPage() {
 
                                                                 return (
                                                                     <div key={field.id} style={cardStyle}>
-                                                                        <div style={{ fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                                        <div style={{ fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '8px', display: 'flex', alignItems: 'center' }}>
+                                                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', borderRadius: '8px', marginRight: '6px', color: '#16a34a' }}>
+                                                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+                                                                            </div>
                                                                             Order Summary
                                                                         </div>
                                                                         {(() => {
@@ -1538,19 +1541,34 @@ export default function QuantityOffersPage() {
 
                                                                             return (
                                                                                 <>
-                                                                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280', marginBottom: '6px' }}>
-                                                                                        <span>Subtotal ({quantity} {quantity === 1 ? 'item' : 'items'})</span>
+                                                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#6b7280', marginBottom: '4px' }}>
+                                                                                        <div style={{ display: 'flex', alignItems: 'center' }}>
+                                                                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', borderRadius: '6px', marginRight: '6px', color: '#4b5563' }}>
+                                                                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+                                                                                            </div>
+                                                                                            <span>Subtotal ({quantity} {quantity === 1 ? 'item' : 'items'})</span>
+                                                                                        </div>
                                                                                         <span>{fmtCurrency(subtotal)}</span>
                                                                                     </div>
                                                                                     {discount > 0 && (
-                                                                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#10b981', marginBottom: '6px' }}>
-                                                                                            <span>Bundle Discount ({discountPercent}%)</span>
+                                                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#10b981', marginBottom: '4px' }}>
+                                                                                            <div style={{ display: 'flex', alignItems: 'center' }}>
+                                                                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', borderRadius: '6px', marginRight: '6px', color: '#16a34a' }}>
+                                                                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+                                                                                                </div>
+                                                                                                <span>Bundle Discount ({discountPercent}%)</span>
+                                                                                            </div>
                                                                                             <span>-{fmtCurrency(discount)}</span>
                                                                                         </div>
                                                                                     )}
                                                                                     {shippingEnabled && (
-                                                                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280', marginBottom: '8px' }}>
-                                                                                            <span>Shipping</span>
+                                                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#6b7280', marginBottom: '6px' }}>
+                                                                                            <div style={{ display: 'flex', alignItems: 'center' }}>
+                                                                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', borderRadius: '6px', marginRight: '6px', color: '#4b5563' }}>
+                                                                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+                                                                                                </div>
+                                                                                                <span>Shipping</span>
+                                                                                            </div>
                                                                                             <span>{shippingCost === 0 ? 'FREE' : fmtCurrency(shippingCost)}</span>
                                                                                         </div>
                                                                                     )}
@@ -1636,13 +1654,13 @@ export default function QuantityOffersPage() {
                                                                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '24px', height: '24px', borderRadius: '6px', color: '#16a34a', backgroundColor: '#dcfce7' }}>
                                                                                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4" /><path d="M4 6v12c0 1.1.9 2 2 2h14v-4" /><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z" /></svg>
                                                                                             </div>
-                                                                                            
+
                                                                                             {/* Center text */}
                                                                                             <div style={{ flex: 1, minWidth: 0 }}>
                                                                                                 <div style={{ fontWeight: 700, fontSize: '11px', color: '#166534', lineHeight: 1.1 }}>Full Prepaid</div>
                                                                                                 <div style={{ color: '#4ade80', fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>Pay now & get fastest delivery</div>
                                                                                             </div>
-                                                                                            
+
                                                                                             {/* Right side pricing */}
                                                                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                                                                                                 <span style={{ fontWeight: 800, fontSize: '12px', color: '#166534' }}>{fmtCurrency(total)}</span>
@@ -1663,16 +1681,16 @@ export default function QuantityOffersPage() {
                                                                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '24px', height: '24px', borderRadius: '6px', color: '#2563eb', backgroundColor: '#dbeafe' }}>
                                                                                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>
                                                                                             </div>
-                                                                                            
+
                                                                                             {/* Center text */}
                                                                                             <div style={{ flex: 1, minWidth: 0 }}>
                                                                                                 <div style={{ fontWeight: 700, fontSize: '11px', color: '#1e3a8a', lineHeight: 1.1, display: 'flex', alignItems: 'center', gap: '3px' }}>
                                                                                                     Partial Payment
-                                                                                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="#2563eb" stroke="#eff6ff" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/></svg>
+                                                                                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="#2563eb" stroke="#eff6ff" strokeWidth="2.5"><circle cx="12" cy="12" r="10" /><path d="M9 12l2 2 4-4" /></svg>
                                                                                                 </div>
                                                                                                 <div style={{ color: '#60a5fa', fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>Pay {fmtCurrency(partialCodAdvanceAmount)} now • Rest on delivery</div>
                                                                                             </div>
-                                                                                            
+
                                                                                             {/* Right side pricing */}
                                                                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                                                                                                 <span style={{ fontWeight: 800, fontSize: '12px', color: '#1e3a8a' }}>{fmtCurrency(partialCodAdvanceAmount)}</span>
@@ -1696,13 +1714,13 @@ export default function QuantityOffersPage() {
                                                                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '24px', height: '24px', borderRadius: '6px', color: '#ea580c', backgroundColor: '#ffedd5' }}>
                                                                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1" ry="1" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
                                                                                         </div>
-                                                                                        
+
                                                                                         {/* Center text */}
                                                                                         <div style={{ flex: 1, minWidth: 0 }}>
                                                                                             <div style={{ fontWeight: 700, fontSize: '11px', color: '#9a3412', lineHeight: 1.1 }}>Cash on Delivery</div>
                                                                                             <div style={{ color: '#fb923c', fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>Pay when you receive</div>
                                                                                         </div>
-                                                                                        
+
                                                                                         {/* Right side pricing */}
                                                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                                                                                             <span style={{ fontWeight: 800, fontSize: '12px', color: '#9a3412' }}>{fmtCurrency(total)}</span>
@@ -1719,7 +1737,7 @@ export default function QuantityOffersPage() {
                                                                     );
                                                                 }
 
-                                                            // Marketing checkbox
+                                                                // Marketing checkbox
                                                                 return (
                                                                     <div key={field.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', fontSize: '10px', color: '#6b7280' }}>
                                                                         <input type="checkbox" disabled style={{ width: '14px', height: '14px' }} />
@@ -1752,9 +1770,9 @@ export default function QuantityOffersPage() {
                                                                 quantity: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><line x1="9" y1="9" x2="15" y2="15" /><line x1="15" y1="9" x2="9" y2="15" /></svg>,
                                                                 state: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>,
                                                                 city: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>,
-                                                                zip: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>,
-                                                                zipcode: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>,
-                                                                hash: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>,
+                                                                zip: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="9" x2="20" y2="9" /><line x1="4" y1="15" x2="20" y2="15" /><line x1="10" y1="3" x2="8" y2="21" /><line x1="16" y1="3" x2="14" y2="21" /></svg>,
+                                                                zipcode: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="9" x2="20" y2="9" /><line x1="4" y1="15" x2="20" y2="15" /><line x1="10" y1="3" x2="8" y2="21" /><line x1="16" y1="3" x2="14" y2="21" /></svg>,
+                                                                hash: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="9" x2="20" y2="9" /><line x1="4" y1="15" x2="20" y2="15" /><line x1="10" y1="3" x2="8" y2="21" /><line x1="16" y1="3" x2="14" y2="21" /></svg>,
                                                                 user: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>,
                                                                 text: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 7 4 4 20 4 20 7" /><line x1="9" y1="20" x2="15" y2="20" /><line x1="12" y1="4" x2="12" y2="20" /></svg>,
                                                                 list: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg>,

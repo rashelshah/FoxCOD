@@ -867,7 +867,7 @@ export default function UpsellDownsellPage() {
                                                                 </div>
                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '2px', whiteSpace: 'nowrap' }}>
                                                                     <svg width="7.5" height="7.5" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
-                                                                    <span style={{ color: '#000000', marginLeft: '2px' }}>Free Shipping</span>
+                                                                    <span style={{ color: '#000000', marginLeft: '2px' }}>Fast Delivery</span>
                                                                 </div>
                                                             </div>
 
@@ -966,7 +966,12 @@ export default function UpsellDownsellPage() {
 
                                                                         return (
                                                                             <div key={field.id} style={cardStyle}>
-                                                                                <div style={{ fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>Order Summary</div>
+                                                                                <div style={{ fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '8px', display: 'flex', alignItems: 'center' }}>
+                                                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', borderRadius: '8px', marginRight: '6px', color: '#16a34a' }}>
+                                                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+                                                                                    </div>
+                                                                                    Order Summary
+                                                                                </div>
                                                                                 {(() => {
                                                                                     const unitPrice = 1999;
                                                                                     const shippingEnabled = formSettings?.shipping_options?.enabled;
@@ -977,12 +982,36 @@ export default function UpsellDownsellPage() {
                                                                                     const total = unitPrice + shippingCost + tickUpsellPrice;
                                                                                     return (
                                                                                         <>
-                                                                                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280', marginBottom: '6px' }}><span>Subtotal (1 item)</span><span>{fmtCurrency(unitPrice)}</span></div>
+                                                                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#6b7280', marginBottom: '4px' }}>
+                                                                                                <div style={{ display: 'flex', alignItems: 'center' }}>
+                                                                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', borderRadius: '6px', marginRight: '6px', color: '#4b5563' }}>
+                                                                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+                                                                                                    </div>
+                                                                                                    <span>Subtotal (1 item)</span>
+                                                                                                </div>
+                                                                                                <span>{fmtCurrency(unitPrice)}</span>
+                                                                                            </div>
                                                                                             {shippingEnabled && (
-                                                                                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280', marginBottom: '8px' }}><span>Shipping</span><span>{shippingCost === 0 ? 'FREE' : fmtCurrency(shippingCost)}</span></div>
+                                                                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#6b7280', marginBottom: '4px' }}>
+                                                                                                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                                                                                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', borderRadius: '6px', marginRight: '6px', color: '#4b5563' }}>
+                                                                                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+                                                                                                        </div>
+                                                                                                        <span>Shipping</span>
+                                                                                                    </div>
+                                                                                                    <span>{shippingCost === 0 ? 'FREE' : fmtCurrency(shippingCost)}</span>
+                                                                                                </div>
                                                                                             )}
                                                                                             {tickUpsellPrice > 0 && (
-                                                                                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#059669', marginBottom: '6px' }}><span>{tickOffer?.upsell_product_title || 'Upsell'}</span><span>{fmtCurrency(tickUpsellPrice)}</span></div>
+                                                                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#059669', marginBottom: '4px' }}>
+                                                                                                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                                                                                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', borderRadius: '6px', marginRight: '6px', color: '#16a34a' }}>
+                                                                                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+                                                                                                        </div>
+                                                                                                        <span>{tickOffer?.upsell_product_title || 'Upsell'}</span>
+                                                                                                    </div>
+                                                                                                    <span>{fmtCurrency(tickUpsellPrice)}</span>
+                                                                                                </div>
                                                                                             )}
                                                                                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 700, color: '#111827', paddingTop: '8px', borderTop: '1px dashed #d1d5db' }}><span>Total</span><span style={{ color: priceColor }}>{fmtCurrency(total)}</span></div>
                                                                                         </>

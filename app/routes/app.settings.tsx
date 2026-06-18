@@ -1164,7 +1164,7 @@ const PreviewDisplay = memo(({
                                         <style dangerouslySetInnerHTML={{ __html: getPreviewKeyframesCSS() }} />
                                         <button
                                             className={getButtonAnimationClasses()}
-                                            style={{ ...getButtonStyle(), ...getButtonAnimationStyle(), maxWidth: '200px', width: '100%', position: 'relative', '--btn-border-color': buttonStylesState?.borderColor || primaryColor || '#6366f1' } as any}
+                                            style={{ ...getButtonStyle(), ...getButtonAnimationStyle(), width: '100%', position: 'relative', '--btn-border-color': buttonStylesState?.borderColor || primaryColor || '#6366f1' } as any}
                                         >
                                             {buttonStylesState?.borderEffect === 'dashed-moving' && (
                                                 <svg className="marching-ants-svg" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }}>
@@ -1236,7 +1236,7 @@ const PreviewDisplay = memo(({
                                             </div>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '2px', whiteSpace: 'nowrap' }}>
                                                 <svg width="8.5" height="8.5" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
-                                                <span style={{ color: '#000000', marginLeft: '2px' }}>Free Shipping</span>
+                                                <span style={{ color: '#000000', marginLeft: '2px' }}>Fast Delivery</span>
                                             </div>
                                         </div>
 
@@ -1391,17 +1391,38 @@ const PreviewDisplay = memo(({
 
                                                 return (
                                                     <div key={field.id} style={cardStyle}>
-                                                        <div style={{ fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                        <div style={{ fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '8px', display: 'flex', alignItems: 'center' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', borderRadius: '8px', marginRight: '6px', color: '#16a34a' }}>
+                                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+                                                            </div>
                                                             Order Summary
                                                         </div>
-                                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280', marginBottom: '6px' }}>
-                                                            <span>Subtotal</span><span>{fmtCurrency(subtotal)}</span>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#6b7280', marginBottom: '4px' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center' }}>
+                                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', borderRadius: '6px', marginRight: '6px', color: '#4b5563' }}>
+                                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+                                                                </div>
+                                                                <span>Subtotal</span>
+                                                            </div>
+                                                            <span>{fmtCurrency(subtotal)}</span>
                                                         </div>
-                                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#10b981', marginBottom: '6px' }}>
-                                                            <span>Discount</span><span>-{fmtCurrency(discount)}</span>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#10b981', marginBottom: '4px' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center' }}>
+                                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', borderRadius: '6px', marginRight: '6px', color: '#16a34a' }}>
+                                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+                                                                </div>
+                                                                <span>Discount</span>
+                                                            </div>
+                                                            <span>-{fmtCurrency(discount)}</span>
                                                         </div>
-                                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#6b7280', marginBottom: '8px' }}>
-                                                            <span>Shipping</span><span>{shippingCost === 0 ? 'FREE' : fmtCurrency(shippingCost)}</span>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', color: '#6b7280', marginBottom: '6px' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center' }}>
+                                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', borderRadius: '6px', marginRight: '6px', color: '#4b5563' }}>
+                                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+                                                                </div>
+                                                                <span>Shipping</span>
+                                                            </div>
+                                                            <span>{shippingCost === 0 ? 'FREE' : fmtCurrency(shippingCost)}</span>
                                                         </div>
                                                         <div style={{
                                                             display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: 700,
@@ -3175,8 +3196,8 @@ export default function SettingsPage() {
                 .preview-panel { background: white; border: 1px solid #e5e7eb; border-radius: 16px; width: 100%; box-shadow: 0 10px 40px rgba(0,0,0,0.1); padding-bottom: 20px; }
                 .preview-header { background: #f9fafb; padding: 16px 20px; border-bottom: 1px solid #e5e7eb; }
                 .preview-content { padding: 24px; }
-                .preview-phone { background: #1f2937; border-radius: 32px; padding: 6px; max-width: 300px; margin: 0 auto; }
-                .preview-phone-screen { background: white; border-radius: 24px; overflow-y: auto; height: 500px; }
+                .preview-phone { background: #1f2937; border-radius: 32px; padding: 6px; max-width: 350px; margin: 0 auto; }
+                .preview-phone-screen { background: white; border-radius: 24px; overflow-y: auto; height: 550px; }
                 .preview-phone-screen.preview-compact { min-height: auto; max-height: none; padding: 20px 16px; }
                 .preview-product { padding: 16px; }
                 .preview-product-img { width: 80px; height: 80px; border-radius: 6px; flex-shrink: 0; object-fit: cover; }
