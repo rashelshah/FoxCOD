@@ -2914,10 +2914,7 @@ export default function SettingsPage() {
                     display: flex;
                     align-items: center;
                     justify-content: space-between;
-                    margin-top: 16px;
                     margin-bottom: 24px;
-                    padding-bottom: 24px;
-                    border-bottom: 1px solid #e5e7eb;
                 }
                 .page-header-left {
                     display: flex;
@@ -4072,20 +4069,25 @@ export default function SettingsPage() {
                                 <p>Customize your COD checkout form</p>
                             </div>
                         </div>
-                        {/* Error message display */}
-                        {saveError && (
-                            <div style={{
-                                background: '#fef2f2',
-                                border: '1px solid #ef4444',
-                                borderRadius: '8px',
-                                padding: '12px 16px',
-                                fontSize: '13px',
-                                color: '#dc2626',
-                                maxWidth: '300px'
-                            }}>
-                                ⚠️ {saveError}
-                            </div>
-                        )}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                            {/* Error message display */}
+                            {saveError && (
+                                <div style={{
+                                    background: '#fef2f2',
+                                    border: '1px solid #ef4444',
+                                    borderRadius: '8px',
+                                    padding: '8px 12px',
+                                    fontSize: '13px',
+                                    color: '#dc2626',
+                                    maxWidth: '300px'
+                                }}>
+                                    ⚠️ {saveError}
+                                </div>
+                            )}
+                            <Badge tone={enabled ? 'success' : 'critical'}>
+                                {enabled ? 'Active' : 'Inactive'}
+                            </Badge>
+                        </div>
                     </div>
 
                     {/* Main Toggle */}

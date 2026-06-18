@@ -217,13 +217,20 @@ export default function AppSettingsPage() {
                             </div>
                         </div>
                     </div>
-                    {/* Polaris Tabs */}
-                    <Tabs
-                        tabs={TABS}
-                        selected={TABS.findIndex(t => t.id === activeTab)}
-                        onSelect={handleTabChange}
-                        fitted
-                    >
+                    {/* Custom Tabs */}
+                    <div className="tabs">
+                        {TABS.map((tab, idx) => (
+                            <button
+                                key={tab.id}
+                                className={`tab ${activeTab === tab.id ? 'active' : ''}`}
+                                onClick={() => handleTabChange(idx)}
+                            >
+                                {tab.content}
+                            </button>
+                        ))}
+                    </div>
+
+                    <div className="tab-content">
                         <div>
                             {/* ── PIXELS TAB ── */}
                             {activeTab === 'pixels' && (
@@ -397,7 +404,7 @@ export default function AppSettingsPage() {
                                 </div>
                             )}
                         </div>
-                    </Tabs>
+                    </div>
                 </div>
             </div>
         </>
@@ -407,7 +414,7 @@ export default function AppSettingsPage() {
 // ── STYLES ──
 const styles = `
     .as-page { display: flex; flex-direction: column; min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f6f6f7; }
-    .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; padding: 0 24px; }
+    .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
     @media (max-width: 640px) { .page-header { padding: 0; } }
     .page-header-left { display: flex; align-items: center; gap: 16px; }
     .back-btn { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border: 1px solid #e5e7eb; border-radius: 10px; background: white; text-decoration: none; color: #374151; transition: all 0.2s ease; }
@@ -458,9 +465,15 @@ const styles = `
     .as-events-table tr:last-child td { border-bottom: none; }
     .as-events-table tr:hover td { background: #f9fafb; }
 
+    /* Tabs */
+    .tabs { display: flex; gap: 8px; margin-bottom: 24px; background: #f3f4f6; padding: 6px; border-radius: 12px; }
+    .tab { flex: 1; padding: 14px 20px; border: none; background: transparent; border-radius: 8px; font-size: 14px; font-weight: 600; color: #6b7280; cursor: pointer; transition: all 0.2s ease; }
+    .tab.active { background: white; color: #111827; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+
     /* Responsive */
     @media (max-width: 640px) {
         .as-row { grid-template-columns: 1fr; }
         .as-body { padding: 16px; }
+        .tabs { flex-direction: column; }
     }
 `;
