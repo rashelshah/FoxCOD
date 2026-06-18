@@ -4586,11 +4586,32 @@ function darkenColor(hex, percent) {
           html += '</div>';
       }
 
+      var renderTag = function(method, defaultColor) {
+          var tagsConfig = ppSettings && ppSettings.payment_method_tags;
+          // Support backward compatibility where full prepaid tag was always shown by default
+          if (!tagsConfig && method === 'full_prepaid') {
+              return '<div style="position: absolute; top: -10px; left: 16px; background: ' + defaultColor + '; color: white; font-size: 9px; font-weight: 700; padding: 3px 8px; border-radius: 6px; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px; text-transform: uppercase;">★ MOST POPULAR</div>';
+          }
+          var tagSettings = tagsConfig && tagsConfig[method];
+          if (tagSettings && tagSettings.enabled && tagSettings.text) {
+              return '<div style="position: absolute; top: -10px; left: 16px; background: ' + defaultColor + '; color: white; font-size: 9px; font-weight: 700; padding: 3px 8px; border-radius: 6px; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px; text-transform: uppercase;">' + tagSettings.text + '</div>';
+          }
+          return '';
+      };
+
+      var hasTag = function(method) {
+          var tagsConfig = ppSettings && ppSettings.payment_method_tags;
+          if (!tagsConfig && method === 'full_prepaid') return true;
+          var tagSettings = tagsConfig && tagsConfig[method];
+          return tagSettings && tagSettings.enabled && !!tagSettings.text;
+      };
+
       if (showFullPrepaid) {
-          html += '<label class="pm-row pm-prepaid" style="display: flex; flex-direction: column; background: #f0fdf4; border-radius: 12px; border: 1.5px solid #22c55e; cursor: pointer; position: relative; overflow: visible; padding: 0 !important; margin: 0 !important; box-sizing: border-box; opacity: 1;">';
+          var marginStyle = hasTag('full_prepaid') ? 'margin: 12px 0 0 0 !important;' : 'margin: 0 !important;';
+          html += '<label class="pm-row pm-prepaid" style="display: flex; flex-direction: column; background: #f0fdf4; border-radius: 12px; border: 1.5px solid #22c55e; cursor: pointer; position: relative; overflow: visible; padding: 0 !important; ' + marginStyle + ' box-sizing: border-box; opacity: 1;">';
           var isPrepaidChecked = (defaultMethod === 'full_prepaid') ? 'checked' : '';
           html += '<input type="radio" name="payment_method" value="full_prepaid" ' + isPrepaidChecked + ' style="position:absolute; opacity:0; pointer-events:none; margin:0; padding:0;">';
-          html += '<div style="position: absolute; top: -10px; left: 16px; background: #22c55e; color: white; font-size: 9px; font-weight: 700; padding: 3px 8px; border-radius: 6px; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px; text-transform: uppercase;">★ MOST POPULAR</div>';
+          html += renderTag('full_prepaid', '#22c55e');
           html += '<div style="display: flex; align-items: flex-start; gap: 12px; padding: 16px 12px 12px 12px; box-sizing: border-box; width: 100%; margin: 0;">';
           html += '<div style="display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px; color: #16a34a; background-color: #dcfce7;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4" /><path d="M4 6v12c0 1.1.9 2 2 2h14v-4" /><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z" /></svg></div>';
           html += '<div style="flex: 1; min-width: 0; padding-top: 2px;">';
@@ -4633,9 +4654,11 @@ function darkenColor(hex, percent) {
           }
           var depositText = formatMoney(depositAmount);
 
-          html += '<label class="pm-row pm-partial" style="display: flex; flex-direction: column; background: #eff6ff; border-radius: 12px; border: 1.5px solid #2563eb; cursor: pointer; position: relative; padding: 0 !important; margin: 0 !important; box-sizing: border-box; overflow: hidden !important;">';
+          var marginStylePartial = hasTag('partial_payment') ? 'margin: 12px 0 0 0 !important;' : 'margin: 0 !important;';
+          html += '<label class="pm-row pm-partial" style="display: flex; flex-direction: column; background: #eff6ff; border-radius: 12px; border: 1.5px solid #2563eb; cursor: pointer; position: relative; overflow: visible; padding: 0 !important; ' + marginStylePartial + ' box-sizing: border-box;">';
           var isPartialChecked = (defaultMethod === 'partial_cod') ? 'checked' : '';
           html += '<input type="radio" name="payment_method" value="partial_cod" ' + isPartialChecked + ' style="position:absolute; opacity:0; pointer-events:none; margin:0; padding:0;">';
+          html += renderTag('partial_payment', '#2563eb');
           html += '<div style="display: flex; align-items: flex-start; gap: 12px; padding: 16px 12px 12px 12px; box-sizing: border-box; width: 100%; margin: 0;">';
           html += '<div style="display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px; color: #2563eb; background-color: #dbeafe;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg></div>';
           html += '<div style="flex: 1; min-width: 0; padding-top: 2px;">';
@@ -4653,7 +4676,7 @@ function darkenColor(hex, percent) {
           var isPartialChecked = (defaultMethod === 'partial_cod') ? 'checked' : '';
           html += '<input type="radio" name="payment_method_visual" class="pm-pill" ' + isPartialChecked + ' style="width: 18px; height: 18px; accent-color: #2563eb; margin: 0; pointer-events: none;">';
           html += '</div></div>';
-          html += '<div style="background: #dbeafe; padding: 10px 12px; font-size: 10px; color: #1e40af; display: flex; justify-content: center; align-items: center; font-weight: 500; width: 100%; box-sizing: border-box; margin: 0;">Secure your order • Avoid fake cancellations </div>';
+          html += '<div style="background: #dbeafe; padding: 10px 12px; font-size: 10px; color: #1e40af; display: flex; justify-content: center; align-items: center; font-weight: 500; width: 100%; box-sizing: border-box; margin: 0; border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;">Secure your order • Avoid fake cancellations </div>';
           html += '</label>';
       }
 
@@ -4668,9 +4691,11 @@ function darkenColor(hex, percent) {
               }
           }
           
-          html += '<label class="pm-row pm-cod" style="display: flex; flex-direction: column; background: #fff7ed; border-radius: 12px; border: 1.5px solid #ea580c; cursor: pointer; position: relative; padding: 0 !important; margin: 0 !important; box-sizing: border-box; overflow: hidden !important;">';
+          var marginStyleCod = hasTag('pure_cod') ? 'margin: 12px 0 0 0 !important;' : 'margin: 0 !important;';
+          html += '<label class="pm-row pm-cod" style="display: flex; flex-direction: column; background: #fff7ed; border-radius: 12px; border: 1.5px solid #ea580c; cursor: pointer; position: relative; overflow: visible; padding: 0 !important; ' + marginStyleCod + ' box-sizing: border-box;">';
           var isCodChecked = (defaultMethod === 'full_cod') ? 'checked' : '';
           html += '<input type="radio" name="payment_method" value="full_cod" ' + isCodChecked + ' style="position:absolute; opacity:0; pointer-events:none; margin:0; padding:0;">';
+          html += renderTag('pure_cod', '#ea580c');
           html += '<div style="display: flex; align-items: flex-start; gap: 12px; padding: 16px 12px 12px 12px; box-sizing: border-box; width: 100%; margin: 0;">';
           html += '<div style="display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px; color: #ea580c; background-color: #ffedd5;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="1" ry="1" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg></div>';
           html += '<div style="flex: 1; min-width: 0; padding-top: 2px;">';
@@ -4688,7 +4713,7 @@ function darkenColor(hex, percent) {
           var isCodChecked = (defaultMethod === 'full_cod') ? 'checked' : '';
           html += '<input type="radio" name="payment_method_visual" class="pm-pill" ' + isCodChecked + ' style="width: 18px; height: 18px; accent-color: #ea580c; margin: 0; pointer-events: none;">';
           html += '</div></div>';
-          html += '<div style="background: #ffedd5; padding: 10px 12px; font-size: 10px; color: #9a3412; display: flex; justify-content: center; align-items: center; font-weight: 500; width: 100%; box-sizing: border-box; margin: 0;"><span style="margin-right: 4px;">ℹ️</span> Higher return risk • Slightly slower processing</div>';
+          html += '<div style="background: #ffedd5; padding: 10px 12px; font-size: 10px; color: #9a3412; display: flex; justify-content: center; align-items: center; font-weight: 500; width: 100%; box-sizing: border-box; margin: 0; border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;"><span style="margin-right: 4px;">ℹ️</span> Higher return risk • Slightly slower processing</div>';
           html += '</label>';
       }
 

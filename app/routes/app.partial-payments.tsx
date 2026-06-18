@@ -94,15 +94,27 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         partial_payment: { allowed_product_ids: [], allowed_collection_ids: [], restricted_product_ids: [], restricted_collection_ids: [] },
         full_prepaid: { allowed_product_ids: [], allowed_collection_ids: [], restricted_product_ids: [], restricted_collection_ids: [] },
         pure_cod: { allowed_product_ids: [], allowed_collection_ids: [], restricted_product_ids: [], restricted_collection_ids: [] }
+      },
+      payment_method_tags: {
+        partial_payment: { enabled: false, text: 'PARTIAL PAYMENT' },
+        full_prepaid: { enabled: true, text: '★ MOST POPULAR' },
+        pure_cod: { enabled: false, text: 'CASH ON DELIVERY' }
       }
     };
   } else {
-    // Ensure the new JSONB field is initialized for existing merchants
+    // Ensure the new JSONB fields are initialized for existing merchants
     if (!settings.payment_method_restrictions) {
       settings.payment_method_restrictions = {
         partial_payment: { allowed_product_ids: [], allowed_collection_ids: [], restricted_product_ids: [], restricted_collection_ids: [] },
         full_prepaid: { allowed_product_ids: [], allowed_collection_ids: [], restricted_product_ids: [], restricted_collection_ids: [] },
         pure_cod: { allowed_product_ids: [], allowed_collection_ids: [], restricted_product_ids: [], restricted_collection_ids: [] }
+      };
+    }
+    if (!settings.payment_method_tags) {
+      settings.payment_method_tags = {
+        partial_payment: { enabled: false, text: 'PARTIAL PAYMENT' },
+        full_prepaid: { enabled: true, text: '★ MOST POPULAR' },
+        pure_cod: { enabled: false, text: 'CASH ON DELIVERY' }
       };
     }
   }
@@ -1102,6 +1114,44 @@ const RestrictionsEditor = ({
   );
 };
 
+const TagEditor = ({
+  method,
+  settings,
+  updTag,
+}: {
+  method: 'partial_payment' | 'full_prepaid' | 'pure_cod';
+  settings: any;
+  updTag: (m: any, patch: any) => void;
+}) => {
+  const methodTitle = method === 'full_prepaid' ? 'Full Prepaid' : method === 'pure_cod' ? 'Cash on Delivery' : 'Partial Payment';
+  const tagSettings = settings.payment_method_tags?.[method] || { enabled: false, text: '' };
+
+  return (
+    <Box paddingBlockStart="400">
+      <BlockStack gap="400">
+        <ToggleRow
+          label={`Show Custom Tag`}
+          sub={`Displays a small badge above the ${methodTitle} option.`}
+          checked={tagSettings.enabled}
+          onChange={(v) => updTag(method, { enabled: v })}
+        />
+        {tagSettings.enabled && (
+          <div style={{ marginLeft: '12px' }}>
+            <TextField
+              label="Tag Text"
+              value={tagSettings.text}
+              onChange={(v) => updTag(method, { text: v })}
+              autoComplete="off"
+              placeholder="e.g. ★ MOST POPULAR"
+              helpText="Keep it short (e.g. ★ MOST POPULAR or ⚡ FASTEST)"
+            />
+          </div>
+        )}
+      </BlockStack>
+    </Box>
+  );
+};
+
 export default function PartialPaymentsPage() {
   const { settings: initialSettings, shopDomain, shopCurrency } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
@@ -1178,6 +1228,22 @@ export default function PartialPaymentsPage() {
             [field]: value,
           },
         },
+      };
+    });
+  }, []);
+
+  const updTag = useCallback((
+    method: 'partial_payment' | 'full_prepaid' | 'pure_cod',
+    patch: Partial<{ enabled: boolean; text: string }>
+  ) => {
+    setSettings((p) => {
+      const currentTag = p.payment_method_tags?.[method] || { enabled: false, text: '' };
+      return {
+        ...p,
+        payment_method_tags: {
+          ...p.payment_method_tags,
+          [method]: { ...currentTag, ...patch }
+        }
       };
     });
   }, []);
@@ -1676,13 +1742,25 @@ export default function PartialPaymentsPage() {
               <Divider />
               {firstOpt && (
                 <BlockStack gap="200">
+                  <TagEditor method="partial_payment" settings={settings} updTag={updTag} />
+                  <Divider />
                   <Text as="h3" variant="headingSm">Storefront Preview</Text>
                   <Text as="p" variant="bodySm" tone="subdued">Preview uses {fmt(previewOrderTotal)} as example cart total</Text>
                   <div style={{
                       display: 'flex', flexDirection: 'column', background: '#eff6ff', borderRadius: '12px',
-                      border: '2px solid #2563eb', position: 'relative', overflow: 'hidden',
-                      maxWidth: '400px', marginTop: '8px'
+                      border: '2px solid #2563eb', position: 'relative', overflow: 'visible',
+                      maxWidth: '400px', marginTop: '16px'
                   }}>
+                      {settings.payment_method_tags?.partial_payment?.enabled && (
+                        <div style={{
+                            position: 'absolute', top: '-10px', left: '16px', background: '#2563eb', color: 'white',
+                            fontSize: '9px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', letterSpacing: '0.05em',
+                            display: 'flex', alignItems: 'center', gap: '4px', textTransform: 'uppercase'
+                        }}>
+                            {settings.payment_method_tags?.partial_payment?.text}
+                        </div>
+                      )}
+
                       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '16px 12px 12px 12px', boxSizing: 'border-box', width: '100%', margin: 0 }}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '32px', height: '32px', borderRadius: '8px', color: '#2563eb', backgroundColor: '#dbeafe' }}>
                               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>
@@ -1709,7 +1787,7 @@ export default function PartialPaymentsPage() {
                               <input type="radio" checked readOnly style={{ width: '18px', height: '18px', accentColor: '#2563eb', margin: 0, pointerEvents: 'none' }} />
                           </div>
                       </div>
-                      <div style={{ background: '#dbeafe', padding: '10px 12px', fontSize: '10px', color: '#1e40af', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500, width: '100%', boxSizing: 'border-box', margin: 0 }}>
+                      <div style={{ background: '#dbeafe', padding: '10px 12px', fontSize: '10px', color: '#1e40af', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500, width: '100%', boxSizing: 'border-box', margin: 0, borderBottomLeftRadius: '10px', borderBottomRightRadius: '10px' }}>
                           Secure your order • Avoid fake cancellations
                       </div>
                   </div>
@@ -1807,8 +1885,6 @@ export default function PartialPaymentsPage() {
                 collectionTitles={collectionTitles}
               />
 
-              <Divider />
-
               {/* Country Restrictions */}
               {renderCountryRestrictions('partial_payment', 'partial payments')}
             </BlockStack>
@@ -1881,50 +1957,61 @@ export default function PartialPaymentsPage() {
                       />
                     </InlineGrid>
 
-                    <Divider />
-                    <BlockStack gap="200">
-                      <Text as="h3" variant="headingSm">Storefront Preview</Text>
-                      <Text as="p" variant="bodySm" tone="subdued">Preview uses 500 as example cart total</Text>
-                      <div style={{
-                          display: 'flex', flexDirection: 'column', background: '#f0fdf4', borderRadius: '12px',
-                          border: '2px solid #22c55e', position: 'relative', overflow: 'visible',
-                          padding: '16px 12px 12px 12px', maxWidth: '400px'
-                      }}>
-                          <div style={{
-                              position: 'absolute', top: '-10px', left: '16px', background: '#22c55e', color: 'white',
-                              fontSize: '9px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', letterSpacing: '0.05em',
-                              display: 'flex', alignItems: 'center', gap: '4px', textTransform: 'uppercase'
-                          }}>
-                              ★ MOST POPULAR
-                          </div>
-
-                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', width: '100%', boxSizing: 'border-box' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '32px', height: '32px', borderRadius: '8px', color: '#16a34a', backgroundColor: '#dcfce7' }}>
-                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4" /><path d="M4 6v12c0 1.1.9 2 2 2h14v-4" /><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z" /></svg>
-                              </div>
-
-                              <div style={{ flex: 1, minWidth: 0, paddingTop: '2px' }}>
-                                  <div style={{ fontWeight: 700, fontSize: '14px', color: '#166534', lineHeight: 1.2 }}>Full Prepaid</div>
-                                  <div style={{ color: '#16a34a', fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>Pay now &amp; get fastest delivery</div>
-                              </div>
-
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
-                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                                      <div style={{ background: '#dcfce7', color: '#166534', fontSize: '11px', fontWeight: 700, padding: '3px 8px', borderRadius: '99px', lineHeight: 1 }}>
-                                          Save {settings.prepaid_discount_type === 'percentage' ? fmt(500 * (settings.prepaid_discount_value / 100)) : fmt(settings.prepaid_discount_value)}
-                                      </div>
-                                      <span style={{ fontWeight: 800, fontSize: '15px', color: '#166534' }}>
-                                          {settings.prepaid_discount_type === 'percentage' ? fmt(500 - (500 * (settings.prepaid_discount_value / 100))) : fmt(500 - settings.prepaid_discount_value)}
-                                      </span>
-                                  </div>
-                                  <input type="radio" checked readOnly style={{ width: '18px', height: '18px', accentColor: '#22c55e', margin: 0, pointerEvents: 'none' }} />
-                              </div>
-                          </div>
-                      </div>
-                    </BlockStack>
                   </BlockStack>
                 </div>
               )}
+
+              <Divider />
+              <BlockStack gap="200">
+                <TagEditor method="full_prepaid" settings={settings} updTag={updTag} />
+                <Divider />
+                <Text as="h3" variant="headingSm">Storefront Preview</Text>
+                <Text as="p" variant="bodySm" tone="subdued">Preview uses 500 as example cart total</Text>
+                <div style={{
+                    display: 'flex', flexDirection: 'column', background: '#f0fdf4', borderRadius: '12px',
+                    border: '2px solid #22c55e', position: 'relative', overflow: 'visible',
+                    padding: '16px 12px 12px 12px', maxWidth: '400px', marginTop: '16px'
+                }}>
+                    {(settings.payment_method_tags?.full_prepaid?.enabled || (!settings.payment_method_tags?.full_prepaid && true)) && (
+                      <div style={{
+                          position: 'absolute', top: '-10px', left: '16px', background: '#22c55e', color: 'white',
+                          fontSize: '9px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', letterSpacing: '0.05em',
+                          display: 'flex', alignItems: 'center', gap: '4px', textTransform: 'uppercase'
+                      }}>
+                          {settings.payment_method_tags?.full_prepaid?.text || '★ MOST POPULAR'}
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', width: '100%', boxSizing: 'border-box' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '32px', height: '32px', borderRadius: '8px', color: '#16a34a', backgroundColor: '#dcfce7' }}>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4" /><path d="M4 6v12c0 1.1.9 2 2 2h14v-4" /><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z" /></svg>
+                        </div>
+
+                        <div style={{ flex: 1, minWidth: 0, paddingTop: '2px' }}>
+                            <div style={{ fontWeight: 700, fontSize: '14px', color: '#166534', lineHeight: 1.2 }}>Full Prepaid</div>
+                            <div style={{ color: '#16a34a', fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>Pay now &amp; get fastest delivery</div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                                {settings.prepaid_discount_enabled && settings.prepaid_discount_value > 0 && (
+                                  <div style={{ background: '#dcfce7', color: '#166534', fontSize: '11px', fontWeight: 700, padding: '3px 8px', borderRadius: '99px', lineHeight: 1 }}>
+                                      Save {settings.prepaid_discount_type === 'percentage' ? fmt(500 * (settings.prepaid_discount_value / 100)) : fmt(settings.prepaid_discount_value)}
+                                  </div>
+                                )}
+                                <span style={{ fontWeight: 800, fontSize: '15px', color: '#166534' }}>
+                                    {settings.prepaid_discount_enabled && settings.prepaid_discount_value > 0 ? (
+                                      settings.prepaid_discount_type === 'percentage' ? fmt(500 - (500 * (settings.prepaid_discount_value / 100))) : fmt(500 - settings.prepaid_discount_value)
+                                    ) : (
+                                      fmt(500)
+                                    )}
+                                </span>
+                            </div>
+                            <input type="radio" checked readOnly style={{ width: '18px', height: '18px', accentColor: '#22c55e', margin: 0, pointerEvents: 'none' }} />
+                        </div>
+                    </div>
+                </div>
+              </BlockStack>
             </BlockStack>
           </Card>
 
@@ -1976,7 +2063,6 @@ export default function PartialPaymentsPage() {
                 collectionTitles={collectionTitles}
               />
               
-              <Divider />
               {renderCountryRestrictions('full_prepaid', 'full prepaid')}
             </BlockStack>
           </Card>
@@ -2069,48 +2155,64 @@ export default function PartialPaymentsPage() {
                       </span>
                     </div>
                   </div>
-                </div>
-
-                <Divider />
-                <BlockStack gap="200">
-                  <Text as="h3" variant="headingSm">Storefront Preview</Text>
-                  <Text as="p" variant="bodySm" tone="subdued">Preview uses 500 as example cart total</Text>
-                  <div style={{
-                      display: 'flex', flexDirection: 'column', background: '#fff7ed', borderRadius: '12px',
-                      border: '2px solid #ea580c', position: 'relative', overflow: 'hidden',
-                      maxWidth: '400px', marginTop: '8px'
-                  }}>
-                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '16px 12px 12px 12px', boxSizing: 'border-box', width: '100%', margin: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '32px', height: '32px', borderRadius: '8px', color: '#ea580c', backgroundColor: '#ffedd5' }}>
-                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1" ry="1" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
-                          </div>
-
-                          <div style={{ flex: 1, minWidth: 0, paddingTop: '2px' }}>
-                              <div style={{ fontWeight: 700, fontSize: '14px', color: '#9a3412', lineHeight: 1.2 }}>Cash on Delivery</div>
-                              <div style={{ color: '#ea580c', fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>Pay when you receive</div>
-                          </div>
-
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
-                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                                  {settings.pure_cod_fee_amount > 0 && (
-                                    <div style={{ background: '#ffedd5', color: '#9a3412', fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '99px', lineHeight: 1, whiteSpace: 'nowrap' }}>
-                                        {settings.pure_cod_fee_type === 'percentage' ? fmt(500 * (settings.pure_cod_fee_amount / 100)) : fmt(settings.pure_cod_fee_amount)} {settings.pure_cod_fee_name || 'COD Fee'}
-                                    </div>
-                                  )}
-                                  <span style={{ fontWeight: 800, fontSize: '15px', color: '#9a3412' }}>
-                                      {settings.pure_cod_fee_type === 'percentage' ? fmt(500 + (500 * (settings.pure_cod_fee_amount / 100))) : fmt(500 + settings.pure_cod_fee_amount)}
-                                  </span>
-                              </div>
-                              <input type="radio" checked readOnly style={{ width: '18px', height: '18px', accentColor: '#ea580c', margin: 0, pointerEvents: 'none' }} />
-                          </div>
-                      </div>
-                      <div style={{ background: '#ffedd5', padding: '10px 12px', fontSize: '10px', color: '#9a3412', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500, width: '100%', boxSizing: 'border-box', margin: 0 }}>
-                          <span style={{ marginRight: '4px' }}>ℹ️</span> Higher return risk • Slightly slower processing
-                      </div>
                   </div>
-                </BlockStack>
-              </div>
-            )}
+                </div>
+              )}
+
+              <Divider />
+              <BlockStack gap="200">
+                <TagEditor method="pure_cod" settings={settings} updTag={updTag} />
+                <Divider />
+                <Text as="h3" variant="headingSm">Storefront Preview</Text>
+                <Text as="p" variant="bodySm" tone="subdued">Preview uses 500 as example cart total</Text>
+                <div style={{
+                    display: 'flex', flexDirection: 'column', background: '#fff7ed', borderRadius: '12px',
+                    border: '2px solid #ea580c', position: 'relative', overflow: 'visible',
+                    maxWidth: '400px', marginTop: '16px'
+                }}>
+                    {settings.payment_method_tags?.pure_cod?.enabled && (
+                      <div style={{
+                          position: 'absolute', top: '-10px', left: '16px', background: '#ea580c', color: 'white',
+                          fontSize: '9px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', letterSpacing: '0.05em',
+                          display: 'flex', alignItems: 'center', gap: '4px', textTransform: 'uppercase'
+                      }}>
+                          {settings.payment_method_tags?.pure_cod?.text}
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '16px 12px 12px 12px', boxSizing: 'border-box', width: '100%', margin: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '32px', height: '32px', borderRadius: '8px', color: '#ea580c', backgroundColor: '#ffedd5' }}>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1" ry="1" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
+                        </div>
+
+                        <div style={{ flex: 1, minWidth: 0, paddingTop: '2px' }}>
+                            <div style={{ fontWeight: 700, fontSize: '14px', color: '#9a3412', lineHeight: 1.2 }}>Cash on Delivery</div>
+                            <div style={{ color: '#ea580c', fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>Pay when you receive</div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+                                {settings.pure_cod_fee_enabled && settings.pure_cod_fee_amount > 0 && (
+                                  <div style={{ background: '#ffedd5', color: '#9a3412', fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '99px', lineHeight: 1, whiteSpace: 'nowrap' }}>
+                                      {settings.pure_cod_fee_type === 'percentage' ? fmt(500 * (settings.pure_cod_fee_amount / 100)) : fmt(settings.pure_cod_fee_amount)} {settings.pure_cod_fee_name || 'COD Fee'}
+                                  </div>
+                                )}
+                                <span style={{ fontWeight: 800, fontSize: '15px', color: '#9a3412' }}>
+                                    {settings.pure_cod_fee_enabled && settings.pure_cod_fee_amount > 0 ? (
+                                      settings.pure_cod_fee_type === 'percentage' ? fmt(500 + (500 * (settings.pure_cod_fee_amount / 100))) : fmt(500 + settings.pure_cod_fee_amount)
+                                    ) : (
+                                      fmt(500)
+                                    )}
+                                </span>
+                            </div>
+                            <input type="radio" checked readOnly style={{ width: '18px', height: '18px', accentColor: '#ea580c', margin: 0, pointerEvents: 'none' }} />
+                        </div>
+                    </div>
+                    <div style={{ background: '#ffedd5', padding: '10px 12px', fontSize: '10px', color: '#9a3412', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500, width: '100%', boxSizing: 'border-box', margin: 0, borderBottomLeftRadius: '10px', borderBottomRightRadius: '10px' }}>
+                        <span style={{ marginRight: '4px' }}>ℹ️</span> Higher return risk • Slightly slower processing
+                    </div>
+                </div>
+              </BlockStack>
           </div>
 
           <Card>
@@ -2154,7 +2256,6 @@ export default function PartialPaymentsPage() {
                 collectionTitles={collectionTitles}
               />
 
-              <Divider />
               {renderCountryRestrictions('full_cod', 'Cash on Delivery')}
             </BlockStack>
           </Card>

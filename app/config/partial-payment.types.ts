@@ -103,8 +103,20 @@ export interface PartialPaymentSettings {
   pure_cod_allowed_collection_ids: string[];
   country_restrictions?: CountryRestrictionsConfig;
   payment_method_restrictions?: PaymentMethodRestrictions;
+  payment_method_tags?: PaymentMethodTags;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface TagConfig {
+  enabled: boolean;
+  text: string;
+}
+
+export interface PaymentMethodTags {
+  partial_payment?: TagConfig;
+  full_prepaid?: TagConfig;
+  pure_cod?: TagConfig;
 }
 
 // ── Defaults ───────────────────────────────────────────────────────────────

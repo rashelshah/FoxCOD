@@ -160,6 +160,7 @@ export async function syncPartialPaymentToMetafield(
         pure_cod_allowed_collection_ids: settings.pure_cod_allowed_collection_ids ?? [],
         country_restrictions: settings.country_restrictions,
         payment_method_restrictions: settings.payment_method_restrictions,
+        payment_method_tags: settings.payment_method_tags,
       }
     : { 
         enabled: true, 
