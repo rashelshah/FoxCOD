@@ -90,7 +90,21 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       prepaid_discount_enabled: false,
       prepaid_discount_type: 'percentage',
       prepaid_discount_value: 0,
+      payment_method_restrictions: {
+        partial_payment: { allowed_product_ids: [], allowed_collection_ids: [], restricted_product_ids: [], restricted_collection_ids: [] },
+        full_prepaid: { allowed_product_ids: [], allowed_collection_ids: [], restricted_product_ids: [], restricted_collection_ids: [] },
+        pure_cod: { allowed_product_ids: [], allowed_collection_ids: [], restricted_product_ids: [], restricted_collection_ids: [] }
+      }
     };
+  } else {
+    // Ensure the new JSONB field is initialized for existing merchants
+    if (!settings.payment_method_restrictions) {
+      settings.payment_method_restrictions = {
+        partial_payment: { allowed_product_ids: [], allowed_collection_ids: [], restricted_product_ids: [], restricted_collection_ids: [] },
+        full_prepaid: { allowed_product_ids: [], allowed_collection_ids: [], restricted_product_ids: [], restricted_collection_ids: [] },
+        pure_cod: { allowed_product_ids: [], allowed_collection_ids: [], restricted_product_ids: [], restricted_collection_ids: [] }
+      };
+    }
   }
 
   // Shop currency
@@ -967,6 +981,127 @@ function ToggleRow({ label, sub, checked, onChange }: ToggleRowProps) {
 
 // ── Main Component ─────────────────────────────────────────────────────────
 
+const RestrictionsEditor = ({
+  method,
+  settings,
+  pickItemsForMethod,
+  updRestrictions,
+  productTitles,
+  collectionTitles,
+}: {
+  method: 'partial_payment' | 'full_prepaid' | 'pure_cod';
+  settings: any;
+  pickItemsForMethod: (m: any, type: any, field: any) => void;
+  updRestrictions: (m: any, field: any, val: any) => void;
+  productTitles: Record<string, string>;
+  collectionTitles: Record<string, string>;
+}) => {
+  const methodTitle = method === 'full_prepaid' ? 'Full Prepaid' : method === 'pure_cod' ? 'Cash on Delivery' : 'Partial Payment';
+  const res = settings.payment_method_restrictions?.[method] || {
+    allowed_product_ids: [], allowed_collection_ids: [], restricted_product_ids: [], restricted_collection_ids: []
+  };
+
+  // Legacy fallback if JSONB is empty (for UI display only)
+  let allowedProducts = res.allowed_product_ids;
+  let allowedCollections = res.allowed_collection_ids;
+  if (allowedProducts.length === 0 && allowedCollections.length === 0) {
+    if (method === 'full_prepaid') {
+      allowedProducts = settings.full_prepaid_allowed_product_ids;
+      allowedCollections = settings.full_prepaid_allowed_collection_ids;
+    } else if (method === 'pure_cod') {
+      allowedProducts = settings.pure_cod_allowed_product_ids;
+      allowedCollections = settings.pure_cod_allowed_collection_ids;
+    } else {
+      allowedProducts = settings.allowed_product_ids;
+      allowedCollections = settings.allowed_collection_ids;
+    }
+    // Note: Saving new values will save to JSONB, but if legacy columns are used, they will show here.
+  }
+
+  const renderPickerRow = (
+    title: string,
+    descEmpty: string,
+    descPopulated: string,
+    type: 'product' | 'collection',
+    field: 'allowed_product_ids' | 'allowed_collection_ids' | 'restricted_product_ids' | 'restricted_collection_ids',
+    currentIds: string[],
+    titlesMap: Record<string, string>
+  ) => {
+    const isProduct = type === 'product';
+    return (
+      <BlockStack gap="400">
+        <InlineStack align="space-between" blockAlign="center">
+          <BlockStack gap="100">
+            <Text as="h3" variant="headingSm">{title}</Text>
+            <Text as="p" variant="bodySm" tone="subdued">
+              {currentIds.length === 0 ? descEmpty : descPopulated.replace('{n}', String(currentIds.length))}
+            </Text>
+          </BlockStack>
+          <Button variant="secondary" onClick={() => pickItemsForMethod(method, type, field)}>
+            {currentIds.length === 0 ? `Add ${isProduct ? 'Products' : 'Collections'}` : `Edit ${isProduct ? 'Products' : 'Collections'} (${currentIds.length})`}
+          </Button>
+        </InlineStack>
+        {currentIds.length > 0 && (
+          <InlineStack gap="200">
+            {currentIds.map((id) => (
+              <Tag
+                key={id}
+                onRemove={() => updRestrictions(method, field, currentIds.filter((x) => x !== id))}
+              >
+                {titlesMap[id] || `${isProduct ? 'Product' : 'Collection'} …${id.slice(-6)}`}
+              </Tag>
+            ))}
+          </InlineStack>
+        )}
+      </BlockStack>
+    );
+  };
+
+  return (
+    <BlockStack gap="400">
+      {renderPickerRow(
+        'Allowed Products',
+        `${methodTitle} shows on all products (unless restricted).`,
+        `Only shows for {n} selected product(s).`,
+        'product',
+        'allowed_product_ids',
+        allowedProducts,
+        productTitles
+      )}
+      <Divider />
+      {renderPickerRow(
+        'Allowed Collections',
+        `${methodTitle} shows for all collections (unless restricted).`,
+        `Only shows for products in {n} selected collection(s).`,
+        'collection',
+        'allowed_collection_ids',
+        allowedCollections,
+        collectionTitles
+      )}
+      <Divider />
+      {renderPickerRow(
+        'Restricted Products',
+        `No specific products restricted.`,
+        `${methodTitle} is hidden for {n} selected product(s).`,
+        'product',
+        'restricted_product_ids',
+        res.restricted_product_ids,
+        productTitles
+      )}
+      <Divider />
+      {renderPickerRow(
+        'Restricted Collections',
+        `No specific collections restricted.`,
+        `${methodTitle} is hidden for products in {n} selected collection(s).`,
+        'collection',
+        'restricted_collection_ids',
+        res.restricted_collection_ids,
+        collectionTitles
+      )}
+    </BlockStack>
+  );
+};
+
 export default function PartialPaymentsPage() {
   const { settings: initialSettings, shopDomain, shopCurrency } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
@@ -1022,6 +1157,31 @@ export default function PartialPaymentsPage() {
     setSettings((p) => ({ ...p, module_flags: { ...p.module_flags, [k]: v } }));
   }, []);
 
+  const updRestrictions = useCallback((
+    method: 'partial_payment' | 'full_prepaid' | 'pure_cod',
+    field: 'allowed_product_ids' | 'allowed_collection_ids' | 'restricted_product_ids' | 'restricted_collection_ids',
+    value: string[]
+  ) => {
+    setSettings((p) => {
+      const currentRes = p.payment_method_restrictions?.[method] || {
+        allowed_product_ids: [],
+        allowed_collection_ids: [],
+        restricted_product_ids: [],
+        restricted_collection_ids: [],
+      };
+      return {
+        ...p,
+        payment_method_restrictions: {
+          ...p.payment_method_restrictions,
+          [method]: {
+            ...currentRes,
+            [field]: value,
+          },
+        },
+      };
+    });
+  }, []);
+
   // ── Save / Discard ────────────────────────────────────────────────────────
   const handleSave = useCallback(() => {
     const fd = new FormData();
@@ -1055,46 +1215,38 @@ export default function PartialPaymentsPage() {
     upd('payment_options', settings.payment_options.filter((o) => o.id !== id));
   };
 
-  // ── Product / Collection pickers ─────────────────────────────────────────
-  const pickProducts = async () => {
+  // ── Generic Product / Collection pickers ───────────────────────────────
+  const pickItemsForMethod = async (
+    method: 'partial_payment' | 'full_prepaid' | 'pure_cod',
+    type: 'product' | 'collection',
+    field: 'allowed_product_ids' | 'allowed_collection_ids' | 'restricted_product_ids' | 'restricted_collection_ids'
+  ) => {
     try {
+      const currentRes = settings.payment_method_restrictions?.[method] || {
+        allowed_product_ids: [], allowed_collection_ids: [], restricted_product_ids: [], restricted_collection_ids: []
+      };
+      const currentIds = currentRes[field] || [];
+      
       const sel = await shopify.resourcePicker({
-        type: 'product',
+        type: type,
         multiple: true,
-        selectionIds: settings.allowed_product_ids.map((id) => ({
-          id: id.includes('gid://') ? id : `gid://shopify/Product/${id}`,
+        selectionIds: currentIds.map((id) => ({
+          id: id.includes('gid://') ? id : `gid://shopify/${type === 'product' ? 'Product' : 'Collection'}/${id}`,
         })),
       });
       if (sel) {
-        const ids = sel.map((p: any) => p.id.replace('gid://shopify/Product/', ''));
+        const ids = sel.map((item: any) => item.id.replace(`gid://shopify/${type === 'product' ? 'Product' : 'Collection'}/`, ''));
         const titles: Record<string, string> = {};
-        sel.forEach((p: any) => {
-          titles[p.id.replace('gid://shopify/Product/', '')] = p.title;
+        sel.forEach((item: any) => {
+          titles[item.id.replace(`gid://shopify/${type === 'product' ? 'Product' : 'Collection'}/`, '')] = item.title;
         });
-        upd('allowed_product_ids', ids);
+        updRestrictions(method, field, ids);
         // Store titles for display
-        setProductTitles((prev) => ({ ...prev, ...titles }));
-      }
-    } catch (_e) {}
-  };
-
-  const pickCollections = async () => {
-    try {
-      const sel = await shopify.resourcePicker({
-        type: 'collection',
-        multiple: true,
-        selectionIds: settings.allowed_collection_ids.map((id) => ({
-          id: id.includes('gid://') ? id : `gid://shopify/Collection/${id}`,
-        })),
-      });
-      if (sel) {
-        const ids = sel.map((c: any) => c.id.replace('gid://shopify/Collection/', ''));
-        const titles: Record<string, string> = {};
-        sel.forEach((c: any) => {
-          titles[c.id.replace('gid://shopify/Collection/', '')] = c.title;
-        });
-        upd('allowed_collection_ids', ids);
-        setCollectionTitles((prev) => ({ ...prev, ...titles }));
+        if (type === 'product') {
+          setProductTitles((prev) => ({ ...prev, ...titles }));
+        } else {
+          setCollectionTitles((prev) => ({ ...prev, ...titles }));
+        }
       }
     } catch (_e) {}
   };
@@ -1645,65 +1797,15 @@ export default function PartialPaymentsPage() {
 
               <Divider />
 
-              {/* Products */}
-              <InlineStack align="space-between" blockAlign="center">
-                <BlockStack gap="100">
-                  <Text as="h3" variant="headingSm">Specific Products</Text>
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    {settings.allowed_product_ids.length === 0
-                      ? 'Partial payment shows on all products.'
-                      : `Only shows for ${settings.allowed_product_ids.length} selected product(s).`}
-                  </Text>
-                </BlockStack>
-                <Button variant="secondary" onClick={pickProducts}>
-                  {settings.allowed_product_ids.length === 0 ? 'Add Products' : `Edit Products (${settings.allowed_product_ids.length})`}
-                </Button>
-              </InlineStack>
-              {settings.allowed_product_ids.length > 0 && (
-                <div style={{ marginTop: '12px' }}>
-                  <InlineStack gap="200">
-                    {settings.allowed_product_ids.map((id) => (
-                      <Tag
-                        key={id}
-                        onRemove={() => upd('allowed_product_ids', settings.allowed_product_ids.filter((x) => x !== id))}
-                      >
-                        {productTitles[id] || `Product …${id.slice(-6)}`}
-                      </Tag>
-                    ))}
-                  </InlineStack>
-                </div>
-              )}
-
-              <Divider />
-
-              {/* Collections */}
-              <InlineStack align="space-between" blockAlign="center">
-                <BlockStack gap="100">
-                  <Text as="h3" variant="headingSm">Specific Collections</Text>
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    {settings.allowed_collection_ids.length === 0
-                      ? 'Partial payment shows for all collections.'
-                      : `Only shows for products in ${settings.allowed_collection_ids.length} selected collection(s).`}
-                  </Text>
-                </BlockStack>
-                <Button variant="secondary" onClick={pickCollections}>
-                  {settings.allowed_collection_ids.length === 0 ? 'Add Collections' : `Edit Collections (${settings.allowed_collection_ids.length})`}
-                </Button>
-              </InlineStack>
-              {settings.allowed_collection_ids.length > 0 && (
-                <div style={{ marginTop: '12px' }}>
-                  <InlineStack gap="200">
-                    {settings.allowed_collection_ids.map((id) => (
-                      <Tag
-                        key={id}
-                        onRemove={() => upd('allowed_collection_ids', settings.allowed_collection_ids.filter((x) => x !== id))}
-                      >
-                        {collectionTitles[id] || `Collection …${id.slice(-6)}`}
-                      </Tag>
-                    ))}
-                  </InlineStack>
-                </div>
-              )}
+              {/* Item Restrictions */}
+              <RestrictionsEditor
+                method="partial_payment"
+                settings={settings}
+                pickItemsForMethod={pickItemsForMethod}
+                updRestrictions={updRestrictions}
+                productTitles={productTitles}
+                collectionTitles={collectionTitles}
+              />
 
               <Divider />
 
@@ -1864,101 +1966,15 @@ export default function PartialPaymentsPage() {
 
               <Divider />
 
-              <InlineStack align="space-between" blockAlign="center">
-                <BlockStack gap="100">
-                  <Text as="h3" variant="headingSm">Specific Products</Text>
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    {settings.full_prepaid_allowed_product_ids.length === 0
-                      ? 'Full prepaid shows on all products.'
-                      : `Only shows for ${settings.full_prepaid_allowed_product_ids.length} selected product(s).`}
-                  </Text>
-                </BlockStack>
-                <Button variant="secondary" onClick={async () => {
-                  try {
-                    const sel = await shopify.resourcePicker({
-                      type: 'product',
-                      multiple: true,
-                      selectionIds: settings.full_prepaid_allowed_product_ids.map((id) => ({
-                        id: id.includes('gid://') ? id : `gid://shopify/Product/${id}`,
-                      })),
-                    });
-                    if (sel) {
-                      const ids = sel.map((p: any) => p.id.replace('gid://shopify/Product/', ''));
-                      const titles: Record<string, string> = {};
-                      sel.forEach((p: any) => {
-                        titles[p.id.replace('gid://shopify/Product/', '')] = p.title;
-                      });
-                      upd('full_prepaid_allowed_product_ids', ids);
-                      setProductTitles((prev) => ({ ...prev, ...titles }));
-                    }
-                  } catch (_e) {}
-                }}>
-                  {settings.full_prepaid_allowed_product_ids.length === 0 ? 'Add Products' : `Edit Products (${settings.full_prepaid_allowed_product_ids.length})`}
-                </Button>
-              </InlineStack>
-              {settings.full_prepaid_allowed_product_ids.length > 0 && (
-                <div style={{ marginTop: '12px' }}>
-                  <InlineStack gap="200">
-                    {settings.full_prepaid_allowed_product_ids.map((id) => (
-                      <Tag
-                        key={id}
-                        onRemove={() => upd('full_prepaid_allowed_product_ids', settings.full_prepaid_allowed_product_ids.filter((x) => x !== id))}
-                      >
-                        {productTitles[id] || `Product …${id.slice(-6)}`}
-                      </Tag>
-                    ))}
-                  </InlineStack>
-                </div>
-              )}
-
-              <Divider />
-
-              <InlineStack align="space-between" blockAlign="center">
-                <BlockStack gap="100">
-                  <Text as="h3" variant="headingSm">Specific Collections</Text>
-                  <Text as="p" variant="bodySm" tone="subdued">
-                    {settings.full_prepaid_allowed_collection_ids.length === 0
-                      ? 'Full prepaid shows for all collections.'
-                      : `Only shows for products in ${settings.full_prepaid_allowed_collection_ids.length} selected collection(s).`}
-                  </Text>
-                </BlockStack>
-                <Button variant="secondary" onClick={async () => {
-                  try {
-                    const sel = await shopify.resourcePicker({
-                      type: 'collection',
-                      multiple: true,
-                      selectionIds: settings.full_prepaid_allowed_collection_ids.map((id) => ({
-                        id: id.includes('gid://') ? id : `gid://shopify/Collection/${id}`,
-                      })),
-                    });
-                    if (sel) {
-                      const ids = sel.map((c: any) => c.id.replace('gid://shopify/Collection/', ''));
-                      const titles: Record<string, string> = {};
-                      sel.forEach((c: any) => {
-                        titles[c.id.replace('gid://shopify/Collection/', '')] = c.title;
-                      });
-                      upd('full_prepaid_allowed_collection_ids', ids);
-                      setCollectionTitles((prev) => ({ ...prev, ...titles }));
-                    }
-                  } catch (_e) {}
-                }}>
-                  {settings.full_prepaid_allowed_collection_ids.length === 0 ? 'Add Collections' : `Edit Collections (${settings.full_prepaid_allowed_collection_ids.length})`}
-                </Button>
-              </InlineStack>
-              {settings.full_prepaid_allowed_collection_ids.length > 0 && (
-                <div style={{ marginTop: '12px' }}>
-                  <InlineStack gap="200">
-                    {settings.full_prepaid_allowed_collection_ids.map((id) => (
-                      <Tag
-                        key={id}
-                        onRemove={() => upd('full_prepaid_allowed_collection_ids', settings.full_prepaid_allowed_collection_ids.filter((x) => x !== id))}
-                      >
-                        {collectionTitles[id] || `Collection …${id.slice(-6)}`}
-                      </Tag>
-                    ))}
-                  </InlineStack>
-                </div>
-              )}
+              {/* Item Restrictions */}
+              <RestrictionsEditor
+                method="full_prepaid"
+                settings={settings}
+                pickItemsForMethod={pickItemsForMethod}
+                updRestrictions={updRestrictions}
+                productTitles={productTitles}
+                collectionTitles={collectionTitles}
+              />
               
               <Divider />
               {renderCountryRestrictions('full_prepaid', 'full prepaid')}
@@ -2128,77 +2144,15 @@ export default function PartialPaymentsPage() {
 
               <Divider />
               
-              <InlineStack align="space-between" blockAlign="center">
-                <BlockStack gap="100">
-                  <Text as="h3" variant="headingSm">Specific Products</Text>
-                  <Text as="p" variant="bodySm" tone="subdued">Only allow COD for selected products.</Text>
-                </BlockStack>
-                <Button variant="secondary" onClick={async () => {
-                  try {
-                    const selected = await shopify.resourcePicker({
-                      type: 'product',
-                      multiple: true,
-                      selectionIds: settings.pure_cod_allowed_product_ids.map(id => ({ id })),
-                    });
-                    if (selected) {
-                      const ids = selected.map((p) => p.id);
-                      upd('pure_cod_allowed_product_ids', ids);
-                      const titles = selected.reduce((acc, p) => ({ ...acc, [p.id]: p.title }), {});
-                      setProductTitles((prev) => ({ ...prev, ...titles }));
-                    }
-                  } catch (_e) {}
-                }}>
-                  {settings.pure_cod_allowed_product_ids.length === 0 ? 'Add Products' : `Edit Products (${settings.pure_cod_allowed_product_ids.length})`}
-                </Button>
-              </InlineStack>
-              {settings.pure_cod_allowed_product_ids.length > 0 && (
-                <div style={{ marginTop: '12px' }}>
-                  <InlineStack gap="200">
-                    {settings.pure_cod_allowed_product_ids.map((id) => (
-                      <Tag key={id} onRemove={() => upd('pure_cod_allowed_product_ids', settings.pure_cod_allowed_product_ids.filter(x => x !== id))}>
-                        {productTitles[id] || `Product …${id.slice(-6)}`}
-                      </Tag>
-                    ))}
-                  </InlineStack>
-                </div>
-              )}
-
-              <Divider />
-
-              <InlineStack align="space-between" blockAlign="center">
-                <BlockStack gap="100">
-                  <Text as="h3" variant="headingSm">Specific Collections</Text>
-                  <Text as="p" variant="bodySm" tone="subdued">Only allow COD for selected collections.</Text>
-                </BlockStack>
-                <Button variant="secondary" onClick={async () => {
-                  try {
-                    const selected = await shopify.resourcePicker({
-                      type: 'collection',
-                      multiple: true,
-                      selectionIds: settings.pure_cod_allowed_collection_ids.map(id => ({ id })),
-                    });
-                    if (selected) {
-                      const ids = selected.map((c) => c.id);
-                      upd('pure_cod_allowed_collection_ids', ids);
-                      const titles = selected.reduce((acc, c) => ({ ...acc, [c.id]: c.title }), {});
-                      setCollectionTitles((prev) => ({ ...prev, ...titles }));
-                    }
-                  } catch (_e) {}
-                }}>
-                  {settings.pure_cod_allowed_collection_ids.length === 0 ? 'Add Collections' : `Edit Collections (${settings.pure_cod_allowed_collection_ids.length})`}
-                </Button>
-              </InlineStack>
-              {settings.pure_cod_allowed_collection_ids.length > 0 && (
-                <div style={{ marginTop: '12px' }}>
-                  <InlineStack gap="200">
-                    {settings.pure_cod_allowed_collection_ids.map((id) => (
-                      <Tag key={id} onRemove={() => upd('pure_cod_allowed_collection_ids', settings.pure_cod_allowed_collection_ids.filter(x => x !== id))}>
-                        {collectionTitles[id] || `Collection …${id.slice(-6)}`}
-                      </Tag>
-                    ))}
-                  </InlineStack>
-                </div>
-              )}
+              {/* Item Restrictions */}
+              <RestrictionsEditor
+                method="pure_cod"
+                settings={settings}
+                pickItemsForMethod={pickItemsForMethod}
+                updRestrictions={updRestrictions}
+                productTitles={productTitles}
+                collectionTitles={collectionTitles}
+              />
 
               <Divider />
               {renderCountryRestrictions('full_cod', 'Cash on Delivery')}

@@ -159,6 +159,7 @@ export async function syncPartialPaymentToMetafield(
         pure_cod_allowed_product_ids: settings.pure_cod_allowed_product_ids ?? [],
         pure_cod_allowed_collection_ids: settings.pure_cod_allowed_collection_ids ?? [],
         country_restrictions: settings.country_restrictions,
+        payment_method_restrictions: settings.payment_method_restrictions,
       }
     : { 
         enabled: true, 
@@ -300,44 +301,55 @@ export function isPaymentMethodEligible(
   }
 
   // ── 4. Product / Collection restrictions ──
-  const allowedProducts = method === 'full_prepaid'
+  const methodConfig = settings.payment_method_restrictions?.[method];
+  
+  // Fallback to legacy flat columns if JSONB is not populated
+  const allowedProducts = methodConfig?.allowed_product_ids || (method === 'full_prepaid'
     ? (settings.full_prepaid_allowed_product_ids ?? [])
     : method === 'pure_cod'
       ? (settings.pure_cod_allowed_product_ids ?? [])
-      : (settings.allowed_product_ids ?? []);
-  const allowedCollections = method === 'full_prepaid'
+      : (settings.allowed_product_ids ?? []));
+      
+  const allowedCollections = methodConfig?.allowed_collection_ids || (method === 'full_prepaid'
     ? (settings.full_prepaid_allowed_collection_ids ?? [])
     : method === 'pure_cod'
       ? (settings.pure_cod_allowed_collection_ids ?? [])
-      : (settings.allowed_collection_ids ?? []);
+      : (settings.allowed_collection_ids ?? []));
 
-  const hasProductFilter = allowedProducts.length > 0;
-  const hasCollectionFilter = allowedCollections.length > 0;
+  const restrictedProducts = methodConfig?.restricted_product_ids || [];
+  const restrictedCollections = methodConfig?.restricted_collection_ids || [];
 
-  if (hasProductFilter || hasCollectionFilter) {
+  const numericProductId = productId ? String(productId).replace(/[^0-9]/g, '') : null;
+  const numericCollectionIds = collectionIds.map(cid => String(cid).replace(/[^0-9]/g, ''));
+
+  // Rule 1: Restricted items always win
+  if (numericProductId && restrictedProducts.some(id => String(id).replace(/[^0-9]/g, '') === numericProductId)) {
+    return { eligible: false, reason: `${method.replace('_', ' ')} is restricted for this product` };
+  }
+  
+  if (numericCollectionIds.length > 0 && restrictedCollections.some(rid => numericCollectionIds.includes(String(rid).replace(/[^0-9]/g, '')))) {
+    return { eligible: false, reason: `${method.replace('_', ' ')} is restricted for this collection` };
+  }
+
+  // Rule 2 & 3: Check allowed lists if they are populated
+  const hasAllowedProductFilter = allowedProducts.length > 0;
+  const hasAllowedCollectionFilter = allowedCollections.length > 0;
+
+  if (hasAllowedProductFilter || hasAllowedCollectionFilter) {
     let productAllowed = false;
 
-    if (hasProductFilter && productId) {
-      const numericId = String(productId).replace(/[^0-9]/g, '');
-      productAllowed = allowedProducts.some(
-        (id) => String(id).replace(/[^0-9]/g, '') === numericId
-      );
+    if (hasAllowedProductFilter && numericProductId) {
+      productAllowed = allowedProducts.some(id => String(id).replace(/[^0-9]/g, '') === numericProductId);
     }
 
-    if (!productAllowed && hasCollectionFilter && collectionIds.length > 0) {
-      productAllowed = collectionIds.some((cid) =>
-        allowedCollections.some(
-          (allowed) =>
-            String(allowed).replace(/[^0-9]/g, '') === String(cid).replace(/[^0-9]/g, '')
-        )
+    if (!productAllowed && hasAllowedCollectionFilter && numericCollectionIds.length > 0) {
+      productAllowed = numericCollectionIds.some(cid =>
+        allowedCollections.some(allowed => String(allowed).replace(/[^0-9]/g, '') === cid)
       );
     }
 
     if (!productAllowed) {
-      return {
-        eligible: false,
-        reason: `${method.replace('_', ' ')} not available for this product`,
-      };
+      return { eligible: false, reason: `${method.replace('_', ' ')} not available for this product` };
     }
   }
 

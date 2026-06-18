@@ -4494,19 +4494,30 @@ function darkenColor(hex, percent) {
           if (min > 0 && orderTotalAmt < min) return false;
           if (max > 0 && orderTotalAmt > max) return false;
 
-          var allowedProds = method === 'full_prepaid' ? (ppSet.full_prepaid_allowed_product_ids || []) : method === 'pure_cod' ? (ppSet.pure_cod_allowed_product_ids || []) : (ppSet.allowed_product_ids || []);
-          var allowedColls = method === 'full_prepaid' ? (ppSet.full_prepaid_allowed_collection_ids || []) : method === 'pure_cod' ? (ppSet.pure_cod_allowed_collection_ids || []) : (ppSet.allowed_collection_ids || []);
+          var methodConfig = ppSet.payment_method_restrictions && ppSet.payment_method_restrictions[method];
+          
+          var allowedProds = methodConfig && methodConfig.allowed_product_ids ? methodConfig.allowed_product_ids : (method === 'full_prepaid' ? (ppSet.full_prepaid_allowed_product_ids || []) : method === 'pure_cod' ? (ppSet.pure_cod_allowed_product_ids || []) : (ppSet.allowed_product_ids || []));
+          var allowedColls = methodConfig && methodConfig.allowed_collection_ids ? methodConfig.allowed_collection_ids : (method === 'full_prepaid' ? (ppSet.full_prepaid_allowed_collection_ids || []) : method === 'pure_cod' ? (ppSet.pure_cod_allowed_collection_ids || []) : (ppSet.allowed_collection_ids || []));
+          
+          var restrictedProds = methodConfig && methodConfig.restricted_product_ids ? methodConfig.restricted_product_ids : [];
+          var restrictedColls = methodConfig && methodConfig.restricted_collection_ids ? methodConfig.restricted_collection_ids : [];
 
+          var pId = String(config.productId || '').replace(/[^0-9]/g, '');
+          var cIds = (config.productCollectionIds || []).map(function(cid) { return String(cid).replace(/[^0-9]/g, ''); });
+
+          // Rule 1: Restricted items always win
+          if (pId && restrictedProds.some(function(id) { return String(id).replace(/[^0-9]/g, '') === pId; })) return false;
+          if (cIds.length > 0 && restrictedColls.some(function(rid) { return cIds.indexOf(String(rid).replace(/[^0-9]/g, '')) > -1; })) return false;
+
+          // Rule 2 & 3: Allowed lists
           var hasProdF = allowedProds.length > 0;
           var hasCollF = allowedColls.length > 0;
           if (hasProdF || hasCollF) {
-              var pId = String(config.productId || '').replace(/[^0-9]/g, '');
               var prodOk = false;
-              if (hasProdF) {
+              if (hasProdF && pId) {
                   prodOk = allowedProds.some(function(id) { return String(id).replace(/[^0-9]/g, '') === pId; });
               }
-              if (!prodOk && hasCollF) {
-                  var cIds = (config.productCollectionIds || []).map(function(cid) { return String(cid).replace(/[^0-9]/g, ''); });
+              if (!prodOk && hasCollF && cIds.length > 0) {
                   prodOk = cIds.some(function(cid) {
                       return allowedColls.some(function(aid) { return String(aid).replace(/[^0-9]/g, '') === cid; });
                   });

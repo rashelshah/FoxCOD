@@ -51,6 +51,19 @@ export interface CountryRestrictionsConfig {
   full_prepaid: CountryRestriction;
 }
 
+export interface PaymentItemRestrictions {
+  allowed_product_ids: string[];
+  allowed_collection_ids: string[];
+  restricted_product_ids: string[];
+  restricted_collection_ids: string[];
+}
+
+export interface PaymentMethodRestrictions {
+  partial_payment?: PaymentItemRestrictions;
+  full_prepaid?: PaymentItemRestrictions;
+  pure_cod?: PaymentItemRestrictions;
+}
+
 export interface PartialPaymentSettings {
   id?: number;
   shop_domain: string;
@@ -89,6 +102,7 @@ export interface PartialPaymentSettings {
   pure_cod_allowed_product_ids: string[];
   pure_cod_allowed_collection_ids: string[];
   country_restrictions?: CountryRestrictionsConfig;
+  payment_method_restrictions?: PaymentMethodRestrictions;
   created_at?: string;
   updated_at?: string;
 }
