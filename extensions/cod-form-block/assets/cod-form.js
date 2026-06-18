@@ -4576,7 +4576,7 @@ function darkenColor(hex, percent) {
       }
 
       if (showFullPrepaid) {
-          html += '<label class="pm-row pm-prepaid" style="display: flex; flex-direction: column; background: #f0fdf4; border-radius: 12px; border: 2px solid #22c55e; cursor: pointer; position: relative; overflow: visible; padding: 0 !important; margin: 0 !important; box-sizing: border-box; opacity: 1;">';
+          html += '<label class="pm-row pm-prepaid" style="display: flex; flex-direction: column; background: #f0fdf4; border-radius: 12px; border: 1.5px solid #22c55e; cursor: pointer; position: relative; overflow: visible; padding: 0 !important; margin: 0 !important; box-sizing: border-box; opacity: 1;">';
           var isPrepaidChecked = (defaultMethod === 'full_prepaid') ? 'checked' : '';
           html += '<input type="radio" name="payment_method" value="full_prepaid" ' + isPrepaidChecked + ' style="position:absolute; opacity:0; pointer-events:none; margin:0; padding:0;">';
           html += '<div style="position: absolute; top: -10px; left: 16px; background: #22c55e; color: white; font-size: 9px; font-weight: 700; padding: 3px 8px; border-radius: 6px; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px; text-transform: uppercase;">★ MOST POPULAR</div>';
@@ -4622,7 +4622,7 @@ function darkenColor(hex, percent) {
           }
           var depositText = formatMoney(depositAmount);
 
-          html += '<label class="pm-row pm-partial" style="display: flex; flex-direction: column; background: #eff6ff; border-radius: 12px; border: 2px solid #2563eb; cursor: pointer; position: relative; padding: 0 !important; margin: 0 !important; box-sizing: border-box; overflow: hidden !important;">';
+          html += '<label class="pm-row pm-partial" style="display: flex; flex-direction: column; background: #eff6ff; border-radius: 12px; border: 1.5px solid #2563eb; cursor: pointer; position: relative; padding: 0 !important; margin: 0 !important; box-sizing: border-box; overflow: hidden !important;">';
           var isPartialChecked = (defaultMethod === 'partial_cod') ? 'checked' : '';
           html += '<input type="radio" name="payment_method" value="partial_cod" ' + isPartialChecked + ' style="position:absolute; opacity:0; pointer-events:none; margin:0; padding:0;">';
           html += '<div style="display: flex; align-items: flex-start; gap: 12px; padding: 16px 12px 12px 12px; box-sizing: border-box; width: 100%; margin: 0;">';
@@ -4657,7 +4657,7 @@ function darkenColor(hex, percent) {
               }
           }
           
-          html += '<label class="pm-row pm-cod" style="display: flex; flex-direction: column; background: #fff7ed; border-radius: 12px; border: 2px solid #ea580c; cursor: pointer; position: relative; padding: 0 !important; margin: 0 !important; box-sizing: border-box; overflow: hidden !important;">';
+          html += '<label class="pm-row pm-cod" style="display: flex; flex-direction: column; background: #fff7ed; border-radius: 12px; border: 1.5px solid #ea580c; cursor: pointer; position: relative; padding: 0 !important; margin: 0 !important; box-sizing: border-box; overflow: hidden !important;">';
           var isCodChecked = (defaultMethod === 'full_cod') ? 'checked' : '';
           html += '<input type="radio" name="payment_method" value="full_cod" ' + isCodChecked + ' style="position:absolute; opacity:0; pointer-events:none; margin:0; padding:0;">';
           html += '<div style="display: flex; align-items: flex-start; gap: 12px; padding: 16px 12px 12px 12px; box-sizing: border-box; width: 100%; margin: 0;">';
@@ -5185,7 +5185,8 @@ function darkenColor(hex, percent) {
           state = calculateCheckoutState(form, config);
       }
 
-      var html = '<div style="font-weight:600; margin-bottom:8px; display:flex; align-items:center;">' +
+      var html = '<div style="font-weight:600; margin-bottom:12px; display:flex; align-items:center;">' +
+          '   <div style="display:flex; align-items:center; justify-content:center; width:28px; height:28px; background:transparent; border-radius:8px; margin-right:8px; color:#16a34a;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg></div>' +
           '   Order Summary' +
           '</div>';
 
@@ -5201,23 +5202,26 @@ function darkenColor(hex, percent) {
       }
 
       // Subtotal
-      html += '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#6b7280;">' +
-          '   <span>Subtotal (' + state.quantity + ' ' + (state.quantity === 1 ? 'item' : 'items') + ')</span>' +
+      html += '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; font-size:13px; color:#6b7280;">' +
+          '   <div style="display:flex; align-items:center;"><div style="display:flex; align-items:center; justify-content:center; width:24px; height:24px; background:transparent; border-radius:6px; margin-right:8px; color:#4b5563;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg></div>' +
+          '   <span>Subtotal (' + state.quantity + ' ' + (state.quantity === 1 ? 'item' : 'items') + ')</span></div>' +
           '   <span id="cod-summary-subtotal">' + formatMoney(state.displaySubtotal) + '</span>' +
           '</div>';
 
       // Downsell savings
       if (state.downsellSavings > 0) {
-          html += '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#10b981;">' +
-              '   <span>Downsell discount</span>' +
+          html += '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; font-size:13px; color:#10b981;">' +
+              '   <div style="display:flex; align-items:center;"><div style="display:flex; align-items:center; justify-content:center; width:24px; height:24px; background:transparent; border-radius:6px; margin-right:8px; color:#16a34a;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg></div>' +
+              '   <span>Downsell discount</span></div>' +
               '   <span>-' + formatMoney(state.downsellSavings) + '</span>' +
               '</div>';
       }
 
       // Bundle discount
       if (state.discount > 0) {
-          html += '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#10b981;">' +
-              '   <span>Bundle Discount (' + state.discountPercent + '%)</span>' +
+          html += '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; font-size:13px; color:#10b981;">' +
+              '   <div style="display:flex; align-items:center;"><div style="display:flex; align-items:center; justify-content:center; width:24px; height:24px; background:transparent; border-radius:6px; margin-right:8px; color:#16a34a;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg></div>' +
+              '   <span>Bundle Discount (' + state.discountPercent + '%)</span></div>' +
               '   <span id="cod-summary-discount">-' + formatMoney(state.discount) + '</span>' +
               '</div>';
       }
@@ -5239,14 +5243,16 @@ function darkenColor(hex, percent) {
       });
 
       // Shipping
-      html += '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#6b7280;">' +
-          '   <span>Shipping</span>' +
+      html += '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; font-size:13px; color:#6b7280;">' +
+          '   <div style="display:flex; align-items:center;"><div style="display:flex; align-items:center; justify-content:center; width:24px; height:24px; background:transparent; border-radius:6px; margin-right:8px; color:#4b5563;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg></div>' +
+          '   <span>Shipping</span></div>' +
           '   <span id="cod-summary-shipping">' + (state.shipping === 0 ? 'FREE' : formatMoney(state.shipping)) + '</span>' +
           '</div>';
 
       if (state.couponDiscount > 0) {
-          html += '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#059669;">' +
-              '   <span>Coupon (' + couponState.code + ')</span>' +
+          html += '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; font-size:13px; color:#059669;">' +
+              '   <div style="display:flex; align-items:center;"><div style="display:flex; align-items:center; justify-content:center; width:24px; height:24px; background:transparent; border-radius:6px; margin-right:8px; color:#16a34a;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg></div>' +
+              '   <span>Coupon (' + couponState.code + ')</span></div>' +
               '   <span id="cod-summary-coupon">-' + formatMoney(state.couponDiscount) + '</span>' +
               '</div>';
       }
@@ -5297,8 +5303,9 @@ function darkenColor(hex, percent) {
       }
 
       if (codFeeDisplayAmount > 0) {
-          html += '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#ea580c;">' +
-              '   <span>' + codFeeDisplayName + '</span>' +
+          html += '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; font-size:13px; color:#ea580c;">' +
+              '   <div style="display:flex; align-items:center;"><div style="display:flex; align-items:center; justify-content:center; width:24px; height:24px; background:transparent; border-radius:6px; margin-right:8px; color:#ea580c;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg></div>' +
+              '   <span>' + codFeeDisplayName + '</span></div>' +
               '   <span id="cod-summary-fee">+' + formatMoney(codFeeDisplayAmount) + '</span>' +
               '</div>';
       }
@@ -5308,8 +5315,9 @@ function darkenColor(hex, percent) {
 
       if (isFullPrepaidSelected && prepaidDiscountAmount > 0) {
           finalSummaryTotal -= prepaidDiscountAmount;
-          html += '<div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:13px; color:#10b981;">' +
-              '   <span>Prepaid Discount</span>' +
+          html += '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; font-size:13px; color:#10b981;">' +
+              '   <div style="display:flex; align-items:center;"><div style="display:flex; align-items:center; justify-content:center; width:24px; height:24px; background:transparent; border-radius:6px; margin-right:8px; color:#16a34a;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg></div>' +
+              '   <span>Prepaid Discount</span></div>' +
               '   <span>-' + formatMoney(prepaidDiscountAmount) + '</span>' +
               '</div>';
       } else if (isPartialSelected) {
