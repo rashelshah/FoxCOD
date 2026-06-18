@@ -1374,6 +1374,7 @@
       cursor: pointer !important;
       transition: all 0.2s ease !important;
       position: relative !important;
+      flex-wrap: wrap !important;
   }
   
   /* Modern Template - Horizontal layout, no images */
@@ -1383,6 +1384,7 @@
       align-items: center !important;
       justify-content: space-between !important;
       gap: 12px !important;
+      flex-wrap: wrap !important;
   }
   
   .cod-quantity-offers.template-modern .cod-offer-card img {
@@ -1395,6 +1397,7 @@
       flex-direction: row !important;
       align-items: center !important;
       gap: 12px !important;
+      flex-wrap: wrap !important;
   }
   
   .cod-quantity-offers.template-classic .cod-offer-card img {
@@ -1430,6 +1433,7 @@
       gap: 8px !important;
       border-width: 1px !important;
       padding: 8px 12px !important;
+      flex-wrap: wrap !important;
   }
   
   .cod-quantity-offers.template-minimal .cod-offer-card img {
@@ -1557,50 +1561,84 @@
   
   /* ── Bundle Variant Selector ── */
   .foxcod-variant-section {
-      margin-top: 12px;
-      padding: 12px;
-      background: rgba(0,0,0,0.02);
+      margin-top: 0;
+      padding: 0;
+      border-top: 1px solid transparent; /* hide border when collapsed */
+      background: transparent;
+      border-radius: 0 0 10px 10px;
+      opacity: 0;
+      max-height: 0;
+      transform: translateY(-8px);
+      overflow: hidden;
+      transition: max-height 250ms ease-out, opacity 250ms ease-out, transform 250ms ease-out, margin-top 250ms ease-out, border-color 250ms ease-out;
+      width: 100% !important;
+      flex-basis: 100% !important;
+      order: 99 !important;
+  }
+  .foxcod-variant-section.expanded {
+      opacity: 1;
+      max-height: 600px;
+      transform: translateY(0);
+      margin-top: 16px;
+      border-top-color: rgba(0,0,0,0.06);
+      padding: 16px 0 0 0;
+  }
+  /* Cards template: section sits below the horizontal cards row as a standalone block */
+  .cod-quantity-offers.template-cards + .foxcod-variant-section {
+      border: 1px solid transparent;
       border-radius: 10px;
-      border: 1px solid rgba(0,0,0,0.06);
+      padding: 0;
+      box-sizing: border-box;
+  }
+  .cod-quantity-offers.template-cards + .foxcod-variant-section.expanded {
+      border-color: rgba(0,0,0,0.08);
+      padding: 16px;
+      margin-top: 12px;
+      background: rgba(0,0,0,0.015);
+  }
+  @media (prefers-reduced-motion: reduce) {
+      .foxcod-variant-section {
+          transition: none !important;
+      }
   }
   .foxcod-variant-section-title {
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 600;
       color: #374151;
-      margin: 0 0 10px 0;
+      margin: 0 0 6px 0;
   }
   .foxcod-variant-row {
       display: flex;
       align-items: center;
-      gap: 8px;
-      margin-bottom: 8px;
-      padding: 6px 0;
+      gap: 4px;
+      margin-bottom: 4px;
+      padding: 2px 0;
   }
   .foxcod-variant-row:last-child {
       margin-bottom: 0;
   }
   .foxcod-variant-label {
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 600;
       color: #6b7280;
-      min-width: 48px;
+      min-width: 42px;
       flex-shrink: 0;
   }
   .foxcod-variant-selects {
-      display: flex;
-      gap: 6px;
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 4px;
       flex: 1;
-      flex-wrap: wrap;
   }
   .foxcod-variant-select {
-      flex: 1;
+      width: 100%;
       min-width: 80px;
-      padding: 8px 28px 8px 10px;
+      padding: 4px 20px 4px 8px;
       border: 1px solid #e5e7eb;
-      border-radius: 8px;
-      font-size: 13px;
+      border-radius: 6px;
+      font-size: 12px;
       color: #1f2937;
-      background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") no-repeat right 8px center;
+      background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") no-repeat right 4px center;
       -webkit-appearance: none;
       -moz-appearance: none;
       appearance: none;
@@ -1624,15 +1662,22 @@
   /* Mobile Responsive Styles for Offers */
   @media only screen and (max-width: 480px) {
       .foxcod-variant-row {
-          flex-direction: column;
-          align-items: flex-start;
           gap: 4px;
+          padding: 0;
+      }
+      .foxcod-variant-label {
+          min-width: 36px;
+          font-size: 10px;
       }
       .foxcod-variant-selects {
-          width: 100%;
+          gap: 3px;
       }
       .foxcod-variant-select {
           min-width: 0;
+          padding: 3px 18px 3px 6px;
+          font-size: 11px;
+          border-radius: 4px;
+          background-position: right 2px center;
       }
   }
 

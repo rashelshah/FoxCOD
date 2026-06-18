@@ -1812,10 +1812,18 @@
       offersContainer.style.overflowX = 'auto';
       offersContainer.style.paddingTop = '8px';
       offersContainer.style.paddingBottom = '8px';
-      // Ensure padding handles ribbon overflow on sides cleanly
       offersContainer.style.paddingLeft = '4px';
       offersContainer.style.paddingRight = '4px';
-      // Prevent scrollbar overlapping by adding a little extra offset
+      // Wrap in a column-flex parent so the variant section renders BELOW the cards row
+      var cardsWrapper = document.createElement('div');
+      cardsWrapper.className = 'foxcod-cards-wrapper';
+      cardsWrapper.style.display = 'flex';
+      cardsWrapper.style.flexDirection = 'column';
+      cardsWrapper.style.width = '100%';
+      cardsWrapper.style.gap = '0';
+      cardsWrapper.appendChild(offersContainer);
+      // Expose wrapper so renderBundleVariantSelectors can append variant section to it
+      offersContainer._cardsWrapper = cardsWrapper;
     } else if (template === 'vertical') {
       offersContainer.style.flexDirection = 'column';
       offersContainer.style.flexWrap = 'nowrap';
@@ -1871,11 +1879,12 @@
       // Cards template - flex layout
       if (isCards) {
         card.style.flex = '0 0 auto';
-        card.style.minWidth = '110px';
+        card.style.minWidth = (idx === selectedIndex) ? '260px' : '110px';
         card.style.flexDirection = 'column';
         card.style.alignItems = 'center';
         card.style.textAlign = 'center';
         card.style.boxShadow = '0 2px 8px rgba(0,0,0,0.05)';
+        card.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
       } else if (isVertical) {
         // Vertical template - column layout, centered, full width
         card.style.width = '100%';
@@ -1885,12 +1894,14 @@
       } else if (isMinimal) {
         // Minimal template - horizontal, compact
         card.style.flexDirection = 'row';
+        card.style.flexWrap = 'wrap';
         card.style.alignItems = 'center';
         card.style.justifyContent = 'space-between';
         card.style.gap = '6px';
       } else {
         // Classic & Modern - horizontal row, text left, price right
         card.style.flexDirection = 'row';
+        card.style.flexWrap = 'wrap';
         card.style.alignItems = 'center';
         card.style.justifyContent = 'space-between';
         card.style.gap = '10px';
@@ -2090,11 +2101,13 @@
           c.style.background = design.unselectedBgColor || 'transparent';
           c.style.borderColor = design.unselectedBorderColor || '#e5e7eb';
           c.style.color = '#6b7280';
+          if (isCards) c.style.minWidth = '110px';
         });
         card.classList.add('selected');
         card.style.background = design.selectedBgColor || 'rgba(99,102,241,0.08)';
         card.style.borderColor = design.selectedBorderColor || config.accentColor;
         card.style.color = design.selectedTextColor || '#1f2937';
+        if (isCards) card.style.minWidth = '260px';
         
         // Update quantity selector
         var form = container.closest('.cod-modal') || container.closest('form');
@@ -2136,7 +2149,8 @@
     offersContainer._initialSelectedOffer = initialOffer;
     offersContainer._selectedIndex = selectedIndex;
     
-    return offersContainer;
+    // Return the wrapper (for cards) or the container itself (for other templates)
+    return offersContainer._cardsWrapper || offersContainer;
   }
 
   /**
@@ -2186,8 +2200,14 @@
       var section = document.createElement('div');
       section.className = 'foxcod-variant-section';
       section.innerHTML = '<p class="foxcod-variant-section-title">Select variants for each item:</p>';
+      
+      // Force inline flex layout to guarantee it drops to the next line in the bundle card
+      section.style.flexBasis = '100%';
+      section.style.width = '100%';
+      section.style.order = '99';
 
-      // Initialize selected variants array
+      // Reuse existing variants if available to preserve state
+      var existingSelectedVariants = window.FoxCod._selectedBundleVariants || [];
       var selectedBundleVariants = [];
       var defaultVariant = variants.find(function(v) { return v.available; }) || variants[0];
 
@@ -2205,6 +2225,16 @@
               var selectsDiv = document.createElement('div');
               selectsDiv.className = 'foxcod-variant-selects';
 
+              var prevVariantState = existingSelectedVariants[itemIndex];
+              var initialVariantObj = null;
+
+              if (prevVariantState) {
+                  initialVariantObj = variants.find(function(v) { return v.id === prevVariantState.variantId; });
+              }
+              if (!initialVariantObj) {
+                  initialVariantObj = defaultVariant;
+              }
+
               // Create a dropdown for each option dynamically from product.options
               optionValues.forEach(function(opt, optIdx) {
                   var sel = document.createElement('select');
@@ -2212,6 +2242,11 @@
                   sel.setAttribute('data-item', itemIndex);
                   sel.setAttribute('data-option-index', optIdx);
                   sel.setAttribute('aria-label', opt.name + ' for Item ' + (itemIndex + 1));
+
+                  // Stop propagation so clicking select doesn't re-select the bundle card
+                  sel.addEventListener('click', function(e) {
+                      e.stopPropagation();
+                  });
 
                   opt.values.forEach(function(val) {
                       var option = document.createElement('option');
@@ -2246,9 +2281,11 @@
                       sel.appendChild(option);
                   });
 
-                  // Set default to the default variant's option
-                  var defaultKey = 'option' + (optIdx + 1);
-                  if (defaultVariant[defaultKey]) sel.value = defaultVariant[defaultKey];
+                  // Set default to the previously selected variant's option, or default
+                  var optKey = 'option' + (optIdx + 1);
+                  if (initialVariantObj[optKey]) {
+                      sel.value = initialVariantObj[optKey];
+                  }
 
                   sel.addEventListener('change', function() {
                       updateBundleVariantSelection(form, config, section, quantity);
@@ -2262,20 +2299,68 @@
 
               // Initialize this item's variant
               selectedBundleVariants.push({
-                  variantId: defaultVariant.id,
-                  title: defaultVariant.title,
-                  price: defaultVariant.price
+                  variantId: initialVariantObj.id,
+                  title: initialVariantObj.title,
+                  price: initialVariantObj.price
               });
           })(i);
       }
 
       window.FoxCod._selectedBundleVariants = selectedBundleVariants;
 
-      // Insert after offers container
-      if (offersContainer && offersContainer.parentNode) {
-          offersContainer.parentNode.insertBefore(section, offersContainer.nextSibling);
-      } else if (form) {
-          form.insertBefore(section, form.firstChild);
+      // Cards template: variant section goes in the wrapper (a column-flex div holding the cards row)
+      // so it naturally renders below the horizontal cards row without any overflow issues.
+      var isCardsTemplate = offersContainer && offersContainer.classList.contains('template-cards');
+      // _cardsWrapper is set at creation time; when queried from DOM (e.g. modal re-query),
+      // the parent IS the wrapper since we appended offersContainer into it.
+      var cardsWrapper = (offersContainer && offersContainer._cardsWrapper) ||
+                        (isCardsTemplate && offersContainer && offersContainer.parentNode &&
+                         offersContainer.parentNode.classList.contains('foxcod-cards-wrapper')
+                           ? offersContainer.parentNode : null);
+
+      function insertAfterEl(newEl, refEl) {
+          if (refEl && refEl.parentNode) refEl.parentNode.insertBefore(newEl, refEl.nextSibling);
+      }
+
+      if (isCardsTemplate && cardsWrapper) {
+          // Clear inline flex styles meant for in-card injection
+          section.style.flexBasis = '';
+          section.style.order = '';
+          section.style.width = '100%';
+          section.style.boxSizing = 'border-box';
+          cardsWrapper.appendChild(section);
+          requestAnimationFrame(function() {
+              requestAnimationFrame(function() {
+                  section.classList.add('expanded');
+              });
+          });
+      } else if (isCardsTemplate) {
+          // Fallback: insert after the cards row (covers modal case without wrapper reference)
+          section.style.flexBasis = '';
+          section.style.order = '';
+          section.style.width = '100%';
+          section.style.boxSizing = 'border-box';
+          insertAfterEl(section, offersContainer);
+          requestAnimationFrame(function() {
+              requestAnimationFrame(function() {
+                  section.classList.add('expanded');
+              });
+          });
+      } else {
+          // All other templates: inject inside the selected card
+          var selectedCard = offersContainer ? offersContainer.querySelector('.cod-offer-card.selected') : null;
+          if (selectedCard) {
+              selectedCard.appendChild(section);
+              requestAnimationFrame(function() {
+                  requestAnimationFrame(function() {
+                      section.classList.add('expanded');
+                  });
+              });
+          } else if (offersContainer && offersContainer.parentNode) {
+              insertAfterEl(section, offersContainer);
+          } else if (form) {
+              form.insertBefore(section, form.firstChild);
+          }
       }
 
       // Initial price update
