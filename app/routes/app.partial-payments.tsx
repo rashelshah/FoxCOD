@@ -1809,9 +1809,10 @@ export default function PartialPaymentsPage() {
                   <Divider />
                   {firstOpt && (
                     <BlockStack gap="200">
-                      <TagEditor method="partial_payment" settings={settings} updTag={updTag} />
-                      <Divider />
-                      <DescEditor method="partial_payment" settings={settings} updDesc={updDesc} />
+                      <InlineGrid columns={{ xs: 1, md: 2 }} gap="400">
+                        <TagEditor method="partial_payment" settings={settings} updTag={updTag} />
+                        <DescEditor method="partial_payment" settings={settings} updDesc={updDesc} />
+                      </InlineGrid>
                       <Divider />
                       <Text as="h3" variant="headingSm">Storefront Preview</Text>
                       <Text as="p" variant="bodySm" tone="subdued">Preview uses {fmt(previewOrderTotal)} as example cart total</Text>
@@ -2034,9 +2035,10 @@ export default function PartialPaymentsPage() {
 
                   <Divider />
                   <BlockStack gap="200">
-                    <TagEditor method="full_prepaid" settings={settings} updTag={updTag} />
-                    <Divider />
-                    <DescEditor method="full_prepaid" settings={settings} updDesc={updDesc} />
+                    <InlineGrid columns={{ xs: 1, md: 2 }} gap="400">
+                      <TagEditor method="full_prepaid" settings={settings} updTag={updTag} />
+                      <DescEditor method="full_prepaid" settings={settings} updDesc={updDesc} />
+                    </InlineGrid>
                     <Divider />
                     <Text as="h3" variant="headingSm">Storefront Preview</Text>
                     <Text as="p" variant="bodySm" tone="subdued">Preview uses 500 as example cart total</Text>
@@ -2236,12 +2238,14 @@ export default function PartialPaymentsPage() {
                     </div>
                   </div>
                 )}
+              </div>
 
-                <Divider />
+              <Card>
                 <BlockStack gap="200">
-                  <TagEditor method="pure_cod" settings={settings} updTag={updTag} />
-                  <Divider />
-                  <DescEditor method="pure_cod" settings={settings} updDesc={updDesc} />
+                  <InlineGrid columns={{ xs: 1, md: 2 }} gap="400">
+                    <TagEditor method="pure_cod" settings={settings} updTag={updTag} />
+                    <DescEditor method="pure_cod" settings={settings} updDesc={updDesc} />
+                  </InlineGrid>
                   <Divider />
                   <Text as="h3" variant="headingSm">Storefront Preview</Text>
                   <Text as="p" variant="bodySm" tone="subdued">Preview uses 500 as example cart total</Text>
@@ -2295,7 +2299,7 @@ export default function PartialPaymentsPage() {
                     )}
                   </div>
                 </BlockStack>
-              </div>
+              </Card>
 
               <Card>
                 <BlockStack gap="400">
