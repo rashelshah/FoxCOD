@@ -1209,32 +1209,33 @@ const PreviewDisplay = memo(({
                                         <div className="cod-trust-badge-band" style={{
                                             display: 'flex',
                                             alignItems: 'center',
-                                            justifyContent: 'space-between',
+                                            justifyContent: 'center',
                                             flexWrap: 'nowrap',
                                             backgroundColor: '#EBF8EE',
                                             borderRadius: '8px',
                                             padding: '6px 8px',
                                             margin: '12px 0 16px 0',
-                                            gap: '4px',
+                                            gap: 'clamp(3px, 1.2vw, 8px)',
                                             fontFamily: formStyles?.fontFamily || 'Inter',
-                                            fontSize: 'clamp(5.8px, 1.4vw, 7.8px)',
+                                            fontSize: 'clamp(6.8px, 1.8vw, 8.8px)',
                                             fontWeight: 600,
                                             color: '#000000',
                                             border: '1px solid #d1fae5',
                                             whiteSpace: 'nowrap',
                                             overflow: 'hidden',
                                             boxSizing: 'border-box',
-                                            letterSpacing: '-0.1px'
+                                            letterSpacing: '-0.2px',
+                                            wordSpacing: '-0.5px'
                                         }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '2px', whiteSpace: 'nowrap' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '1px', whiteSpace: 'nowrap' }}>
                                                 <svg width="8.5" height="8.5" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 11 2 2 4-4"></path></svg>
                                                 <span style={{ color: '#000000', marginLeft: '2px' }}>100% Secure Order</span>
                                             </div>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '2px', whiteSpace: 'nowrap' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '1px', whiteSpace: 'nowrap' }}>
                                                 <svg width="8.5" height="8.5" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
                                                 <span style={{ color: '#000000', marginLeft: '2px' }}>Instant Confirmation</span>
                                             </div>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '2px', whiteSpace: 'nowrap' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '1px', whiteSpace: 'nowrap' }}>
                                                 <svg width="8.5" height="8.5" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
                                                 <span style={{ color: '#000000', marginLeft: '2px' }}>Fast Delivery</span>
                                             </div>
@@ -1458,7 +1459,7 @@ const PreviewDisplay = memo(({
                                                                 <label style={{
                                                                     display: 'flex', flexDirection: 'column', background: '#f0fdf4', borderRadius: '10px',
                                                                     border: '2px solid #22c55e', cursor: 'pointer', position: 'relative', overflow: 'visible',
-                                                                    padding: '18px 10px 8px 10px', opacity: 1
+                                                                    padding: 0, opacity: 1
                                                                 }}>
                                                                     {/* Most Popular Badge */}
                                                                     <div style={{
@@ -1469,7 +1470,7 @@ const PreviewDisplay = memo(({
                                                                         ★ MOST POPULAR
                                                                     </div>
 
-                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '18px 10px 8px 10px' }}>
                                                                         {/* Icon */}
                                                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '24px', height: '24px', borderRadius: '6px', color: '#16a34a', backgroundColor: '#dcfce7' }}>
                                                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4" /><path d="M4 6v12c0 1.1.9 2 2 2h14v-4" /><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z" /></svg>
@@ -1489,6 +1490,10 @@ const PreviewDisplay = memo(({
                                                                             </div>
                                                                             <input type="radio" name="preview-payment" checked readOnly style={{ width: '14px', height: '14px', accentColor: '#22c55e', margin: 0, cursor: 'pointer' }} />
                                                                         </div>
+                                                                    </div>
+                                                                    {/* Info Bar */}
+                                                                    <div style={{ background: '#dcfce7', padding: '5px 8px', borderBottomLeftRadius: '8px', borderBottomRightRadius: '8px', fontSize: '8.5px', color: '#166534', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500 }}>
+                                                                        Pay now, save more, receive sooner
                                                                     </div>
                                                                 </label>
                                                             )}

@@ -102,8 +102,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       },
       payment_method_descriptions: {
         partial_payment: { enabled: true, text: 'Secure your order • Avoid fake cancellations' },
-        full_prepaid: { enabled: true, text: 'Secure your order • Avoid fake cancellations' },
-        pure_cod: { enabled: true, text: 'ℹ️ Higher return risk • Slightly slower processing' }
+        full_prepaid: { enabled: true, text: 'Pay now, save more, receive sooner' },
+        pure_cod: { enabled: true, text: 'Higher return risk • Slightly slower processing' }
       }
     };
   } else {
@@ -126,7 +126,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       settings.payment_method_descriptions = {
         partial_payment: { enabled: true, text: 'Secure your order • Avoid fake cancellations' },
         full_prepaid: { enabled: true, text: 'Pay now, save more, receive sooner' },
-        pure_cod: { enabled: true, text: 'ℹ️ Higher return risk • Slightly slower processing' }
+        pure_cod: { enabled: true, text: 'Higher return risk • Slightly slower processing' }
       };
     }
   }
@@ -1173,7 +1173,7 @@ const DescEditor = ({
   updDesc: (m: any, patch: any) => void;
 }) => {
   const methodTitle = method === 'full_prepaid' ? 'Full Prepaid' : method === 'pure_cod' ? 'Cash on Delivery' : 'Partial Payment';
-  const defaultDesc = method === 'pure_cod' ? 'ℹ️ Higher return risk • Slightly slower processing' : 'Secure your order • Avoid fake cancellations';
+  const defaultDesc = method === 'pure_cod' ? 'Higher return risk • Slightly slower processing' : (method === 'full_prepaid' ? 'Pay now, save more, receive sooner' : 'Secure your order • Avoid fake cancellations');
   const descSettings = settings.payment_method_descriptions?.[method] || { enabled: true, text: defaultDesc };
 
   return (
@@ -1303,7 +1303,7 @@ export default function PartialPaymentsPage() {
     patch: Partial<{ enabled: boolean; text: string }>
   ) => {
     setSettings((p) => {
-      const defaultDesc = method === 'pure_cod' ? 'ℹ️ Higher return risk • Slightly slower processing' : 'Secure your order • Avoid fake cancellations';
+      const defaultDesc = method === 'pure_cod' ? 'Higher return risk • Slightly slower processing' : (method === 'full_prepaid' ? 'Pay now, save more, receive sooner' : 'Secure your order • Avoid fake cancellations');
       const currentDesc = p.payment_method_descriptions?.[method] || { enabled: true, text: defaultDesc };
       return {
         ...p,

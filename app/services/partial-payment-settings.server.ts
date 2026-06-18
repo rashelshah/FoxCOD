@@ -173,7 +173,7 @@ export async function syncPartialPaymentToMetafield(
       payment_method_descriptions: {
         partial_payment: { enabled: true, text: 'Secure your order • Avoid fake cancellations' },
         full_prepaid: { enabled: true, text: 'Pay now, save more, receive sooner' },
-        pure_cod: { enabled: true, text: 'ℹ️ Higher return risk • Slightly slower processing' }
+        pure_cod: { enabled: true, text: 'Higher return risk • Slightly slower processing' }
       }
     };
 
