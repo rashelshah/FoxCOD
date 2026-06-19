@@ -4427,32 +4427,34 @@ export default function SettingsPage() {
                                                 onChange={(c) => setButtonStylesState(s => ({ ...s, borderColor: c }))}
                                             />
                                         </div>
-                                        <div className="input-group" style={{ marginTop: 12 }}>
-                                            <label className="input-label">Border Width (px)</label>
-                                            <div style={{ padding: '0 8px', width: '100%' }}>
-                                                <RangeSlider
-                                                    labelHidden
-                                                    label="Border Width"
-                                                    min={0}
-                                                    max={4}
-                                                    value={buttonStylesState?.borderWidth ?? 0}
-                                                    onChange={(val) => setButtonStylesState(s => ({ ...s, borderWidth: Number(val) }))}
-                                                    output
-                                                />
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '12px', marginTop: '12px' }}>
+                                            <div className="input-group" style={{ marginTop: 0, minWidth: 0 }}>
+                                                <label className="input-label">Border Width (px)</label>
+                                                <div style={{ padding: '0 8px', width: '100%' }}>
+                                                    <RangeSlider
+                                                        labelHidden
+                                                        label="Border Width"
+                                                        min={0}
+                                                        max={4}
+                                                        value={buttonStylesState?.borderWidth ?? 0}
+                                                        onChange={(val) => setButtonStylesState(s => ({ ...s, borderWidth: Number(val) }))}
+                                                        output
+                                                    />
+                                                </div>
                                             </div>
-                                        </div>
-                                        <div className="input-group" style={{ marginTop: 12 }}>
-                                            <label className="input-label">Rounded Corners (px)</label>
-                                            <div style={{ padding: '0 8px', width: '100%' }}>
-                                                <RangeSlider
-                                                    labelHidden
-                                                    label="Rounded Corners"
-                                                    min={0}
-                                                    max={24}
-                                                    value={buttonStylesState?.borderRadius ?? 12}
-                                                    onChange={(val) => setButtonStylesState(s => ({ ...s, borderRadius: Number(val) }))}
-                                                    output
-                                                />
+                                            <div className="input-group" style={{ marginTop: 0, minWidth: 0 }}>
+                                                <label className="input-label">Rounded Corners (px)</label>
+                                                <div style={{ padding: '0 8px', width: '100%' }}>
+                                                    <RangeSlider
+                                                        labelHidden
+                                                        label="Rounded Corners"
+                                                        min={0}
+                                                        max={24}
+                                                        value={buttonStylesState?.borderRadius ?? 12}
+                                                        onChange={(val) => setButtonStylesState(s => ({ ...s, borderRadius: Number(val) }))}
+                                                        output
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
                                         <div className="toggle-option" style={{ marginTop: 12 }} onClick={() => setButtonStylesState(s => ({ ...s, shadow: !s.shadow }))}>
@@ -4837,12 +4839,21 @@ export default function SettingsPage() {
                                         })()}
 
                                         {/* ── Advanced Style Controls ── */}
-                                        <div className="input-group" style={{ marginTop: 16 }}>
-                                            <ColorSelector
-                                                label="Text Color"
-                                                value={formStyles?.textColor || '#333333'}
-                                                onChange={(c) => setFormStyles(s => ({ ...s, textColor: c }))}
-                                            />
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '12px', marginTop: '16px' }}>
+                                            <div className="input-group" style={{ marginTop: 0, minWidth: 0 }}>
+                                                <ColorSelector
+                                                    label="Text Color"
+                                                    value={formStyles?.textColor || '#333333'}
+                                                    onChange={(c) => setFormStyles(s => ({ ...s, textColor: c }))}
+                                                />
+                                            </div>
+                                            <div className="input-group" style={{ marginTop: 0, minWidth: 0 }}>
+                                                <ColorSelector
+                                                    label="Price Color"
+                                                    value={formStyles?.priceColor || '#111827'}
+                                                    onChange={(c) => setFormStyles(s => ({ ...s, priceColor: c }))}
+                                                />
+                                            </div>
                                         </div>
                                         <div className="input-group" style={{ marginTop: 12 }}>
                                             <label className="input-label">Text Size (px)</label>
@@ -4859,13 +4870,6 @@ export default function SettingsPage() {
                                             </div>
                                         </div>
                                         <div className="input-group" style={{ marginTop: 12 }}>
-                                            <ColorSelector
-                                                label="Price Color"
-                                                value={formStyles?.priceColor || '#111827'}
-                                                onChange={(c) => setFormStyles(s => ({ ...s, priceColor: c }))}
-                                            />
-                                        </div>
-                                        <div className="input-group" style={{ marginTop: 12 }}>
                                             <label className="input-label">Font Style</label>
                                             <div className="style-options">
                                                 {(['normal', 'bold', 'italic'] as const).map((fs) => (
@@ -4875,72 +4879,92 @@ export default function SettingsPage() {
                                                 ))}
                                             </div>
                                         </div>
-                                        <div className="input-group" style={{ marginTop: 12 }}>
-                                            <ColorSelector
-                                                label="Border Color"
-                                                value={formStyles?.borderColor || '#d1d5db'}
-                                                onChange={(c) => setFormStyles(s => ({ ...s, borderColor: c }))}
-                                            />
-                                        </div>
-                                        <div className="input-group" style={{ marginTop: 12 }}>
-                                            <label className="input-label">Border Width (px)</label>
-                                            <div style={{ padding: '0 8px', width: '100%' }}>
-                                                <RangeSlider
-                                                    labelHidden
-                                                    label="Border Width"
-                                                    min={0}
-                                                    max={3}
-                                                    value={formStyles?.borderWidth ?? 1}
-                                                    onChange={(val) => setFormStyles(s => ({ ...s, borderWidth: Number(val) }))}
-                                                    output
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '12px', marginTop: '12px' }}>
+                                            <div className="input-group" style={{ marginTop: 0, minWidth: 0 }}>
+                                                <ColorSelector
+                                                    label="Border Color"
+                                                    value={formStyles?.borderColor || '#d1d5db'}
+                                                    onChange={(c) => setFormStyles(s => ({ ...s, borderColor: c }))}
+                                                />
+                                            </div>
+                                            <div className="input-group" style={{ marginTop: 0, minWidth: 0 }}>
+                                                <ColorSelector
+                                                    label="Background Color"
+                                                    value={formStyles?.backgroundColor || '#ffffff'}
+                                                    onChange={(c) => setFormStyles(s => ({ ...s, backgroundColor: c, background: undefined, backgroundImage: undefined }))}
                                                 />
                                             </div>
                                         </div>
-                                        <div className="input-group" style={{ marginTop: 12 }}>
-                                            <label className="input-label">Rounded Corners (px)</label>
-                                            <div style={{ padding: '0 8px', width: '100%' }}>
-                                                <RangeSlider
-                                                    labelHidden
-                                                    label="Rounded Corners"
-                                                    min={0}
-                                                    max={20}
-                                                    value={formStyles?.borderRadius ?? 12}
-                                                    onChange={(val) => setFormStyles(s => ({ ...s, borderRadius: Number(val) }))}
-                                                    output
-                                                />
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '12px', marginTop: '12px' }}>
+                                            <div className="input-group" style={{ marginTop: 0, minWidth: 0 }}>
+                                                <label className="input-label">Border Width (px)</label>
+                                                <div style={{ padding: '0 8px', width: '100%' }}>
+                                                    <RangeSlider
+                                                        labelHidden
+                                                        label="Border Width"
+                                                        min={0}
+                                                        max={3}
+                                                        value={formStyles?.borderWidth ?? 1}
+                                                        onChange={(val) => setFormStyles(s => ({ ...s, borderWidth: Number(val) }))}
+                                                        output
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="input-group" style={{ marginTop: 0, minWidth: 0 }}>
+                                                <label className="input-label">Rounded Corners (px)</label>
+                                                <div style={{ padding: '0 8px', width: '100%' }}>
+                                                    <RangeSlider
+                                                        labelHidden
+                                                        label="Rounded Corners"
+                                                        min={0}
+                                                        max={20}
+                                                        value={formStyles?.borderRadius ?? 12}
+                                                        onChange={(val) => setFormStyles(s => ({ ...s, borderRadius: Number(val) }))}
+                                                        output
+                                                    />
+                                                </div>
                                             </div>
                                         </div>
-                                        <div className="input-group" style={{ marginTop: 12 }}>
-                                            <label className="input-label">Shadow Intensity</label>
-                                            <div style={{ padding: '0 8px', width: '100%' }}>
-                                                <RangeSlider
-                                                    labelHidden
-                                                    label="Shadow Intensity"
-                                                    min={0}
-                                                    max={100}
-                                                    value={
-                                                        typeof formStyles?.shadowIntensity === 'number'
-                                                            ? formStyles.shadowIntensity
-                                                            : (formStyles?.shadow ? 35 : 0)
-                                                    }
-                                                    onChange={(val) => {
-                                                        const num = Number(val);
-                                                        setFormStyles(s => ({
-                                                            ...s,
-                                                            shadowIntensity: num,
-                                                            shadow: num > 0
-                                                        }));
-                                                    }}
-                                                    output
-                                                />
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '12px', marginTop: '12px' }}>
+                                            <div className="input-group" style={{ marginTop: 0, minWidth: 0 }}>
+                                                <label className="input-label">Shadow Intensity</label>
+                                                <div style={{ padding: '0 8px', width: '100%' }}>
+                                                    <RangeSlider
+                                                        labelHidden
+                                                        label="Shadow Intensity"
+                                                        min={0}
+                                                        max={100}
+                                                        value={
+                                                            typeof formStyles?.shadowIntensity === 'number'
+                                                                ? formStyles.shadowIntensity
+                                                                : (formStyles?.shadow ? 35 : 0)
+                                                        }
+                                                        onChange={(val) => {
+                                                            const num = Number(val);
+                                                            setFormStyles(s => ({
+                                                                ...s,
+                                                                shadowIntensity: num,
+                                                                shadow: num > 0
+                                                            }));
+                                                        }}
+                                                        output
+                                                    />
+                                                </div>
                                             </div>
-                                        </div>
-                                        <div className="input-group" style={{ marginTop: 12 }}>
-                                            <ColorSelector
-                                                label="Background Color"
-                                                value={formStyles?.backgroundColor || '#ffffff'}
-                                                onChange={(c) => setFormStyles(s => ({ ...s, backgroundColor: c, background: undefined, backgroundImage: undefined }))}
-                                            />
+                                            <div className="input-group" style={{ marginTop: 0, minWidth: 0 }}>
+                                                <label className="input-label">Label Font Size (px)</label>
+                                                <div style={{ padding: '0 8px', width: '100%' }}>
+                                                    <RangeSlider
+                                                        labelHidden
+                                                        label="Label Font Size"
+                                                        min={11}
+                                                        max={20}
+                                                        value={formStyles?.labelFontSize ?? 14}
+                                                        onChange={(val) => setFormStyles(s => ({ ...s, labelFontSize: Number(val) }))}
+                                                        output
+                                                    />
+                                                </div>
+                                            </div>
                                         </div>
                                         <div className="input-group" style={{ marginTop: 12 }}>
                                             <label className="input-label">Labels Alignment</label>
@@ -4952,56 +4976,46 @@ export default function SettingsPage() {
                                                 ))}
                                             </div>
                                         </div>
-                                        <div className="input-group" style={{ marginTop: 12 }}>
-                                            <ColorSelector
-                                                label="Icon Color"
-                                                value={formStyles?.iconColor || '#6b7280'}
-                                                onChange={(c) => setFormStyles(s => ({ ...s, iconColor: c }))}
-                                            />
-                                        </div>
-                                        <div className="input-group" style={{ marginTop: 12 }}>
-                                            <ColorSelector
-                                                label="Icon Background"
-                                                value={formStyles?.iconBackground || '#f3f4f6'}
-                                                onChange={(c) => setFormStyles(s => ({ ...s, iconBackground: c }))}
-                                            />
-                                        </div>
-                                        <div className="input-group" style={{ marginTop: 12 }}>
-                                            <ColorSelector
-                                                label="Field Background Color"
-                                                value={formStyles?.fieldBackgroundColor || '#ffffff'}
-                                                onChange={(c) => {
-                                                    console.log('[ColorSelector] New value:', c);
-                                                    setFormStyles(s => {
-                                                        const newStyles = { ...s, fieldBackgroundColor: c };
-                                                        console.log('[ColorSelector] Updated formStyles:', newStyles);
-                                                        return newStyles;
-                                                    });
-                                                }}
-                                            />
-                                            <p className="setting-helper">Controls the background color of input fields.</p>
-                                        </div>
-                                        <div className="input-group" style={{ marginTop: 12 }}>
-                                            <ColorSelector
-                                                label="Label Color"
-                                                value={formStyles?.labelColor || '#111827'}
-                                                onChange={(c) => setFormStyles(s => ({ ...s, labelColor: c }))}
-                                            />
-                                        </div>
-                                        <div className="input-group" style={{ marginTop: 12 }}>
-                                            <label className="input-label">Label Font Size (px)</label>
-                                            <div style={{ padding: '0 8px', width: '100%' }}>
-                                                <RangeSlider
-                                                    labelHidden
-                                                    label="Label Font Size"
-                                                    min={11}
-                                                    max={20}
-                                                    value={formStyles?.labelFontSize ?? 14}
-                                                    onChange={(val) => setFormStyles(s => ({ ...s, labelFontSize: Number(val) }))}
-                                                    output
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '12px', marginTop: '12px' }}>
+                                            <div className="input-group" style={{ marginTop: 0, minWidth: 0 }}>
+                                                <ColorSelector
+                                                    label="Icon Color"
+                                                    value={formStyles?.iconColor || '#6b7280'}
+                                                    onChange={(c) => setFormStyles(s => ({ ...s, iconColor: c }))}
+                                                />
+                                            </div>
+                                            <div className="input-group" style={{ marginTop: 0, minWidth: 0 }}>
+                                                <ColorSelector
+                                                    label="Icon Background"
+                                                    value={formStyles?.iconBackground || '#f3f4f6'}
+                                                    onChange={(c) => setFormStyles(s => ({ ...s, iconBackground: c }))}
                                                 />
                                             </div>
                                         </div>
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '12px', marginTop: '12px' }}>
+                                            <div className="input-group" style={{ marginTop: 0, minWidth: 0 }}>
+                                                <ColorSelector
+                                                    label="Field Background Color"
+                                                    value={formStyles?.fieldBackgroundColor || '#ffffff'}
+                                                    onChange={(c) => {
+                                                        console.log('[ColorSelector] New value:', c);
+                                                        setFormStyles(s => {
+                                                            const newStyles = { ...s, fieldBackgroundColor: c };
+                                                            console.log('[ColorSelector] Updated formStyles:', newStyles);
+                                                            return newStyles;
+                                                        });
+                                                    }}
+                                                />
+                                            </div>
+                                            <div className="input-group" style={{ marginTop: 0, minWidth: 0 }}>
+                                                <ColorSelector
+                                                    label="Label Color"
+                                                    value={formStyles?.labelColor || '#111827'}
+                                                    onChange={(c) => setFormStyles(s => ({ ...s, labelColor: c }))}
+                                                />
+                                            </div>
+                                        </div>
+                                        <p className="setting-helper" style={{ marginTop: 4 }}>Controls the background color of input fields.</p>
                                         <button
                                             type="button"
                                             onClick={() => setFormStyles({ ...DEFAULT_STYLES })}
@@ -5142,22 +5156,22 @@ export default function SettingsPage() {
                                                         </div>
                                                     </div>
 
-                                                    {/* Background Color */}
-                                                    <div className="input-group">
-                                                        <ColorSelector
-                                                            label="Background Color"
-                                                            value={formSubmitButtonState.backgroundColor || '#6366f1'}
-                                                            onChange={(c: string) => setFormSubmitButtonState(prev => ({ ...prev, backgroundColor: c }))}
-                                                        />
-                                                    </div>
-
-                                                    {/* Text Color */}
-                                                    <div className="input-group">
-                                                        <ColorSelector
-                                                            label="Text Color"
-                                                            value={formSubmitButtonState.textColor || '#ffffff'}
-                                                            onChange={(c: string) => setFormSubmitButtonState(prev => ({ ...prev, textColor: c }))}
-                                                        />
+                                                    {/* Background & Text Color */}
+                                                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '12px', marginTop: '12px' }}>
+                                                        <div className="input-group" style={{ marginTop: 0, minWidth: 0 }}>
+                                                            <ColorSelector
+                                                                label="Background Color"
+                                                                value={formSubmitButtonState.backgroundColor || '#6366f1'}
+                                                                onChange={(c: string) => setFormSubmitButtonState(prev => ({ ...prev, backgroundColor: c }))}
+                                                            />
+                                                        </div>
+                                                        <div className="input-group" style={{ marginTop: 0, minWidth: 0 }}>
+                                                            <ColorSelector
+                                                                label="Text Color"
+                                                                value={formSubmitButtonState.textColor || '#ffffff'}
+                                                                onChange={(c: string) => setFormSubmitButtonState(prev => ({ ...prev, textColor: c }))}
+                                                            />
+                                                        </div>
                                                     </div>
 
                                                     {/* Text Size */}
@@ -5203,35 +5217,35 @@ export default function SettingsPage() {
                                                         />
                                                     </div>
 
-                                                    {/* Border Width */}
-                                                    <div className="input-group" style={{ marginTop: 12 }}>
-                                                        <label className="input-label">Border Width (px)</label>
-                                                        <div style={{ padding: '0 8px', width: '100%' }}>
-                                                            <RangeSlider
-                                                                labelHidden
-                                                                label="Border Width"
-                                                                min={0}
-                                                                max={4}
-                                                                value={formSubmitButtonState.borderWidth ?? 0}
-                                                                onChange={(val) => setFormSubmitButtonState(prev => ({ ...prev, borderWidth: Number(val) }))}
-                                                                output
-                                                            />
+                                                    {/* Border Width & Radius */}
+                                                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '12px', marginTop: '12px' }}>
+                                                        <div className="input-group" style={{ marginTop: 0, minWidth: 0 }}>
+                                                            <label className="input-label">Border Width (px)</label>
+                                                            <div style={{ padding: '0 8px', width: '100%' }}>
+                                                                <RangeSlider
+                                                                    labelHidden
+                                                                    label="Border Width"
+                                                                    min={0}
+                                                                    max={4}
+                                                                    value={formSubmitButtonState.borderWidth ?? 0}
+                                                                    onChange={(val) => setFormSubmitButtonState(prev => ({ ...prev, borderWidth: Number(val) }))}
+                                                                    output
+                                                                />
+                                                            </div>
                                                         </div>
-                                                    </div>
-
-                                                    {/* Border Radius */}
-                                                    <div className="input-group" style={{ marginTop: 12 }}>
-                                                        <label className="input-label">Rounded Corners (px)</label>
-                                                        <div style={{ padding: '0 8px', width: '100%' }}>
-                                                            <RangeSlider
-                                                                labelHidden
-                                                                label="Rounded Corners"
-                                                                min={0}
-                                                                max={24}
-                                                                value={formSubmitButtonState.borderRadius ?? 12}
-                                                                onChange={(val) => setFormSubmitButtonState(prev => ({ ...prev, borderRadius: Number(val) }))}
-                                                                output
-                                                            />
+                                                        <div className="input-group" style={{ marginTop: 0, minWidth: 0 }}>
+                                                            <label className="input-label">Rounded Corners (px)</label>
+                                                            <div style={{ padding: '0 8px', width: '100%' }}>
+                                                                <RangeSlider
+                                                                    labelHidden
+                                                                    label="Rounded Corners"
+                                                                    min={0}
+                                                                    max={24}
+                                                                    value={formSubmitButtonState.borderRadius ?? 12}
+                                                                    onChange={(val) => setFormSubmitButtonState(prev => ({ ...prev, borderRadius: Number(val) }))}
+                                                                    output
+                                                                />
+                                                            </div>
                                                         </div>
                                                     </div>
 

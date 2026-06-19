@@ -231,16 +231,16 @@ export const colorSelectorStyles = `
     .polaris-color-row {
         display: flex;
         align-items: center;
-        gap: 12px;
+        gap: 8px;
         margin-top: 6px;
         background: #f9fafb;
         border-radius: 12px;
-        padding: 8px 12px;
+        padding: 6px 8px;
     }
     .polaris-color-swatch {
-        width: 48px;
-        height: 48px;
-        border-radius: 10px;
+        width: 38px;
+        height: 38px;
+        border-radius: 8px;
         border: 2px solid #e5e7eb;
         cursor: pointer;
         flex-shrink: 0;
@@ -251,10 +251,11 @@ export const colorSelectorStyles = `
     }
     .polaris-hex-input {
         flex: 1;
-        padding: 14px 16px;
+        min-width: 0;
+        padding: 10px 12px;
         border: 1px solid #e5e7eb;
-        border-radius: 10px;
-        font-size: 14px;
+        border-radius: 8px;
+        font-size: 13px;
         font-family: 'SF Mono', Monaco, monospace;
         text-transform: uppercase;
         background: #ffffff;

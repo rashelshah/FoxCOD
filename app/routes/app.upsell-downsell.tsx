@@ -723,8 +723,14 @@ export default function UpsellDownsellPage() {
                                                         { label: 'Dashed (Animation)', value: 'dashed_animation' },
                                                     ]}
                                                 />
-                                                <RangeSlider label="Rounded Corners (px)" min={0} max={20} value={editing.design.acceptButton.borderRadius} onChange={val => updAccept({ borderRadius: Number(val) })} output />
-                                                <RangeSlider label="Text Size (px)" min={10} max={20} value={editing.design.headerTextSize} onChange={val => updDesign({ headerTextSize: Number(val) })} output />
+                                                <InlineStack gap="300" wrap={false}>
+                                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                                        <RangeSlider label="Rounded Corners (px)" min={0} max={20} value={editing.design.acceptButton.borderRadius} onChange={val => updAccept({ borderRadius: Number(val) })} output />
+                                                    </div>
+                                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                                        <RangeSlider label="Text Size (px)" min={10} max={20} value={editing.design.headerTextSize} onChange={val => updDesign({ headerTextSize: Number(val) })} output />
+                                                    </div>
+                                                </InlineStack>
                                             </BlockStack>
                                         </LegacyCard>
                                     </AccordionSection>
@@ -2017,13 +2023,17 @@ export default function UpsellDownsellPage() {
                                         <div className="sec">
                                             <div className="fg"><label>Header Text</label><input value={editing.design.headerText} onChange={e => updDesign({ headerText: e.target.value })} /></div>
                                             <div className="fg"><label>Subheader</label><input value={editing.design.subheaderText} onChange={e => updDesign({ subheaderText: e.target.value })} /></div>
-                                            <div className="fg">
-                                                <label>Text Size (px)</label>
-                                                <div style={{ padding: '0 8px', width: '100%' }}>
-                                                    <RangeSlider labelHidden label="Text Size" min={10} max={36} value={editing.design.headerTextSize} onChange={val => updDesign({ headerTextSize: Number(val) || 20 })} output />
+                                            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '12px', marginTop: '12px' }}>
+                                                <div className="fg" style={{ minWidth: 0, marginTop: 0 }}>
+                                                    <label>Text Size (px)</label>
+                                                    <div style={{ padding: '0 8px', width: '100%' }}>
+                                                        <RangeSlider labelHidden label="Text Size" min={10} max={36} value={editing.design.headerTextSize} onChange={val => updDesign({ headerTextSize: Number(val) || 20 })} output />
+                                                    </div>
+                                                </div>
+                                                <div style={{ minWidth: 0 }}>
+                                                    <ColorSelector label="Text Color" value={editing.design.headerTextColor} onChange={c => updDesign({ headerTextColor: c })} />
                                                 </div>
                                             </div>
-                                            <ColorSelector label="Text Color" value={editing.design.headerTextColor} onChange={c => updDesign({ headerTextColor: c })} />
                                         </div>
                                     </AccordionSection>
 
@@ -2049,18 +2059,26 @@ export default function UpsellDownsellPage() {
                                     <AccordionSection id="click-discount-tag" tab="click" title="Discount Tag" helperText="Customize the discount tag badge." expandedSection={expandedSection} toggleSection={toggleSection}>
                                         <div className="sec">
                                             <div className="fg"><label>Text</label><input value={editing.design.discountTag.text} onChange={e => updDesign({ discountTag: { ...editing.design.discountTag, text: e.target.value } })} /></div>
-                                            <ColorSelector label="Background" value={editing.design.discountTag.bgColor.startsWith('#') ? editing.design.discountTag.bgColor : '#ec4899'} onChange={c => updDesign({ discountTag: { ...editing.design.discountTag, bgColor: c } })} />
-                                            <ColorSelector label="Text Color" value={editing.design.discountTag.textColor} onChange={c => updDesign({ discountTag: { ...editing.design.discountTag, textColor: c } })} />
-                                            <div className="fg">
-                                                <label>Text Size (px)</label>
-                                                <div style={{ padding: '0 8px', width: '100%' }}>
-                                                    <RangeSlider labelHidden label="Text Size" min={8} max={24} value={editing.design.discountTag.textSize} onChange={val => updDesign({ discountTag: { ...editing.design.discountTag, textSize: Number(val) || 14 } })} output />
+                                            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '12px', marginTop: '12px' }}>
+                                                <div style={{ minWidth: 0 }}>
+                                                    <ColorSelector label="Background" value={editing.design.discountTag.bgColor.startsWith('#') ? editing.design.discountTag.bgColor : '#ec4899'} onChange={c => updDesign({ discountTag: { ...editing.design.discountTag, bgColor: c } })} />
+                                                </div>
+                                                <div style={{ minWidth: 0 }}>
+                                                    <ColorSelector label="Text Color" value={editing.design.discountTag.textColor} onChange={c => updDesign({ discountTag: { ...editing.design.discountTag, textColor: c } })} />
                                                 </div>
                                             </div>
-                                            <div className="fg">
-                                                <label>Rounded Corners (px)</label>
-                                                <div style={{ padding: '0 8px', width: '100%' }}>
-                                                    <RangeSlider labelHidden label="Rounded Corners" min={0} max={30} value={editing.design.discountTag.borderRadius} onChange={val => updDesign({ discountTag: { ...editing.design.discountTag, borderRadius: Number(val) } })} output />
+                                            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '12px', marginTop: '12px' }}>
+                                                <div className="fg" style={{ minWidth: 0, marginTop: 0 }}>
+                                                    <label>Text Size (px)</label>
+                                                    <div style={{ padding: '0 8px', width: '100%' }}>
+                                                        <RangeSlider labelHidden label="Text Size" min={8} max={24} value={editing.design.discountTag.textSize} onChange={val => updDesign({ discountTag: { ...editing.design.discountTag, textSize: Number(val) || 14 } })} output />
+                                                    </div>
+                                                </div>
+                                                <div className="fg" style={{ minWidth: 0, marginTop: 0 }}>
+                                                    <label>Rounded Corners (px)</label>
+                                                    <div style={{ padding: '0 8px', width: '100%' }}>
+                                                        <RangeSlider labelHidden label="Rounded Corners" min={0} max={30} value={editing.design.discountTag.borderRadius} onChange={val => updDesign({ discountTag: { ...editing.design.discountTag, borderRadius: Number(val) } })} output />
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -2072,8 +2090,14 @@ export default function UpsellDownsellPage() {
                                             <div className="fg"><label>Button Text</label><input value={editing.design.acceptButton.text} onChange={e => updAccept({ text: e.target.value })} /></div>
                                             <div className="fg"><label>Animation</label><select value={editing.design.acceptButton.animation} onChange={e => updAccept({ animation: e.target.value })}><option value="none">None</option><option value="pulse">Pulse</option><option value="bounce">Bounce</option><option value="shake">Shake</option></select></div>
                                             <div className="up-section-label">Colors</div>
-                                            <ColorSelector label="Background" value={editing.design.acceptButton.bgColor} onChange={c => updAccept({ bgColor: c })} />
-                                            <ColorSelector label="Text Color" value={editing.design.acceptButton.textColor} onChange={c => updAccept({ textColor: c })} />
+                                            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '12px', marginTop: '12px' }}>
+                                                <div style={{ minWidth: 0 }}>
+                                                    <ColorSelector label="Background" value={editing.design.acceptButton.bgColor} onChange={c => updAccept({ bgColor: c })} />
+                                                </div>
+                                                <div style={{ minWidth: 0 }}>
+                                                    <ColorSelector label="Text Color" value={editing.design.acceptButton.textColor} onChange={c => updAccept({ textColor: c })} />
+                                                </div>
+                                            </div>
                                             <div className="fg">
                                                 <label>Text Size (px)</label>
                                                 <div style={{ padding: '0 8px', width: '100%' }}>
@@ -2082,16 +2106,18 @@ export default function UpsellDownsellPage() {
                                             </div>
                                             <div className="up-section-label">Border</div>
                                             <ColorSelector label="Border Color" value={editing.design.acceptButton.borderColor} onChange={c => updAccept({ borderColor: c })} />
-                                            <div className="fg">
-                                                <label>Border Width (px)</label>
-                                                <div style={{ padding: '0 8px', width: '100%' }}>
-                                                    <RangeSlider labelHidden label="Border Width" min={0} max={5} value={editing.design.acceptButton.borderWidth} onChange={val => updAccept({ borderWidth: Number(val) })} output />
+                                            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '12px', marginTop: '12px' }}>
+                                                <div className="fg" style={{ minWidth: 0, marginTop: 0 }}>
+                                                    <label>Border Width (px)</label>
+                                                    <div style={{ padding: '0 8px', width: '100%' }}>
+                                                        <RangeSlider labelHidden label="Border Width" min={0} max={5} value={editing.design.acceptButton.borderWidth} onChange={val => updAccept({ borderWidth: Number(val) })} output />
+                                                    </div>
                                                 </div>
-                                            </div>
-                                            <div className="fg">
-                                                <label>Rounded Corners (px)</label>
-                                                <div style={{ padding: '0 8px', width: '100%' }}>
-                                                    <RangeSlider labelHidden label="Rounded Corners" min={0} max={30} value={editing.design.acceptButton.borderRadius} onChange={val => updAccept({ borderRadius: Number(val) })} output />
+                                                <div className="fg" style={{ minWidth: 0, marginTop: 0 }}>
+                                                    <label>Rounded Corners (px)</label>
+                                                    <div style={{ padding: '0 8px', width: '100%' }}>
+                                                        <RangeSlider labelHidden label="Rounded Corners" min={0} max={30} value={editing.design.acceptButton.borderRadius} onChange={val => updAccept({ borderRadius: Number(val) })} output />
+                                                    </div>
                                                 </div>
                                             </div>
                                             <div className="up-toggle-row" onClick={() => updAccept({ shadow: !editing.design.acceptButton.shadow })}>
@@ -2106,20 +2132,28 @@ export default function UpsellDownsellPage() {
                                         <div className="sec">
                                             <div className="fg"><label>Button Text</label><input value={editing.design.rejectButton.text} onChange={e => updReject({ text: e.target.value })} /></div>
                                             <div className="up-section-label">Colors</div>
-                                            <ColorSelector label="Background" value={editing.design.rejectButton.bgColor} onChange={c => updReject({ bgColor: c })} />
-                                            <ColorSelector label="Text Color" value={editing.design.rejectButton.textColor} onChange={c => updReject({ textColor: c })} />
-                                            <div className="up-section-label">Border</div>
-                                            <ColorSelector label="Border Color" value={editing.design.rejectButton.borderColor} onChange={c => updReject({ borderColor: c })} />
-                                            <div className="fg">
-                                                <label>Border Width (px)</label>
-                                                <div style={{ padding: '0 8px', width: '100%' }}>
-                                                    <RangeSlider labelHidden label="Border Width" min={0} max={5} value={editing.design.rejectButton.borderWidth} onChange={val => updReject({ borderWidth: Number(val) })} output />
+                                            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '12px', marginTop: '12px' }}>
+                                                <div style={{ minWidth: 0 }}>
+                                                    <ColorSelector label="Background" value={editing.design.rejectButton.bgColor} onChange={c => updReject({ bgColor: c })} />
+                                                </div>
+                                                <div style={{ minWidth: 0 }}>
+                                                    <ColorSelector label="Text Color" value={editing.design.rejectButton.textColor} onChange={c => updReject({ textColor: c })} />
                                                 </div>
                                             </div>
-                                            <div className="fg">
-                                                <label>Rounded Corners (px)</label>
-                                                <div style={{ padding: '0 8px', width: '100%' }}>
-                                                    <RangeSlider labelHidden label="Rounded Corners" min={0} max={30} value={editing.design.rejectButton.borderRadius} onChange={val => updReject({ borderRadius: Number(val) })} output />
+                                            <div className="up-section-label">Border</div>
+                                            <ColorSelector label="Border Color" value={editing.design.rejectButton.borderColor} onChange={c => updReject({ borderColor: c })} />
+                                            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '12px', marginTop: '12px' }}>
+                                                <div className="fg" style={{ minWidth: 0, marginTop: 0 }}>
+                                                    <label>Border Width (px)</label>
+                                                    <div style={{ padding: '0 8px', width: '100%' }}>
+                                                        <RangeSlider labelHidden label="Border Width" min={0} max={5} value={editing.design.rejectButton.borderWidth} onChange={val => updReject({ borderWidth: Number(val) })} output />
+                                                    </div>
+                                                </div>
+                                                <div className="fg" style={{ minWidth: 0, marginTop: 0 }}>
+                                                    <label>Rounded Corners (px)</label>
+                                                    <div style={{ padding: '0 8px', width: '100%' }}>
+                                                        <RangeSlider labelHidden label="Rounded Corners" min={0} max={30} value={editing.design.rejectButton.borderRadius} onChange={val => updReject({ borderRadius: Number(val) })} output />
+                                                    </div>
                                                 </div>
                                             </div>
                                             <div className="up-toggle-row" onClick={() => updReject({ shadow: !editing.design.rejectButton.shadow })}>
