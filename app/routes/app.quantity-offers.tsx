@@ -44,6 +44,7 @@ import {
 import { supabase } from "../config/supabase.server";
 import { getFormSettings } from "../config/supabase.server";
 import { DEFAULT_FIELDS } from "../config/form-builder.types";
+import { getPartialPaymentSettings } from "../services/partial-payment-settings.server";
 
 // Color Presets for quick selection
 const COLOR_PRESETS = [
@@ -137,7 +138,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         shopCurrency = currencyData?.data?.shop?.currencyCode || 'USD';
     } catch (e) { console.log('Error fetching shop currency:', e); }
 
-    return { shopDomain, offerGroups: groupsWithProducts, formSettings, shopCurrency };
+    const partialPaymentSettings = await getPartialPaymentSettings(shopDomain);
+
+    return { shopDomain, offerGroups: groupsWithProducts, formSettings, shopCurrency, partialPaymentSettings };
 };
 
 // Ensure metafield definition
@@ -415,7 +418,7 @@ function SortableOfferItem({
 
 // Main Component
 export default function QuantityOffersPage() {
-    const { shopDomain, offerGroups: initialOfferGroups, formSettings, shopCurrency } = useLoaderData<typeof loader>();
+    const { shopDomain, offerGroups: initialOfferGroups, formSettings, shopCurrency, partialPaymentSettings } = useLoaderData<typeof loader>();
     const actionData = useActionData<typeof action>();
     const revalidator = useRevalidator();
     const submit = useSubmit();
@@ -1633,7 +1636,7 @@ export default function QuantityOffersPage() {
                                                                                 </div>
                                                                             </div>
 
-                                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                                                                                 {/* 1. Full Prepaid (Visual Only) */}
                                                                                 {showFullPrepaid && (
                                                                                     <label style={{
@@ -1641,16 +1644,18 @@ export default function QuantityOffersPage() {
                                                                                         border: '2px solid #22c55e', cursor: 'pointer', position: 'relative', overflow: 'visible',
                                                                                         padding: 0, opacity: 1
                                                                                     }}>
-                                                                                        {/* Most Popular Badge */}
-                                                                                        <div style={{
-                                                                                            position: 'absolute', top: '-10px', left: '12px', background: '#22c55e', color: 'white',
-                                                                                            fontSize: '7.5px', fontWeight: 700, padding: '2px 5px', borderRadius: '4px', letterSpacing: '0.05em',
-                                                                                            display: 'flex', alignItems: 'center', gap: '3px', textTransform: 'uppercase'
-                                                                                        }}>
-                                                                                            ★ MOST POPULAR
-                                                                                        </div>
+                                                                                        {/* Custom Tag Badge */}
+                                                                                        {(partialPaymentSettings?.payment_method_tags?.full_prepaid?.enabled || (!partialPaymentSettings?.payment_method_tags?.full_prepaid && true)) && (
+                                                                                            <div style={{
+                                                                                                position: 'absolute', top: '-10px', left: '16px', background: '#22c55e', color: 'white',
+                                                                                                fontSize: '9px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', letterSpacing: '0.05em',
+                                                                                                display: 'flex', alignItems: 'center', gap: '4px', textTransform: 'uppercase'
+                                                                                            }}>
+                                                                                                {partialPaymentSettings?.payment_method_tags?.full_prepaid?.text || '★ MOST POPULAR'}
+                                                                                            </div>
+                                                                                        )}
 
-                                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '18px 10px 8px 10px' }}>
+                                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: (partialPaymentSettings?.payment_method_tags?.full_prepaid?.enabled || (!partialPaymentSettings?.payment_method_tags?.full_prepaid && true)) ? '18px 10px 8px 10px' : '8px 10px' }}>
                                                                                             {/* Icon */}
                                                                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '24px', height: '24px', borderRadius: '6px', color: '#16a34a', backgroundColor: '#dcfce7' }}>
                                                                                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4" /><path d="M4 6v12c0 1.1.9 2 2 2h14v-4" /><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z" /></svg>
@@ -1669,9 +1674,11 @@ export default function QuantityOffersPage() {
                                                                                             </div>
                                                                                         </div>
                                                                                         {/* Info Bar */}
-                                                                                        <div style={{ background: '#dcfce7', padding: '5px 8px', borderBottomLeftRadius: '8px', borderBottomRightRadius: '8px', fontSize: '8.5px', color: '#166534', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500 }}>
-                                                                                            Pay now, save more, receive sooner
-                                                                                        </div>
+                                                                                        {partialPaymentSettings?.payment_method_descriptions?.full_prepaid?.enabled && (
+                                                                                            <div style={{ background: '#dcfce7', padding: '5px 8px', borderBottomLeftRadius: '8px', borderBottomRightRadius: '8px', fontSize: '8.5px', color: '#166534', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500 }}>
+                                                                                                {partialPaymentSettings?.payment_method_descriptions?.full_prepaid?.text}
+                                                                                            </div>
+                                                                                        )}
                                                                                     </label>
                                                                                 )}
 
@@ -1679,9 +1686,18 @@ export default function QuantityOffersPage() {
                                                                                 {showPartial && (
                                                                                     <label style={{
                                                                                         display: 'flex', flexDirection: 'column', background: '#eff6ff', borderRadius: '10px',
-                                                                                        border: '2px solid #bfdbfe', cursor: 'default', position: 'relative'
+                                                                                        border: '2px solid #bfdbfe', cursor: 'default', position: 'relative', overflow: 'visible'
                                                                                     }}>
-                                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px' }}>
+                                                                                        {partialPaymentSettings?.payment_method_tags?.partial_payment?.enabled && (
+                                                                                            <div style={{
+                                                                                                position: 'absolute', top: '-10px', left: '16px', background: '#2563eb', color: 'white',
+                                                                                                fontSize: '9px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', letterSpacing: '0.05em',
+                                                                                                display: 'flex', alignItems: 'center', gap: '4px', textTransform: 'uppercase'
+                                                                                            }}>
+                                                                                                {partialPaymentSettings?.payment_method_tags?.partial_payment?.text}
+                                                                                            </div>
+                                                                                        )}
+                                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: partialPaymentSettings?.payment_method_tags?.partial_payment?.enabled ? '18px 10px 8px 10px' : '8px 10px' }}>
                                                                                             {/* Icon */}
                                                                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '24px', height: '24px', borderRadius: '6px', color: '#2563eb', backgroundColor: '#dbeafe' }}>
                                                                                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>
@@ -1703,18 +1719,29 @@ export default function QuantityOffersPage() {
                                                                                             </div>
                                                                                         </div>
                                                                                         {/* Info Bar */}
-                                                                                        <div style={{ background: '#dbeafe', padding: '5px 8px', borderBottomLeftRadius: '8px', borderBottomRightRadius: '8px', fontSize: '8.5px', color: '#1e40af', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500 }}>
-                                                                                            Secure your order • Avoid fake cancellations
-                                                                                        </div>
+                                                                                        {partialPaymentSettings?.payment_method_descriptions?.partial_payment?.enabled && (
+                                                                                            <div style={{ background: '#dbeafe', padding: '5px 8px', borderBottomLeftRadius: '8px', borderBottomRightRadius: '8px', fontSize: '8.5px', color: '#1e40af', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500 }}>
+                                                                                                {partialPaymentSettings?.payment_method_descriptions?.partial_payment?.text}
+                                                                                            </div>
+                                                                                        )}
                                                                                     </label>
                                                                                 )}
 
                                                                                 {/* 3. Cash on Delivery */}
                                                                                 <label style={{
                                                                                     display: 'flex', flexDirection: 'column', background: '#fff7ed', borderRadius: '10px',
-                                                                                    border: '2px solid #fed7aa', cursor: 'default', position: 'relative'
+                                                                                    border: '2px solid #fed7aa', cursor: 'default', position: 'relative', overflow: 'visible'
                                                                                 }}>
-                                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 10px' }}>
+                                                                                    {partialPaymentSettings?.payment_method_tags?.pure_cod?.enabled && (
+                                                                                        <div style={{
+                                                                                            position: 'absolute', top: '-10px', left: '16px', background: '#ea580c', color: 'white',
+                                                                                            fontSize: '9px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', letterSpacing: '0.05em',
+                                                                                            display: 'flex', alignItems: 'center', gap: '4px', textTransform: 'uppercase'
+                                                                                        }}>
+                                                                                            {partialPaymentSettings?.payment_method_tags?.pure_cod?.text}
+                                                                                        </div>
+                                                                                    )}
+                                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: partialPaymentSettings?.payment_method_tags?.pure_cod?.enabled ? '18px 10px 8px 10px' : '8px 10px' }}>
                                                                                         {/* Icon */}
                                                                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '24px', height: '24px', borderRadius: '6px', color: '#ea580c', backgroundColor: '#ffedd5' }}>
                                                                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1" ry="1" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
@@ -1733,9 +1760,11 @@ export default function QuantityOffersPage() {
                                                                                         </div>
                                                                                     </div>
                                                                                     {/* Info Bar */}
-                                                                                    <div style={{ background: '#ffedd5', padding: '5px 8px', borderBottomLeftRadius: '8px', borderBottomRightRadius: '8px', fontSize: '8.5px', color: '#9a3412', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500 }}>
-                                                                                        Higher return risk • Slower processing
-                                                                                    </div>
+                                                                                    {partialPaymentSettings?.payment_method_descriptions?.pure_cod?.enabled && (
+                                                                                        <div style={{ background: '#ffedd5', padding: '5px 8px', borderBottomLeftRadius: '8px', borderBottomRightRadius: '8px', fontSize: '8.5px', color: '#9a3412', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500 }}>
+                                                                                            {partialPaymentSettings?.payment_method_descriptions?.pure_cod?.text}
+                                                                                        </div>
+                                                                                    )}
                                                                                 </label>
                                                                             </div>
                                                                         </div>
