@@ -21,7 +21,7 @@ export default function App() {
   return (
     <div className={styles.index}>
       <div className={styles.content}>
-        <h1 className={styles.heading}>Fox COD</h1>
+        <h1 className={styles.heading}>Foxly COD</h1>
 
         <p className={styles.text}>
           One-click Cash on Delivery checkout for Shopify stores.

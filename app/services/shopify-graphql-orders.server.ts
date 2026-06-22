@@ -204,6 +204,7 @@ export async function createPendingOrder(params: GraphQLOrderParams): Promise<Gr
     note: params.note || '',
     customAttributes: params.noteAttributes || [],
     email: params.customer.email || undefined,
+    sourceName: "Foxly COD + Partial & Prepaid",
   };
 
   if (customerId) {

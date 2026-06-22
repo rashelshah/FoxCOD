@@ -1630,7 +1630,7 @@ export default function PartialPaymentsPage() {
 
               <Text as="h3" variant="headingSm">Module Compatibility</Text>
               <Text as="p" variant="bodySm" tone="subdued">
-                Control whether other Fox COD features apply when a customer uses partial payment.
+                Control whether other Foxly COD features apply when a customer uses partial payment.
               </Text>
 
               <ToggleRow

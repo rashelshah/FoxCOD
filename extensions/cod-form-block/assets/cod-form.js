@@ -18,7 +18,7 @@
   );
 
   if (isShopifyEditor) {
-    console.log('FoxCOD: Running in Theme Editor (safe mode)');
+    console.log('FoxlyCOD: Running in Theme Editor (safe mode)');
   }
 
   // =============================================
@@ -774,7 +774,7 @@
       return await response.json();
     } catch (error) {
       if (error && error._isServerError) throw error;
-      console.warn('FoxCOD fetch failed (network):', error);
+      console.warn('FoxlyCOD fetch failed (network):', error);
       return null;
     }
   }
@@ -782,7 +782,7 @@
   function requestProxyJson(config, path, options) {
     return safeFetch((config.proxyUrl || '/apps/fox-cod') + path, options).then(function(data) {
       if (!data) {
-        throw new Error('Failed to reach the Fox COD service. Please try again.');
+        throw new Error('Failed to reach the Foxly COD service. Please try again.');
       }
       return data;
     });
@@ -1169,11 +1169,11 @@
     }
 
     if (!buyTarget) {
-      console.warn('[FoxCOD] Could not find buy buttons anywhere on the page. COD button stays at block position.');
+      console.warn('[FoxlyCOD] Could not find buy buttons anywhere on the page. COD button stays at block position.');
       return;
     }
 
-    console.log('[FoxCOD] Found buy buttons target:', buyTarget.tagName, buyTarget.className || '');
+    console.log('[FoxlyCOD] Found buy buttons target:', buyTarget.tagName, buyTarget.className || '');
 
     // Get the shell element (contains trigger button + status text)
     var shell = rootElement.querySelector('[data-foxcod-shell]');
@@ -1201,7 +1201,7 @@
     // Store reference so rest of the code can find the shell/trigger
     rootElement._foxcodInjectedWrapper = wrapper;
     rootElement.dataset.foxcodInjected = 'true';
-    console.log('[FoxCOD] ✅ COD button injected at buy buttons position successfully.');
+    console.log('[FoxlyCOD] ✅ COD button injected at buy buttons position successfully.');
   }
 
   function initFoxCodSafe() {
@@ -1210,7 +1210,7 @@
     var roots = document.querySelectorAll('[data-fox-cod-root]');
 
     if (!roots.length) {
-      console.warn('FoxCOD: No roots found');
+      console.warn('FoxlyCOD: No roots found');
       return false;
     }
 
@@ -1218,7 +1218,7 @@
 
     roots.forEach(function(rootElement) {
       if (!rootElement.isConnected) {
-        console.warn('FoxCOD: Root not attached yet');
+        console.warn('FoxlyCOD: Root not attached yet');
         return;
       }
 
@@ -1271,11 +1271,11 @@
       return;
     }
 
-    console.warn('FoxCOD: DOM never stabilized');
+    console.warn('FoxlyCOD: DOM never stabilized');
   }
 
   /**
-   * Initialize a single Fox COD root after the DOM is stable.
+   * Initialize a single Foxly COD root after the DOM is stable.
    */
   function initFoxCod(rootElement, trigger) {
       var dataContainer = rootElement.querySelector('.cod-form-data');
@@ -7242,7 +7242,7 @@ function darkenColor(hex, percent) {
    * The server's decision engine (createFullPrepaidCheckout) automatically selects:
    *   - Cart Permalink: for standard products with native pricing (fastest)
    *   - Draft Order:    when bundle/upsell/downsell/coupon/custom pricing is present
-   *     (so Shopify Checkout always shows the correct Fox COD price — no trust issue)
+   *     (so Shopify Checkout always shows the correct Foxly COD price — no trust issue)
    */
   function submitFullPrepaidCheckout(form, config, payload, submitBtn, originalBtnText) {
       var fpPayload = Object.assign({}, payload, {

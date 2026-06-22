@@ -1,5 +1,5 @@
 /**
- * Dashboard Page - Main admin view for Fox COD app
+ * Dashboard Page - Main admin view for Foxly COD app
  * Route: /app
  * Premium modern design
  */
@@ -675,7 +675,7 @@ export default function Index() {
             <div className="welcome-content">
               <div className="welcome-script">Welcome to</div>
               <div className="welcome-title-row">
-                <h1>Fox COD</h1>
+                <h1>Foxly COD</h1>
                 <div className="welcome-fox-icon">
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M22 12c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2s10 4.477 10 10z"/>

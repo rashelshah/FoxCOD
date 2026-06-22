@@ -111,7 +111,7 @@ export async function createPartialPaymentCheckout(
               nativePrices[numericId] = nativePrice;
               nativeCartTotal += nativePrice * lineItem.quantity;
               
-              // Compare native price with Fox COD's passed price
+              // Compare native price with Foxly COD's passed price
               if (Math.abs(nativePrice - lineItem.price) > 0.01) {
                 hasCustomPricing = true;
               }
@@ -213,7 +213,7 @@ async function createCartPermalinkCheckout(
     `, {
       variables: {
         basicCodeDiscount: {
-          title: `FoxCOD Partial Payment — ${partialPaymentReference}`,
+          title: `FoxlyCOD Partial Payment — ${partialPaymentReference}`,
           code,
           startsAt: new Date().toISOString(),
           endsAt: expiresAt,
@@ -260,7 +260,7 @@ async function createCartPermalinkCheckout(
   
   queryParams.append('attributes[original_total]', totalOrderValue.toFixed(2));
   queryParams.append('attributes[partial_payment_reference]', partialPaymentReference);
-  queryParams.append('attributes[order_source]', 'FoxCOD');
+  queryParams.append('attributes[order_source]', 'FoxlyCOD');
   queryParams.append('attributes[checkout_type]', 'cart_permalink');
   
   const cartNote = [
@@ -407,7 +407,7 @@ async function createDraftOrderCheckout(
     !params.isFullPrepaid ? { key: 'remaining_amount', value: remainingAmount.toFixed(2) } : null,
     { key: 'original_total', value: totalOrderValue.toFixed(2) },
     { key: 'partial_payment_reference', value: partialPaymentReference },
-    { key: 'order_source', value: 'FoxCOD' },
+    { key: 'order_source', value: 'FoxlyCOD' },
     { key: 'checkout_type', value: 'draft_order' }
   ].filter(Boolean) as { key: string; value: string }[];
 
@@ -454,13 +454,16 @@ async function createDraftOrderCheckout(
   graphqlInput.note = cartNote;
   graphqlInput.customAttributes = customAttributes;
   graphqlInput.tags = params.isFullPrepaid
-    ? (params.prepaidDiscountAmount && params.prepaidDiscountAmount > 0 ? ["FoxCOD", "Full Prepaid", "Prepaid Discount"] : ["FoxCOD", "Full Prepaid"])
-    : ["FoxCOD", "Partial COD", "Pending Advance"];
+    ? (params.prepaidDiscountAmount && params.prepaidDiscountAmount > 0 ? ["FoxlyCOD", "Full Prepaid", "Prepaid Discount"] : ["FoxlyCOD", "Full Prepaid"])
+    : ["FoxlyCOD", "Partial COD", "Pending Advance"];
 
   if (Object.keys(cleanAddressInput).length > 0) {
     graphqlInput.shippingAddress = cleanAddressInput;
     graphqlInput.billingAddress = cleanAddressInput;
   }
+
+  // Set the sourceName so Shopify associates this draft order (and the resulting order) with the app
+  graphqlInput.sourceName = "Foxly COD + Partial & Prepaid";
 
   if (customer.email) {
     graphqlInput.email = customer.email;
@@ -528,7 +531,7 @@ async function createDraftOrderCheckout(
  *   - Uses Cart Permalink when pricing is native (fastest path)
  *   - Falls back to Draft Order when custom pricing exists
  *     (bundle variants, upsells, downsells, coupons, paid shipping)
- *     so checkout always shows the correct Fox COD price.
+ *     so checkout always shows the correct Foxly COD price.
  *
  * No discount code is generated for standard products since
  * requiredDiscount = nativeCartTotal - totalOrderValue = 0 in that case.
@@ -575,7 +578,7 @@ export async function cleanupPartialPaymentDiscounts(
         }
       }
     }
-  `, { variables: { query: `title:FoxCOD Partial Payment AND status:expired` } });
+  `, { variables: { query: `title:FoxlyCOD Partial Payment AND status:expired` } });
 
   const listData = await listRes.json();
   const nodes: any[] = listData?.data?.codeDiscountNodes?.edges?.map((e: any) => e.node) || [];

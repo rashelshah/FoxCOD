@@ -35,9 +35,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     } catch (e) {}
     
     const pcodCode = discountCodes.find((dc: any) => dc.code?.startsWith("FOX-PCOD-"));
-    const pcodApp = discountApps.find((da: any) => da.code?.startsWith("FOX-PCOD-") || da.title?.startsWith("FoxCOD Partial Payment"));
+    const pcodApp = discountApps.find((da: any) => da.code?.startsWith("FOX-PCOD-") || da.title?.startsWith("FoxlyCOD Partial Payment"));
     
-    const isFullPrepaid = fullPrepaidAttr?.value === "true" || (payload.tags && payload.tags.includes("FoxCOD, Full Prepaid"));
+    const isFullPrepaid = fullPrepaidAttr?.value === "true" || (payload.tags && payload.tags.includes("FoxlyCOD, Full Prepaid"));
     const isPartialCod = !isFullPrepaid && (partialCodAttr?.value === "true" || !!pcodCode || !!pcodApp);
 
     if (!isPartialCod && !isFullPrepaid) {
@@ -146,7 +146,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           {
             variables: { 
               id: `gid://shopify/Order/${payload.id}`,
-              tags: isFullPrepaid ? ["FoxCOD", "Full Prepaid"] : ["FoxCOD", "Partial COD", "Pending Advance"]
+              tags: isFullPrepaid ? ["FoxlyCOD", "Full Prepaid"] : ["FoxlyCOD", "Partial COD", "Pending Advance"]
             },
           }
         );

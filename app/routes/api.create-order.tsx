@@ -443,8 +443,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 country: body.customerCountry || 'IN',
                 phone: formattedPhone || '',
             } : undefined,
-            tags: ['FoxCOD', 'COD'],
-            note: orderNotes || 'Order placed via FoxCOD COD Form',
+            tags: ['FoxlyCOD', 'COD'],
+            note: orderNotes || 'Order placed via FoxlyCOD COD Form',
             shippingLine: { title: shippingLabel, price: shippingPrice.toFixed(2) },
             discount: (couponCode && couponDiscount > 0) ? {
                 code: couponCode,
@@ -452,7 +452,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 valueType: 'FIXED_AMOUNT' as const
             } : undefined,
             noteAttributes: [
-                { key: 'Order Source', value: 'FoxCOD' },
+                { key: 'Order Source', value: 'FoxlyCOD' },
                 ...(couponCode && couponDiscount > 0 ? [
                     { key: 'Coupon Code', value: couponCode },
                     { key: 'Coupon Type', value: couponType === 'percentage' ? `${couponValue}% off` : `Fixed ${fmtPrice(couponValue)}` },

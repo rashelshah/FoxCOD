@@ -254,8 +254,8 @@ export async function createShopifyOrderBackground(orderId: string): Promise<Sho
                 country: orderCountry,
                 phone: formattedPhone || '',
             } : undefined,
-            tags: ['FoxCOD', 'COD'],
-            note: orderNotes || `Order placed via FoxCOD COD Form`,
+            tags: ['FoxlyCOD', 'COD'],
+            note: orderNotes || `Order placed via FoxlyCOD COD Form`,
             shippingLine: { title: shippingLabel, price: shippingPrice.toFixed(2) }
         };
 
