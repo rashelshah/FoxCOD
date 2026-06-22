@@ -1095,7 +1095,7 @@ export default function QuantityOffersPage() {
                             </div>
                             <div className="preview-content">
                                 <div className="preview-phone">
-                                    <div className="preview-phone-screen" style={{ background: (formSettings?.styles as any)?.background || formSettings?.styles?.backgroundColor || '#ffffff' }}>
+                                    <div className="preview-phone-screen">
                                         {/* In Product Page placement: show offers on the product page itself */}
                                         {activeGroup && activeGroup.placement === 'in_product_page' ? (
                                             <div style={{ padding: '16px' }}>
@@ -2281,7 +2281,7 @@ const styles = `
     .preview-header h3 { margin: 0; font-size: 14px; font-weight: 600; }
     .preview-content { padding: 24px; }
     .preview-phone { background: #1f2937; border-radius: 32px; padding: 6px; max-width: 380px; margin: 0 auto; }
-    .preview-phone-screen { background: white; border-radius: 24px; overflow: hidden; max-height: 600px; padding: 16px; overflow-y: auto; }
+    .preview-phone-screen { background: white; border-radius: 24px; max-height: 600px; overflow: hidden; overflow-y: auto; transform: translateZ(0); -webkit-mask-image: -webkit-radial-gradient(white, black); mask-image: radial-gradient(white, black); }
     .preview-header-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f3f4f6; margin-bottom: 12px; }
     .preview-header-row span { font-size: 13px; font-weight: 500; }
     .preview-close { font-size: 18px; color: #9ca3af; cursor: pointer; }

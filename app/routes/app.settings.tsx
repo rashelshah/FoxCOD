@@ -10,7 +10,7 @@ import { useLoaderData, useSubmit, useNavigation, Link, useActionData } from "re
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { RangeSlider, Button, InlineStack, Modal, Text, Icon, Select, TextField, ColorPicker, Banner, Popover, ActionList, Badge } from "@shopify/polaris";
-import { EditIcon, DeleteIcon, ViewIcon, HideIcon, StarFilledIcon } from "@shopify/polaris-icons";
+import { EditIcon, DeleteIcon, ViewIcon, HideIcon, StarFilledIcon, ResetIcon, PlusIcon } from "@shopify/polaris-icons";
 import {
     DndContext,
     closestCenter,
@@ -2263,7 +2263,7 @@ const AccordionSection = ({ id, tab, title, helperText, expandedSection, toggleS
 }) => {
     const isOpen = expandedSection[tab] === id;
     return (
-        <div className={`accordion-section ${isOpen ? 'open' : ''}`}>
+        <div id={id} className={`accordion-section ${isOpen ? 'open' : ''}`}>
             <button type="button" className="accordion-header" onClick={() => toggleSection(tab, id)}>
                 <span className="accordion-title">{title}</span>
                 <span className={`accordion-chevron ${isOpen ? 'rotated' : ''}`}>▶</span>
@@ -2337,6 +2337,11 @@ export default function SettingsPage() {
         setExpandedSection(prev => {
             const next = prev[tab] === sectionId ? '' : sectionId;
             if (prev[tab] === next) return prev;
+            
+            if (next) {
+                window.scrollTo(0, 0);
+            }
+            
             return { ...prev, [tab]: next };
         });
     }, []);
@@ -3141,11 +3146,11 @@ export default function SettingsPage() {
                 .main-toggle.enabled { background: rgba(16, 185, 129, 0.1); border: 2px solid #10b981; }
                 .main-toggle.disabled { background: #f9fafb; border: 2px solid #e5e7eb; }
                 .toggle-info h3 { font-size: 16px; font-weight: 600; color: #111827; margin: 0 0 4px 0; }
-                .toggle-switch { width: 56px; height: 32px; border-radius: 16px; position: relative; cursor: pointer; transition: background 0.2s cubic-bezier(0.25, 0.1, 0.25, 1); }
+                .toggle-switch { width: 44px; height: 24px; border-radius: 12px; position: relative; cursor: pointer; transition: background 0.2s cubic-bezier(0.25, 0.1, 0.25, 1); }
                 .toggle-switch.enabled { background: var(--p-color-bg-fill-inverse, #1a1a1a); }
                 .toggle-switch.disabled { background: var(--p-color-bg-surface-secondary-active, #dfe3e8); }
-                .toggle-switch::after { content: ''; position: absolute; width: 28px; height: 28px; background: white; border-radius: 50%; top: 2px; transition: left 0.2s cubic-bezier(0.25, 0.1, 0.25, 1); box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06); }
-                .toggle-switch.enabled::after { left: 26px; }
+                .toggle-switch::after { content: ''; position: absolute; width: 20px; height: 20px; background: white; border-radius: 50%; top: 2px; transition: left 0.2s cubic-bezier(0.25, 0.1, 0.25, 1); box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06); }
+                .toggle-switch.enabled::after { left: 22px; }
                 .toggle-switch.disabled::after { left: 2px; }
                 .tabs { display: flex; gap: 4px; margin-bottom: 24px; background: #ffffff; padding: 6px; border-radius: 10px; border: 1px solid #e5e7eb; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05); }
                 .tab { flex: 1; padding: 10px 16px; border: none; background: transparent; border-radius: 6px; font-size: 13px; font-weight: 500; color: #4b5563; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s ease; }
@@ -3245,7 +3250,7 @@ export default function SettingsPage() {
                 .preview-header { background: #f9fafb; padding: 16px 20px; border-bottom: 1px solid #e5e7eb; }
                 .preview-content { padding: 24px; }
                 .preview-phone { background: #1f2937; border-radius: 32px; padding: 6px; max-width: 350px; margin: 0 auto; }
-                .preview-phone-screen { background: white; border-radius: 24px; overflow-y: auto; height: 550px; }
+                .preview-phone-screen { background: white; border-radius: 24px; overflow: hidden; overflow-y: auto; height: 550px; transform: translateZ(0); -webkit-mask-image: -webkit-radial-gradient(white, black); mask-image: radial-gradient(white, black); }
                 .preview-phone-screen.preview-compact { min-height: auto; max-height: none; padding: 20px 16px; }
                 .preview-product { padding: 16px; }
                 .preview-product-img { width: 80px; height: 80px; border-radius: 6px; flex-shrink: 0; object-fit: cover; }
@@ -4628,13 +4633,15 @@ export default function SettingsPage() {
 
                                     {/* Restore to Default — always visible */}
                                     <div className="settings-card">
-                                        <button
-                                            type="button"
-                                            onClick={() => setButtonStylesState({ ...DEFAULT_BUTTON_STYLES })}
-                                            style={{ width: '100%', padding: '12px 16px', fontSize: 13, fontWeight: 600, color: '#202223', background: '#F6F6F7', border: '2px solid #202223', borderRadius: 10, cursor: 'pointer' }}
-                                        >
-                                            Restore All to Default
-                                        </button>
+                                        <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                            <Button
+                                                tone="critical"
+                                                icon={ResetIcon}
+                                                onClick={() => setButtonStylesState({ ...DEFAULT_BUTTON_STYLES })}
+                                            >
+                                                Restore All to Default
+                                            </Button>
+                                        </div>
                                     </div>
                                 </>
                             )}
@@ -4675,20 +4682,23 @@ export default function SettingsPage() {
                                                 </SortableContext>
                                             </DndContext>
 
-                                            <button
-                                                type="button"
-                                                className="add-field-btn"
-                                                onClick={() => setShowAddFieldModal(true)}
-                                            >
-                                                + Add Custom Field
-                                            </button>
+                                            <div style={{ marginTop: '12px' }}>
+                                                <Button
+                                                    fullWidth
+                                                    variant="primary"
+                                                    icon={PlusIcon}
+                                                    onClick={() => setShowAddFieldModal(true)}
+                                                >
+                                                    Add Custom Field
+                                                </Button>
+                                            </div>
                                         </div>
 
                                         <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #e5e7eb' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                                 <div>
-                                                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#374151' }}>Enable State / Province Dropdown</div>
-                                                    <div style={{ fontSize: '13px', color: '#6b7280', marginTop: '2px' }}>Automatically detects the customer's country and displays the appropriate State/Province dropdown.</div>
+                                                    <div style={{ fontSize: '13px', fontWeight: 600, color: '#374151' }}>Enable State / Province Dropdown</div>
+                                                    <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>Automatically detects the customer's country and displays the appropriate State/Province dropdown.</div>
                                                 </div>
                                                 <div
                                                     className={`toggle-switch ${blocks?.enable_state_province ?? true ? 'enabled' : 'disabled'}`}
@@ -5075,13 +5085,15 @@ export default function SettingsPage() {
                                             </div>
                                         </div>
                                         <p className="setting-helper" style={{ marginTop: 4 }}>Controls the background color of input fields.</p>
-                                        <button
-                                            type="button"
-                                            onClick={() => setFormStyles({ ...DEFAULT_STYLES })}
-                                            style={{ marginTop: 16, padding: '10px 16px', fontSize: 13, fontWeight: 600, color: '#202223', background: '#F6F6F7', border: '2px solid #202223', borderRadius: 10, cursor: 'pointer' }}
-                                        >
-                                            Restore to Default
-                                        </button>
+                                        <div style={{ marginTop: 16 }}>
+                                            <Button
+                                                tone="critical"
+                                                icon={ResetIcon}
+                                                onClick={() => setFormStyles({ ...DEFAULT_STYLES })}
+                                            >
+                                                Restore to Default
+                                            </Button>
+                                        </div>
                                     </AccordionSection>
 
                                     <AccordionSection id="coupon-settings" tab="form" title="Coupon Codes" helperText="Enable the coupon field and use Shopify Discounts as the source of truth" expandedSection={expandedSection} toggleSection={toggleSection}>
@@ -5638,19 +5650,21 @@ export default function SettingsPage() {
 
                                     {/* Restore to Default */}
                                     <div style={{ padding: '12px 16px' }}>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setModalStyle('modern');
-                                                setAnimationStyle('fade');
-                                                setBorderRadius(12);
-                                                setShowProductImage(true);
-                                                setShowPrice(true);
-                                            }}
-                                            style={{ padding: '10px 16px', fontSize: 13, fontWeight: 600, color: '#202223', background: '#F6F6F7', border: '2px solid #202223', borderRadius: 10, cursor: 'pointer' }}
-                                        >
-                                            Restore All to Default
-                                        </button>
+                                        <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                            <Button
+                                                tone="critical"
+                                                icon={ResetIcon}
+                                                onClick={() => {
+                                                    setModalStyle('modern');
+                                                    setAnimationStyle('fade');
+                                                    setBorderRadius(12);
+                                                    setShowProductImage(true);
+                                                    setShowPrice(true);
+                                                }}
+                                            >
+                                                Restore All to Default
+                                            </Button>
+                                        </div>
                                     </div>
                                 </>
                             )}

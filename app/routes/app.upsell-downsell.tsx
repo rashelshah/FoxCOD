@@ -231,7 +231,7 @@ ${colorSelectorStyles}
 .pv-panel-header h3{margin:0;font-size:14px;font-weight:700;color:#111827;display:flex;align-items:center;gap:8px}
 .pv-panel-header .pv-badge{font-size:11px;color:#6b7280;background:#f3f4f6;padding:4px 10px;border-radius:6px;font-weight:500}
 .pv-phone{background:#1f2937;border-radius:32px;padding:6px;max-width:350px;margin:16px auto}
-.pv-phone-screen{background:#fff;border-radius:24px;overflow-y:auto;height:550px}
+.pv-phone-screen{background:#fff;border-radius:24px;overflow:hidden;overflow-y:auto;height:550px;transform:translateZ(0);-webkit-mask-image:-webkit-radial-gradient(white, black);mask-image:radial-gradient(white, black)}
 /* Accept button animations */
 @keyframes up-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
 @keyframes up-bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
@@ -758,12 +758,42 @@ export default function UpsellDownsellPage() {
                                                 <h3>Live Preview</h3>
                                             </div>
                                             <div className="pv-phone">
-                                                <div className="pv-phone-screen" ref={tickPreviewRef} style={{ background: (formSettings?.styles as any)?.background || formSettings?.styles?.backgroundColor || '#ffffff' }}>
+                                                <div className="pv-phone-screen" ref={tickPreviewRef}>
 
                                                     {/* Product Section + Form Modal - same structure as Form Builder */}
-                                                    {/* Product Section - horizontal layout matching storefront mobile */}
-                                                    <div className="tick-pv-product" style={{ background: (formSettings?.styles as any)?.background || formSettings?.styles?.backgroundColor || '#ffffff' }}>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingBottom: '10px', borderBottom: '1px solid #e5e5e5', marginBottom: '6px', position: 'relative' }}>
+                                                    <div className="tick-pv-product" style={(() => {
+                                                        const ms = formSettings?.modal_style === 'modern' ? 'glassmorphism' : (formSettings?.modal_style || 'glassmorphism');
+                                                        const fs: any = formSettings?.styles || {};
+                                                        const bg = fs.background || fs.backgroundColor || '#ffffff';
+                                                        const br = (fs.borderRadius || 12) + 'px';
+                                                        const base: any = {
+                                                            background: bg,
+                                                            borderRadius: br,
+                                                            padding: '16px',
+                                                            transition: 'all 0.3s ease',
+                                                        };
+                                                        if (ms === 'glassmorphism') {
+                                                            base.backdropFilter = 'blur(10px)';
+                                                            base.WebkitBackdropFilter = 'blur(10px)';
+                                                            base.border = '1px solid rgba(255,255,255,0.3)';
+                                                            base.boxShadow = '0 8px 32px rgba(0,0,0,0.1)';
+                                                        } else if (ms === 'minimal') {
+                                                            base.border = '1px solid #e5e7eb';
+                                                            base.boxShadow = 'none';
+                                                        } else {
+                                                            // modern
+                                                            base.boxShadow = '0 4px 16px rgba(0,0,0,0.08)';
+                                                            const bw = fs.borderWidth ?? 0;
+                                                            if (bw > 0) {
+                                                                base.border = `${bw}px solid ${fs.borderColor || '#e5e7eb'}`;
+                                                            } else {
+                                                                base.border = '1px solid rgba(0,0,0,0.06)';
+                                                            }
+                                                        }
+                                                        return base;
+                                                    })()}>
+                                                        {/* Product Section - horizontal layout matching storefront mobile */}
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingBottom: '12px', borderBottom: '1px solid rgba(0,0,0,0.08)', marginBottom: '8px', position: 'relative' }}>
                                                             <div style={{ position: 'relative', flexShrink: 0 }}>
                                                                 <img
                                                                     src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRfEiGMrC1y0OMGHknT1nakNKz7HWAgTAl3LQ&s?w=200&h=200&fit=crop&crop=center"
@@ -800,54 +830,21 @@ export default function UpsellDownsellPage() {
                                                             </div>
                                                         </div>
 
-                                                        {/* COD Form Modal - uses real Form Builder settings + modal style */}
-                                                        <div style={(() => {
-                                                            const ms = formSettings?.modal_style === 'modern' ? 'glassmorphism' : (formSettings?.modal_style || 'glassmorphism');
-                                                            const fs: any = formSettings?.styles || {};
-                                                            const bg = fs.background || fs.backgroundColor || '#ffffff';
-                                                            const br = (fs.borderRadius || 12) + 'px';
-                                                            const base: any = {
-                                                                background: bg,
-                                                                borderRadius: br,
-                                                                padding: '16px',
-                                                                marginTop: '12px',
-                                                                transition: 'all 0.3s ease',
-                                                            };
-                                                            if (ms === 'glassmorphism') {
-                                                                base.backdropFilter = 'blur(10px)';
-                                                                base.WebkitBackdropFilter = 'blur(10px)';
-                                                                base.border = '1px solid rgba(255,255,255,0.3)';
-                                                                base.boxShadow = '0 8px 32px rgba(0,0,0,0.1)';
-                                                            } else if (ms === 'minimal') {
-                                                                base.border = '1px solid #e5e7eb';
-                                                                base.boxShadow = 'none';
-                                                            } else {
-                                                                // modern
-                                                                base.boxShadow = '0 4px 16px rgba(0,0,0,0.08)';
-                                                                const bw = fs.borderWidth ?? 0;
-                                                                if (bw > 0) {
-                                                                    base.border = `${bw}px solid ${fs.borderColor || '#e5e7eb'}`;
-                                                                } else {
-                                                                    base.border = '1px solid rgba(0,0,0,0.06)';
-                                                                }
-                                                            }
-                                                            return base;
-                                                        })()}>
-                                                            {/* Form Title */}
-                                                            <div style={{
-                                                                fontWeight: 700,
-                                                                fontSize: '16px',
-                                                                marginBottom: '4px',
-                                                                color: (formSettings?.styles as any)?.textColor || '#111',
-                                                                textAlign: 'center',
-                                                                fontFamily: formSettings?.styles?.fontFamily || 'Inter',
-                                                            }}>
-                                                                {formSettings?.form_title || 'Cash on Delivery Order'}
-                                                            </div>
+                                                        {/* Form Title */}
+                                                        <div style={{
+                                                            fontWeight: 700,
+                                                            fontSize: '16px',
+                                                            marginBottom: '4px',
+                                                            color: (formSettings?.styles as any)?.textColor || '#111',
+                                                            textAlign: 'center',
+                                                            fontFamily: formSettings?.styles?.fontFamily || 'Inter',
+                                                        }}>
+                                                            {formSettings?.form_title || 'Cash on Delivery Order'}
+                                                        </div>
 
-                                                            {/* Form Subtitle */}
-                                                            {formSettings?.form_subtitle && (
-                                                                <div style={{
+                                                        {/* Form Subtitle */}
+                                                        {formSettings?.form_subtitle && (
+                                                            <div style={{
                                                                     fontSize: '13px',
                                                                     color: '#6b7280',
                                                                     marginBottom: '16px',
@@ -1456,7 +1453,6 @@ export default function UpsellDownsellPage() {
                                                                     </button>
                                                                 );
                                                             })()}
-                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
