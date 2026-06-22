@@ -212,10 +212,10 @@ const S = `
 .pp-title p { font-size: 14px; color: #6b7280; margin: 0; }
 
 /* ── Tabs ── */
-.tabs { display: flex; gap: 8px; margin-bottom: 24px; background: #f3f4f6; padding: 6px; border-radius: 12px; }
-.tab { flex: 1; padding: 14px 20px; border: none; background: transparent; border-radius: 8px; font-size: 14px; font-weight: 600; color: #6b7280; cursor: pointer; transition: all 0.2s ease; }
-.tab:hover { color: #111827; }
-.tab.active { background: white; color: #111827; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.tabs { display: flex; gap: 4px; margin-bottom: 24px; background: #ffffff; padding: 6px; border-radius: 10px; border: 1px solid #e5e7eb; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05); }
+.tab { flex: 1; padding: 10px 16px; border: none; background: transparent; border-radius: 6px; font-size: 13px; font-weight: 500; color: #4b5563; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s ease; }
+.tab:hover { background: #f9fafb; color: #111827; }
+.tab.active { background: #f3f4f6; color: #111827; box-shadow: none; font-weight: 600; }
 
 /* ── Toggle ── */
 .pp-toggle-track { width: 44px; height: 24px; border-radius: 12px; background: #dfe3e8; cursor: pointer; position: relative; transition: .2s cubic-bezier(.25,.1,.25,1); flex-shrink: 0; }

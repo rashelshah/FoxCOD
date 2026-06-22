@@ -120,13 +120,13 @@ ${colorSelectorStyles}
 .toggle-thumb{width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:.2s cubic-bezier(.25,.1,.25,1);box-shadow:0 1px 3px rgba(0,0,0,.1),0 1px 2px rgba(0,0,0,.06)}
 .toggle-track.on .toggle-thumb{left:22px}
 .active-badge{padding:3px 12px;border-radius:12px;font-size:12px;font-weight:600}
-/* ==================== PILL TABS ==================== */
-.up-tabs{display:flex;gap:4px;margin-bottom:28px;background:#f3f4f6;border-radius:12px;padding:4px}
-.up-tab{padding:10px 22px;cursor:pointer;font-size:13px;font-weight:600;color:#6b7280;border:none;border-radius:10px;background:none;transition:all .2s ease}
-.up-tab:hover{color:#374151;background:rgba(0,0,0,.03)}
-.up-tab.active{background:#1f2937;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.12)}
-.up-tab .cnt{background:rgba(0,0,0,.08);color:#6b7280;padding:1px 8px;border-radius:10px;font-size:11px;margin-left:6px}
-.up-tab.active .cnt{background:rgba(255,255,255,.2);color:#fff}
+/* ==================== TABS ==================== */
+.tabs { display: flex; gap: 4px; margin-bottom: 24px; background: #ffffff; padding: 6px; border-radius: 10px; border: 1px solid #e5e7eb; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05); }
+.tab { flex: 1; padding: 10px 16px; border: none; background: transparent; border-radius: 6px; font-size: 13px; font-weight: 500; color: #4b5563; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s ease; }
+.tab:hover { background: #f9fafb; color: #111827; }
+.tab.active { background: #f3f4f6; color: #111827; box-shadow: none; font-weight: 600; }
+.tab .cnt { background: #e5e7eb; color: #6b7280; padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+.tab.active .cnt { background: #d1d5db; color: #111827; }
 /* ==================== LIST CARDS ==================== */
 .up-list{display:flex;flex-direction:column;gap:10px}
 .up-card{background:#fff;border:1px solid #e5e7eb;border-left:3px solid transparent;border-radius:12px;padding:16px 20px;display:flex;align-items:center;gap:16px;cursor:pointer;transition:all .2s ease}
@@ -559,56 +559,66 @@ export default function UpsellDownsellPage() {
                 </div>
                 {!editing ? (
                     <BlockStack gap="400">
-                        <Tabs tabs={polarisTabs} selected={selectedTabIndex} onSelect={(idx) => setActiveTab(tabTypes[idx])}>
-                            <Box paddingBlockStart="400">
-                                {filtered.length === 0 ? (
-                                    <Card>
-                                        <EmptyState
-                                            heading={`No ${tabLabels[activeTab]} campaigns yet`}
-                                            action={{ content: `Create ${tabLabels[activeTab]}`, onAction: handleCreate }}
-                                            image=""
-                                        >
-                                            <p>Create your first campaign to boost your average order value.</p>
-                                        </EmptyState>
-                                    </Card>
-                                ) : (
-                                    <BlockStack gap="300">
-                                        {displayCampaigns.map((c: any) => {
-                                            const firstOffer = c.offers?.[0];
-                                            return (
-                                                <Card key={c.id}>
-                                                    <div className="up-row-card" style={{ cursor: 'pointer' }} onClick={() => handleEdit(c)}>
-                                                        <InlineStack align="space-between" blockAlign="center" gap="400">
-                                                            <InlineStack gap="400" blockAlign="center">
-                                                                <div className="up-card-img">{(firstOffer?.upsell_product_image || firstOffer?._selectedProduct?.featuredImage?.url || firstOffer?._selectedProduct?.images?.[0]?.url) ? <img src={firstOffer?.upsell_product_image || firstOffer?._selectedProduct?.featuredImage?.url || firstOffer?._selectedProduct?.images?.[0]?.url} alt="" /> : <span style={{ color: '#9ca3af', fontSize: '12px' }}>No img</span>}</div>
-                                                                <BlockStack gap="100">
-                                                                    <Text variant="bodyMd" fontWeight="semibold" as="span">{c.campaign_name || 'Untitled'}</Text>
-                                                                    <InlineStack gap="200" align="start">
-                                                                        <Text variant="bodySm" tone="subdued" as="span">{c.offers?.length || 0} offer{c.offers?.length !== 1 ? 's' : ''}</Text>
-                                                                        {firstOffer?.discount_value > 0 && (
-                                                                            <Badge tone="success">{`${firstOffer.discount_type === 'percentage' ? `${firstOffer.discount_value}%` : fmtCurrency(firstOffer.discount_value)} OFF`}</Badge>
-                                                                        )}
-                                                                    </InlineStack>
-                                                                </BlockStack>
-                                                            </InlineStack>
-                                                            <InlineStack gap="200" blockAlign="center">
-                                                                <div onClick={e => e.stopPropagation()}>
-                                                                    <div className={`toggle-track ${c.active ? 'on' : ''}`} onClick={e => handleToggle(c.id, !c.active, e)}><div className="toggle-thumb" /></div>
-                                                                </div>
-                                                                <div onClick={e => e.stopPropagation()} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                                    <Button icon={DeleteIcon} variant="tertiary" tone="critical" accessibilityLabel="Delete campaign" onClick={() => setCampaignToDelete({ id: c.id, name: c.campaign_name || 'Untitled' })} />
-                                                                    <Button icon={EditIcon} variant="tertiary" accessibilityLabel="Edit campaign" onClick={() => handleEdit(c)} />
-                                                                </div>
-                                                            </InlineStack>
+                        <div className="tabs">
+                            {tabTypes.map((t) => (
+                                <button
+                                    key={t}
+                                    className={`tab ${activeTab === t ? 'active' : ''}`}
+                                    onClick={() => setActiveTab(t)}
+                                >
+                                    {tabLabels[t]}
+                                    <span className="cnt">{tabCounts[t]}</span>
+                                </button>
+                            ))}
+                        </div>
+                        <Box paddingBlockStart="100">
+                            {filtered.length === 0 ? (
+                                <Card>
+                                    <EmptyState
+                                        heading={`No ${tabLabels[activeTab]} campaigns yet`}
+                                        action={{ content: `Create ${tabLabels[activeTab]}`, onAction: handleCreate }}
+                                        image=""
+                                    >
+                                        <p>Create your first campaign to boost your average order value.</p>
+                                    </EmptyState>
+                                </Card>
+                            ) : (
+                                <BlockStack gap="300">
+                                    {displayCampaigns.map((c: any) => {
+                                        const firstOffer = c.offers?.[0];
+                                        return (
+                                            <Card key={c.id}>
+                                                <div className="up-row-card" style={{ cursor: 'pointer' }} onClick={() => handleEdit(c)}>
+                                                    <InlineStack align="space-between" blockAlign="center" gap="400">
+                                                        <InlineStack gap="400" blockAlign="center">
+                                                            <div className="up-card-img">{(firstOffer?.upsell_product_image || firstOffer?._selectedProduct?.featuredImage?.url || firstOffer?._selectedProduct?.images?.[0]?.url) ? <img src={firstOffer?.upsell_product_image || firstOffer?._selectedProduct?.featuredImage?.url || firstOffer?._selectedProduct?.images?.[0]?.url} alt="" /> : <span style={{ color: '#9ca3af', fontSize: '12px' }}>No img</span>}</div>
+                                                            <BlockStack gap="100">
+                                                                <Text variant="bodyMd" fontWeight="semibold" as="span">{c.campaign_name || 'Untitled'}</Text>
+                                                                <InlineStack gap="200" align="start">
+                                                                    <Text variant="bodySm" tone="subdued" as="span">{c.offers?.length || 0} offer{c.offers?.length !== 1 ? 's' : ''}</Text>
+                                                                    {firstOffer?.discount_value > 0 && (
+                                                                        <Badge tone="success">{`${firstOffer.discount_type === 'percentage' ? `${firstOffer.discount_value}%` : fmtCurrency(firstOffer.discount_value)} OFF`}</Badge>
+                                                                    )}
+                                                                </InlineStack>
+                                                            </BlockStack>
                                                         </InlineStack>
-                                                    </div>
-                                                </Card>
-                                            );
-                                        })}
-                                    </BlockStack>
-                                )}
-                            </Box>
-                        </Tabs>
+                                                        <InlineStack gap="200" blockAlign="center">
+                                                            <div onClick={e => e.stopPropagation()}>
+                                                                <div className={`toggle-track ${c.active ? 'on' : ''}`} onClick={e => handleToggle(c.id, !c.active, e)}><div className="toggle-thumb" /></div>
+                                                            </div>
+                                                            <div onClick={e => e.stopPropagation()} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                                <Button icon={DeleteIcon} variant="tertiary" tone="critical" accessibilityLabel="Delete campaign" onClick={() => setCampaignToDelete({ id: c.id, name: c.campaign_name || 'Untitled' })} />
+                                                                <Button icon={EditIcon} variant="tertiary" accessibilityLabel="Edit campaign" onClick={() => handleEdit(c)} />
+                                                            </div>
+                                                        </InlineStack>
+                                                    </InlineStack>
+                                                </div>
+                                            </Card>
+                                        );
+                                    })}
+                                </BlockStack>
+                            )}
+                        </Box>
                     </BlockStack>
                 ) : (
                     <div className="up-editor">

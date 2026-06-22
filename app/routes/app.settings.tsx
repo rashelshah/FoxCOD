@@ -3103,9 +3103,10 @@ export default function SettingsPage() {
                 .toggle-switch::after { content: ''; position: absolute; width: 28px; height: 28px; background: white; border-radius: 50%; top: 2px; transition: left 0.2s cubic-bezier(0.25, 0.1, 0.25, 1); box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06); }
                 .toggle-switch.enabled::after { left: 26px; }
                 .toggle-switch.disabled::after { left: 2px; }
-                .tabs { display: flex; gap: 8px; margin-bottom: 24px; background: #f3f4f6; padding: 6px; border-radius: 12px; }
-                .tab { flex: 1; padding: 14px 20px; border: none; background: transparent; border-radius: 8px; font-size: 14px; font-weight: 600; color: #6b7280; cursor: pointer; }
-                .tab.active { background: white; color: #111827; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+                .tabs { display: flex; gap: 4px; margin-bottom: 24px; background: #ffffff; padding: 6px; border-radius: 10px; border: 1px solid #e5e7eb; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05); }
+                .tab { flex: 1; padding: 10px 16px; border: none; background: transparent; border-radius: 6px; font-size: 13px; font-weight: 500; color: #4b5563; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s ease; }
+                .tab:hover { background: #f9fafb; color: #111827; }
+                .tab.active { background: #f3f4f6; color: #111827; box-shadow: none; font-weight: 600; }
                 .builder-page {
                     display: grid;
                     grid-template-columns: 1fr 420px;
@@ -3212,12 +3213,12 @@ export default function SettingsPage() {
                 .sortable-field-item {
                     display: flex;
                     align-items: center;
-                    gap: 12px;
-                    padding: 12px 16px;
+                    gap: 10px;
+                    padding: 8px 12px;
                     background: white;
                     border: 1px solid #e5e7eb;
                     border-radius: 10px;
-                    margin-bottom: 8px;
+                    margin-bottom: 6px;
                     transition: all 0.2s ease;
                 }
                 .sortable-field-item:hover { border-color: #202223; box-shadow: 0 2px 8px rgba(21, 21, 28, 0.1); }
@@ -3229,13 +3230,13 @@ export default function SettingsPage() {
                     user-select: none;
                 }
                 .field-drag-handle:active { cursor: grabbing; }
-                .field-info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
-                .field-label { font-weight: 600; color: #1f2937; font-size: 14px; }
-                .field-type { font-size: 11px; color: #9ca3af; text-transform: uppercase; }
-                .field-actions { display: flex; gap: 8px; }
+                .field-info { flex: 1; display: flex; flex-direction: column; gap: 0px; }
+                .field-label { font-weight: 600; color: #1f2937; font-size: 13px; }
+                .field-type { font-size: 10px; color: #9ca3af; text-transform: uppercase; }
+                .field-actions { display: flex; gap: 6px; }
                 .icon-btn {
-                    width: 32px;
-                    height: 32px;
+                    width: 28px;
+                    height: 28px;
                     border-radius: 8px;
                     border: 1px solid #e5e7eb;
                     background: #f9fafb;
@@ -4081,27 +4082,21 @@ export default function SettingsPage() {
                                     color: '#dc2626',
                                     maxWidth: '300px'
                                 }}>
-                                    ⚠️ {saveError}
+                                    {saveError}
                                 </div>
                             )}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#f9fafb', padding: '6px 12px', borderRadius: '10px', border: '1px solid #e5e7eb' }}>
+                                <span style={{ fontSize: '13px', fontWeight: 600, color: '#374151' }}>COD Form Status</span>
+                                <div
+                                    className={`mini-toggle ${enabled ? 'on' : ''}`}
+                                    onClick={() => setEnabled(!enabled)}
+                                    style={{ background: enabled ? 'var(--p-color-bg-fill-inverse, #1a1a1a)' : '#dfe3e8' }}
+                                />
+                            </div>
                             <Badge tone={enabled ? 'success' : 'critical'}>
                                 {enabled ? 'Active' : 'Inactive'}
                             </Badge>
                         </div>
-                    </div>
-
-                    {/* Main Toggle */}
-                    <div className={`main-toggle ${enabled ? 'enabled' : 'disabled'}`}>
-                        <div className="toggle-info">
-                            <h3>
-                                <span>{enabled ? '' : ''}</span> COD Form Status
-                            </h3>
-                            <p>{enabled ? 'Your COD form is live on product pages' : 'Enable to show COD form on your store'}</p>
-                        </div>
-                        <div
-                            className={`toggle-switch ${enabled ? 'enabled' : 'disabled'}`}
-                            onClick={() => setEnabled(!enabled)}
-                        />
                     </div>
 
                     {/* Tabs */}
@@ -4436,6 +4431,7 @@ export default function SettingsPage() {
                                                         label="Border Width"
                                                         min={0}
                                                         max={4}
+                                                        step={0.5}
                                                         value={buttonStylesState?.borderWidth ?? 0}
                                                         onChange={(val) => setButtonStylesState(s => ({ ...s, borderWidth: Number(val) }))}
                                                         output
@@ -4904,6 +4900,7 @@ export default function SettingsPage() {
                                                         label="Border Width"
                                                         min={0}
                                                         max={3}
+                                                        step={0.5}
                                                         value={formStyles?.borderWidth ?? 1}
                                                         onChange={(val) => setFormStyles(s => ({ ...s, borderWidth: Number(val) }))}
                                                         output
@@ -5227,6 +5224,7 @@ export default function SettingsPage() {
                                                                     label="Border Width"
                                                                     min={0}
                                                                     max={4}
+                                                                    step={0.5}
                                                                     value={formSubmitButtonState.borderWidth ?? 0}
                                                                     onChange={(val) => setFormSubmitButtonState(prev => ({ ...prev, borderWidth: Number(val) }))}
                                                                     output
