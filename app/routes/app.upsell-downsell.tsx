@@ -1770,7 +1770,7 @@ export default function UpsellDownsellPage() {
                                                 <h3>Live Preview</h3>
                                             </div>
                                             <div className="pv-phone">
-                                                <div className="pv-phone-screen">
+                                                <div className="pv-phone-screen" style={{ height: 'auto', minHeight: 0 }}>
                                                     {/* Downsell popup preview */}
                                                     {(() => {
                                                         const d = editing.design;

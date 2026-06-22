@@ -5038,18 +5038,32 @@ function darkenColor(hex, percent) {
           }
           
           var marginStyleCod = hasTag('pure_cod') ? 'margin: 12px 0 0 0 !important;' : 'margin: 0 !important;';
-          html += '<label class="pm-row pm-cod" style="display: flex; flex-direction: column; background: #fff7ed; border-radius: 12px; border: 1.5px solid #ea580c; cursor: pointer; position: relative; overflow: visible; padding: 0 !important; ' + marginStyleCod + ' box-sizing: border-box;">';
+          var isOnlyCodEnabled = !showFullPrepaid && !showPartial && showFullCod;
+          var theme = {
+              bg: isOnlyCodEnabled ? '#f0fdf4' : '#fff7ed',
+              border: isOnlyCodEnabled ? '#22c55e' : '#ea580c',
+              iconColor: isOnlyCodEnabled ? '#16a34a' : '#ea580c',
+              iconBg: isOnlyCodEnabled ? '#dcfce7' : '#ffedd5',
+              titleColor: isOnlyCodEnabled ? '#166534' : '#9a3412',
+              pillBg: isOnlyCodEnabled ? '#dcfce7' : '#ffedd5',
+              pillColor: isOnlyCodEnabled ? '#166534' : '#9a3412',
+              accent: isOnlyCodEnabled ? '#22c55e' : '#ea580c',
+              footerBg: isOnlyCodEnabled ? '#dcfce7' : '#ffedd5',
+              footerColor: isOnlyCodEnabled ? '#166534' : '#9a3412'
+          };
+
+          html += '<label class="pm-row pm-cod" style="display: flex; flex-direction: column; background: ' + theme.bg + '; border-radius: 12px; border: 1.5px solid ' + theme.border + '; cursor: pointer; position: relative; overflow: visible; padding: 0 !important; ' + marginStyleCod + ' box-sizing: border-box;">';
           var isCodChecked = (defaultMethod === 'full_cod') ? 'checked' : '';
           html += '<input type="radio" name="payment_method" value="full_cod" ' + isCodChecked + ' style="position:absolute; opacity:0; pointer-events:none; margin:0; padding:0;">';
-          html += renderTag('pure_cod', '#ea580c');
+          html += renderTag('pure_cod', theme.border);
           html += '<div style="display: flex; align-items: flex-start; gap: 12px; padding: 16px 12px 12px 12px; box-sizing: border-box; width: 100%; margin: 0;">';
-          html += '<div style="display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px; color: #ea580c; background-color: #ffedd5;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="1" ry="1" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg></div>';
+          html += '<div style="display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px; color: ' + theme.iconColor + '; background-color: ' + theme.iconBg + ';"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="1" ry="1" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg></div>';
           html += '<div style="flex: 1; min-width: 0; padding-top: 2px;">';
-          html += '<div style="font-weight: 700; font-size: 14px; color: #9a3412; line-height: 1.2;">Cash on Delivery</div>';
+          html += '<div style="font-weight: 700; font-size: 14px; color: ' + theme.titleColor + '; line-height: 1.2;">Cash on Delivery</div>';
           var showCodSub = !ppSettings || ppSettings.show_pure_cod_subtitle !== false;
           var codSub = ppSettings && ppSettings.pure_cod_subtitle;
           if (showCodSub && codSub) {
-              html += '<div style="color: #ea580c; font-size: 11px; margin-top: 4px; line-height: 1.3;">' + codSub + '</div>';
+              html += '<div style="color: ' + theme.iconColor + '; font-size: 11px; margin-top: 4px; line-height: 1.3;">' + codSub + '</div>';
           }
 
           html += '</div>';
@@ -5057,16 +5071,16 @@ function darkenColor(hex, percent) {
           html += '<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">';
           if (ppSettings && ppSettings.pure_cod_fee_enabled && ppSettings.pure_cod_fee_amount) {
               var displayStyle = pureCodFeeAmount > 0 ? 'block' : 'none';
-              html += '<div class="pm-cod-fee-pill" style="display: ' + displayStyle + '; background: #ffedd5; color: #9a3412; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 99px; line-height: 1; white-space: nowrap;">' + formatMoney(pureCodFeeAmount) + ' ' + (ppSettings.pure_cod_fee_name || 'COD fee') + '</div>';
+              html += '<div class="pm-cod-fee-pill" style="display: ' + displayStyle + '; background: ' + theme.pillBg + '; color: ' + theme.pillColor + '; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 99px; line-height: 1; white-space: nowrap;">' + formatMoney(pureCodFeeAmount) + ' ' + (ppSettings.pure_cod_fee_name || 'COD fee') + '</div>';
           }
-          html += '<span class="pm-amt-cod" style="font-weight: 800; font-size: 15px; color: #9a3412;">' + formatMoney(parseFloat(orderTotal || 0) + parseFloat(pureCodFeeAmount || 0)) + '</span>';
+          html += '<span class="pm-amt-cod" style="font-weight: 800; font-size: 15px; color: ' + theme.titleColor + ';">' + formatMoney(parseFloat(orderTotal || 0) + parseFloat(pureCodFeeAmount || 0)) + '</span>';
           html += '</div>';
           var isCodChecked = (defaultMethod === 'full_cod') ? 'checked' : '';
-          html += '<input type="radio" name="payment_method_visual" class="pm-pill" ' + isCodChecked + ' style="width: 18px; height: 18px; accent-color: #ea580c; margin: 0; pointer-events: none;">';
+          html += '<input type="radio" name="payment_method_visual" class="pm-pill" ' + isCodChecked + ' style="width: 18px; height: 18px; accent-color: ' + theme.accent + '; margin: 0; pointer-events: none;">';
           html += '</div></div>';
           var codDesc = ppSettings && ppSettings.payment_method_descriptions && ppSettings.payment_method_descriptions.pure_cod ? ppSettings.payment_method_descriptions.pure_cod : { enabled: true, text: 'Higher return risk • Slightly slower processing' };
           if (codDesc.enabled) {
-              html += '<div style="background: #ffedd5; padding: 10px 12px; font-size: 10px; color: #9a3412; display: flex; justify-content: center; align-items: center; font-weight: 500; width: 100%; box-sizing: border-box; margin: 0; border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;">' + codDesc.text + '</div>';
+              html += '<div style="background: ' + theme.footerBg + '; padding: 10px 12px; font-size: 10px; color: ' + theme.footerColor + '; display: flex; justify-content: center; align-items: center; font-weight: 500; width: 100%; box-sizing: border-box; margin: 0; border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;">' + codDesc.text + '</div>';
           }
           html += '</label>';
       }
@@ -6788,7 +6802,7 @@ function darkenColor(hex, percent) {
           : 'background: ' + (design.bgColor || '#fff') + ';';
 
       // Main container
-      html += '<div style="padding: 24px; text-align: center; ' + bgCss + ' border-radius: 12px;">';
+      html += '<div style="padding: 32px 24px; text-align: center; ' + bgCss + ' border-radius: 12px;">';
 
       // Title
       if (design.titleText) {
@@ -6860,7 +6874,7 @@ function darkenColor(hex, percent) {
       overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2147483640; display: flex; align-items: center; justify-content: center; padding: 16px;';
       var modal = document.createElement('div');
       var isMobileDs = window.innerWidth <= 480;
-      modal.style.cssText = 'background: #fff; border-radius: 24px; max-width: ' + (isMobileDs ? '340px' : '420px') + '; width: 100%; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.2); max-height: ' + (isMobileDs ? '85vh' : '90vh') + '; overflow-y: auto;';
+      modal.style.cssText = 'background: #fff; border-radius: 24px; max-width: ' + (isMobileDs ? '360px' : '460px') + '; width: 100%; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.2); max-height: ' + (isMobileDs ? '85vh' : '90vh') + '; overflow-y: auto;';
 
       // Use dedicated downsell builder if design has downsell-specific fields, else fallback to upsell builder
       var hasDownsellDesign = dsCampaign.design && (dsCampaign.design.titleText || dsCampaign.design.subtitleText || dsCampaign.design.descriptionText);
