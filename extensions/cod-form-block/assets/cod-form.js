@@ -4862,16 +4862,17 @@ function darkenColor(hex, percent) {
       var prepaidDiscountAmount = 0;
       var prepaidDiscountText = '';
       var finalPrepaidTotal = orderTotal;
-
       if (showFullPrepaid && ppSettings && ppSettings.prepaid_discount_enabled && ppSettings.prepaid_discount_value > 0) {
-          if (ppSettings.prepaid_discount_type === 'percentage') {
-              prepaidDiscountAmount = (orderTotal * ppSettings.prepaid_discount_value) / 100;
-          } else {
-              prepaidDiscountAmount = ppSettings.prepaid_discount_value;
-          }
-          prepaidDiscountAmount = Math.min(prepaidDiscountAmount, orderTotal);
+          prepaidDiscountAmount = calculatePaymentMethodDiscount(orderTotal, ppSettings.prepaid_discount_type, ppSettings.prepaid_discount_value);
           finalPrepaidTotal = orderTotal - prepaidDiscountAmount;
           prepaidDiscountText = 'Save ' + formatMoney(prepaidDiscountAmount);
+      }
+
+      var partialDiscountAmount = 0;
+      var partialDiscountText = '';
+      if (showPartial && ppSettings && ppSettings.partial_payment_discount_enabled && ppSettings.partial_payment_discount_value > 0) {
+          partialDiscountAmount = calculatePaymentMethodDiscount(orderTotal, ppSettings.partial_payment_discount_type, ppSettings.partial_payment_discount_value);
+          partialDiscountText = 'Save ' + formatMoney(partialDiscountAmount);
       }
 
       var existingSelected = null;
@@ -4961,14 +4962,15 @@ function darkenColor(hex, percent) {
       }
 
       if (showPartial) {
+          var finalPartialTotal = orderTotal - partialDiscountAmount;
           var depositAmount = partialAdvance;
           var codFeeAmount = 0;
           if (ppSettings && ppSettings.payment_options && ppSettings.payment_options.length > 0) {
               var opt = ppSettings.payment_options[0];
               if (opt.type === 'percentage' || opt.type === 'remaining_percentage') {
-                  depositAmount = (orderTotal * opt.value) / 100;
+                  depositAmount = (finalPartialTotal * opt.value) / 100;
               } else {
-                  depositAmount = Math.min(opt.value, orderTotal);
+                  depositAmount = Math.min(opt.value, finalPartialTotal);
               }
               
               if (ppSettings.cod_fee_enabled && ppSettings.cod_fee_amount) {
@@ -5006,7 +5008,13 @@ function darkenColor(hex, percent) {
               var displayStyle = codFeeAmount > 0 ? 'block' : 'none';
               html += '<div class="pm-cod-fee-pill" style="display: ' + displayStyle + '; background: #dbeafe; color: #1e3a8a; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 99px; line-height: 1; white-space: nowrap;">' + formatMoney(codFeeAmount) + ' ' + (ppSettings.cod_fee_name || 'COD fee') + '</div>';
           }
-          html += '<span class="pm-amt-partial" style="font-weight: 800; font-size: 15px; color: #1e3a8a;">' + depositText + '</span>';
+          if (partialDiscountAmount > 0) {
+              html += '<div class="pm-partial-save-pill" style="background: #dbeafe; color: #1e3a8a; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 99px; line-height: 1; white-space: nowrap;">' + partialDiscountText + '</div>';
+          } else {
+              html += '<div class="pm-partial-save-pill" style="background: #dbeafe; color: #1e3a8a; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 99px; line-height: 1; display: none; white-space: nowrap;"></div>';
+          }
+          var amtColor = '#1e3a8a';
+          html += '<span class="pm-amt-partial" style="font-weight: 800; font-size: 15px; color: ' + amtColor + ';">' + depositText + '</span>';
           html += '</div>';
           var isPartialChecked = (defaultMethod === 'partial_cod') ? 'checked' : '';
           html += '<input type="radio" name="payment_method_visual" class="pm-pill" ' + isPartialChecked + ' style="width: 18px; height: 18px; accent-color: #2563eb; margin: 0; pointer-events: none;">';
@@ -5293,6 +5301,25 @@ function darkenColor(hex, percent) {
                   feePill.style.display = 'none';
               }
           }
+
+          var partialDiscountAmount = 0;
+          if (ppSettings && ppSettings.partial_payment_discount_enabled && ppSettings.partial_payment_discount_value > 0) {
+              if (ppSettings.partial_payment_discount_type === 'percentage') {
+                  partialDiscountAmount = (orderTotal * ppSettings.partial_payment_discount_value) / 100;
+              } else {
+                  partialDiscountAmount = ppSettings.partial_payment_discount_value;
+              }
+              partialDiscountAmount = Math.min(partialDiscountAmount, orderTotal);
+          }
+          var partialSavePill = pmPartial.querySelector('.pm-partial-save-pill');
+          if (partialSavePill) {
+              if (partialDiscountAmount > 0) {
+                  partialSavePill.style.display = 'block';
+                  partialSavePill.textContent = 'Save ' + formatMoney(partialDiscountAmount);
+              } else {
+                  partialSavePill.style.display = 'none';
+              }
+          }
       }
 
       // Update Full COD
@@ -5341,6 +5368,11 @@ function darkenColor(hex, percent) {
   // =============================================
   // CENTRALIZED PRICING ENGINE
   // =============================================
+
+  function calculatePaymentMethodDiscount(total, type, value) {
+      var discount = type === 'percentage' ? (total * value) / 100 : value;
+      return Math.min(discount, total);
+  }
 
   function formatMoney(amount) {
       var num = parseFloat(amount) || 0;
@@ -5591,7 +5623,7 @@ function darkenColor(hex, percent) {
       html += '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; font-size:13px; color:#6b7280;">' +
           '   <div style="display:flex; align-items:center;"><div style="display:flex; align-items:center; justify-content:center; width:24px; height:24px; background:transparent; border-radius:6px; margin-right:8px; color:#4b5563;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg></div>' +
           '   <span>Subtotal (' + state.quantity + ' ' + (state.quantity === 1 ? 'item' : 'items') + ')</span></div>' +
-          '   <span id="cod-summary-subtotal">' + formatMoney(state.displaySubtotal) + '</span>' +
+          '   <span id="cod-summary-subtotal">' + formatMoney(state.subtotal) + '</span>' +
           '</div>';
 
       // Downsell savings
@@ -5650,22 +5682,23 @@ function darkenColor(hex, percent) {
 
       var ppSettings = config.partialPaymentSettings;
       var prepaidDiscountAmount = 0;
-      if (ppSettings && ppSettings.prepaid_discount_enabled && ppSettings.prepaid_discount_value > 0) {
-          if (ppSettings.prepaid_discount_type === 'percentage') {
-              prepaidDiscountAmount = (state.total * ppSettings.prepaid_discount_value) / 100;
-          } else {
-              prepaidDiscountAmount = ppSettings.prepaid_discount_value;
-          }
-          prepaidDiscountAmount = Math.min(prepaidDiscountAmount, state.total);
+      if (isFullPrepaidSelected && ppSettings && ppSettings.prepaid_discount_enabled && ppSettings.prepaid_discount_value > 0) {
+          prepaidDiscountAmount = calculatePaymentMethodDiscount(state.total, ppSettings.prepaid_discount_type, ppSettings.prepaid_discount_value);
+      }
+
+      var partialDiscountAmount = 0;
+      if (isPartialSelected && ppSettings && ppSettings.partial_payment_discount_enabled && ppSettings.partial_payment_discount_value > 0) {
+          partialDiscountAmount = calculatePaymentMethodDiscount(state.total, ppSettings.partial_payment_discount_type, ppSettings.partial_payment_discount_value);
       }
 
       var depositAmount = config.partialCodAdvance || 0;
+      var finalPartialTotal = state.total - partialDiscountAmount;
       if (isPartialSelected && ppSettings && ppSettings.payment_options && ppSettings.payment_options.length > 0) {
           var opt = ppSettings.payment_options[0];
           if (opt.type === 'percentage' || opt.type === 'remaining_percentage') {
-              depositAmount = (state.total * opt.value) / 100;
+              depositAmount = (finalPartialTotal * opt.value) / 100;
           } else {
-              depositAmount = Math.min(opt.value, state.total);
+              depositAmount = Math.min(opt.value, finalPartialTotal);
           }
       }
 
@@ -5707,17 +5740,15 @@ function darkenColor(hex, percent) {
               '   <span>-' + formatMoney(prepaidDiscountAmount) + '</span>' +
               '</div>';
       } else if (isPartialSelected) {
-          var depositAmount = config.partialCodAdvance || 0;
-          if (ppSettings && ppSettings.payment_options && ppSettings.payment_options.length > 0) {
-              var opt = ppSettings.payment_options[0];
-              if (opt.type === 'percentage' || opt.type === 'remaining_percentage') {
-                  depositAmount = (state.total * opt.value) / 100;
-              } else {
-                  depositAmount = Math.min(opt.value, state.total);
-              }
+          if (partialDiscountAmount > 0) {
+              html += '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; font-size:13px; color:#10b981;">' +
+                  '   <div style="display:flex; align-items:center;"><div style="display:flex; align-items:center; justify-content:center; width:24px; height:24px; background:transparent; border-radius:6px; margin-right:8px; color:#16a34a;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg></div>' +
+                  '   <span>Partial Payment Discount</span></div>' +
+                  '   <span>-' + formatMoney(partialDiscountAmount) + '</span>' +
+                  '</div>';
           }
           finalSummaryTotal = depositAmount;
-          dueOnDelivery = parseFloat(state.total || 0) + parseFloat(codFeeDisplayAmount || 0) - parseFloat(depositAmount || 0);
+          dueOnDelivery = parseFloat(finalPartialTotal || 0) + parseFloat(codFeeDisplayAmount || 0) - parseFloat(depositAmount || 0);
       }
 
       // Total
@@ -7352,12 +7383,22 @@ function darkenColor(hex, percent) {
       var finalTotal = payload.finalTotal || 0;
       var ppSettings = config.partialPaymentSettings;
 
+      var partialDiscountAmount = 0;
+      if (ppSettings && ppSettings.partial_payment_discount_enabled && ppSettings.partial_payment_discount_value > 0) {
+          partialDiscountAmount = ppSettings.partial_payment_discount_type === 'percentage'
+              ? (finalTotal * ppSettings.partial_payment_discount_value) / 100
+              : ppSettings.partial_payment_discount_value;
+          partialDiscountAmount = Math.min(partialDiscountAmount, finalTotal);
+      }
+
+      var discountedTotal = finalTotal - partialDiscountAmount;
+
       function calcDeposit(opt) {
           var d = 0;
           if (opt.type === 'percentage' || opt.type === 'remaining_percentage') {
-              d = (finalTotal * opt.value) / 100;
+              d = (discountedTotal * opt.value) / 100;
           } else {
-              d = Math.min(opt.value, finalTotal);
+              d = Math.min(opt.value, discountedTotal);
           }
           return Math.round(d * 100) / 100;
       }
@@ -7382,12 +7423,16 @@ function darkenColor(hex, percent) {
       var advanceAmount = calcDeposit(selOpt);
       var codFeeAmount = calcCodFee(advanceAmount);
       var payNow = advanceAmount;
-      var remainingAmount = Math.max(finalTotal - advanceAmount, 0) + codFeeAmount;
+      var remainingAmount = Math.max(discountedTotal - advanceAmount, 0) + codFeeAmount;
 
       submitPartialCodCheckout(form, config, payload, submitBtn, originalBtnText, payNow, remainingAmount, {
           optionLabel: selOpt.label,
           depositAmount: advanceAmount,
           codFeeAmount: codFeeAmount,
+          discountAmount: partialDiscountAmount,
+          discountType: ppSettings ? ppSettings.partial_payment_discount_type : null,
+          discountValue: ppSettings ? ppSettings.partial_payment_discount_value : 0,
+          discountSource: 'partial_payment',
       });
   }
 
@@ -7504,6 +7549,10 @@ function darkenColor(hex, percent) {
           partialOptionLabel: (optionMeta && optionMeta.optionLabel) || 'Partial Payment',
           partialDepositAmount: (optionMeta && optionMeta.depositAmount) || advanceAmount,
           partialCodFeeAmount: (optionMeta && optionMeta.codFeeAmount) || 0,
+          discount_amount: (optionMeta && optionMeta.discountAmount) || 0,
+          discount_type: (optionMeta && optionMeta.discountType) || null,
+          discount_value: (optionMeta && optionMeta.discountValue) || 0,
+          discount_source: (optionMeta && optionMeta.discountSource) || null,
       });
 
       console.log('[COD Form] Partial COD v2 checkout payload:', partialCodPayload);
@@ -7555,8 +7604,21 @@ function darkenColor(hex, percent) {
    *     (so Shopify Checkout always shows the correct Foxly COD price — no trust issue)
    */
   function submitFullPrepaidCheckout(form, config, payload, submitBtn, originalBtnText) {
+      var ppSettings = config.partialPaymentSettings;
+      var prepaidDiscountAmount = 0;
+      if (ppSettings && ppSettings.prepaid_discount_enabled && ppSettings.prepaid_discount_value > 0) {
+          prepaidDiscountAmount = ppSettings.prepaid_discount_type === 'percentage'
+              ? ((payload.finalTotal || 0) * ppSettings.prepaid_discount_value) / 100
+              : ppSettings.prepaid_discount_value;
+          prepaidDiscountAmount = Math.min(prepaidDiscountAmount, payload.finalTotal || 0);
+      }
+
       var fpPayload = Object.assign({}, payload, {
-          paymentMethod: 'full_prepaid'
+          paymentMethod: 'full_prepaid',
+          discount_amount: prepaidDiscountAmount,
+          discount_type: ppSettings ? ppSettings.prepaid_discount_type : null,
+          discount_value: ppSettings ? ppSettings.prepaid_discount_value : 0,
+          discount_source: 'full_prepaid',
       });
 
       console.log('[COD Form] Full Prepaid checkout payload:', fpPayload);

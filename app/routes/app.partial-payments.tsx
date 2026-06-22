@@ -1785,9 +1785,77 @@ export default function PartialPaymentsPage() {
 
                   <Divider />
 
+                  {/* Partial Payment Discount */}
+                  <div className="pp-cod-fee-box">
+                    <div className={`pp-cod-fee-card ${settings.partial_payment_discount_enabled ? 'expanded' : ''} ${settings.cod_fee_enabled ? 'locked' : ''}`} style={{ opacity: settings.cod_fee_enabled ? 0.6 : 1 }}>
+                      <div className="pp-cod-fee-left">
+                        <div className="pp-cod-fee-icon-wrap" style={{ color: '#10b981', background: '#ecfdf5' }}>
+                          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+                            <line x1="7" y1="7" x2="7.01" y2="7" />
+                          </svg>
+                        </div>
+                        <div className="pp-cod-fee-details">
+                          <div className="pp-cod-fee-title">Discount Settings</div>
+                          <div className="pp-cod-fee-sub">Offer a discount to incentivize customers to select Partial Payment</div>
+                        </div>
+                      </div>
+                      <div
+                        className={`pp-toggle-track ${settings.partial_payment_discount_enabled ? 'on' : ''}`}
+                        onClick={() => {
+                          if (settings.cod_fee_enabled) return;
+                          upd('partial_payment_discount_enabled', !settings.partial_payment_discount_enabled);
+                        }}
+                        style={{ cursor: settings.cod_fee_enabled ? 'not-allowed' : 'pointer' }}
+                      >
+                        <div className="pp-toggle-thumb" />
+                      </div>
+                    </div>
+
+                    {settings.cod_fee_enabled && (
+                      <div style={{ padding: '12px 16px', background: '#fffbeb', color: '#b45309', fontSize: '13px', borderBottomLeftRadius: '12px', borderBottomRightRadius: '12px', borderTop: '1px solid #fef3c7' }}>
+                        Discounts cannot be used together with COD Fees. Disable the COD Fee to enable Partial Payment Discounts.
+                      </div>
+                    )}
+
+                    {settings.partial_payment_discount_enabled && (
+                      <div className="pp-cod-fee-body">
+                        <div className="pp-option-box-body">
+                          <div className="pp-fg">
+                            <label>Discount Type</label>
+                            <select
+                              value={settings.partial_payment_discount_type}
+                              onChange={(e) => upd('partial_payment_discount_type', e.target.value as 'percentage' | 'fixed')}
+                            >
+                              <option value="percentage">Percentage</option>
+                              <option value="fixed">Fixed Amount</option>
+                            </select>
+                          </div>
+                          <div className="pp-fg">
+                            <label>Discount Value</label>
+                            <div className="pp-input-suffix-wrap">
+                              <input
+                                type="number"
+                                value={settings.partial_payment_discount_value}
+                                min={0}
+                                step={0.5}
+                                onChange={(e) => upd('partial_payment_discount_value', parseFloat(e.target.value) || 0)}
+                              />
+                              <span className="pp-input-suffix">
+                                {settings.partial_payment_discount_type === 'percentage' ? '%' : shopCurrency}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <Divider />
+
                   {/* COD Fee */}
                   <div className="pp-cod-fee-box">
-                    <div className={`pp-cod-fee-card ${settings.cod_fee_enabled ? 'expanded' : ''}`}>
+                    <div className={`pp-cod-fee-card ${settings.cod_fee_enabled ? 'expanded' : ''} ${settings.partial_payment_discount_enabled ? 'locked' : ''}`} style={{ opacity: settings.partial_payment_discount_enabled ? 0.6 : 1 }}>
                       <div className="pp-cod-fee-left">
                         <div className="pp-cod-fee-icon-wrap">
                           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1804,12 +1872,21 @@ export default function PartialPaymentsPage() {
                       </div>
                       <div
                         className={`pp-toggle-track ${settings.cod_fee_enabled ? 'on' : ''}`}
-                        onClick={() => upd('cod_fee_enabled', !settings.cod_fee_enabled)}
-                        style={{ cursor: 'pointer' }}
+                        onClick={() => {
+                          if (settings.partial_payment_discount_enabled) return;
+                          upd('cod_fee_enabled', !settings.cod_fee_enabled);
+                        }}
+                        style={{ cursor: settings.partial_payment_discount_enabled ? 'not-allowed' : 'pointer' }}
                       >
                         <div className="pp-toggle-thumb" />
                       </div>
                     </div>
+
+                    {settings.partial_payment_discount_enabled && (
+                      <div style={{ padding: '12px 16px', background: '#fffbeb', color: '#b45309', fontSize: '13px', borderBottomLeftRadius: '12px', borderBottomRightRadius: '12px', borderTop: '1px solid #fef3c7' }}>
+                        COD Fee cannot be used together with Partial Payment Discounts. Disable the discount to enable COD Fees.
+                      </div>
+                    )}
 
                     {settings.cod_fee_enabled && (
                       <div className="pp-cod-fee-body">
@@ -1902,8 +1979,17 @@ export default function PartialPaymentsPage() {
                                   {fmt(previewCodFee)} {settings.cod_fee_name || 'COD Fee'}
                                 </div>
                               )}
+                              {settings.partial_payment_discount_enabled && settings.partial_payment_discount_value > 0 && (
+                                <div style={{ background: '#dbeafe', color: '#1e3a8a', fontSize: '11px', fontWeight: 700, padding: '3px 8px', borderRadius: '99px', lineHeight: 1 }}>
+                                  Save {settings.partial_payment_discount_type === 'percentage' ? fmt(previewOrderTotal * (settings.partial_payment_discount_value / 100)) : fmt(settings.partial_payment_discount_value)}
+                                </div>
+                              )}
                               <span style={{ fontWeight: 800, fontSize: '15px', color: '#1e3a8a' }}>
-                                {fmt(previewDeposit)}
+                                {settings.partial_payment_discount_enabled && settings.partial_payment_discount_value > 0 ? (
+                                  settings.partial_payment_discount_type === 'percentage' ? fmt(previewDeposit - (previewOrderTotal * (settings.partial_payment_discount_value / 100))) : fmt(previewDeposit - settings.partial_payment_discount_value)
+                                ) : (
+                                  fmt(previewDeposit)
+                                )}
                               </span>
                             </div>
                             <input type="radio" checked readOnly style={{ width: '18px', height: '18px', accentColor: '#2563eb', margin: 0, pointerEvents: 'none' }} />

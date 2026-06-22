@@ -111,6 +111,9 @@ export interface PartialPaymentSettings {
   show_full_prepaid_subtitle?: boolean;
   show_partial_payment_subtitle?: boolean;
   show_pure_cod_subtitle?: boolean;
+  partial_payment_discount_enabled?: boolean;
+  partial_payment_discount_type?: 'percentage' | 'fixed';
+  partial_payment_discount_value?: number;
   created_at?: string;
   updated_at?: string;
 }

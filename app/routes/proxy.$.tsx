@@ -344,6 +344,25 @@ async function handlePartialCodCheckout(request: Request, data: any) {
             console.log('[Proxy Partial COD v2] Coupon applied:', normalizedCouponCode, 'discount:', couponDiscount);
         }
 
+        // ── Partial Payment Discount ─────────────────────────────────────────
+        let partialDiscountAmount = 0;
+        let partialDiscountType: 'percentage' | 'fixed' | undefined;
+        let partialDiscountValue: number | undefined;
+
+        if (ppSettings && ppSettings.partial_payment_discount_enabled && ppSettings.partial_payment_discount_value > 0) {
+            if (ppSettings.partial_payment_discount_type === 'percentage') {
+                partialDiscountAmount = (totalOrderValue * ppSettings.partial_payment_discount_value) / 100;
+            } else {
+                partialDiscountAmount = ppSettings.partial_payment_discount_value;
+            }
+            partialDiscountAmount = Math.min(partialDiscountAmount, totalOrderValue);
+            partialDiscountType = ppSettings.partial_payment_discount_type;
+            partialDiscountValue = ppSettings.partial_payment_discount_value;
+            
+            totalOrderValue -= partialDiscountAmount;
+            console.log('[Proxy Partial COD v2] Partial payment discount applied:', partialDiscountAmount);
+        }
+
         // Safety: advance must not exceed total
         const safeAdvance = Math.min(parsedAdvance, totalOrderValue);
         const remainingAmount = Math.max(totalOrderValue - safeAdvance, 0);
@@ -382,18 +401,19 @@ async function handlePartialCodCheckout(request: Request, data: any) {
             };
         });
 
-        // ── Distribute coupon discount across line items so Shopify Checkout shows it properly
-        if (couponDiscount > 0) {
-            let remainingCoupon = couponDiscount;
+        // ── Distribute discounts across line items so Shopify Checkout shows it properly
+        const totalDiscountToDistribute = couponDiscount + partialDiscountAmount;
+        if (totalDiscountToDistribute > 0) {
+            let remainingDiscount = totalDiscountToDistribute;
             const totalItemsPrice = storefrontLineItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
             if (totalItemsPrice > 0) {
                 storefrontLineItems.forEach((item, index) => {
                     if (index === storefrontLineItems.length - 1) {
-                        item.price = Math.max(0, item.price - (remainingCoupon / item.quantity));
+                        item.price = Math.max(0, item.price - (remainingDiscount / item.quantity));
                     } else {
                         const proportion = (item.price * item.quantity) / totalItemsPrice;
-                        const discountForItem = Number((couponDiscount * proportion).toFixed(2));
-                        remainingCoupon -= discountForItem;
+                        const discountForItem = Number((totalDiscountToDistribute * proportion).toFixed(2));
+                        remainingDiscount -= discountForItem;
                         item.price = Math.max(0, item.price - (discountForItem / item.quantity));
                     }
                 });
@@ -411,6 +431,7 @@ async function handlePartialCodCheckout(request: Request, data: any) {
             `Advance: ${fmtAmt(safeAdvance)}`,
             `Remaining (COD): ${fmtAmt(remainingAmount)}`,
             normalizedCouponCode ? `Coupon: ${normalizedCouponCode} (-${fmtAmt(couponDiscount)})` : '',
+            partialDiscountAmount > 0 ? `Partial Payment Discount: -${fmtAmt(partialDiscountAmount)}` : '',
         ].filter(Boolean).join('\n');
 
         // ── Create Shopify Checkout via Storefront API ─────────────────────
@@ -483,6 +504,10 @@ async function handlePartialCodCheckout(request: Request, data: any) {
                     discountAmount: couponDiscount,
                     originalTotal: pricing.originalTotal,
                     finalTotal: totalOrderValue,
+                    discount_type: partialDiscountType || null,
+                    discount_value: partialDiscountValue || null,
+                    discount_amount: partialDiscountAmount || 0,
+                    discount_source: partialDiscountAmount > 0 ? 'partial_payment' : null,
                 },
             })
         ).then(() => {

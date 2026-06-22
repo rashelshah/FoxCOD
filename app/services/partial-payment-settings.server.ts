@@ -47,14 +47,22 @@ export async function getPartialPaymentSettings(
     throw error;
   }
 
-  if (data && data.payment_method_descriptions && data.payment_method_descriptions.subtitles) {
-    const subs = data.payment_method_descriptions.subtitles;
-    data.full_prepaid_subtitle = subs.full_prepaid_subtitle;
-    data.partial_payment_subtitle = subs.partial_payment_subtitle;
-    data.pure_cod_subtitle = subs.pure_cod_subtitle;
-    data.show_full_prepaid_subtitle = subs.show_full_prepaid_subtitle;
-    data.show_partial_payment_subtitle = subs.show_partial_payment_subtitle;
-    data.show_pure_cod_subtitle = subs.show_pure_cod_subtitle;
+  if (data && data.payment_method_descriptions) {
+    if (data.payment_method_descriptions.subtitles) {
+      const subs = data.payment_method_descriptions.subtitles;
+      data.full_prepaid_subtitle = subs.full_prepaid_subtitle;
+      data.partial_payment_subtitle = subs.partial_payment_subtitle;
+      data.pure_cod_subtitle = subs.pure_cod_subtitle;
+      data.show_full_prepaid_subtitle = subs.show_full_prepaid_subtitle;
+      data.show_partial_payment_subtitle = subs.show_partial_payment_subtitle;
+      data.show_pure_cod_subtitle = subs.show_pure_cod_subtitle;
+    }
+    if (data.payment_method_descriptions.partial_discounts) {
+      const pdis = data.payment_method_descriptions.partial_discounts;
+      data.partial_payment_discount_enabled = pdis.partial_payment_discount_enabled;
+      data.partial_payment_discount_type = pdis.partial_payment_discount_type;
+      data.partial_payment_discount_value = pdis.partial_payment_discount_value;
+    }
   }
 
   return data as PartialPaymentSettings | null;
@@ -79,6 +87,11 @@ export async function savePartialPaymentSettings(
     show_partial_payment_subtitle: rest.show_partial_payment_subtitle,
     show_pure_cod_subtitle: rest.show_pure_cod_subtitle,
   };
+  pm_desc.partial_discounts = {
+    partial_payment_discount_enabled: rest.partial_payment_discount_enabled,
+    partial_payment_discount_type: rest.partial_payment_discount_type,
+    partial_payment_discount_value: rest.partial_payment_discount_value,
+  };
   rest.payment_method_descriptions = pm_desc;
 
   // Remove top-level subtitle properties so Supabase Postgres doesn't error
@@ -88,6 +101,9 @@ export async function savePartialPaymentSettings(
   delete rest.show_full_prepaid_subtitle;
   delete rest.show_partial_payment_subtitle;
   delete rest.show_pure_cod_subtitle;
+  delete rest.partial_payment_discount_enabled;
+  delete rest.partial_payment_discount_type;
+  delete rest.partial_payment_discount_value;
 
   const { data, error } = await supabase
     .from('partial_payment_settings')
@@ -198,6 +214,9 @@ export async function syncPartialPaymentToMetafield(
       show_full_prepaid_subtitle: settings.show_full_prepaid_subtitle ?? true,
       show_partial_payment_subtitle: settings.show_partial_payment_subtitle ?? true,
       show_pure_cod_subtitle: settings.show_pure_cod_subtitle ?? true,
+      partial_payment_discount_enabled: settings.partial_payment_discount_enabled ?? false,
+      partial_payment_discount_type: settings.partial_payment_discount_type ?? 'percentage',
+      partial_payment_discount_value: settings.partial_payment_discount_value ?? 0,
     }
     : {
       enabled: true,
@@ -216,7 +235,10 @@ export async function syncPartialPaymentToMetafield(
         partial_payment: { enabled: true, text: 'Secure your order • Avoid fake cancellations' },
         full_prepaid: { enabled: true, text: 'Pay now, save more, receive sooner' },
         pure_cod: { enabled: true, text: 'Higher return risk • Slightly slower processing' }
-      }
+      },
+      partial_payment_discount_enabled: false,
+      partial_payment_discount_type: 'percentage',
+      partial_payment_discount_value: 0,
     };
 
   // Get shop GID
