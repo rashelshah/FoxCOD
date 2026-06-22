@@ -110,6 +110,26 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         }), { headers: corsHeaders });
     }
 
+    // Proxy static data requests (e.g. countries.json, states.json)
+    if (path.startsWith("data/")) {
+        const appUrl = process.env.SHOPIFY_APP_URL || url.origin;
+        try {
+            const res = await fetch(`${appUrl}/${path}`);
+            if (res.ok) {
+                const data = await res.text();
+                return new Response(data, {
+                    headers: {
+                        "Content-Type": "application/json",
+                        ...corsHeaders
+                    }
+                });
+            }
+        } catch (e) {
+            console.error('[Proxy] Failed to fetch static data:', e);
+        }
+        return new Response("[]", { status: 404, headers: corsHeaders });
+    }
+
     return new Response(JSON.stringify({
         success: true,
         message: "Foxly COD App Proxy is working",

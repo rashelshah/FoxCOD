@@ -37,6 +37,7 @@ export interface ContentBlocks {
     shipping_options: boolean;
     cart_quantity_offers: boolean;
     buyer_marketing: boolean;
+    enable_state_province?: boolean;
 }
 
 /**
@@ -167,6 +168,7 @@ export const DEFAULT_BLOCKS: ContentBlocks = {
     shipping_options: false,
     cart_quantity_offers: false,
     buyer_marketing: false,
+    enable_state_province: true,
 };
 
 /**

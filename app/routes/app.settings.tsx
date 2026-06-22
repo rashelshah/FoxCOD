@@ -1724,6 +1724,11 @@ const PreviewDisplay = memo(({
                                                                     opacity: 1
                                                                 } as any}
                                                             />
+                                                            {field.id === 'state' && (blocks?.enable_state_province ?? true) && (
+                                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" style={{ position: 'absolute', right: '12px', top: '13px', fill: 'none', stroke: formStyles?.textColor || '#4b5563', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', pointerEvents: 'none', opacity: 0.7 }}>
+                                                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                                                </svg>
+                                                            )}
                                                         </div>
                                                     )}
                                                 </div>
@@ -2350,7 +2355,8 @@ export default function SettingsPage() {
                 }
             });
         }
-        return result;
+        // Remove 'country' field as it shouldn't be visible to users
+        return result.filter(f => f.id !== 'country');
     };
     const [fields, setFields] = useState<FormField[]>(mergeFieldsWithDefaults(settings.fields, settings.custom_fields));
     const [blocks, setBlocks] = useState<ContentBlocks>(settings.blocks || DEFAULT_BLOCKS);
@@ -3755,7 +3761,9 @@ export default function SettingsPage() {
                     .builder-title p { font-size: 12px; }
                     .tabs { gap: 4px; }
                     .tab-btn { padding: 8px 12px; }
-                    .toggle-switch { width: 48px; height: 26px; }
+                    .toggle-switch { width: 44px; height: 24px; }
+                    .toggle-switch::after { width: 20px; height: 20px; top: 2px; }
+                    .toggle-switch.enabled::after { left: 22px; }
                 }
                 
                 /* =========================
@@ -4635,6 +4643,21 @@ export default function SettingsPage() {
                                             >
                                                 + Add Custom Field
                                             </button>
+                                        </div>
+
+                                        <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid #e5e7eb' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                <div>
+                                                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#374151' }}>Enable State / Province Dropdown</div>
+                                                    <div style={{ fontSize: '13px', color: '#6b7280', marginTop: '2px' }}>Automatically detects the customer's country and displays the appropriate State/Province dropdown.</div>
+                                                </div>
+                                                <div
+                                                    className={`toggle-switch ${blocks?.enable_state_province ?? true ? 'enabled' : 'disabled'}`}
+                                                    onClick={() => setBlocks({ ...blocks, enable_state_province: !(blocks?.enable_state_province ?? true) })}
+                                                    style={{ flexShrink: 0 }}
+                                                >
+                                                </div>
+                                            </div>
                                         </div>
                                     </AccordionSection>
 

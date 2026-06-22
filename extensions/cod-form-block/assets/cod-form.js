@@ -225,12 +225,35 @@
   window.FoxCod.CountryRestrictionEngine = {
     currentCountry: null,
     currentSource: null,
+    ipCountry: null,
+
+    initAsync: function() {
+      var self = this;
+      if (this.ipCountry) return Promise.resolve(this.ipCountry);
+      // Fast Cloudflare IP trace
+      return fetch('https://1.1.1.1/cdn-cgi/trace')
+        .then(function(res) { return res.text(); })
+        .then(function(data) {
+          var match = data.match(/loc=([A-Z]{2})/);
+          if (match && match[1]) {
+            self.ipCountry = match[1];
+          }
+          return self.ipCountry;
+        })
+        .catch(function(err) {
+          console.warn('[FoxCod] Failed to fetch IP geolocation:', err);
+          return null;
+        });
+    },
 
     /**
      * Determines the customer's country based on priority:
-     * 1. Form Input
-     * 2. Shopify Window Variable
-     * 3. Phone Number (via bundled libphonenumber-js)
+     * 1. Customer-selected country (if the Country field is enabled)
+     * 2. Previously saved country from local storage
+     * 3. IP geolocation
+     * 4. Shopify localization (window.Shopify.country)
+     * 5. Browser locale (navigator.language)
+     * 6. Merchant default country
      */
     getCustomerCountry: function(form) {
       var detectedCountry = null;
@@ -261,10 +284,8 @@
         "VENEZUELA":"VE","VIETNAM":"VN","YEMEN":"YE","ZAMBIA":"ZM","ZIMBABWE":"ZW"
       };
 
-      // Priority 1: Form Input
-      if (form) {
-        // findInputByCanonicalKey might not be initialized yet, so use querySelector fallback primarily 
-        // if called too early, but it's hoisted so it should be fine.
+      // Priority 1: Customer-selected country
+      if (!detectedCountry && form) {
         var countryInput = (typeof findInputByCanonicalKey === 'function' ? findInputByCanonicalKey(form, 'country') : null) || form.querySelector('input[name="country"]') || form.querySelector('select[name="country"]');
         if (countryInput && countryInput.value) {
           var rawVal = countryInput.value.trim().toUpperCase();
@@ -273,69 +294,58 @@
         }
       }
 
-      // Priority 2: Phone Number
-      if (!detectedCountry && form) {
-        var phoneInput = (typeof findInputByCanonicalKey === 'function' ? findInputByCanonicalKey(form, 'phone') : null) || form.querySelector('input[name="phone"]');
-        if (phoneInput && phoneInput.value) {
-          var phone = phoneInput.value.trim();
-          if (phone.indexOf('+') === 0) {
-            var digits = phone.replace(/\D/g, '');
-            var phonePrefixMap = {
-              "1": "US", "20": "EG", "27": "ZA", "30": "GR", "31": "NL", "32": "BE", "33": "FR", "34": "ES", "36": "HU", "39": "IT",
-              "40": "RO", "41": "CH", "43": "AT", "44": "GB", "45": "DK", "46": "SE", "47": "NO", "48": "PL", "49": "DE", "51": "PE",
-              "52": "MX", "53": "CU", "54": "AR", "55": "BR", "56": "CL", "57": "CO", "58": "VE", "60": "MY", "61": "AU", "62": "ID",
-              "63": "PH", "64": "NZ", "65": "SG", "66": "TH", "81": "JP", "82": "KR", "84": "VN", "86": "CN", "90": "TR", "91": "IN",
-              "92": "PK", "93": "AF", "94": "LK", "95": "MM", "98": "IR", "211": "SS", "212": "MA", "213": "DZ", "216": "TN", "218": "LY",
-              "220": "GM", "221": "SN", "222": "MR", "223": "ML", "224": "GN", "225": "CI", "226": "BF", "227": "NE", "228": "TG",
-              "229": "BJ", "230": "MU", "231": "LR", "232": "SL", "233": "GH", "234": "NG", "235": "TD", "236": "CF", "237": "CM",
-              "238": "CV", "239": "ST", "240": "GQ", "241": "GA", "242": "CG", "243": "CD", "244": "AO", "245": "GW", "246": "IO",
-              "248": "SC", "249": "SD", "250": "RW", "251": "ET", "252": "SO", "253": "DJ", "254": "KE", "255": "TZ", "256": "UG",
-              "257": "BI", "258": "MZ", "260": "ZM", "261": "MG", "262": "RE", "263": "ZW", "264": "NA", "265": "MW", "266": "LS",
-              "267": "BW", "268": "SZ", "269": "KM", "290": "SH", "291": "ER", "297": "AW", "298": "FO", "299": "GL", "350": "GI",
-              "351": "PT", "352": "LU", "353": "IE", "354": "IS", "355": "AL", "356": "MT", "357": "CY", "358": "FI", "359": "BG",
-              "370": "LT", "371": "LV", "372": "EE", "373": "MD", "374": "AM", "375": "BY", "376": "AD", "377": "MC", "378": "SM",
-              "379": "VA", "380": "UA", "381": "RS", "382": "ME", "383": "XK", "385": "HR", "386": "SI", "387": "BA", "389": "MK",
-              "420": "CZ", "421": "SK", "423": "LI", "500": "FK", "501": "BZ", "502": "GT", "503": "SV", "504": "HN", "505": "NI",
-              "506": "CR", "507": "PA", "508": "PM", "509": "HT", "590": "BL", "591": "BO", "592": "GY", "593": "EC", "594": "GF",
-              "595": "PY", "596": "MQ", "597": "SR", "598": "UY", "599": "CW", "670": "TL", "672": "NF", "673": "BN", "674": "NR",
-              "675": "PG", "676": "TO", "677": "SB", "678": "VU", "679": "FJ", "680": "PW", "681": "WF", "682": "CK", "683": "NU",
-              "685": "WS", "686": "KI", "687": "NC", "688": "TV", "689": "PF", "690": "TK", "691": "FM", "692": "MH", "850": "KP",
-              "852": "HK", "853": "MO", "855": "KH", "856": "LA", "880": "BD", "886": "TW", "960": "MV", "961": "LB", "962": "JO",
-              "963": "SY", "964": "IQ", "965": "KW", "966": "SA", "967": "YE", "968": "OM", "970": "PS", "971": "AE", "972": "IL",
-              "973": "BH", "974": "QA", "975": "BT", "976": "MN", "977": "NP", "992": "TJ", "993": "TM", "994": "AZ", "995": "GE",
-              "996": "KG", "998": "UZ"
-            };
-            
-            for (var i = 4; i >= 1; i--) {
-              var prefix = digits.substring(0, i);
-              if (phonePrefixMap[prefix]) {
-                detectedCountry = phonePrefixMap[prefix];
-                source = 'phone';
-                break;
-              }
-            }
-          } else if (window.libphonenumber && typeof window.libphonenumber.parsePhoneNumberFromString === 'function') {
-            // Fallback to libphonenumber if it happens to exist and phone doesn't start with '+'
-            try {
-              var parsed = window.libphonenumber.parsePhoneNumberFromString(phone);
-              if (parsed && parsed.country) {
-                detectedCountry = parsed.country.toUpperCase();
-                source = 'phone';
-              }
-            } catch (e) {
-              console.warn('[FoxCod] Phone number parsing failed', e);
+      // Priority 2: Previously saved country from local storage
+      if (!detectedCountry) {
+        try {
+          var stored = localStorage.getItem('cod_customer');
+          if (stored) {
+            var data = JSON.parse(stored);
+            if (data && data.country) {
+              var rawVal = data.country.trim().toUpperCase();
+              detectedCountry = countryMap[rawVal] || rawVal;
+              source = 'local_storage';
             }
           }
-        }
+        } catch(e) {}
       }
 
-      // Priority 3: Shopify Window Variable
+      // Priority 3: IP geolocation (resolved via initAsync)
+      if (!detectedCountry && this.ipCountry) {
+        detectedCountry = this.ipCountry;
+        source = 'ip_geolocation';
+      }
+
+      // Priority 4: Shopify Window Variable
       if (!detectedCountry) {
         var shopifyCountry = (window.Shopify && window.Shopify.country) || null;
         if (shopifyCountry) {
           detectedCountry = String(shopifyCountry).trim().toUpperCase();
           source = 'shopify';
         }
+      }
+
+      // Priority 5: Browser locale
+      if (!detectedCountry && typeof navigator !== 'undefined' && navigator.language) {
+        var parts = navigator.language.split('-');
+        if (parts.length > 1) {
+          var loc = parts[1].toUpperCase();
+          if (loc.length === 2) {
+             detectedCountry = loc;
+             source = 'browser_locale';
+          }
+        }
+      }
+
+      // Priority 6: Merchant default country
+      if (!detectedCountry && window.FoxCod && window.FoxCod.defaultCountry) {
+        detectedCountry = window.FoxCod.defaultCountry.trim().toUpperCase();
+        source = 'merchant_default';
+      }
+
+      // Final fallback
+      if (!detectedCountry) {
+        detectedCountry = 'US';
+        source = 'fallback';
       }
 
       this.currentCountry = detectedCountry;
@@ -386,6 +396,82 @@
       }
 
       return true;
+    }
+  };
+
+  // =============================================
+  // LOCATION ENGINE (Countries & States)
+  // =============================================
+  window.FoxCod.LocationEngine = {
+    countries: [],
+    statesCache: {},
+    loadingStates: {}, // Keep track of pending state promises
+    
+    getCountries: function(appUrl) {
+      var self = this;
+      if (this.countries.length > 0) return Promise.resolve(this.countries);
+      if (this.loadingCountries) return this.loadingCountries;
+      
+      var url = appUrl ? (appUrl + '/data/countries.json') : '/apps/fox-cod/data/countries.json';
+      this.loadingCountries = fetch(url)
+        .then(function(res) {
+          if (!res.ok) throw new Error('Network response was not ok');
+          return res.json();
+        })
+        .catch(function(err) {
+          if (appUrl) {
+            console.warn('[FoxCod] Direct CDN fetch failed for countries, falling back to app proxy:', err);
+            return fetch('/apps/fox-cod/data/countries.json').then(function(res) {
+                if (!res.ok) throw new Error('Proxy network response was not ok');
+                return res.json();
+            });
+          }
+          throw err;
+        })
+        .then(function(data) {
+          self.countries = data;
+          return data;
+        })
+        .catch(function(err) {
+          console.error('[FoxCod LocationEngine] Failed to load countries:', err);
+          return [];
+        });
+      return this.loadingCountries;
+    },
+
+    getStates: function(appUrl, countryCode) {
+      var self = this;
+      if (!countryCode) return Promise.resolve([]);
+      if (this.statesCache[countryCode]) return Promise.resolve(this.statesCache[countryCode]);
+      if (this.loadingStates[countryCode]) return this.loadingStates[countryCode];
+      
+      var url = appUrl ? (appUrl + '/data/states/' + encodeURIComponent(countryCode) + '.json') : '/apps/fox-cod/data/states/' + encodeURIComponent(countryCode) + '.json';
+      this.loadingStates[countryCode] = fetch(url)
+        .then(function(res) {
+          if (!res.ok) throw new Error('Network response was not ok');
+          return res.json();
+        })
+        .catch(function(err) {
+          if (appUrl) {
+            console.warn('[FoxCod] Direct CDN fetch failed for states, falling back to app proxy:', err);
+            return fetch('/apps/fox-cod/data/states/' + encodeURIComponent(countryCode) + '.json').then(function(res) {
+                if (!res.ok) throw new Error('Proxy network response was not ok');
+                return res.json();
+            });
+          }
+          throw err;
+        })
+        .then(function(data) {
+          self.statesCache[countryCode] = data;
+          return data;
+        })
+        .catch(function(err) {
+          console.error('[FoxCod LocationEngine] Failed to load states for ' + countryCode + ':', err);
+          self.statesCache[countryCode] = [];
+          return [];
+        });
+        
+      return this.loadingStates[countryCode];
     }
   };
 
@@ -1414,9 +1500,16 @@
 
       console.log('[COD Form] Initialized for product:', productId, config);
       
-      // Initialize form immediately
-      initializeProduct(productId, config);
-      hydratePublicSettings(config);
+      // Initialize form after fetching IP geolocation
+      if (window.FoxCod.CountryRestrictionEngine && window.FoxCod.CountryRestrictionEngine.initAsync) {
+          window.FoxCod.CountryRestrictionEngine.initAsync().then(function() {
+              initializeProduct(productId, config);
+              hydratePublicSettings(config);
+          });
+      } else {
+          initializeProduct(productId, config);
+          hydratePublicSettings(config);
+      }
   }
 
   /**
@@ -2803,6 +2896,7 @@
           address: '',
           city: '',
           state: '',
+          country: '',
           zipcode: ''
       };
       if (!form) return result;
@@ -3079,7 +3173,9 @@
             return;
         }
         
-        if (!field.visible) {
+        var isDynamicLocationField = (field.id === 'state' || field.id === 'country') && config.blocks && (config.blocks.enable_state_province !== false);
+
+        if (!field.visible && !isDynamicLocationField) {
             console.log('[COD Form] Skipping invisible field:', field.id);
             return;
         }
@@ -3088,6 +3184,9 @@
             var couponWrapper = document.createElement('div');
             couponWrapper.className = 'cod-form-field cod-coupon-field';
             couponWrapper.style.marginBottom = '12px';
+            if (isDynamicLocationField && !field.visible) {
+                couponWrapper.style.display = 'none'; // Edge case, shouldn't happen for coupon
+            }
             couponWrapper.style.padding = '12px';
             couponWrapper.style.borderRadius = Math.max(borderRadius + 3, 15) + 'px';
             couponWrapper.style.background = 'linear-gradient(135deg, ' + (hexToRgba(primaryThemeColor, 0.14) || 'rgba(17,24,39,0.08)') + ' 0%, ' + (styles.fieldBackgroundColor || '#ffffff') + ' 58%, ' + (hexToRgba(config.formThemeColor || primaryThemeColor, 0.08) || 'rgba(17,24,39,0.04)') + ' 100%)';
@@ -3287,8 +3386,11 @@
 
         var wrapper = document.createElement('div');
         wrapper.className = 'cod-form-field';
+        if (isDynamicLocationField && !field.visible) {
+            wrapper.style.display = 'none'; // Initially hidden
+        }
         if (isSideBySide) {
-            wrapper.style.display = 'inline-block';
+            wrapper.style.display = (isDynamicLocationField && !field.visible) ? 'none' : 'inline-block';
             wrapper.style.width = 'calc(50% - 6px)';
             wrapper.style.verticalAlign = 'top';
             wrapper.style.marginRight = field.id === 'city' ? '12px' : '0px';
@@ -3296,7 +3398,7 @@
             wrapper.style.marginBottom = '0px';
         } else {
             wrapper.style.marginBottom = '0px';
-            wrapper.style.display = 'block';
+            wrapper.style.display = (isDynamicLocationField && !field.visible) ? 'none' : 'block';
             wrapper.style.width = '100%';
         }
 
@@ -3382,17 +3484,17 @@
         if (field.type === 'textarea') {
             input = document.createElement('textarea');
             input.rows = field.id === 'address' ? 3 : 2;
-        } else if (field.type === 'dropdown') {
+        } else if (field.type === 'dropdown' || isDynamicLocationField) {
             input = document.createElement('select');
             // Add placeholder option
             var placeholderOpt = document.createElement('option');
             placeholderOpt.value = '';
-            placeholderOpt.textContent = field.placeholder || ('Select ' + field.label.toLowerCase());
+            placeholderOpt.textContent = field.placeholder || ('Select ' + field.label);
             placeholderOpt.disabled = true;
             placeholderOpt.selected = true;
             input.appendChild(placeholderOpt);
             // Add options logic if custom fields have options
-            if (field.options) {
+            if (field.options && field.type === 'dropdown') {
                 field.options.forEach(function(opt) {
                     var option = document.createElement('option');
                     option.value = opt;
@@ -3527,8 +3629,94 @@
     });
     
     console.log('[COD Form] renderFields completed. Container children count:', container.children.length);
+    if (config.blocks && config.blocks.enable_state_province !== false) {
+        initializeLocationDropdowns(container, config);
+    }
   }
 
+  function initializeLocationDropdowns(container, config) {
+      if (!config.blocks || config.blocks.enable_state_province === false) return;
+      var currentForm = container.closest('form') || container;
+      var countryInput = currentForm.querySelector('select[name="country"]');
+      var stateInput = currentForm.querySelector('select[name="state"]');
+      
+      if (!countryInput && !stateInput) return;
+
+      var countryInfo = window.FoxCod.CountryRestrictionEngine.getCustomerCountry(currentForm);
+      var currentCountryCode = countryInfo.country || 'US';
+
+      function updateStateDropdown(countryCode) {
+          if (!stateInput) return;
+          window.FoxCod.LocationEngine.getStates(config.appUrl, countryCode).then(function(states) {
+              var wrapper = stateInput._foxcodWrapper || stateInput.closest('.cod-form-field');
+              if (!wrapper) return;
+              
+              // Only keep the current value if the user manually selected it (data-autofilled is absent)
+              // Do NOT restore state from localStorage — state should only fill via phone autofill
+              var previousValue = (stateInput.value && !stateInput.hasAttribute('data-autofilled-state-ls')) ? stateInput.value : '';
+              
+              while (stateInput.options.length > 1) {
+                  stateInput.remove(1);
+              }
+              
+              if (states && states.length > 0) {
+                  states.sort(function(a, b) { return a.name.localeCompare(b.name); });
+                  
+                  states.forEach(function(s) {
+                      var opt = document.createElement('option');
+                      opt.value = s.code;
+                      opt.textContent = s.name;
+                      if (s.code === previousValue || s.name === previousValue) {
+                          opt.selected = true;
+                      }
+                      stateInput.appendChild(opt);
+                  });
+                  
+                  if (wrapper.style.display === 'none') {
+                      var isSideBySide = wrapper.style.width && wrapper.style.width.indexOf('50%') !== -1;
+                      wrapper.style.display = isSideBySide ? 'inline-block' : 'block';
+                  }
+                  
+                  stateInput.required = true;
+                  stateInput.setAttribute('data-required', 'true');
+              } else {
+                  wrapper.style.display = 'none';
+                  stateInput.required = false;
+                  stateInput.removeAttribute('data-required');
+                  stateInput.value = '';
+              }
+          });
+      }
+
+      if (countryInput) {
+          window.FoxCod.LocationEngine.getCountries(config.appUrl).then(function(countries) {
+              // Use geolocation/IP-detected country only — do NOT pull country from localStorage
+              var previousCountry = countryInput.value || currentCountryCode;
+
+              countries.forEach(function(c) {
+                  var opt = document.createElement('option');
+                  opt.value = c.code;
+                  opt.textContent = c.name;
+                  if (c.code === previousCountry || c.name === previousCountry) {
+                      opt.selected = true;
+                  }
+                  countryInput.appendChild(opt);
+              });
+              
+              if (!countryInput.value && previousCountry) {
+                  countryInput.value = previousCountry;
+              }
+              
+              updateStateDropdown(countryInput.value);
+          });
+          
+          countryInput.addEventListener('change', function() {
+              updateStateDropdown(this.value);
+          });
+      } else {
+          updateStateDropdown(currentCountryCode);
+      }
+  }
 
   /**
    * Save customer data to LocalStorage for future auto-fill
@@ -3545,6 +3733,7 @@
             address: customer.address || '',
             email: customer.email || '',
             state: customer.state || '',
+            country: customer.country || '',
             city: customer.city || '',
             zipcode: customer.zipcode || ''
         }));
@@ -3787,6 +3976,12 @@
     var phoneInput = findInputByCanonicalKey(form, 'phone') || form.querySelector('input[name="phone"]');
     if (!phoneInput) return;
 
+    form.addEventListener('input', function(e) {
+        if (e.isTrusted && e.target && e.target.hasAttribute && e.target.hasAttribute('data-autofilled')) {
+            e.target.removeAttribute('data-autofilled');
+        }
+    });
+
     function triggerAutoFill() {
         var phone = phoneInput.value.replace(/\D/g, '');
         if (phone.length < 10) return;
@@ -3826,6 +4021,51 @@
                     };
                     autoFillFields(form, customerData);
                     console.log('[COD Form] Auto-filled from database');
+                } else {
+                    var matchesLS = false;
+                    try {
+                        var stored = localStorage.getItem('cod_customer');
+                        if (stored) {
+                            var lsData = JSON.parse(stored);
+                            var storedPhone = lsData.phone ? lsData.phone.replace(/\D/g, '') : '';
+                            if (storedPhone && (storedPhone === phone || storedPhone.endsWith(phone) || phone.endsWith(storedPhone))) {
+                                matchesLS = true;
+                            }
+                        }
+                    } catch(e) {}
+
+                    if (!matchesLS) {
+                        var fieldsToClear = ['name', 'address', 'city', 'state', 'zip', 'zipcode', 'email', 'country'];
+                        var clearedAny = false;
+                        fieldsToClear.forEach(function(fieldName) {
+                            var inputs = form.querySelectorAll('input[name="' + fieldName + '"], select[name="' + fieldName + '"], textarea[name="' + fieldName + '"]');
+                            inputs.forEach(function(el) {
+                                if (el.value) {
+                                    el.value = '';
+                                    el.removeAttribute('data-autofilled');
+                                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                                    clearedAny = true;
+                                }
+                            });
+                        });
+                        
+                        // Also check generic custom fields just in case
+                        var all = form.querySelectorAll('input, textarea, select');
+                        all.forEach(function(el) {
+                            if (el.type === 'hidden' || el.type === 'checkbox' || el.type === 'radio' || el.type === 'submit' || el.type === 'button') return;
+                            if (el === phoneInput || el.name === 'phone' || el.name === 'phone_number') return;
+                            
+                            var canonical = getCanonicalCustomerKeyForInput(el);
+                            if (canonical && canonical !== 'phone' && el.value) {
+                                el.value = '';
+                                el.removeAttribute('data-autofilled');
+                                el.dispatchEvent(new Event('change', { bubbles: true }));
+                                clearedAny = true;
+                            }
+                        });
+
+                        if (clearedAny) console.log('[COD Form] Force cleared all fields because new phone number has no associated data');
+                    }
                 }
             })
             .catch(function(err) {
@@ -3856,41 +4096,29 @@
         address: data.address || '',
         city: data.city || '',
         state: data.state || '',
+        country: data.country || '',
         zipcode: data.zipcode || data.zip || ''
     };
     if (!normalized.name && normalized.firstName) {
         normalized.name = normalized.lastName ? (normalized.firstName + ' ' + normalized.lastName).trim() : normalized.firstName;
     }
 
-    // Backward-compatible direct field IDs
-    if (normalized.name) {
-        var nameInput = form.querySelector('input[name="name"]');
-        if (nameInput && !nameInput.value) nameInput.value = normalized.name;
+    function setVal(el, val) {
+        if (el && !el.value && val) {
+            el.value = val;
+            el.setAttribute('data-autofilled', 'true');
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+        }
     }
-    if (normalized.phone) {
-        var phoneInput = form.querySelector('input[name="phone"]');
-        if (phoneInput && !phoneInput.value) phoneInput.value = normalized.phone;
-    }
-    if (normalized.address) {
-        var addrInput = form.querySelector('[name="address"]');
-        if (addrInput && !addrInput.value) addrInput.value = normalized.address;
-    }
-    if (normalized.email) {
-        var emailInput = form.querySelector('input[name="email"]');
-        if (emailInput && !emailInput.value) emailInput.value = normalized.email;
-    }
-    if (normalized.state) {
-        var stateInput = form.querySelector('input[name="state"], select[name="state"]');
-        if (stateInput && !stateInput.value) stateInput.value = normalized.state;
-    }
-    if (normalized.city) {
-        var cityInput = form.querySelector('input[name="city"]');
-        if (cityInput && !cityInput.value) cityInput.value = normalized.city;
-    }
-    if (normalized.zipcode) {
-        var zipInput = form.querySelector('input[name="zip"], input[name="zipcode"]');
-        if (zipInput && !zipInput.value) zipInput.value = normalized.zipcode;
-    }
+
+    setVal(form.querySelector('input[name="name"]'), normalized.name);
+    setVal(form.querySelector('input[name="phone"]'), normalized.phone);
+    setVal(form.querySelector('[name="address"]'), normalized.address);
+    setVal(form.querySelector('input[name="email"]'), normalized.email);
+    setVal(form.querySelector('input[name="country"], select[name="country"]'), normalized.country);
+    setVal(form.querySelector('input[name="state"], select[name="state"]'), normalized.state);
+    setVal(form.querySelector('input[name="city"]'), normalized.city);
+    setVal(form.querySelector('input[name="zip"], input[name="zipcode"]'), normalized.zipcode);
 
     // Generic canonical fill for custom-labeled fields
     var all = form.querySelectorAll('input, textarea, select');
@@ -3900,7 +4128,11 @@
         var canonical = getCanonicalCustomerKeyForInput(el);
         if (!canonical) return;
         var val = normalized[canonical];
-        if (val) el.value = val;
+        if (val) {
+            el.value = val;
+            el.setAttribute('data-autofilled', 'true');
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+        }
     });
   }
 
@@ -6875,6 +7107,18 @@ function darkenColor(hex, percent) {
       // Build payload with proper field mapping
       var countryInfo = window.FoxCod.CountryRestrictionEngine.getCustomerCountry(form);
       
+      var stateInput = form.querySelector('[name="state"]');
+      var stateName = '';
+      if (stateInput && stateInput.tagName.toLowerCase() === 'select' && stateInput.options[stateInput.selectedIndex]) {
+          stateName = stateInput.options[stateInput.selectedIndex].text;
+      }
+      
+      var countryInput = form.querySelector('[name="country"]');
+      var countryName = '';
+      if (countryInput && countryInput.tagName.toLowerCase() === 'select' && countryInput.options[countryInput.selectedIndex]) {
+          countryName = countryInput.options[countryInput.selectedIndex].text;
+      }
+
       var payload = {
           shop: config.shop,
           customerName: normalizedCustomer.name || formData.get('name') || '',
@@ -6882,6 +7126,7 @@ function darkenColor(hex, percent) {
           customerAddress: normalizedCustomer.address || formData.get('address') || '',
           customerEmail: normalizedCustomer.email || formData.get('email') || '',
           customerState: normalizedCustomer.state || formData.get('state') || '',
+          customerStateName: stateName || normalizedCustomer.state || formData.get('state') || '',
           customerCity: normalizedCustomer.city || formData.get('city') || '',
           customerZipcode: normalizedCustomer.zipcode || formData.get('zip') || formData.get('zipcode') || '',
           notes: formData.get('notes') || '',
@@ -6897,6 +7142,7 @@ function darkenColor(hex, percent) {
           finalTotal: 0,
           upsell_items: getCheckedTickUpsells(form, config),
           detectedCountry: countryInfo.country,
+          countryName: countryName || countryInfo.country,
           countryDetectionSource: countryInfo.source
       };
 

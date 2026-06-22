@@ -6,12 +6,35 @@
 import { supabase } from "../config/supabase.server";
 
 function normalizePhone(phone: string): string {
-    return phone.replace(/[\s\-\(\)\+]/g, '');
+    // Strip all non-digit characters
+    return phone.replace(/\D/g, '');
+}
+
+/**
+ * Strict phone match: two phone numbers match if:
+ * - Their normalized digits are exactly equal, OR
+ * - One ends with the other's digits AND the shorter one is at least 10 digits
+ *   (handles country code prefix like +91 vs local 10-digit number)
+ *   BUT only if the shorter number has >= 10 digits to avoid false positives.
+ */
+function phonesMatch(a: string, b: string): boolean {
+    const na = normalizePhone(a);
+    const nb = normalizePhone(b);
+    if (!na || !nb) return false;
+    if (na === nb) return true;
+    // Allow country-code prefix strip only when both are at least 10 digits
+    if (na.length >= 10 && nb.length >= 10) {
+        // The longer should end with the shorter (country code scenario)
+        const longer = na.length > nb.length ? na : nb;
+        const shorter = na.length <= nb.length ? na : nb;
+        if (longer.endsWith(shorter) && shorter.length >= 10) return true;
+    }
+    return false;
 }
 
 function isValidPhone(phone: string): boolean {
     const normalized = normalizePhone(phone);
-    return normalized.length >= 8 && normalized.length <= 15 && /^\d+$/.test(normalized);
+    return normalized.length >= 8 && normalized.length <= 15;
 }
 
 export interface CustomerLookupResult {
@@ -33,64 +56,19 @@ export async function lookupCustomerByPhone(phone: string, shop: string): Promis
         return { found: false, error: "Invalid phone number format" };
     }
 
-    // First, try customers table with ilike to match numbers with country codes like +91
+    const normalizedInput = normalizePhone(phone);
+
+    // --- Customers table ---
+    // Fetch recent customers for this shop (limit reasonable for lookup)
     const { data: customerData, error: customerError } = await supabase
         .from('customers')
         .select('name, phone, address, state, city, zipcode, email')
         .eq('shop_domain', shop)
-        .ilike('phone', `%${phone}%`)
         .order('updated_at', { ascending: false })
-        .limit(1);
+        .limit(200);
 
-    if (customerData && customerData.length > 0 && !customerError) {
-        const customer = customerData[0];
-        return {
-            found: true,
-            name: customer.name,
-            address: customer.address,
-            state: customer.state || '',
-            city: customer.city || '',
-            zipcode: customer.zipcode || '',
-            email: customer.email || '',
-        };
-    }
-
-    // Fallback: order_logs
-    const { data: orderData, error: orderError } = await supabase
-        .from('order_logs')
-        .select('customer_name, customer_address, customer_phone, customer_email, city, state, pincode')
-        .eq('shop_domain', shop)
-        .ilike('customer_phone', `%${phone}%`)
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-    if (orderData && orderData.length > 0 && !orderError) {
-        const order = orderData[0];
-        return {
-            found: true,
-            name: order.customer_name,
-            address: order.customer_address,
-            email: order.customer_email || '',
-            state: order.state || '',
-            city: order.city || '',
-            zipcode: order.pincode || '',
-        };
-    }
-
-    // Try normalized phone
-    const normalizedPhone = normalizePhone(phone);
-
-    const { data: normalizedCustomers } = await supabase
-        .from('customers')
-        .select('name, phone, address, state, city, zipcode, email')
-        .eq('shop_domain', shop)
-        .limit(50);
-
-    if (normalizedCustomers) {
-        const matched = normalizedCustomers.find(c => {
-            const dbPhone = normalizePhone(c.phone);
-            return dbPhone === normalizedPhone || dbPhone.endsWith(normalizedPhone) || normalizedPhone.endsWith(dbPhone);
-        });
+    if (customerData && !customerError) {
+        const matched = customerData.find(c => phonesMatch(c.phone || '', normalizedInput));
         if (matched) {
             return {
                 found: true,
@@ -104,18 +82,16 @@ export async function lookupCustomerByPhone(phone: string, shop: string): Promis
         }
     }
 
-    const { data: normalizedOrders } = await supabase
+    // --- Order logs fallback ---
+    const { data: orderData, error: orderError } = await supabase
         .from('order_logs')
         .select('customer_name, customer_address, customer_phone, customer_email, city, state, pincode')
         .eq('shop_domain', shop)
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(200);
 
-    if (normalizedOrders) {
-        const match = normalizedOrders.find(o => {
-            const dbPhone = normalizePhone(o.customer_phone);
-            return dbPhone === normalizedPhone || dbPhone.endsWith(normalizedPhone) || normalizedPhone.endsWith(dbPhone);
-        });
+    if (orderData && !orderError) {
+        const match = orderData.find(o => phonesMatch(o.customer_phone || '', normalizedInput));
         if (match) {
             return {
                 found: true,
