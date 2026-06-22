@@ -105,6 +105,12 @@ export interface PartialPaymentSettings {
   payment_method_restrictions?: PaymentMethodRestrictions;
   payment_method_tags?: PaymentMethodTags;
   payment_method_descriptions?: PaymentMethodDescriptions;
+  full_prepaid_subtitle?: string;
+  partial_payment_subtitle?: string;
+  pure_cod_subtitle?: string;
+  show_full_prepaid_subtitle?: boolean;
+  show_partial_payment_subtitle?: boolean;
+  show_pure_cod_subtitle?: boolean;
   created_at?: string;
   updated_at?: string;
 }

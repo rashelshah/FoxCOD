@@ -4934,7 +4934,11 @@ function darkenColor(hex, percent) {
           html += '<div style="display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px; color: #16a34a; background-color: #dcfce7;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4" /><path d="M4 6v12c0 1.1.9 2 2 2h14v-4" /><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z" /></svg></div>';
           html += '<div style="flex: 1; min-width: 0; padding-top: 2px;">';
           html += '<div style="font-weight: 700; font-size: 14px; color: #166534; line-height: 1.2;">Full Prepaid</div>';
-          html += '<div style="color: #16a34a; font-size: 11px; margin-top: 4px; line-height: 1.3;">Pay now & get fastest delivery</div>';
+          var showFpSub = !ppSettings || ppSettings.show_full_prepaid_subtitle !== false;
+          var fpSub = (ppSettings && ppSettings.full_prepaid_subtitle) || 'Pay now & get fastest delivery';
+          if (showFpSub && fpSub) {
+              html += '<div style="color: #16a34a; font-size: 11px; margin-top: 4px; line-height: 1.3;">' + fpSub + '</div>';
+          }
           html += '</div>';
           html += '<div style="display: flex; align-items: center; gap: 12px; flex-shrink: 0;">';
           html += '<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">';
@@ -4986,7 +4990,15 @@ function darkenColor(hex, percent) {
           html += '<div style="display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px; color: #2563eb; background-color: #dbeafe;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg></div>';
           html += '<div style="flex: 1; min-width: 0; padding-top: 2px;">';
           html += '<div style="font-weight: 700; font-size: 14px; color: #1e3a8a; line-height: 1.2; display: flex; align-items: center; gap: 4px;">Partial Payment <svg width="14" height="14" viewBox="0 0 24 24" fill="#2563eb" stroke="#eff6ff" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/></svg></div>';
-          html += '<div class="pm-desc-partial" style="color: #2563eb; font-size: 11px; margin-top: 4px; line-height: 1.3;">Pay ' + depositText + ' now • Rest on delivery</div>';
+          var showPpSub = !ppSettings || ppSettings.show_partial_payment_subtitle !== false;
+          var ppSub = ppSettings && ppSettings.partial_payment_subtitle;
+          if (showPpSub) {
+              if (ppSub) {
+                  html += '<div class="pm-desc-partial" style="color: #2563eb; font-size: 11px; margin-top: 4px; line-height: 1.3;">' + ppSub + '</div>';
+              } else {
+                  html += '<div class="pm-desc-partial" style="color: #2563eb; font-size: 11px; margin-top: 4px; line-height: 1.3;">Pay ' + depositText + ' now • Rest on delivery</div>';
+              }
+          }
           html += '</div>';
           html += '<div style="display: flex; align-items: center; gap: 12px; flex-shrink: 0;">';
           html += '<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">';
@@ -5026,7 +5038,12 @@ function darkenColor(hex, percent) {
           html += '<div style="display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px; color: #ea580c; background-color: #ffedd5;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="1" ry="1" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg></div>';
           html += '<div style="flex: 1; min-width: 0; padding-top: 2px;">';
           html += '<div style="font-weight: 700; font-size: 14px; color: #9a3412; line-height: 1.2;">Cash on Delivery</div>';
-          html += '<div style="color: #ea580c; font-size: 11px; margin-top: 4px; line-height: 1.3;">Pay when you receive</div>';
+          var showCodSub = !ppSettings || ppSettings.show_pure_cod_subtitle !== false;
+          var codSub = ppSettings && ppSettings.pure_cod_subtitle;
+          if (showCodSub && codSub) {
+              html += '<div style="color: #ea580c; font-size: 11px; margin-top: 4px; line-height: 1.3;">' + codSub + '</div>';
+          }
+
           html += '</div>';
           html += '<div style="display: flex; align-items: center; gap: 12px; flex-shrink: 0;">';
           html += '<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">';
@@ -5258,7 +5275,11 @@ function darkenColor(hex, percent) {
           depositText = formatMoney(depositAmount);
 
           var descEl = pmPartial.querySelector('.pm-desc-partial');
-          if (descEl) descEl.textContent = 'Pay ' + depositText + ' now • Rest on delivery';
+          var showPpSub = !ppSettings || ppSettings.show_partial_payment_subtitle !== false;
+          var ppSub = ppSettings && ppSettings.partial_payment_subtitle;
+          if (descEl && showPpSub && !ppSub) {
+              descEl.textContent = 'Pay ' + depositText + ' now • Rest on delivery';
+          }
 
           var amtEl = pmPartial.querySelector('.pm-amt-partial');
           if (amtEl) amtEl.textContent = depositText;

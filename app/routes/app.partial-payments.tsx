@@ -122,6 +122,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         pure_cod: { enabled: false, text: 'CASH ON DELIVERY' }
       };
     }
+    if (settings.full_prepaid_subtitle === undefined) settings.full_prepaid_subtitle = 'Pay now & get fastest delivery';
+    if (settings.partial_payment_subtitle === undefined) settings.partial_payment_subtitle = 'Pay a small advance today';
+    if (settings.pure_cod_subtitle === undefined) settings.pure_cod_subtitle = 'Pay when you receive';
+    if (settings.show_full_prepaid_subtitle === undefined) settings.show_full_prepaid_subtitle = true;
+    if (settings.show_partial_payment_subtitle === undefined) settings.show_partial_payment_subtitle = true;
+    if (settings.show_pure_cod_subtitle === undefined) settings.show_pure_cod_subtitle = true;
+
     if (!settings.payment_method_descriptions) {
       settings.payment_method_descriptions = {
         partial_payment: { enabled: true, text: 'Secure your order • Avoid fake cancellations' },
@@ -1202,6 +1209,46 @@ const DescEditor = ({
   );
 };
 
+const SubtitleEditor = ({
+  method,
+  settings,
+  upd,
+}: {
+  method: 'partial_payment' | 'full_prepaid' | 'pure_cod';
+  settings: any;
+  upd: (key: any, val: any) => void;
+}) => {
+  const methodTitle = method === 'full_prepaid' ? 'Full Prepaid' : method === 'pure_cod' ? 'Cash on Delivery' : 'Partial Payment';
+  const showKey = `show_${method}_subtitle`;
+  const textKey = `${method}_subtitle`;
+  const defaultText = method === 'full_prepaid' ? 'Pay now & get fastest delivery' : method === 'partial_payment' ? 'Pay a small advance today' : 'Pay when you receive';
+
+  return (
+    <Box paddingBlockStart="400">
+      <BlockStack gap="400">
+        <ToggleRow
+          label={`Show Subtitle`}
+          sub={`Displays a subtitle below the ${methodTitle} option.`}
+          checked={settings[showKey] !== false}
+          onChange={(v) => upd(showKey, v)}
+        />
+        {settings[showKey] !== false && (
+          <div style={{ marginLeft: '12px' }}>
+            <TextField
+              label="Subtitle Text"
+              value={settings[textKey] || ''}
+              onChange={(v) => upd(textKey, v)}
+              autoComplete="off"
+              placeholder={defaultText}
+              helpText="Short subtitle to appear directly below the payment method title"
+            />
+          </div>
+        )}
+      </BlockStack>
+    </Box>
+  );
+};
+
 export default function PartialPaymentsPage() {
   const { settings: initialSettings, shopDomain, shopCurrency } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
@@ -1809,8 +1856,9 @@ export default function PartialPaymentsPage() {
                   <Divider />
                   {firstOpt && (
                     <BlockStack gap="200">
-                      <InlineGrid columns={{ xs: 1, md: 2 }} gap="400">
+                      <InlineGrid columns={{ xs: 1, md: 3 }} gap="400">
                         <TagEditor method="partial_payment" settings={settings} updTag={updTag} />
+                        <SubtitleEditor method="partial_payment" settings={settings} upd={upd} />
                         <DescEditor method="partial_payment" settings={settings} updDesc={updDesc} />
                       </InlineGrid>
                       <Divider />
@@ -1840,7 +1888,11 @@ export default function PartialPaymentsPage() {
                             <div style={{ fontWeight: 700, fontSize: '14px', color: '#1e3a8a', lineHeight: 1.2, display: 'flex', alignItems: 'center', gap: '4px' }}>
                               Partial Payment <svg width="14" height="14" viewBox="0 0 24 24" fill="#2563eb" stroke="#eff6ff" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M9 12l2 2 4-4" /></svg>
                             </div>
-                            <div style={{ color: '#2563eb', fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>Pay {fmt(previewDeposit)} now • Rest on delivery</div>
+                            {settings.show_partial_payment_subtitle !== false && settings.partial_payment_subtitle ? (
+                              <div style={{ color: '#2563eb', fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>{settings.partial_payment_subtitle}</div>
+                            ) : (
+                              <div style={{ color: '#2563eb', fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>Pay {fmt(previewDeposit)} now • Rest on delivery</div>
+                            )}
                           </div>
 
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
@@ -2035,8 +2087,9 @@ export default function PartialPaymentsPage() {
 
                   <Divider />
                   <BlockStack gap="200">
-                    <InlineGrid columns={{ xs: 1, md: 2 }} gap="400">
+                    <InlineGrid columns={{ xs: 1, md: 3 }} gap="400">
                       <TagEditor method="full_prepaid" settings={settings} updTag={updTag} />
+                      <SubtitleEditor method="full_prepaid" settings={settings} upd={upd} />
                       <DescEditor method="full_prepaid" settings={settings} updDesc={updDesc} />
                     </InlineGrid>
                     <Divider />
@@ -2064,7 +2117,9 @@ export default function PartialPaymentsPage() {
 
                         <div style={{ flex: 1, minWidth: 0, paddingTop: '2px' }}>
                           <div style={{ fontWeight: 700, fontSize: '14px', color: '#166534', lineHeight: 1.2 }}>Full Prepaid</div>
-                          <div style={{ color: '#16a34a', fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>Pay now &amp; get fastest delivery</div>
+                          {settings.show_full_prepaid_subtitle !== false && settings.full_prepaid_subtitle && (
+                            <div style={{ color: '#16a34a', fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>{settings.full_prepaid_subtitle}</div>
+                          )}
                         </div>
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
@@ -2242,10 +2297,11 @@ export default function PartialPaymentsPage() {
 
               <Card>
                 <BlockStack gap="200">
-                  <InlineGrid columns={{ xs: 1, md: 2 }} gap="400">
-                    <TagEditor method="pure_cod" settings={settings} updTag={updTag} />
-                    <DescEditor method="pure_cod" settings={settings} updDesc={updDesc} />
-                  </InlineGrid>
+                  <InlineGrid columns={{ xs: 1, md: 3 }} gap="400">
+                      <TagEditor method="pure_cod" settings={settings} updTag={updTag} />
+                      <SubtitleEditor method="pure_cod" settings={settings} upd={upd} />
+                      <DescEditor method="pure_cod" settings={settings} updDesc={updDesc} />
+                    </InlineGrid>
                   <Divider />
                   <Text as="h3" variant="headingSm">Storefront Preview</Text>
                   <Text as="p" variant="bodySm" tone="subdued">Preview uses 500 as example cart total</Text>
@@ -2271,7 +2327,10 @@ export default function PartialPaymentsPage() {
 
                       <div style={{ flex: 1, minWidth: 0, paddingTop: '2px' }}>
                         <div style={{ fontWeight: 700, fontSize: '14px', color: '#9a3412', lineHeight: 1.2 }}>Cash on Delivery</div>
-                        <div style={{ color: '#ea580c', fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>Pay when you receive</div>
+                          {settings.show_pure_cod_subtitle !== false && settings.pure_cod_subtitle && (
+                            <div style={{ color: '#ea580c', fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>{settings.pure_cod_subtitle}</div>
+                          )}
+
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>

@@ -154,7 +154,7 @@ ${colorSelectorStyles}
 .btn-create{background:#1f2937;color:#fff;border:none;border-radius:10px;padding:10px 24px;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s ease}
 .btn-create:hover{background:#111827;box-shadow:0 2px 8px rgba(0,0,0,.15)}
 /* ==================== EDITOR LAYOUT ==================== */
-.up-editor{display:grid;grid-template-columns:1fr 380px;gap:24px}
+.up-editor{display:grid;grid-template-columns:1fr 420px;gap:24px}
 @media(max-width:900px){.up-editor{grid-template-columns:1fr}}
 /* Settings Card (Form Builder style) */
 .sec{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:24px;margin-bottom:16px}
@@ -228,8 +228,8 @@ ${colorSelectorStyles}
 .pv-panel-header{background:#f9fafb;padding:14px 20px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between}
 .pv-panel-header h3{margin:0;font-size:14px;font-weight:700;color:#111827;display:flex;align-items:center;gap:8px}
 .pv-panel-header .pv-badge{font-size:11px;color:#6b7280;background:#f3f4f6;padding:4px 10px;border-radius:6px;font-weight:500}
-.pv-phone{background:#1f2937;border-radius:32px;padding:6px;max-width:300px;margin:16px auto}
-.pv-phone-screen{background:#fff;border-radius:24px;overflow-y:auto;height:420px}
+.pv-phone{background:#1f2937;border-radius:32px;padding:6px;max-width:350px;margin:16px auto}
+.pv-phone-screen{background:#fff;border-radius:24px;overflow-y:auto;height:550px}
 /* Accept button animations */
 @keyframes up-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
 @keyframes up-bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
@@ -1094,7 +1094,9 @@ export default function UpsellDownsellPage() {
                                                                                                 {/* Center text */}
                                                                                                 <div style={{ flex: 1, minWidth: 0 }}>
                                                                                                     <div style={{ fontWeight: 700, fontSize: '11px', color: '#166534', lineHeight: 1.1 }}>Full Prepaid</div>
-                                                                                                    <div style={{ color: '#16a34a', fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>Pay now & get fastest delivery</div>
+                                                                                                    {partialPaymentSettings?.show_full_prepaid_subtitle !== false && partialPaymentSettings?.full_prepaid_subtitle && (
+                                                                                                    <div style={{ color: '#16a34a', fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>{partialPaymentSettings.full_prepaid_subtitle}</div>
+                                                                                                )}
                                                                                                 </div>
 
                                                                                                 {/* Right side pricing */}
@@ -1142,7 +1144,11 @@ export default function UpsellDownsellPage() {
                                                                                                         Partial Payment
                                                                                                         <svg width="10" height="10" viewBox="0 0 24 24" fill="#2563eb" stroke="#eff6ff" strokeWidth="2.5"><circle cx="12" cy="12" r="10" /><path d="M9 12l2 2 4-4" /></svg>
                                                                                                     </div>
+                                                                                                    {partialPaymentSettings?.show_partial_payment_subtitle !== false && partialPaymentSettings?.partial_payment_subtitle ? (
+                                                                                                    <div style={{ color: '#60a5fa', fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>{partialPaymentSettings.partial_payment_subtitle}</div>
+                                                                                                ) : (
                                                                                                     <div style={{ color: '#60a5fa', fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>Pay {fmtCurrency(partialCodAdvanceAmount)} now • Rest on delivery</div>
+                                                                                                )}
                                                                                                 </div>
 
                                                                                                 {/* Right side pricing */}
@@ -1183,7 +1189,10 @@ export default function UpsellDownsellPage() {
                                                                                             {/* Center text */}
                                                                                             <div style={{ flex: 1, minWidth: 0 }}>
                                                                                                 <div style={{ fontWeight: 700, fontSize: '11px', color: '#9a3412', lineHeight: 1.1 }}>Cash on Delivery</div>
-                                                                                                <div style={{ color: '#fb923c', fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>Pay when you receive</div>
+                                                                                            {partialPaymentSettings?.show_pure_cod_subtitle !== false && partialPaymentSettings?.pure_cod_subtitle && (
+                                                                                                <div style={{ color: '#ea580c', fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>{partialPaymentSettings.pure_cod_subtitle}</div>
+                                                                                            )}
+
                                                                                             </div>
 
                                                                                             {/* Right side pricing */}

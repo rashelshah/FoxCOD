@@ -47,6 +47,16 @@ export async function getPartialPaymentSettings(
     throw error;
   }
 
+  if (data && data.payment_method_descriptions && data.payment_method_descriptions.subtitles) {
+    const subs = data.payment_method_descriptions.subtitles;
+    data.full_prepaid_subtitle = subs.full_prepaid_subtitle;
+    data.partial_payment_subtitle = subs.partial_payment_subtitle;
+    data.pure_cod_subtitle = subs.pure_cod_subtitle;
+    data.show_full_prepaid_subtitle = subs.show_full_prepaid_subtitle;
+    data.show_partial_payment_subtitle = subs.show_partial_payment_subtitle;
+    data.show_pure_cod_subtitle = subs.show_pure_cod_subtitle;
+  }
+
   return data as PartialPaymentSettings | null;
 }
 
@@ -58,6 +68,26 @@ export async function savePartialPaymentSettings(
   settings: PartialPaymentSettings
 ): Promise<PartialPaymentSettings> {
   const { shop_domain, id, created_at, ...rest } = settings as any;
+
+  // Bundle subtitle settings into the existing JSONB column to avoid DB schema migration
+  const pm_desc = { ...(rest.payment_method_descriptions || {}) };
+  pm_desc.subtitles = {
+    full_prepaid_subtitle: rest.full_prepaid_subtitle,
+    partial_payment_subtitle: rest.partial_payment_subtitle,
+    pure_cod_subtitle: rest.pure_cod_subtitle,
+    show_full_prepaid_subtitle: rest.show_full_prepaid_subtitle,
+    show_partial_payment_subtitle: rest.show_partial_payment_subtitle,
+    show_pure_cod_subtitle: rest.show_pure_cod_subtitle,
+  };
+  rest.payment_method_descriptions = pm_desc;
+
+  // Remove top-level subtitle properties so Supabase Postgres doesn't error
+  delete rest.full_prepaid_subtitle;
+  delete rest.partial_payment_subtitle;
+  delete rest.pure_cod_subtitle;
+  delete rest.show_full_prepaid_subtitle;
+  delete rest.show_partial_payment_subtitle;
+  delete rest.show_pure_cod_subtitle;
 
   const { data, error } = await supabase
     .from('partial_payment_settings')
@@ -162,6 +192,12 @@ export async function syncPartialPaymentToMetafield(
       payment_method_restrictions: settings.payment_method_restrictions,
       payment_method_tags: settings.payment_method_tags,
       payment_method_descriptions: settings.payment_method_descriptions,
+      full_prepaid_subtitle: settings.full_prepaid_subtitle ?? 'Pay now & get fastest delivery',
+      partial_payment_subtitle: settings.partial_payment_subtitle ?? 'Pay a small advance today',
+      pure_cod_subtitle: settings.pure_cod_subtitle ?? 'Pay when you receive',
+      show_full_prepaid_subtitle: settings.show_full_prepaid_subtitle ?? true,
+      show_partial_payment_subtitle: settings.show_partial_payment_subtitle ?? true,
+      show_pure_cod_subtitle: settings.show_pure_cod_subtitle ?? true,
     }
     : {
       enabled: true,
@@ -170,6 +206,12 @@ export async function syncPartialPaymentToMetafield(
       prepaid_discount_enabled: false,
       pure_cod_enabled: true,
       pure_cod_fee_enabled: false,
+      full_prepaid_subtitle: 'Pay now & get fastest delivery',
+      partial_payment_subtitle: 'Pay a small advance today',
+      pure_cod_subtitle: 'Pay when you receive',
+      show_full_prepaid_subtitle: true,
+      show_partial_payment_subtitle: true,
+      show_pure_cod_subtitle: true,
       payment_method_descriptions: {
         partial_payment: { enabled: true, text: 'Secure your order • Avoid fake cancellations' },
         full_prepaid: { enabled: true, text: 'Pay now, save more, receive sooner' },

@@ -1664,7 +1664,9 @@ export default function QuantityOffersPage() {
                                                                                             {/* Center text */}
                                                                                             <div style={{ flex: 1, minWidth: 0 }}>
                                                                                                 <div style={{ fontWeight: 700, fontSize: '11px', color: '#166534', lineHeight: 1.1 }}>Full Prepaid</div>
-                                                                                                <div style={{ color: '#16a34a', fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>Pay now & get fastest delivery</div>
+                                                                                                {partialPaymentSettings?.show_full_prepaid_subtitle !== false && partialPaymentSettings?.full_prepaid_subtitle && (
+                                                                                                    <div style={{ color: '#16a34a', fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>{partialPaymentSettings.full_prepaid_subtitle}</div>
+                                                                                                )}
                                                                                             </div>
 
                                                                                             {/* Right side pricing */}
@@ -1709,7 +1711,11 @@ export default function QuantityOffersPage() {
                                                                                                     Partial Payment
                                                                                                     <svg width="10" height="10" viewBox="0 0 24 24" fill="#2563eb" stroke="#eff6ff" strokeWidth="2.5"><circle cx="12" cy="12" r="10" /><path d="M9 12l2 2 4-4" /></svg>
                                                                                                 </div>
-                                                                                                <div style={{ color: '#60a5fa', fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>Pay {fmtCurrency(partialCodAdvanceAmount)} now • Rest on delivery</div>
+                                                                                                {partialPaymentSettings?.show_partial_payment_subtitle !== false && partialPaymentSettings?.partial_payment_subtitle ? (
+                                                                                                    <div style={{ color: '#60a5fa', fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>{partialPaymentSettings.partial_payment_subtitle}</div>
+                                                                                                ) : (
+                                                                                                    <div style={{ color: '#60a5fa', fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>Pay {fmtCurrency(partialCodAdvanceAmount)} now • Rest on delivery</div>
+                                                                                                )}
                                                                                             </div>
 
                                                                                             {/* Right side pricing */}
@@ -1750,7 +1756,10 @@ export default function QuantityOffersPage() {
                                                                                         {/* Center text */}
                                                                                         <div style={{ flex: 1, minWidth: 0 }}>
                                                                                             <div style={{ fontWeight: 700, fontSize: '11px', color: '#9a3412', lineHeight: 1.1 }}>Cash on Delivery</div>
-                                                                                            <div style={{ color: '#fb923c', fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>Pay when you receive</div>
+                                                                                            {partialPaymentSettings?.show_pure_cod_subtitle !== false && partialPaymentSettings?.pure_cod_subtitle && (
+                                                                                                <div style={{ color: '#ea580c', fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>{partialPaymentSettings.pure_cod_subtitle}</div>
+                                                                                            )}
+
                                                                                         </div>
 
                                                                                         {/* Right side pricing */}
@@ -2152,7 +2161,7 @@ const styles = `
     .btn-save:disabled { opacity: 0.6; }
 
     /* Body */
-    .qo-body { display: grid; grid-template-columns: 1fr 380px; gap: 24px; padding: 24px; flex: 1; align-items: start; }
+    .qo-body { display: grid; grid-template-columns: 1fr 420px; gap: 24px; padding: 24px; flex: 1; align-items: start; }
     
     /* Builder */
     .qo-builder { display: flex; flex-direction: column; gap: 16px; overflow-y: auto; max-height: 150vh; padding-right: 4px; }
