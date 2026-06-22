@@ -2164,7 +2164,7 @@ const styles = `
     .qo-body { display: grid; grid-template-columns: 1fr 420px; gap: 24px; padding: 24px; flex: 1; align-items: start; }
     
     /* Builder */
-    .qo-builder { display: flex; flex-direction: column; gap: 16px; overflow-y: auto; max-height: 150vh; padding-right: 4px; }
+    .qo-builder { display: flex; flex-direction: column; gap: 16px; min-width: 0; padding-right: 4px; }
     .qo-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px; }
     .field-row { display: flex; align-items: center; gap: 12px; }
     .field-row label { font-size: 14px; font-weight: 500; min-width: 50px; }

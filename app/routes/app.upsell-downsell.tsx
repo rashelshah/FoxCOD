@@ -154,7 +154,9 @@ ${colorSelectorStyles}
 .btn-create{background:#1f2937;color:#fff;border:none;border-radius:10px;padding:10px 24px;font-size:14px;font-weight:600;cursor:pointer;transition:all .15s ease}
 .btn-create:hover{background:#111827;box-shadow:0 2px 8px rgba(0,0,0,.15)}
 /* ==================== EDITOR LAYOUT ==================== */
-.up-editor{display:grid;grid-template-columns:1fr 420px;gap:24px}
+.up-editor{display:grid;grid-template-columns:1fr 420px;gap:24px;align-items:start}
+.up-editor > div:first-child{min-width:0;padding-right:4px}
+.up-editor > div:last-child{position:sticky;top:20px;height:fit-content}
 @media(max-width:900px){.up-editor{grid-template-columns:1fr}}
 /* Settings Card (Form Builder style) */
 .sec{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:24px;margin-bottom:16px}
@@ -223,7 +225,7 @@ ${colorSelectorStyles}
 .info-banner{background:#f0f4ff;border:1px solid #c7d2fe;border-radius:12px;padding:12px 16px;font-size:13px;color:#4338ca;display:flex;align-items:center;gap:8px;margin-bottom:16px}
 .info-banner .close-banner{background:none;border:none;cursor:pointer;font-size:16px;color:#6366f1;margin-left:auto}
 /* ==================== LIVE PREVIEW ==================== */
-.pv-wrap{position:sticky;top:20px}
+.pv-wrap{width:100%}
 .pv-panel{background:#fff;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.1)}
 .pv-panel-header{background:#f9fafb;padding:14px 20px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between}
 .pv-panel-header h3{margin:0;font-size:14px;font-weight:700;color:#111827;display:flex;align-items:center;gap:8px}

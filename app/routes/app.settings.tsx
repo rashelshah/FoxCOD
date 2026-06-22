@@ -3155,12 +3155,13 @@ export default function SettingsPage() {
                     display: grid;
                     grid-template-columns: 1fr 420px;
                     gap: 24px;
-                    height: calc(100vh - 64px);
+                    min-height: calc(100vh - 64px);
                     max-width: 1200px;
                     margin: 0 auto;
+                    align-items: start;
                 }
                 .builder-left {
-                    overflow-y: auto;
+                    min-width: 0;
                     padding-right: 4px;
                     padding-bottom: 40px;
                 }
@@ -3768,9 +3769,9 @@ export default function SettingsPage() {
                 /* ==================== RESPONSIVE DESIGN ==================== */
                 
                 @media (max-width: 1024px) {
-                    .builder-layout { flex-direction: column; gap: 24px; }
-                    .settings-panel { width: 100%; flex: none; }
-                    .preview-panel { position: relative; top: 0; width: 100%; order: -1; }
+                    .builder-page { grid-template-columns: 1fr; gap: 24px; }
+                    .builder-left { width: 100%; flex: none; padding-right: 0; }
+                    .builder-right { position: relative; top: 0; width: 100%; order: -1; }
                     .preview-phone { max-width: 320px; }
                 }
                 
