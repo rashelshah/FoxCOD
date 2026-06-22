@@ -191,6 +191,8 @@ async function ensureMetafieldDefinitions(admin: any) {
         { key: "pixel_tracking_settings_json", type: "json" },
         // Form submit button style overrides
         { key: "form_submit_button_json", type: "json" },
+        // Merchant Branding (checkout redirect + future sections)
+        { key: "branding_json", type: "json" },
     ];
 
     console.log('[Settings] Ensuring metafield definitions (parallel)...');
@@ -2611,7 +2613,7 @@ export default function SettingsPage() {
         setPendingShippingOps([]);
         setShippingRates(initialShippingRates || []);
         // Explicitly hide save bar immediately
-        try { shopify.saveBar.hide('form-builder-save-bar'); } catch (e) { }
+        try { shopify.saveBar.hide('form-builder-save-bar')?.catch(() => {}); } catch (e) { }
     }, [savedSettingsString, initialShippingRates, shopify]);
 
     // Handle successful save - only process each actionData once
@@ -2854,9 +2856,9 @@ export default function SettingsPage() {
                 }
 
                 if (hasUnsavedChanges) {
-                    shopify.saveBar.show(saveBarId);
+                    shopify.saveBar.show(saveBarId)?.catch(() => {});
                 } else {
-                    shopify.saveBar.hide(saveBarId);
+                    shopify.saveBar.hide(saveBarId)?.catch(() => {});
                 }
             } catch (e) {
                 console.warn('[Form Builder] SaveBar control failed:', e);
@@ -2866,7 +2868,7 @@ export default function SettingsPage() {
         return () => {
             clearTimeout(timeout);
             try {
-                shopify.saveBar.hide(saveBarId);
+                shopify.saveBar.hide(saveBarId)?.catch(() => {});
             } catch (e) {
                 // Ignore cleanup errors
             }

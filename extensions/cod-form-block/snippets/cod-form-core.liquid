@@ -343,6 +343,26 @@
     }
     window.FoxCod.buttonStyles = (btnStylesRaw && typeof btnStylesRaw === 'object') ? btnStylesRaw : {};
     console.log('[FoxCod] buttonStyles injected:', window.FoxCod.buttonStyles);
+
+    // ── Merchant Branding (checkout redirect + future sections) ──────────────
+    var brandingRaw = {{ shop.metafields.fox_cod.branding_json.value | json | default: 'null' }};
+    if (typeof brandingRaw === 'string') {
+      try { brandingRaw = JSON.parse(brandingRaw); } catch (e) {}
+    }
+    window.FoxCod.branding = (brandingRaw && typeof brandingRaw === 'object') ? brandingRaw : null;
+    console.log('[FoxCod] branding injected:', window.FoxCod.branding);
+    
+    // Preload checkout logo if configured to avoid layout shift / delay
+    if (window.FoxCod.branding && window.FoxCod.branding.checkout_redirect) {
+      var cr = window.FoxCod.branding.checkout_redirect;
+      if (cr.display_mode === 'custom_logo' && cr.logo_url) {
+        var link = document.createElement('link');
+        link.rel = 'preload';
+        link.as = 'image';
+        link.href = cr.logo_url;
+        document.head.appendChild(link);
+      }
+    }
   } catch (e) {
     console.error('[FoxCod] Failed to parse settings:', e);
     window.FoxCod.quantityOffers = [];

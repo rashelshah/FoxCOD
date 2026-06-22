@@ -121,6 +121,13 @@ import {
 export type { FormField, CouponConfig, ContentBlocks, FormStyles, ButtonStyles, ShippingOption, ShippingOptions, FormSubmitButtonStyles };
 export { DEFAULT_FIELDS, DEFAULT_BLOCKS, DEFAULT_STYLES, DEFAULT_BUTTON_STYLES, DEFAULT_SHIPPING_OPTIONS, DEFAULT_FORM_SUBMIT_BUTTON };
 
+// =============================================
+// BRANDING TYPES
+// =============================================
+import type { Branding, BrandingCheckoutRedirect } from './branding.types';
+export type { Branding, BrandingCheckoutRedirect };
+export { DEFAULT_BRANDING } from './branding.types';
+
 export interface FormSettings {
     shop_domain: string;
     enabled: boolean;
@@ -170,6 +177,8 @@ export interface FormSettings {
     coupons?: CouponConfig[];
     // Form submit button style overrides
     form_submit_button?: FormSubmitButtonStyles;
+    // Merchant branding (JSONB column)
+    branding?: Branding;
 }
 
 /**
@@ -246,6 +255,8 @@ export async function saveFormSettings(settings: FormSettings) {
                 coupons: settings.coupons || [],
                 // Form submit button style overrides
                 form_submit_button: settings.form_submit_button || DEFAULT_FORM_SUBMIT_BUTTON,
+                // Merchant branding
+                ...(settings.branding !== undefined ? { branding: settings.branding } : {}),
             },
             { onConflict: 'shop_domain' }
         )
@@ -259,6 +270,46 @@ export async function saveFormSettings(settings: FormSettings) {
 
     console.log('[Supabase] Settings saved successfully');
     return data;
+}
+
+/**
+ * Save or update only the branding settings for a shop.
+ * Uses a targeted upsert so it never overwrites other form settings.
+ */
+export async function saveBrandingSettings(shopDomain: string, branding: Branding): Promise<void> {
+    console.log('[Supabase] Saving branding settings for:', shopDomain);
+
+    const { error } = await supabase
+        .from('form_settings')
+        .upsert(
+            { shop_domain: shopDomain, branding },
+            { onConflict: 'shop_domain' }
+        );
+
+    if (error) {
+        console.error('[Supabase] Error saving branding settings:', error);
+        throw error;
+    }
+
+    console.log('[Supabase] Branding settings saved successfully');
+}
+
+/**
+ * Get just the branding settings for a shop.
+ */
+export async function getBrandingSettings(shopDomain: string): Promise<Branding | null> {
+    const { data, error } = await supabase
+        .from('form_settings')
+        .select('branding')
+        .eq('shop_domain', shopDomain)
+        .single();
+
+    if (error && error.code !== 'PGRST116') {
+        console.error('[Supabase] Error getting branding settings:', error);
+        return null;
+    }
+
+    return (data?.branding as Branding) || null;
 }
 
 // =============================================

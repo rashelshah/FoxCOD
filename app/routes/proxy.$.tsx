@@ -73,6 +73,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
                 button_styles: settings.button_styles,
                 required_fields: settings.required_fields,
                 max_quantity: settings.max_quantity,
+                branding: settings.branding,
             } : {
                 enabled: false,
                 button_text: "Buy Now - Cash on Delivery",
@@ -84,6 +85,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
                 button_styles: { showAddToCart: true },
                 required_fields: ["phone", "name", "address"],
                 max_quantity: 10,
+                branding: null,
             },
         }), { headers: corsHeaders });
     }

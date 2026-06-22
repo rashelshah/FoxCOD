@@ -7372,6 +7372,7 @@ function darkenColor(hex, percent) {
 
   /**
    * Show fullscreen loader while Shopify checkout is being created.
+   * Respects merchant branding (window.FoxCod.branding.checkout_redirect).
    * Returns the overlay element so it can be hidden on error.
    */
   function showPartialCodLoader() {
@@ -7389,25 +7390,67 @@ function darkenColor(hex, percent) {
       overlay.id = 'foxcod-partial-loader';
       overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:rgba(255,255,255,0.96);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;animation:foxcodPartialFadeIn 0.2s ease;';
 
+      // ── Read branding config ──────────────────────────────────────────────
+      var branding = (window.FoxCod && window.FoxCod.branding && window.FoxCod.branding.checkout_redirect) || null;
+      var useCustomLogo = branding && branding.display_mode === 'custom_logo' && branding.logo_url;
+      var logoSize = (branding && branding.logo_size) ? parseInt(branding.logo_size) : 72;
+      var outerSize = logoSize + 10;
+      var outerHalf = outerSize / 2;
+      var innerR = outerHalf - 3;
+
+      // ── Spinner ring (always shown) ──────────────────────────────────────
+      var spinnerSvg = '<svg style="position:absolute;inset:0;width:' + outerSize + 'px;height:' + outerSize + 'px;animation:foxcodPartialSpin 1.1s linear infinite;" viewBox="0 0 ' + outerSize + ' ' + outerSize + '" fill="none">'
+          + '<circle cx="' + outerHalf + '" cy="' + outerHalf + '" r="' + innerR + '" stroke="#e0e7ff" stroke-width="4"/>'
+          + '<path d="M3 ' + outerHalf + ' A' + innerR + ' ' + innerR + ' 0 0 1 ' + outerHalf + ' 3" stroke="#2563eb" stroke-width="4" stroke-linecap="round"/>'
+          + '</svg>';
+
+      // ── Center icon: custom logo OR lock SVG ─────────────────────────────
+      var centerIcon;
+      if (useCustomLogo) {
+          var shapeRadius = branding.logo_shape === 'circle' ? '50%' : branding.logo_shape === 'rounded' ? '14px' : '0px';
+          var zoomScale = branding.logo_zoom ? branding.logo_zoom / 100 : 1;
+          var imgSize = Math.round(logoSize * 0.58 * zoomScale);
+          
+          if (branding.show_background) {
+              centerIcon = '<div style="background:white;box-shadow:0 4px 16px rgba(0,0,0,0.12);padding:8px;border-radius:' + shapeRadius + ';overflow:hidden;display:flex;align-items:center;justify-content:center;width:' + (imgSize + 16) + 'px;height:' + (imgSize + 16) + 'px;box-sizing:border-box;">'
+                  + '<img id="foxcod-brand-logo" src="' + branding.logo_url + '" '
+                  + 'style="display:block;width:100%;height:100%;object-fit:' + (branding.logo_shape === 'circle' ? 'cover' : 'contain') + ';" '
+                  + 'loading="lazy" '
+                  + 'onerror="this.style.display=\'none\';var fb=document.getElementById(\'foxcod-lock-fallback\');if(fb)fb.style.display=\'flex\';" />'
+                  + '</div>';
+          } else {
+              centerIcon = '<div style="overflow:hidden;border-radius:' + shapeRadius + ';width:' + imgSize + 'px;height:' + imgSize + 'px;display:flex;align-items:center;justify-content:center;">'
+                  + '<img id="foxcod-brand-logo" src="' + branding.logo_url + '" '
+                  + 'style="display:block;width:100%;height:100%;object-fit:' + (branding.logo_shape === 'circle' ? 'cover' : 'contain') + ';" '
+                  + 'loading="lazy" '
+                  + 'onerror="this.style.display=\'none\';var fb=document.getElementById(\'foxcod-lock-fallback\');if(fb)fb.style.display=\'flex\';" />'
+                  + '</div>';
+          }
+          
+          centerIcon += '<div id="foxcod-lock-fallback" style="display:none;align-items:center;justify-content:center;">'
+              + '<svg width="' + Math.round(logoSize * 0.5) + '" height="' + Math.round(logoSize * 0.5) + '" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>'
+              + '</div>';
+      } else {
+          // Default Shopify lock icon
+          centerIcon = '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
+      }
+
       overlay.innerHTML = [
-          // Animated lock icon with spinner ring
-          '<div style="position:relative;width:72px;height:72px;">',
-              '<svg style="position:absolute;inset:0;width:72px;height:72px;animation:foxcodPartialSpin 1.1s linear infinite;" viewBox="0 0 72 72" fill="none">',
-                  '<circle cx="36" cy="36" r="32" stroke="#e0e7ff" stroke-width="4"/>',
-                  '<path d="M4 36 A32 32 0 0 1 36 4" stroke="#2563eb" stroke-width="4" stroke-linecap="round"/>',
-              '</svg>',
+          // Animated lock/logo icon with spinner ring
+          '<div style="position:relative;width:' + outerSize + 'px;height:' + outerSize + 'px;">',
+              spinnerSvg,
               '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">',
-                  '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
+                  centerIcon,
               '</div>',
           '</div>',
 
-          // Text
+          // Text (unchanged)
           '<div style="text-align:center;">',
               '<div style="font-size:20px;font-weight:700;color:#111827;margin-bottom:6px;">Redirecting to secure checkout</div>',
               '<div style="font-size:14px;color:#6b7280;line-height:1.6;">Please wait while we prepare your Shopify checkout...<br>Do not close or refresh this page.</div>',
           '</div>',
 
-          // Shopify badge
+          // Shopify badge (unchanged)
           '<div style="display:flex;align-items:center;gap:6px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:99px;padding:8px 14px;">',
               '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 11 2 2 4-4"/></svg>',
               '<span style="font-size:12px;font-weight:600;color:#166534;">Secured by Shopify</span>',

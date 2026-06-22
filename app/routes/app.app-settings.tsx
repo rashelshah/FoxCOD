@@ -1,15 +1,16 @@
 /**
- * App Settings Page — Tabbed: Pixels | Fraud Protection
+ * App Settings Page — Tabbed: Pixels | Fraud Protection | Branding
  * Route: /app/app-settings
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useLoaderData, useSubmit, useActionData, useNavigation, Link, useSearchParams } from 'react-router';
 import type { LoaderFunctionArgs, ActionFunctionArgs } from 'react-router';
 import { useAppBridge } from '@shopify/app-bridge-react';
 import {
     Text, InlineStack, BlockStack,
-    TextField, Checkbox, Badge, Banner, Select, Divider, LegacyCard,
-    Button, RadioButton, Tabs, Page,
+    TextField, Checkbox, Badge, Banner, Select, Divider,
+    Button, RadioButton, Tabs, Page, Card, DropZone,
+    Thumbnail, RangeSlider, Layout, ChoiceList
 } from '@shopify/polaris';
 import { DeleteIcon } from '@shopify/polaris-icons';
 import { authenticate } from '../shopify.server';
@@ -23,17 +24,118 @@ import {
 } from '../services/fraud-protection.server';
 import type { FraudProtectionSettings } from '../config/fraud-protection.types';
 import { DEFAULT_FRAUD_SETTINGS } from '../config/fraud-protection.types';
+import { getBrandingSettings, saveBrandingSettings } from '../config/supabase.server';
+import type { Branding, BrandingCheckoutRedirect } from '../config/branding.types';
+import { DEFAULT_BRANDING } from '../config/branding.types';
 
 // ── LOADER ──
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const { admin, session } = await authenticate.admin(request);
     const shopDomain = session.shop;
-    const [pixels, fraudSettings] = await Promise.all([
+    const [pixels, fraudSettings, branding] = await Promise.all([
         getPixelSettings(shopDomain),
         getFraudProtectionSettings(shopDomain),
+        getBrandingSettings(shopDomain),
     ]);
-    return { pixels, fraudSettings, shopDomain };
+    return { pixels, fraudSettings, branding, shopDomain };
 };
+
+// ── SHOPIFY FILES UPLOAD HELPER ──
+async function uploadLogoToShopify(admin: any, file: File): Promise<string> {
+    // 1. Get staged upload URL from Shopify
+    const stagedRes = await admin.graphql(`
+        mutation StagedUploadsCreate($input: [StagedUploadInput!]!) {
+            stagedUploadsCreate(input: $input) {
+                stagedTargets {
+                    url
+                    resourceUrl
+                    parameters { name value }
+                }
+                userErrors { field message }
+            }
+        }
+    `, {
+        variables: {
+            input: [{
+                filename: file.name,
+                mimeType: file.type,
+                resource: 'FILE',
+                fileSize: String(file.size),
+                httpMethod: 'POST',
+            }],
+        },
+    });
+
+    const stagedData = await stagedRes.json();
+    const userErrors = stagedData?.data?.stagedUploadsCreate?.userErrors;
+    if (userErrors?.length) throw new Error(`Shopify staged upload error: ${userErrors[0].message}`);
+
+    const target = stagedData?.data?.stagedUploadsCreate?.stagedTargets?.[0];
+    if (!target) throw new Error('Failed to get staged upload target from Shopify');
+
+    // 2. Upload file bytes to Shopify S3
+    const uploadForm = new FormData();
+    for (const param of target.parameters) {
+        uploadForm.append(param.name, param.value);
+    }
+    const fileBuffer = await file.arrayBuffer();
+    uploadForm.append('file', new Blob([fileBuffer], { type: file.type }), file.name);
+
+    const uploadRes = await fetch(target.url, { method: 'POST', body: uploadForm });
+    if (!uploadRes.ok) {
+        throw new Error(`Failed to upload to Shopify CDN: ${uploadRes.status} ${uploadRes.statusText}`);
+    }
+
+    // 3. Create the file record in Shopify Files
+    const fileCreateRes = await admin.graphql(`
+        mutation FileCreate($files: [FileCreateInput!]!) {
+            fileCreate(files: $files) {
+                files { id fileStatus }
+                userErrors { field message }
+            }
+        }
+    `, {
+        variables: {
+            files: [{
+                originalSource: target.resourceUrl,
+                contentType: 'IMAGE',
+            }],
+        },
+    });
+
+    const fileCreateData = await fileCreateRes.json();
+    const fileUserErrors = fileCreateData?.data?.fileCreate?.userErrors;
+    if (fileUserErrors?.length) throw new Error(`Shopify fileCreate error: ${fileUserErrors[0].message}`);
+
+    // 4. Return the CDN URL (resourceUrl is the permanent public URL)
+    return target.resourceUrl;
+}
+
+// ── BRANDING METAFIELD SYNC ──
+async function syncBrandingToMetafield(admin: any, shopDomain: string, branding: Branding): Promise<void> {
+    const shopRes = await admin.graphql(`query { shop { id } }`);
+    const shopGid = (await shopRes.json())?.data?.shop?.id;
+    if (!shopGid) throw new Error('Could not resolve shop GID for metafield sync');
+
+    await admin.graphql(`
+        mutation MetafieldsSet($metafields: [MetafieldsSetInput!]!) {
+            metafieldsSet(metafields: $metafields) {
+                metafields { key }
+                userErrors { field message }
+            }
+        }
+    `, {
+        variables: {
+            metafields: [{
+                ownerId: shopGid,
+                namespace: 'fox_cod',
+                key: 'branding_json',
+                value: JSON.stringify(branding),
+                type: 'json',
+            }],
+        },
+    });
+}
 
 // ── ACTION ──
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -70,6 +172,48 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             return { success: true, message: 'Fraud protection settings saved!' };
         }
 
+        // Branding actions
+        if (intent === 'save_branding') {
+            const brandingJson = formData.get('branding') as string;
+            const logoFile = formData.get('logo_file') as File | null;
+
+            let branding: Branding = JSON.parse(brandingJson);
+
+            // Upload new logo if provided
+            if (logoFile && logoFile.size > 0) {
+                // Validate file type
+                const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml', 'image/webp'];
+                if (!ALLOWED_TYPES.includes(logoFile.type)) {
+                    return { success: false, message: `Invalid file type: ${logoFile.type}. Allowed: PNG, JPG, JPEG, SVG, WEBP.` };
+                }
+                // Validate file size (5MB)
+                if (logoFile.size > 5 * 1024 * 1024) {
+                    return { success: false, message: 'Logo file is too large. Maximum size is 5 MB.' };
+                }
+
+                console.log('[Branding] Uploading logo to Shopify Files...', logoFile.name, logoFile.size, 'bytes');
+                const logoUrl = await uploadLogoToShopify(admin, logoFile);
+                branding = {
+                    ...branding,
+                    checkout_redirect: {
+                        ...branding.checkout_redirect,
+                        logo_url: logoUrl,
+                        display_mode: 'custom_logo',
+                        enabled: true,
+                    },
+                };
+                console.log('[Branding] Logo uploaded successfully:', logoUrl);
+            }
+
+            // Save to Supabase
+            await saveBrandingSettings(shopDomain, branding);
+
+            // Sync to Shopify metafield (storefront-accessible)
+            await syncBrandingToMetafield(admin, shopDomain, branding);
+
+            return { success: true, message: 'Branding settings saved!', branding };
+        }
+
         return { success: false, message: 'Unknown action' };
     } catch (error: any) {
         console.error('[Settings] Action error:', error);
@@ -81,13 +225,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 const TABS = [
     { id: 'pixels', content: 'Pixels' },
     { id: 'fraud', content: 'Fraud Protection' },
+    { id: 'branding', content: 'Branding' },
 ];
 
-type TabId = 'pixels' | 'fraud';
+type TabId = 'pixels' | 'fraud' | 'branding';
 
 // ── COMPONENT ──
 export default function AppSettingsPage() {
-    const { pixels: initialPixels, fraudSettings: initialFraud, shopDomain } = useLoaderData<any>();
+    const { pixels: initialPixels, fraudSettings: initialFraud, branding: initialBranding, shopDomain } = useLoaderData<any>();
     const actionData = useActionData<any>();
     const submit = useSubmit();
     const navigation = useNavigation();
@@ -179,24 +324,136 @@ export default function AppSettingsPage() {
         setFraudChanges(false);
     }, [initialFraud, shopDomain]);
 
-    // ═══════════ SAVE BAR ═══════════
-    const hasChanges = (activeTab === 'pixels' && pixelChanges) || (activeTab === 'fraud' && fraudChanges);
+    // ═══════════ BRANDING STATE ═══════════
+    const mergedBranding: Branding = {
+        ...DEFAULT_BRANDING,
+        ...(initialBranding || {}),
+        checkout_redirect: {
+            ...DEFAULT_BRANDING.checkout_redirect,
+            ...((initialBranding as Branding)?.checkout_redirect || {}),
+        },
+    };
+    const [branding, setBranding] = useState<Branding>(mergedBranding);
+    const [brandingChanges, setBrandingChanges] = useState(false);
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [previewUrl, setPreviewUrl] = useState<string>(mergedBranding.checkout_redirect.logo_url || '');
+    const [dragOver, setDragOver] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
     useEffect(() => {
-        if (hasChanges) shopify.saveBar.show('app-settings-save-bar');
-        else shopify.saveBar.hide('app-settings-save-bar');
+        if (initialBranding) {
+            const merged: Branding = {
+                ...DEFAULT_BRANDING,
+                ...initialBranding,
+                checkout_redirect: { ...DEFAULT_BRANDING.checkout_redirect, ...(initialBranding.checkout_redirect || {}) },
+            };
+            setBranding(merged);
+            setPreviewUrl(merged.checkout_redirect.logo_url || '');
+            setBrandingChanges(false);
+        }
+    }, [initialBranding]);
+
+    const updateCheckoutRedirect = useCallback((updates: Partial<BrandingCheckoutRedirect>) => {
+        setBranding(prev => ({
+            ...prev,
+            checkout_redirect: { ...prev.checkout_redirect, ...updates },
+        }));
+        setBrandingChanges(true);
+    }, []);
+
+    const handleFileSelect = useCallback((file: File) => {
+        setSelectedFile(file);
+        const objectUrl = URL.createObjectURL(file);
+        setPreviewUrl(objectUrl);
+        updateCheckoutRedirect({ display_mode: 'custom_logo', enabled: true });
+    }, [updateCheckoutRedirect]);
+
+    const handleDropZoneDrop = useCallback((_dropFiles: File[], acceptedFiles: File[], _rejectedFiles: File[]) => {
+        if (acceptedFiles.length > 0) handleFileSelect(acceptedFiles[0]);
+    }, [handleFileSelect]);
+
+    const handleRemoveLogo = useCallback(() => {
+        setSelectedFile(null);
+        setPreviewUrl('');
+        updateCheckoutRedirect({ logo_url: '', display_mode: 'lock_icon', enabled: false });
+    }, [updateCheckoutRedirect]);
+
+    const saveBranding = useCallback(() => {
+        const fd = new FormData();
+        fd.set('intent', 'save_branding');
+        fd.set('branding', JSON.stringify(branding));
+        if (selectedFile) fd.set('logo_file', selectedFile);
+        submit(fd, { method: 'post', encType: 'multipart/form-data' });
+    }, [branding, selectedFile, submit]);
+
+    const discardBranding = useCallback(() => {
+        const merged: Branding = {
+            ...DEFAULT_BRANDING,
+            ...(initialBranding || {}),
+            checkout_redirect: { ...DEFAULT_BRANDING.checkout_redirect, ...((initialBranding as Branding)?.checkout_redirect || {}) },
+        };
+        setBranding(merged);
+        setSelectedFile(null);
+        setPreviewUrl(merged.checkout_redirect.logo_url || '');
+        setBrandingChanges(false);
+    }, [initialBranding]);
+
+    const resetBrandingToDefault = useCallback(() => {
+        setBranding(DEFAULT_BRANDING);
+        setSelectedFile(null);
+        setPreviewUrl('');
+        setBrandingChanges(true);
+    }, []);
+
+    // Update URL if logo was saved successfully
+    useEffect(() => {
+        if (actionData?.success && actionData?.branding) {
+            const savedBranding = actionData.branding as Branding;
+            setBranding(savedBranding);
+            setPreviewUrl(savedBranding.checkout_redirect.logo_url || '');
+            setSelectedFile(null);
+            setBrandingChanges(false);
+        }
+    }, [actionData]);
+
+    // ═══════════ SAVE BAR ═══════════
+    const hasChanges = (activeTab === 'pixels' && pixelChanges) || (activeTab === 'fraud' && fraudChanges) || (activeTab === 'branding' && brandingChanges);
+    useEffect(() => {
+        if (hasChanges) shopify.saveBar.show('app-settings-save-bar')?.catch(() => {});
+        else shopify.saveBar.hide('app-settings-save-bar')?.catch(() => {});
     }, [hasChanges]);
 
-    const handleSave = () => { if (activeTab === 'pixels') savePixels(); else saveFraud(); };
-    const handleDiscard = () => { if (activeTab === 'pixels') discardPixels(); else discardFraud(); shopify.saveBar.hide('app-settings-save-bar'); };
+    const handleSave = () => {
+        if (activeTab === 'pixels') savePixels();
+        else if (activeTab === 'fraud') saveFraud();
+        else if (activeTab === 'branding') saveBranding();
+    };
+    const handleDiscard = () => {
+        if (activeTab === 'pixels') discardPixels();
+        else if (activeTab === 'fraud') discardFraud();
+        else if (activeTab === 'branding') discardBranding();
+        shopify.saveBar.hide('app-settings-save-bar')?.catch(() => {});
+    };
 
     useEffect(() => {
         if (actionData?.message) {
             shopify.toast.show(actionData.message, { isError: !actionData.success });
-            if (actionData.success) { setPixelChanges(false); setFraudChanges(false); shopify.saveBar.hide('app-settings-save-bar'); }
+            if (actionData.success) { setPixelChanges(false); setFraudChanges(false); setBrandingChanges(false); shopify.saveBar.hide('app-settings-save-bar')?.catch(() => {}); }
         }
     }, [actionData]);
 
     const getProviderMeta = (key: PixelProvider) => PIXEL_PROVIDERS.find(p => p.key === key) || PIXEL_PROVIDERS[0];
+
+    // ── Branding Redirect Preview ──
+    const cr = branding.checkout_redirect;
+    const showCustomLogo = cr.display_mode === 'custom_logo' && (previewUrl || cr.logo_url);
+    const logoUrl = previewUrl || cr.logo_url;
+    const logoSize = cr.logo_size || 72;
+
+    const logoShapeBorderRadius = cr.logo_shape === 'circle' ? '50%' : cr.logo_shape === 'rounded' ? '14px' : '0px';
+    const logoBg = cr.show_background
+        ? 'background: white; box-shadow: 0 4px 16px rgba(0,0,0,0.12); border-radius: 14px; padding: 10px;'
+        : '';
 
     return (
         <>
@@ -213,7 +470,7 @@ export default function AppSettingsPage() {
                             <Link to="/app" className="back-btn">←</Link>
                             <div className="page-title">
                                 <h1>Settings</h1>
-                                <p>Manage your Tracking Pixels and Fraud Protection</p>
+                                <p>Pixels, Fraud Protection & Branding</p>
                             </div>
                         </div>
                     </div>
@@ -403,6 +660,215 @@ export default function AppSettingsPage() {
                                     </BlockStack>
                                 </div>
                             )}
+
+                            {/* ── BRANDING TAB ── */}
+                            {activeTab === 'branding' && (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 350px', gap: '32px', alignItems: 'start' }}>
+                                    <div>
+                                        <BlockStack gap="400">
+                                            {/* Section Header */}
+                                            <BlockStack gap="200">
+                                                <Text variant="headingLg" as="h2">Checkout Redirect Branding</Text>
+                                                <Text variant="bodySm" tone="subdued" as="p">Customize the loading screen shown before customers are redirected to Shopify Checkout</Text>
+                                            </BlockStack>
+
+                                            {/* Display Mode */}
+                                            <Card>
+                                                <BlockStack gap="400">
+                                                    <Text variant="headingMd" as="h2">Display Mode</Text>
+                                                    <ChoiceList
+                                                        title="Choose what icon appears on the redirect screen"
+                                                        titleHidden
+                                                        choices={[
+                                                            { label: 'Shopify Lock Icon', value: 'lock_icon' },
+                                                            { label: 'Custom Logo', value: 'custom_logo' }
+                                                        ]}
+                                                        selected={[cr.display_mode]}
+                                                        onChange={(selected) => updateCheckoutRedirect({ display_mode: selected[0] as 'lock_icon' | 'custom_logo' })}
+                                                    />
+                                                    {cr.display_mode === 'custom_logo' && !logoUrl && (
+                                                        <Banner tone="warning">Upload a logo below to use custom branding.</Banner>
+                                                    )}
+                                                </BlockStack>
+                                            </Card>
+
+                                            {/* Logo Upload */}
+                                            <Card>
+                                                <BlockStack gap="400">
+                                                    <Text variant="headingMd" as="h2">Checkout Logo</Text>
+                                                    <Text variant="bodySm" tone="subdued" as="p">PNG, JPG, SVG, WEBP · Max 5 MB · Recommended 300×300 px</Text>
+                                                    
+                                                    {logoUrl ? (
+                                                        <InlineStack gap="400" align="start" blockAlign="center">
+                                                            <div style={{ width: 80, height: 80, border: '1px solid #e5e7eb', borderRadius: 8, padding: 4, background: 'white' }}>
+                                                                <img src={logoUrl} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                                                            </div>
+                                                            <BlockStack gap="200">
+                                                                <div style={{ width: 200 }}>
+                                                                    <DropZone allowMultiple={false} onDrop={handleDropZoneDrop} accept="image/png, image/jpeg, image/svg+xml, image/webp">
+                                                                        <DropZone.FileUpload actionTitle="Replace Logo" />
+                                                                    </DropZone>
+                                                                </div>
+                                                                <Button tone="critical" variant="plain" onClick={handleRemoveLogo}>Remove</Button>
+                                                            </BlockStack>
+                                                        </InlineStack>
+                                                    ) : (
+                                                        <DropZone allowMultiple={false} onDrop={handleDropZoneDrop} accept="image/png, image/jpeg, image/svg+xml, image/webp">
+                                                            <DropZone.FileUpload />
+                                                        </DropZone>
+                                                    )}
+                                                </BlockStack>
+                                            </Card>
+
+                                            {cr.display_mode === 'custom_logo' && (
+                                                <>
+                                                    {/* Logo Size */}
+                                                    <Card>
+                                                        <BlockStack gap="400">
+                                                            <Text variant="headingMd" as="h2">Logo Size: {logoSize}px</Text>
+                                                            <RangeSlider
+                                                                label="Logo Size"
+                                                                labelHidden
+                                                                min={40}
+                                                                max={120}
+                                                                step={4}
+                                                                value={logoSize}
+                                                                onChange={(v) => updateCheckoutRedirect({ logo_size: v })}
+                                                                output
+                                                            />
+                                                        </BlockStack>
+                                                    </Card>
+
+                                                    {/* Logo Zoom */}
+                                                    <Card>
+                                                        <BlockStack gap="400">
+                                                            <Text variant="headingMd" as="h2">Image Zoom: {cr.logo_zoom || 100}%</Text>
+                                                            <Text variant="bodySm" tone="subdued" as="p">Scale the image up or down to fit perfectly inside the logo container.</Text>
+                                                            <RangeSlider
+                                                                label="Image Zoom"
+                                                                labelHidden
+                                                                min={50}
+                                                                max={200}
+                                                                step={5}
+                                                                value={cr.logo_zoom || 100}
+                                                                onChange={(v) => updateCheckoutRedirect({ logo_zoom: v })}
+                                                                output
+                                                            />
+                                                        </BlockStack>
+                                                    </Card>
+
+                                                    {/* Logo Shape */}
+                                                    <Card>
+                                                        <BlockStack gap="400">
+                                                            <Text variant="headingMd" as="h2">Logo Shape</Text>
+                                                            <Text variant="bodySm" tone="subdued" as="p">Visual clipping for the logo container</Text>
+                                                            <ChoiceList
+                                                                title="Logo Shape"
+                                                                titleHidden
+                                                                choices={[
+                                                                    { label: 'Original', value: 'original' },
+                                                                    { label: 'Rounded', value: 'rounded' },
+                                                                    { label: 'Circle', value: 'circle' }
+                                                                ]}
+                                                                selected={[cr.logo_shape]}
+                                                                onChange={(selected) => updateCheckoutRedirect({ logo_shape: selected[0] as 'original' | 'rounded' | 'circle' })}
+                                                            />
+                                                        </BlockStack>
+                                                    </Card>
+
+                                                    {/* Logo Background */}
+                                                    <Card>
+                                                        <InlineStack align="space-between" blockAlign="center">
+                                                            <BlockStack gap="200">
+                                                                <Text variant="headingMd" as="h2">Logo Background</Text>
+                                                                <Text variant="bodySm" tone="subdued" as="p">Add white background with shadow for transparent logos</Text>
+                                                            </BlockStack>
+                                                            <Checkbox
+                                                                label="Enable Background"
+                                                                labelHidden
+                                                                checked={cr.show_background}
+                                                                onChange={(v) => updateCheckoutRedirect({ show_background: v })}
+                                                            />
+                                                        </InlineStack>
+                                                    </Card>
+                                                </>
+                                            )}
+
+                                            <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '16px' }}>
+                                                <Button tone="critical" onClick={resetBrandingToDefault}>Reset to default</Button>
+                                            </div>
+                                        </BlockStack>
+                                    </div>
+
+                                    {/* RIGHT COLUMN — Live Preview */}
+                                    <div>
+                                        <div style={{ position: 'sticky', top: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                            <BlockStack gap="200">
+                                                <Text variant="headingSm" as="h3">Live Preview</Text>
+                                                <Text variant="bodySm" tone="subdued" as="p">Updates instantly as you change settings</Text>
+                                            </BlockStack>
+
+                                            <div className="preview-phone">
+                                                <div className="preview-phone-screen preview-compact" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px 16px', background: 'white', minHeight: '380px' }}>
+                                                    <div className="brd-preview-bg" style={{ width: '100%' }}>
+                                                        {/* Spinner ring + icon */}
+                                                        <div style={{ position: 'relative', width: `${logoSize + 10}px`, height: `${logoSize + 10}px`, flexShrink: 0, margin: '0 auto' }}>
+                                                            {/* Animated spinner ring */}
+                                                            <svg style={{ position: 'absolute', inset: 0, width: `${logoSize + 10}px`, height: `${logoSize + 10}px`, animation: 'brd-spin 1.1s linear infinite' }} viewBox={`0 0 ${logoSize + 10} ${logoSize + 10}`} fill="none">
+                                                                <circle cx={(logoSize + 10) / 2} cy={(logoSize + 10) / 2} r={(logoSize + 10) / 2 - 3} stroke="#e0e7ff" strokeWidth="4"/>
+                                                                <path d={`M3 ${(logoSize + 10) / 2} A${(logoSize + 10) / 2 - 3} ${(logoSize + 10) / 2 - 3} 0 0 1 ${(logoSize + 10) / 2} 3`} stroke="#2563eb" strokeWidth="4" strokeLinecap="round"/>
+                                                            </svg>
+                                                            {/* Center icon */}
+                                                            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                                {showCustomLogo ? (() => {
+                                                                    const zoomScale = cr.logo_zoom ? cr.logo_zoom / 100 : 1;
+                                                                    const imgSize = Math.round(logoSize * 0.58 * zoomScale);
+                                                                    return (
+                                                                        <div style={{ borderRadius: logoShapeBorderRadius, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', ...(cr.show_background ? { background: 'white', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', borderRadius: '14px', padding: '8px', width: `${imgSize + 16}px`, height: `${imgSize + 16}px`, boxSizing: 'border-box' } : { width: `${imgSize}px`, height: `${imgSize}px` }) }}>
+                                                                            <img
+                                                                                src={logoUrl}
+                                                                                alt="Logo preview"
+                                                                                style={{ width: '100%', height: '100%', objectFit: cr.logo_shape === 'circle' ? 'cover' : 'contain', borderRadius: logoShapeBorderRadius, display: 'block' }}
+                                                                                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                                                            />
+                                                                        </div>
+                                                                    );
+                                                                })() : (
+                                                                    <svg width={logoSize * 0.5} height={logoSize * 0.5} viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                                        <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
+                                                                    </svg>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        {/* Text */}
+                                                        <div style={{ textAlign: 'center', marginTop: '20px' }}>
+                                                            <div style={{ fontSize: 16, fontWeight: 700, color: '#111827', marginBottom: 4 }}>Redirecting to secure checkout</div>
+                                                            <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>Please wait while we prepare your Shopify checkout…</div>
+                                                        </div>
+                                                        {/* Shopify badge */}
+                                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 99, padding: '6px 12px', marginTop: '20px', width: 'fit-content', margin: '20px auto 0' }}>
+                                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 11 2 2 4-4"/></svg>
+                                                            <span style={{ fontSize: 11, fontWeight: 600, color: '#166534' }}>Secured by Shopify</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Preview legend */}
+                                            <div className="brd-preview-legend" style={{ display: 'flex', justifyContent: 'center', marginTop: '8px', gap: '12px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                    <span className={`brd-legend-dot ${cr.display_mode === 'lock_icon' ? 'active' : ''}`} />
+                                                    <span style={{ fontSize: '12px', color: '#6b7280' }}>Default lock icon</span>
+                                                </div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                    <span className={`brd-legend-dot ${cr.display_mode === 'custom_logo' ? 'active' : ''}`} />
+                                                    <span style={{ fontSize: '12px', color: '#6b7280' }}>Custom logo</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -413,6 +879,12 @@ export default function AppSettingsPage() {
 
 // ── STYLES ──
 const styles = `
+    .preview-phone { background: #1f2937; border-radius: 32px; padding: 6px; max-width: 350px; margin: 0 auto; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+    .preview-phone-screen { background: white; border-radius: 24px; overflow-y: auto; height: 550px; }
+    .preview-phone-screen.preview-compact { min-height: auto; max-height: none; padding: 20px 16px; }
+
+    @keyframes brd-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
     .as-page { display: flex; flex-direction: column; min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f6f6f7; }
     .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
     @media (max-width: 640px) { .page-header { padding: 0; } }
@@ -424,7 +896,7 @@ const styles = `
     .page-title p { font-size: 14px; color: #6b7280; margin: 0; }
 
     /* Body */
-    .as-body { padding: 24px 0; flex: 1; max-width: 820px; margin: 0 auto; width: 100%; }
+    .as-body { padding: 24px 0; flex: 1; max-width: 900px; margin: 0 auto; width: 100%; }
 
     /* Section */
     .as-section-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
@@ -438,7 +910,7 @@ const styles = `
     .as-del:hover { background: #fee2e2; }
 
     /* Fraud card headers */
-    .as-card-hdr { display: flex; align-items: center; gap: 14px; padding: 18px 22px; background: #fafbfc; border-bottom: 1px solid #f0f0f0; }
+    .as-card-hdr { display: flex; align-items: center; gap: 14px; padding: 18px 22px; background: #fafbfc; border-bottom: 1px solid #f0f0f0; flex-wrap: wrap; }
     .as-icon { width: 42px; height: 42px; border-radius: 11px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
     .as-icon-orders { background: linear-gradient(135deg, #ede9fe, #ddd6fe); }
     .as-icon-qty { background: linear-gradient(135deg, #fef3c7, #fde68a); }
@@ -471,10 +943,75 @@ const styles = `
     .tab:hover { background: #f9fafb; color: #111827; }
     .tab.active { background: #f3f4f6; color: #111827; box-shadow: none; font-weight: 600; }
 
+    /* ── BRANDING STYLES ── */
+
+    /* Hero section */
+    .brd-hero { display: flex; align-items: center; gap: 16px; padding: 20px 24px; background: linear-gradient(135deg, #eef2ff 0%, #f5f3ff 100%); border: 1px solid #e0e7ff; border-radius: 14px; }
+    .brd-hero-icon { width: 52px; height: 52px; background: white; border-radius: 14px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(99,102,241,0.15); flex-shrink: 0; }
+
+    /* Two-column layout */
+    .brd-grid { display: grid; grid-template-columns: 1fr 340px; gap: 24px; align-items: start; }
+    @media (max-width: 860px) { .brd-grid { grid-template-columns: 1fr; } }
+
+    /* Controls column */
+    .brd-controls { display: flex; flex-direction: column; gap: 16px; }
+
+    /* Dropzone */
+    .brd-dropzone { border: 2px dashed #d1d5db; border-radius: 12px; padding: 36px 20px; text-align: center; cursor: pointer; transition: all 0.2s ease; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+    .brd-dropzone:hover, .brd-dropzone.drag-over { border-color: #6366f1; background: #eef2ff; }
+    .brd-drop-title { font-size: 14px; font-weight: 600; color: #374151; margin: 0; }
+    .brd-drop-sub { font-size: 12px; color: #9ca3af; margin: 0; }
+
+    /* Logo preview */
+    .brd-logo-preview { display: flex; align-items: center; gap: 20px; padding: 12px; background: #f9fafb; border-radius: 12px; border: 1px solid #e5e7eb; }
+    .brd-logo-thumb { width: 80px; height: 80px; object-fit: contain; border-radius: 10px; border: 1px solid #e5e7eb; background: white; padding: 6px; }
+    .brd-logo-actions { display: flex; flex-direction: column; gap: 8px; }
+    .brd-btn-replace { padding: 8px 16px; background: #6366f1; color: white; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+    .brd-btn-replace:hover { background: #4f46e5; }
+    .brd-btn-remove { padding: 8px 16px; background: white; color: #dc2626; border: 1px solid #fecaca; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s; }
+    .brd-btn-remove:hover { background: #fee2e2; }
+
+    /* Display Mode */
+    .brd-mode-options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .brd-mode-card { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px 12px; border: 2px solid #e5e7eb; border-radius: 12px; cursor: pointer; transition: all 0.2s; text-align: center; font-size: 13px; font-weight: 500; color: #374151; }
+    .brd-mode-card input { display: none; }
+    .brd-mode-card.selected { border-color: #6366f1; background: #eef2ff; color: #4f46e5; }
+    .brd-mode-icon { width: 42px; height: 42px; background: #f3f4f6; border-radius: 10px; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
+    .brd-mode-card.selected .brd-mode-icon { background: #e0e7ff; }
+
+    /* Logo Slider */
+    .brd-slider-row { display: flex; align-items: center; gap: 12px; }
+    .brd-slider { flex: 1; accent-color: #6366f1; height: 6px; }
+    .brd-slider-label { font-size: 12px; color: #6b7280; font-weight: 500; min-width: 36px; }
+
+    /* Logo Shape */
+    .brd-shape-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .brd-shape-card { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 16px; border: 2px solid #e5e7eb; border-radius: 12px; cursor: pointer; transition: all 0.2s; font-size: 12px; font-weight: 500; color: #374151; }
+    .brd-shape-card input { display: none; }
+    .brd-shape-card.selected { border-color: #6366f1; background: #eef2ff; color: #4f46e5; }
+    .brd-shape-thumb { width: 40px; height: 40px; background: linear-gradient(135deg, #6366f1, #8b5cf6); }
+
+    /* Logo Background Toggle */
+    .brd-toggle { width: 44px; height: 24px; background: #d1d5db; border-radius: 99px; position: relative; cursor: pointer; transition: background 0.25s; margin-left: auto; flex-shrink: 0; }
+    .brd-toggle::after { content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; background: white; border-radius: 50%; transition: transform 0.25s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+    .brd-toggle.on { background: #6366f1; }
+    .brd-toggle.on::after { transform: translateX(20px); }
+
+    /* Live Preview */
+    .brd-preview-col { position: relative; }
+    .brd-preview-sticky { position: sticky; top: 24px; display: flex; flex-direction: column; gap: 12px; }
+    .brd-preview-frame { border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.06); }
+    .brd-preview-bg { background: rgba(255,255,255,0.96); backdrop-filter: blur(8px); padding: 32px 24px; display: flex; flex-direction: column; align-items: center; gap: 18px; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    .brd-preview-legend { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #6b7280; }
+    .brd-legend-dot { width: 8px; height: 8px; border-radius: 50%; background: #d1d5db; display: inline-block; flex-shrink: 0; }
+    .brd-legend-dot.active { background: #6366f1; }
+
     /* Responsive */
     @media (max-width: 640px) {
         .as-row { grid-template-columns: 1fr; }
         .as-body { padding: 16px; }
-        .tabs { flex-direction: column; }
+        .tabs { flex-wrap: wrap; }
+        .brd-mode-options { grid-template-columns: 1fr; }
+        .brd-shape-options { grid-template-columns: repeat(3, 1fr); }
     }
 `;
