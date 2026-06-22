@@ -1392,9 +1392,9 @@ const PreviewDisplay = memo(({
 
                                                 return (
                                                     <div key={field.id} style={cardStyle}>
-                                                        <div style={{ fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '8px', display: 'flex', alignItems: 'center' }}>
-                                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', borderRadius: '8px', marginRight: '6px', color: '#16a34a' }}>
-                                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+                                                        <div style={{ fontSize: '16px', fontWeight: 700, color: '#374151', marginBottom: '10px', display: 'flex', alignItems: 'center' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', borderRadius: '8px', marginRight: '8px', color: '#16a34a' }}>
+                                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
                                                             </div>
                                                             Order Summary
                                                         </div>
@@ -4660,7 +4660,7 @@ export default function SettingsPage() {
                                             ];
 
                                             const presetMap: Record<string, any> = {
-                                                default: { styles: { themeKey: 'default', textColor: '#333333', textSize: 13, fontStyle: 'bold' as const, borderColor: '#333333', borderWidth: 1, background: '#ffffff', backgroundColor: '#ffffff', labelAlignment: 'left' as const, iconColor: '#333333', iconBackground: '#ffffff', borderRadius: 7, shadow: true, fieldBackgroundColor: '#FFFFFF', labelColor: '#333333', labelFontSize: 14, priceColor: '#28C866' }, buttonColor: '#000000' },
+                                                default: { styles: { ...DEFAULT_STYLES }, buttonColor: '#000000' },
                                                 modern_slate: { styles: { themeKey: 'modern_slate', textColor: '#1e293b', textSize: 14, fontStyle: 'normal' as const, borderColor: '#f97316', borderWidth: 2, background: '#fff7ed', backgroundColor: '#fff7ed', labelAlignment: 'left' as const, iconColor: '#ea580c', iconBackground: '#fed7aa', borderRadius: 16, shadow: true, fieldBackgroundColor: '#fff7ed', labelColor: '#9a3412', labelFontSize: 14, priceColor: '#ea580c' }, buttonColor: '#ea580c' },
                                                 dark_mode: { styles: { themeKey: 'dark_mode', textColor: '#f8fafc', textSize: 14, fontStyle: 'normal' as const, borderColor: '#475569', borderWidth: 1, background: '#1f2a3a', backgroundColor: '#1f2a3a', labelAlignment: 'left' as const, iconColor: '#cbd5f5', iconBackground: '#1f2a3a', borderRadius: 12, shadow: true, fieldBackgroundColor: '#0f172a', labelColor: '#f8fafc', labelFontSize: 14, priceColor: '#f8fafc' }, buttonColor: '#6366f1' },
                                                 eastern_gold: { styles: { themeKey: 'eastern_gold', textColor: '#78350f', textSize: 14, fontStyle: 'normal' as const, borderColor: '#d4a574', borderWidth: 1, background: '#fffbeb', backgroundColor: '#fffbeb', labelAlignment: 'left' as const, iconColor: '#b45309', iconBackground: '#fef3c7', borderRadius: 10, shadow: true, fieldBackgroundColor: '#fef9c3', labelColor: '#713f12', labelFontSize: 14, priceColor: '#b45309' }, buttonColor: '#b45309' },

@@ -4060,7 +4060,8 @@ function darkenColor(hex, percent) {
       }
 
       card.innerHTML =
-        '<div style="font-weight:600; margin-bottom:8px; display:flex; align-items:center;">' +
+        '<div style="font-weight:700; font-size:16px; margin-bottom:12px; display:flex; align-items:center; color:#374151;">' +
+        '   <div style="display:flex; align-items:center; justify-content:center; background:transparent; border-radius:8px; margin-right:8px; color:#16a34a;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg></div>' +
         '   Order Summary' +
         '</div>' +
         lineItemsHtml +
@@ -5317,8 +5318,8 @@ function darkenColor(hex, percent) {
           state = calculateCheckoutState(form, config);
       }
 
-      var html = '<div style="font-weight:600; margin-bottom:12px; display:flex; align-items:center;">' +
-          '   <div style="display:flex; align-items:center; justify-content:center; width:28px; height:28px; background:transparent; border-radius:8px; margin-right:8px; color:#16a34a;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg></div>' +
+      var html = '<div style="font-weight:700; font-size:16px; margin-bottom:12px; display:flex; align-items:center; color:#374151;">' +
+          '   <div style="display:flex; align-items:center; justify-content:center; background:transparent; border-radius:8px; margin-right:8px; color:#16a34a;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg></div>' +
           '   Order Summary' +
           '</div>';
 

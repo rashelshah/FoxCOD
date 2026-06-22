@@ -174,8 +174,8 @@ export const DEFAULT_BLOCKS: ContentBlocks = {
  */
 export const DEFAULT_STYLES: FormStyles = {
     textColor: '#333333',
-    textSize: 14,
-    fontStyle: 'normal',
+    textSize: 13,
+    fontStyle: 'bold',
     borderColor: '#333333',
     borderWidth: 1,
     background: '#ffffff',
@@ -183,14 +183,14 @@ export const DEFAULT_STYLES: FormStyles = {
     labelAlignment: 'left',
     iconColor: '#333333',
     iconBackground: '#ffffff',
-    borderRadius: 9,
+    borderRadius: 7,
     shadow: true,
     shadowIntensity: 35,
     themeKey: 'default',
     fieldBackgroundColor: '#FFFFFF',
     labelColor: '#333333',
     labelFontSize: 14,
-    priceColor: '#333333',
+    priceColor: '#28C866',
     fontFamily: 'Inter',
 };
 
