@@ -12,8 +12,9 @@
 }
 {% endschema %}
 
-{% comment %} Only render on product pages {% endcomment %}
-{% if request.page_type == 'product' %}
+{% comment %} Render on all pages to support Cart Drawers {% endcomment %}
+{% assign embed_id = 'embed_global' %}
+{% if product %}
   {% assign embed_id = 'embed' | append: product.id %}
-  {% render 'cod-form-core', instance_id: embed_id, shopify_attributes: '', is_embed: true, section_id: '' %}
 {% endif %}
+{% render 'cod-form-core', instance_id: embed_id, shopify_attributes: '', is_embed: true, section_id: '' %}

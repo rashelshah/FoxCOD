@@ -254,7 +254,9 @@ async function handlePartialCodCheckout(request: Request, data: any) {
         } = data;
 
         // ── Validate required fields ────────────────────────────────────────
-        if (!shop || !variantId || !advanceAmount) {
+        // For cart page / cart drawer flow, cart_items replaces the single variantId
+        const hasCartItems = Array.isArray(data.cart_items) && data.cart_items.length > 0;
+        if (!shop || (!variantId && !hasCartItems) || !advanceAmount) {
             return new Response(JSON.stringify({
                 success: false,
                 error: 'Missing required fields: shop, variantId, advanceAmount',
@@ -597,7 +599,9 @@ async function handleFullPrepaidCheckout(request: Request, data: any) {
         } = data;
 
         // ── Validate required fields ────────────────────────────────────────
-        if (!shop || !variantId) {
+        // For cart page / cart drawer flow, cart_items replaces the single variantId
+        const hasCartItems = Array.isArray(data.cart_items) && data.cart_items.length > 0;
+        if (!shop || (!variantId && !hasCartItems)) {
             return new Response(JSON.stringify({
                 success: false,
                 error: 'Missing required fields: shop, variantId',
@@ -852,7 +856,9 @@ async function handleRegularOrder(request: Request, data: any) {
     const normalizedProductId = data.productId || data.variantId || "";
 
     // Validate required fields
-    if (!data.shop || !data.variantId) {
+    // For cart page / cart drawer flow, cart_items replaces the single variantId
+    const hasCartItems = Array.isArray(data.cart_items) && data.cart_items.length > 0;
+    if (!data.shop || (!data.variantId && !hasCartItems)) {
         return new Response(JSON.stringify({
             success: false,
             error: "Missing required fields: shop, variantId"
@@ -969,11 +975,28 @@ async function handleRegularOrder(request: Request, data: any) {
     const discountMultiplier = 1 - (discountPercent / 100);
     const lineItems: Array<Record<string, any>> = [];
 
+    const cartItems: Array<any> =
+        Array.isArray(data.cart_items) && data.cart_items.length > 0
+            ? data.cart_items : null;
+
     const bundleVariants: Array<any> =
         Array.isArray(data.bundleVariants) && data.bundleVariants.length > 1
             ? data.bundleVariants : null;
 
-    if (bundleVariants) {
+    if (cartItems) {
+        for (const item of cartItems) {
+            const rawVariantId = item?.variantId ?? item?.variant_id ?? item?.id ?? null;
+            const itemVariantId = toNumericVariantId(rawVariantId) || mainVariantId;
+            const originalPrice = parseFloat(String(item.price || 0));
+            const discountedPrice = (originalPrice * discountMultiplier).toFixed(2);
+            lineItems.push(buildCatalogOrCustomLineItem({
+                variantId: itemVariantId,
+                title: item.title || 'Cart Item',
+                quantity: item.quantity || 1,
+                price: discountedPrice,
+            }));
+        }
+    } else if (bundleVariants) {
         for (const bv of bundleVariants) {
             const rawBundleVariantId = bv?.variantId ?? bv?.variant_id ?? bv?.id ?? null;
             const bvVariantId = toNumericVariantId(rawBundleVariantId) || mainVariantId;

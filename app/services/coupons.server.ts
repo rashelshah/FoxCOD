@@ -174,11 +174,25 @@ function buildOrderDiscountItems(body: any): OrderDiscountItem[] {
     const items: OrderDiscountItem[] = [];
     const quantity = Math.max(1, parseInt(String(body?.quantity || 1), 10) || 1);
     const discountMultiplier = Math.max(0, 1 - (Math.max(0, Number(body?.discountPercent) || 0) / 100));
+    
+    const cartItems = Array.isArray(body?.cart_items) && body.cart_items.length > 0
+        ? body.cart_items
+        : null;
+
     const bundleVariants = Array.isArray(body?.bundleVariants) && body.bundleVariants.length > 1
         ? body.bundleVariants
         : null;
 
-    if (bundleVariants) {
+    if (cartItems) {
+        cartItems.forEach((item: any) => {
+            items.push({
+                productId: item?.productId,
+                variantId: item?.variantId,
+                price: roundCurrency((Number(item?.price) || 0) * discountMultiplier),
+                quantity: Math.max(1, parseInt(String(item?.quantity || 1), 10) || 1),
+            });
+        });
+    } else if (bundleVariants) {
         bundleVariants.forEach((variant: any) => {
             items.push({
                 productId: body?.productId,
@@ -797,6 +811,11 @@ export function calculateOrderPricing(body: any, formSettings?: any): OrderPrici
     const shippingTitle = String(body?.shippingTitle || body?.shippingLabel || "Shipping");
     const discountPercent = Math.max(0, Number(body?.discountPercent) || 0);
     const quantity = Math.max(1, parseInt(String(body?.quantity || 1), 10) || 1);
+    
+    const cartItems = Array.isArray(body?.cart_items) && body.cart_items.length > 0
+        ? body.cart_items
+        : null;
+
     const bundleVariants = Array.isArray(body?.bundleVariants) && body.bundleVariants.length > 1
         ? body.bundleVariants
         : null;
@@ -804,7 +823,15 @@ export function calculateOrderPricing(body: any, formSettings?: any): OrderPrici
     let mainItemsSubtotal = 0;
     let bundleDiscountAmount = 0;
 
-    if (bundleVariants) {
+    if (cartItems) {
+        cartItems.forEach((item: any) => {
+            const itemQuantity = Math.max(1, parseInt(String(item?.quantity || 1), 10) || 1);
+            const itemPrice = Number(item?.price) || 0;
+            const rawLineTotal = itemPrice * itemQuantity;
+            mainItemsSubtotal += rawLineTotal;
+            bundleDiscountAmount += rawLineTotal * (discountPercent / 100);
+        });
+    } else if (bundleVariants) {
         bundleVariants.forEach((variant: any) => {
             const variantQuantity = Math.max(1, parseInt(String(variant?.quantity || 1), 10) || 1);
             const variantPrice = Number(variant?.price) || 0;

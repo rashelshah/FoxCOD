@@ -121,6 +121,9 @@ export interface ButtonStyles {
 
     // Mobile Features
     stickyOnMobile: boolean;  // Sticky button on mobile scrolling
+
+    // Cart Features
+    enable_cart_page_form?: boolean;
 }
 
 /**
@@ -241,6 +244,9 @@ export const DEFAULT_BUTTON_STYLES: ButtonStyles = {
 
     // Mobile Features
     stickyOnMobile: false,
+
+    // Cart Features
+    enable_cart_page_form: false,
 };
 
 /**

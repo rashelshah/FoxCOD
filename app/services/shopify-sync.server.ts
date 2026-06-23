@@ -155,13 +155,34 @@ export async function createShopifyOrderBackground(orderId: string): Promise<Sho
         const lineItems: Array<Record<string, any>> = [];
         const discountMultiplier = 1 - (discountPercent / 100);
 
+        // Check for cart items (cart page / cart drawer flow)
+        const cartItemsBody: Array<any> =
+            Array.isArray(body?.cart_items) && body.cart_items.length > 0
+                ? body.cart_items
+                : null;
+
         // Check for bundle variants (user selected different variants per bundle item)
         const bundleVariants: Array<{variantId?: string; variant_id?: string; id?: string; title?: string; price?: number; quantity?: number}> =
             Array.isArray(body?.bundleVariants) && body.bundleVariants.length > 1
                 ? body.bundleVariants
                 : null;
 
-        if (bundleVariants) {
+        if (cartItemsBody) {
+            // Cart order: one line item per cart item
+            console.log('[SYNC] Cart order detected:', cartItemsBody.length, 'items');
+            for (const item of cartItemsBody) {
+                const rawVariantId = item?.variantId ?? item?.variant_id ?? item?.id ?? null;
+                const itemVariantId = toNumericVariantId(rawVariantId) || mainVariantId;
+                const originalPrice = parseFloat(String(item.price || 0));
+                const discountedPrice = (originalPrice * discountMultiplier).toFixed(2);
+                lineItems.push(buildCatalogOrCustomLineItem({
+                    variantId: itemVariantId,
+                    title: item.title || 'Cart Item',
+                    quantity: item.quantity || 1,
+                    price: discountedPrice,
+                }));
+            }
+        } else if (bundleVariants) {
             // Bundle order: create one line item per variant with its own discounted price
             console.log('[SYNC] Bundle order detected:', bundleVariants.length, 'variants');
             for (const bv of bundleVariants) {

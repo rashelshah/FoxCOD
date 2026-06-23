@@ -351,6 +351,8 @@ export interface OrderLogEntry {
     payment_method?: 'cod' | 'partial_cod' | 'full_prepaid';
     // 2-phase sync: full request payload for retry after restart
     order_payload?: Record<string, any>;
+    // Source tracking
+    order_source?: 'product_page' | 'cart_page' | 'cart_drawer';
 }
 
 // Order status types are imported from ./constants
@@ -412,6 +414,7 @@ export async function logOrder(order: OrderLogEntry) {
     if (order.advance_amount != null) insertPayload.advance_amount = order.advance_amount;
     if (order.remaining_cod_amount != null) insertPayload.remaining_cod_amount = order.remaining_cod_amount;
     if (order.is_full_prepaid != null) insertPayload.is_full_prepaid = order.is_full_prepaid;
+    if (order.order_source != null) insertPayload.order_source = order.order_source;
     // payment_method: always set — defaults to 'cod' if not provided
     insertPayload.payment_method = order.payment_method ?? 'cod';
 
@@ -476,6 +479,7 @@ export async function logOrderWithShopifyIds(
     if (order.advance_amount != null) insertPayload.advance_amount = order.advance_amount;
     if (order.remaining_cod_amount != null) insertPayload.remaining_cod_amount = order.remaining_cod_amount;
     if (order.is_full_prepaid != null) insertPayload.is_full_prepaid = order.is_full_prepaid;
+    if (order.order_source != null) insertPayload.order_source = order.order_source;
     // payment_method: always set — defaults to 'cod' if not provided
     insertPayload.payment_method = order.payment_method ?? 'cod';
 

@@ -1,11 +1,15 @@
 {% comment %} Get product and variant info {% endcomment %}
-{% assign current_variant = product.selected_or_first_available_variant %}
-{% comment %} Use raw price in cents/paise for JavaScript calculations {% endcomment %}
-{% assign product_price_cents = current_variant.price %}
-{% assign product_price_display = current_variant.price | money_without_trailing_zeros %}
-{% assign product_price_numeric = product_price_cents | divided_by: 100.0 %}
-
-
+{% if product %}
+  {% assign current_variant = product.selected_or_first_available_variant %}
+  {% assign product_price_cents = current_variant.price %}
+  {% assign product_price_display = current_variant.price | money_without_trailing_zeros %}
+  {% assign product_price_numeric = product_price_cents | divided_by: 100.0 %}
+{% else %}
+  {% assign current_variant = null %}
+  {% assign product_price_cents = 0 %}
+  {% assign product_price_display = 0 | money_without_trailing_zeros %}
+  {% assign product_price_numeric = 0 %}
+{% endif %}
 {% comment %} Read COD settings from metafields (synced from app dashboard) {% endcomment %}
 {% assign cod_enabled = shop.metafields.fox_cod.enabled | default: 'true' %}
 {% assign cod_button_text = shop.metafields.fox_cod.button_text.value | default: shop.metafields.fox_cod.button_text | default: 'Buy Now - Cash on Delivery' %}
@@ -101,13 +105,15 @@
 
 {% comment %} Build product collection IDs for shipping rate collection matching {% endcomment %}
 {% assign product_collection_ids = '' %}
-{% for collection in product.collections %}
-  {% if forloop.first %}
-    {% assign product_collection_ids = collection.id %}
-  {% else %}
-    {% assign product_collection_ids = product_collection_ids | append: ',' | append: collection.id %}
-  {% endif %}
-{% endfor %}
+{% if product %}
+  {% for collection in product.collections %}
+    {% if forloop.first %}
+      {% assign product_collection_ids = collection.id %}
+    {% else %}
+      {% assign product_collection_ids = product_collection_ids | append: ',' | append: collection.id %}
+    {% endif %}
+  {% endfor %}
+{% endif %}
 
 {% comment %} DEBUG: Quantity offers metafield check {% endcomment %}
 {% if cod_quantity_offers != '[]' and cod_quantity_offers != blank %}
@@ -148,7 +154,7 @@
 </style>
 {% endunless %}
 
-<div id="fox-cod-root-{{ instance_id }}" class="foxcod-block-root {% if is_embed %}foxcod-embed-root{% endif %}" data-fox-cod-root data-product-id="{{ product.id }}" {{ shopify_attributes }}>
+<div id="fox-cod-root-{{ instance_id }}" class="foxcod-block-root {% if is_embed %}foxcod-embed-root{% endif %}" data-fox-cod-root data-product-id="{% if product %}{{ product.id }}{% endif %}" {{ shopify_attributes }}>
   <div class="foxcod-block-shell" data-foxcod-shell>
     <button
       type="button"
@@ -201,15 +207,15 @@
   console.log("[COD Form] Liquid block rendered successfully. App is ENABLED.");
 </script>
 <div class="cod-form-data" 
-     id="cod-data-{{ product.id }}"
+     id="cod-data-{% if product %}{{ product.id }}{% else %}cart{% endif %}"
      style="display: none;"
-     data-product-id="{{ product.id }}"
+     data-product-id="{% if product %}{{ product.id }}{% endif %}"
      data-block-id="{{ instance_id }}"
      data-currency="{{ shop.currency }}"
-     data-variant-id="{{ current_variant.id }}"
-     data-product-title="{{ product.title | escape }}"
-     data-product-price="{{ current_variant.price | divided_by: 100.0 }}"
-     data-product-image="{% if product.featured_image %}{{ product.featured_image | image_url: width: 300 }}{% endif %}"
+     data-variant-id="{% if product %}{{ current_variant.id }}{% endif %}"
+     data-product-title="{% if product %}{{ product.title | escape }}{% else %}Cart Order{% endif %}"
+     data-product-price="{% if product %}{{ current_variant.price | divided_by: 100.0 }}{% else %}0{% endif %}"
+     data-product-image="{% if product and product.featured_image %}{{ product.featured_image | image_url: width: 300 }}{% endif %}"
      data-shop="{{ shop.permanent_domain }}"
      data-enabled="{{ is_enabled }}"
      data-proxy-base="/apps/fox-cod"
@@ -257,7 +263,8 @@
      data-quantity-offers="{{ cod_quantity_offers | escape }}"
      data-product-collection-ids="{{ product_collection_ids }}"
      data-upsell-offers="{{ cod_upsell_offers | escape }}"
-     data-form-submit-button="{{ cod_form_submit_btn | json | escape }}">
+     data-form-submit-button="{{ cod_form_submit_btn | json | escape }}"
+     data-enable-cart-page="{{ btn_styles.enable_cart_page_form | default: false }}">
 </div>
 
 {% comment %} Inject settings into global scope for reliable JavaScript access {% endcomment %}
@@ -273,18 +280,22 @@
         try { offersData = JSON.parse(offersData); } catch(e) {}
     }
     window.FoxCod.quantityOffers = Array.isArray(offersData) ? offersData : (offersData ? [offersData] : []);
-    window.FoxCod.productId = '{{ product.id }}';
+    window.FoxCod.productId = '{% if product %}{{ product.id }}{% endif %}';
     
     // Product variants & options for bundle variant selector
     window.FoxCod.productVariants = [
+      {% if product %}
       {%- for variant in product.variants -%}
         { id: '{{ variant.id }}', title: {{ variant.title | json }}, price: {{ variant.price | divided_by: 100.0 }}, available: {{ variant.available }}, option1: {{ variant.option1 | json }}, option2: {{ variant.option2 | json | default: 'null' }}, option3: {{ variant.option3 | json | default: 'null' }} }{%- unless forloop.last -%},{%- endunless -%}
       {%- endfor -%}
+      {% endif %}
     ];
     window.FoxCod.productOptions = [
+      {% if product %}
       {%- for option in product.options -%}
         {{ option.name | json }}{%- unless forloop.last -%},{%- endunless -%}
       {%- endfor -%}
+      {% endif %}
     ];
     
     // Product collection IDs for collection-based shipping rate matching
@@ -408,32 +419,39 @@
   {% comment %} Product Info {% endcomment %}
   {% if cod_show_product_image == 'true' or cod_show_price == 'true' %}
   <div class="cod-product-info">
-    {% if cod_show_product_image == 'true' and product.featured_image %}
-      <div class="cod-product-image-wrapper" style="position:relative; display:inline-block;">
-        <span class="cod-qty-badge" style="position:absolute; top:-6px; right:-6px; background:#000000; color:#fff; font-size:11px; font-weight:700; width:20px; height:20px; border-radius:50%; display:grid; place-items:center; z-index:2; line-height:20px; text-align:center; padding:0; box-sizing:border-box; font-variant-numeric:tabular-nums;">1</span>
-        <img src="{{ product.featured_image | image_url: width: 100 }}" 
-             alt="{{ product.title }}" 
-             class="cod-product-image"
-             width="80"
-             height="80"
-             loading="lazy">
+    {% if product %}
+      {% if cod_show_product_image == 'true' and product.featured_image %}
+        <div class="cod-product-image-wrapper" style="position:relative; display:inline-block;">
+          <span class="cod-qty-badge" style="position:absolute; top:-6px; right:-6px; background:#000000; color:#fff; font-size:11px; font-weight:700; width:20px; height:20px; border-radius:50%; display:grid; place-items:center; z-index:2; line-height:20px; text-align:center; padding:0; box-sizing:border-box; font-variant-numeric:tabular-nums;">1</span>
+          <img src="{{ product.featured_image | image_url: width: 100 }}" 
+               alt="{{ product.title }}" 
+               class="cod-product-image"
+               width="80"
+               height="80"
+               loading="lazy">
+        </div>
+      {% endif %}
+      <div class="cod-product-details">
+        <h3 class="cod-product-title">{{ product.title }}</h3>
+        {% if cod_show_price == 'true' %}
+            <p class="cod-product-price" style="color: {{ cod_styles_parsed.priceColor | default: accent_color }};">{{ product_price_display }}</p>
+        {% endif %}
+        {% if current_variant.title != 'Default Title' %}
+          <p class="cod-variant-title">{{ current_variant.title }}</p>
+        {% endif %}
+      </div>
+      {%- comment -%} Quantity Selector — hidden when bundle offers are active {%- endcomment -%}
+      <div class="cod-product-qty" data-max-qty="{{ cod_max_quantity }}">
+        <button type="button" class="cod-qty-btn cod-qty-minus" aria-label="Decrease quantity">−</button>
+        <input type="number" name="quantity" class="cod-qty-input" value="1" min="1" max="{{ cod_max_quantity }}" readonly>
+        <button type="button" class="cod-qty-btn cod-qty-plus" aria-label="Increase quantity">+</button>
+      </div>
+    {% else %}
+      <div class="cod-product-details" style="width:100%;">
+        <h3 class="cod-product-title" style="margin-bottom:8px;">Cart Order</h3>
+        <p class="cod-variant-title" style="margin-top:0;">Items details will be updated below.</p>
       </div>
     {% endif %}
-    <div class="cod-product-details">
-      <h3 class="cod-product-title">{{ product.title }}</h3>
-      {% if cod_show_price == 'true' %}
-          <p class="cod-product-price" style="color: {{ cod_styles_parsed.priceColor | default: accent_color }};">{{ product_price_display }}</p>
-      {% endif %}
-      {% if current_variant.title != 'Default Title' %}
-        <p class="cod-variant-title">{{ current_variant.title }}</p>
-      {% endif %}
-    </div>
-    {%- comment -%} Quantity Selector — hidden when bundle offers are active {%- endcomment -%}
-    <div class="cod-product-qty" data-max-qty="{{ cod_max_quantity }}">
-      <button type="button" class="cod-qty-btn cod-qty-minus" aria-label="Decrease quantity">−</button>
-      <input type="number" name="quantity" class="cod-qty-input" value="1" min="1" max="{{ cod_max_quantity }}" readonly>
-      <button type="button" class="cod-qty-btn cod-qty-plus" aria-label="Increase quantity">+</button>
-    </div>
   </div>
   {% endif %}
   
@@ -561,7 +579,7 @@
     position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, 0.5);
-    z-index: 2147483640 !important;
+    z-index: 2147483647 !important;
     display: flex;
     justify-content: center;
     align-items: flex-start;

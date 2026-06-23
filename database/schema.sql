@@ -121,11 +121,25 @@ CREATE TABLE IF NOT EXISTS order_logs (
   final_total DECIMAL(10, 2),
   currency VARCHAR(10) DEFAULT 'INR',
   
-  -- Order status
+  -- Full prepaid tracking
+  is_full_prepaid boolean default false,
+  -- Canonical payment method
+  payment_method text default 'cod'::text,
+  
+  -- Sync tracking
+  sync_status text default 'pending_sync'::text,
+  sync_attempts integer default 0,
+  sync_error text,
+  next_retry_at timestamp with time zone,
+  
+  -- Source tracking
+  order_source text default 'product_page',
+  
+  -- Status
   status VARCHAR(50) DEFAULT 'pending',
   
   -- Timestamps
-  created_at TIMESTAMPTZ DEFAULT NOW(),
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   
   -- Foreign key (soft reference, no cascade)
   CONSTRAINT fk_order_logs_shop 

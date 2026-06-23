@@ -4629,6 +4629,10 @@ export default function SettingsPage() {
                                             <span className="toggle-option-label">Sticky Button on Mobile (below fold)</span>
                                             <div className={`mini-toggle ${buttonStylesState?.stickyOnMobile ? 'on' : 'off'}`} />
                                         </div>
+                                        <div className="toggle-option" style={{ marginTop: 10 }} onClick={() => setButtonStylesState(s => ({ ...s, enable_cart_page_form: !s.enable_cart_page_form }))}>
+                                            <span className="toggle-option-label">Enable Cart Page & Drawer COD Form</span>
+                                            <div className={`mini-toggle ${buttonStylesState?.enable_cart_page_form ? 'on' : 'off'}`} />
+                                        </div>
                                     </AccordionSection>
 
                                     {/* Restore to Default — always visible */}

@@ -475,8 +475,199 @@
     }
   };
 
+  function initCartPageFlow() {
+      var globalRoot = document.querySelector('#fox-cod-root-embed_global') || document.querySelector('[data-fox-cod-root]');
+      if (!globalRoot) return;
+      var dataContainer = globalRoot.querySelector('.cod-form-data');
+      if (!dataContainer) return;
+      var enableCartPage = dataContainer.dataset.enableCartPage === 'true';
+      if (!enableCartPage) return;
+
+      var debounceTimer;
+      var observer = new MutationObserver(function() {
+          clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(injectCartButtons, 300);
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+      injectCartButtons();
+
+      function injectCartButtons() {
+          var checkoutBtns = document.querySelectorAll('button[name="checkout"], input[name="checkout"], .cart__checkout-button, .cart-drawer__checkout');
+          
+          checkoutBtns.forEach(function(btn) {
+              if (btn.parentNode.querySelector('.foxcod-cart-button-wrapper')) return;
+              
+              // Hide standard checkout button as requested
+              btn.style.display = 'none';
+
+              var wrapper = document.createElement('div');
+              wrapper.className = 'foxcod-cart-button-wrapper';
+              wrapper.style.cssText = 'width: 100%; margin-bottom: 10px; display: block; clear: both;';
+              
+              var codBtn = document.createElement('button');
+              codBtn.type = 'button';
+              codBtn.className = 'foxcod-block-trigger foxcod-cart-page-btn';
+              
+              var originalTrigger = globalRoot.querySelector('[data-foxcod-trigger]');
+              if (originalTrigger) {
+                  codBtn.style.cssText = originalTrigger.style.cssText;
+              } else {
+                  codBtn.style.cssText = 'width:100%; padding:12px; background:' + (dataContainer.dataset.primaryColor || '#000') + '; color:#fff; border:none; border-radius:4px; font-weight:bold; cursor:pointer;';
+              }
+              codBtn.style.width = '100%';
+              codBtn.textContent = dataContainer.dataset.buttonText || 'Buy Now - Cash on Delivery';
+              
+              codBtn.addEventListener('click', function(e) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  
+                  codBtn.textContent = 'Loading...';
+                  codBtn.disabled = true;
+                  fetch(window.Shopify.routes.root + 'cart.js')
+                    .then(function(res) { return res.json(); })
+                    .then(function(cart) {
+                        codBtn.textContent = dataContainer.dataset.buttonText || 'Buy Now - Cash on Delivery';
+                        codBtn.disabled = false;
+                        if (!cart.items || cart.items.length === 0) {
+                            alert('Your cart is empty');
+                            return;
+                        }
+                        
+                        var cartItems = cart.items.map(function(item) {
+                            return {
+                                variantId: 'gid://shopify/ProductVariant/' + item.variant_id,
+                                productId: 'gid://shopify/Product/' + item.product_id,
+                                title: item.product_title || item.title,
+                                price: (item.price / 100).toFixed(2),
+                                quantity: item.quantity
+                            };
+                        });
+                        
+                        window.FoxCod = window.FoxCod || {};
+                        window.FoxCod._cartItems = cartItems;
+                        window.FoxCod._orderSource = window.location.pathname.indexOf('/cart') !== -1 ? 'cart_page' : 'cart_drawer';
+                        window.FoxCod._pendingCartFlow = true;
+                        window.FoxCod._selectedBundleVariants = null;
+                        
+                        var titleEl = globalRoot.querySelector('.cod-product-title');
+                        if (titleEl) titleEl.textContent = 'Cart Order (' + cart.item_count + ' items)';
+                        var imgEl = globalRoot.querySelector('.cod-product-image');
+                        if (imgEl && cart.items[0].image) imgEl.src = cart.items[0].image;
+                        
+                        // ── Close the cart drawer before opening the COD form ──
+                        // Covers Dawn, Debut, Motion, Impulse, Expanse, and most popular themes
+                        (function closeCartDrawer() {
+                            try {
+                                // 1. Dawn / OS2 themes — cart-drawer custom element
+                                var cartDrawerEl = document.querySelector('cart-drawer');
+                                if (cartDrawerEl && typeof cartDrawerEl.close === 'function') {
+                                    cartDrawerEl.close();
+                                }
+                                // 2. Click the close button inside common drawer containers
+                                var closeSelectors = [
+                                    '.cart-drawer__close',
+                                    '.cart-drawer .js-drawer-close',
+                                    '.cart-drawer [aria-label*="Close"]',
+                                    '.drawer--right .js-drawer-close',
+                                    '[data-cart-drawer] .drawer__close',
+                                    '.js-cart-cart-drawer-close',
+                                    'cart-drawer button[aria-label*="Close"]',
+                                    'cart-notification button[aria-label*="Close"]'
+                                ];
+                                closeSelectors.forEach(function(sel) {
+                                    var closeBtn = document.querySelector(sel);
+                                    if (closeBtn) closeBtn.click();
+                                });
+                                // 3. Remove open/active class from common drawer wrappers
+                                var drawerSelectors = [
+                                    '.cart-drawer',
+                                    '.cart-notification',
+                                    '[data-cart-drawer]',
+                                    '#CartDrawer',
+                                    '#cart-drawer',
+                                    '.drawer--right',
+                                    '.js-drawer-open-right'
+                                ];
+                                drawerSelectors.forEach(function(sel) {
+                                    var el = document.querySelector(sel);
+                                    if (el) {
+                                        el.classList.remove('is-open', 'open', 'active', 'drawer--open', 'js-drawer-open');
+                                        el.setAttribute('aria-hidden', 'true');
+                                        el.setAttribute('hidden', '');
+                                    }
+                                });
+                                // 4. Remove body classes that keep drawer open
+                                document.body.classList.remove('js-drawer-open', 'js-drawer-open-right', 'drawer-open', 'overflow-hidden');
+                                // 5. Remove overlay backdrop that may cover content
+                                var overlays = document.querySelectorAll('.drawer-backdrop, .js-drawer-overlay, .cart-drawer__overlay');
+                                overlays.forEach(function(ov) { ov.style.display = 'none'; ov.classList.remove('is-visible'); });
+                            } catch(err) {
+                                console.warn('[FoxlyCOD] Could not close cart drawer:', err);
+                            }
+                        })();
+                        
+                        // Ensure it's initialized before trying to open
+                        if (dataContainer.dataset.foxcodInitialized !== 'true') {
+                            initFoxCod(globalRoot, originalTrigger || codBtn);
+                        }
+                        
+                        // ── ALWAYS open the modal directly using the stored config ──
+                        // We must NEVER call originalTrigger.click() here because:
+                        // - On a product page, originalTrigger is the Buy Now button for that product.
+                        // - Clicking it would open the PRODUCT form (not the cart form),
+                        //   conflicting with the cart items we just set in window.FoxCod._cartItems.
+                        // Instead, we use the config that was registered by initFoxCod on the root element
+                        // and call openModal() directly, bypassing the product trigger entirely.
+                        setTimeout(function() {
+                            var storedConfig = globalRoot._foxcodConfig;
+                            if (storedConfig && typeof openModal === 'function') {
+                                // Use stored config but ensure the root element reference is current
+                                storedConfig.rootElement = globalRoot;
+                                openModal('', storedConfig);
+                            } else if (typeof openModal === 'function') {
+                                // Fallback: build config from dataset attributes
+                                console.warn('[FoxlyCOD] No stored config on root, building from dataset');
+                                var builtConfig = {
+                                    rootElement: globalRoot,
+                                    shop: dataContainer.dataset.shop || (window.Shopify && window.Shopify.shop) || '',
+                                    proxyUrl: dataContainer.dataset.proxyBase || '/apps/fox-cod',
+                                    buttonText: dataContainer.dataset.buttonText || 'Buy Now - Cash on Delivery',
+                                    primaryColor: dataContainer.dataset.primaryColor || '#000000',
+                                    partialPaymentSettings: (window.FoxCod && window.FoxCod.partialPaymentSettings) || null,
+                                    buttonStyles: safeJSONParse(dataContainer.dataset.buttonStyles, {}),
+                                    formSubmitButton: safeJSONParse(dataContainer.dataset.formSubmitButton, {}),
+                                    fields: safeJSONParse(dataContainer.dataset.fields, {}),
+                                    blocks: safeJSONParse(dataContainer.dataset.blocks, {}),
+                                    styles: safeJSONParse(dataContainer.dataset.styles, {}),
+                                    submitText: dataContainer.dataset.submitText || 'Place Order (COD)',
+                                    formType: dataContainer.dataset.formType || 'popup',
+                                    modalStyle: dataContainer.dataset.modalStyle || 'glassmorphism',
+                                    shellElement: globalRoot.querySelector('[data-foxcod-shell]'),
+                                    statusElement: globalRoot.querySelector('[data-foxcod-status]')
+                                };
+                                openModal('', builtConfig);
+                            } else {
+                                console.error('[FoxlyCOD] openModal not available; cannot open cart COD form');
+                            }
+                        }, 150);
+                    })
+                    .catch(function(err) {
+                        console.error('Error fetching cart:', err);
+                        codBtn.textContent = dataContainer.dataset.buttonText || 'Buy Now - Cash on Delivery';
+                        codBtn.disabled = false;
+                    });
+              });
+              
+              wrapper.appendChild(codBtn);
+              // Insert ABOVE the checkout button
+              btn.parentNode.insertBefore(wrapper, btn);
+          });
+      }
+  }
+
   function scheduleFoxCodBoot() {
     waitForStableDOM();
+    initCartPageFlow();
   }
 
   if (document.readyState === 'loading') {
@@ -773,7 +964,10 @@
         isOutOfViewport = false;
       } else {
         var rect = config.triggerElement.getBoundingClientRect();
-        isOutOfViewport = rect.bottom < 0;
+        // Ensure the element is actually taking up space (not hidden via layout tricks)
+        var isHiddenByLayout = rect.width === 0 && rect.height === 0;
+        // Only show sticky button if we've scrolled PAST the original button (it's above the viewport)
+        isOutOfViewport = !isHiddenByLayout && rect.bottom < 0;
       }
 
       if (isOutOfViewport) {
@@ -982,7 +1176,9 @@
   }
 
   function validateOrderPayload(payload) {
-    if (!payload.variantId) throw new Error('Missing variant_id');
+    // For cart page / cart drawer flow, cart_items replaces the single variantId
+    var hasCartItems = Array.isArray(payload.cart_items) && payload.cart_items.length > 0;
+    if (!hasCartItems && !payload.variantId) throw new Error('Missing variant_id');
     if (!payload.customerPhone || !String(payload.customerPhone).trim()) throw new Error('Phone required');
     if (!payload.customerName || !String(payload.customerName).trim()) throw new Error('Name required');
   }
@@ -1165,6 +1361,19 @@
         }
         if (settings.max_quantity) config.maxQuantity = parseInt(settings.max_quantity, 10) || config.maxQuantity;
 
+        // If the modal happens to be open (e.g. fast clicker before settings loaded), force a UI sync
+        try {
+            var form = getOrderFormElement(config);
+            var modal = getModalContainer(config);
+            if (modal && modal.style.display !== 'none' && form) {
+                renderPaymentMethodOptions(form, config);
+                var submitBtn = form.querySelector('.cod-submit-btn');
+                if (submitBtn) applySubmitButtonStyles(submitBtn, config);
+            }
+        } catch(e) {
+            console.error('[COD Form] Error syncing UI after settings load:', e);
+        }
+
         mountBlockRoot(config.productId, config, { loading: false, disabled: !!config._isSoldOut });
         setBlockStatus(config, '', 'info');
       })
@@ -1185,6 +1394,10 @@
   function injectCodButtonAtBuyPosition(rootElement) {
     if (!rootElement || !rootElement.isConnected) return;
     if (rootElement.dataset.foxcodInjected === 'true') return;
+    
+    // Do not inject the product page buy button if there's no product context (e.g. global cart block)
+    var dataContainer = rootElement.querySelector('.cod-form-data');
+    if (!dataContainer || !dataContainer.dataset.productId) return;
 
     var buyTarget = null;
 
@@ -1500,6 +1713,11 @@
 
       console.log('[COD Form] Initialized for product:', productId, config);
       
+      // ── Store config on root so cart-drawer buttons can open the modal directly ──
+      // Without this, clicking the cart COD button on a product page would call
+      // originalTrigger.click() and re-open the product form instead of the cart form.
+      rootElement._foxcodConfig = config;
+
       // Initialize form after fetching IP geolocation
       if (window.FoxCod.CountryRestrictionEngine && window.FoxCod.CountryRestrictionEngine.initAsync) {
           window.FoxCod.CountryRestrictionEngine.initAsync().then(function() {
@@ -1748,7 +1966,7 @@
 
     var src = useCustom ? fsb : productBtnStyles;
     var productBtnColor = productBtnStyles.backgroundColor || config.primaryColor || '#667eea';
-    var btnColor = useCustom ? (fsb.backgroundColor || '#6366f1') : productBtnColor;
+    var btnColor = useCustom ? (fsb.backgroundColor || productBtnColor) : productBtnColor;
     var borderCol = src.borderColor || btnColor;
     var borderW = src.borderWidth != null ? Number(src.borderWidth) : 0;
     var btnSize = useCustom
@@ -4279,9 +4497,18 @@ function darkenColor(hex, percent) {
       
       console.log('[COD Form] Order Summary Calculation (initial):', state);
 
-      // Build per-variant line items
+      // Build per-variant / per-cart-item line items
       var lineItemsHtml = '';
-      if (state.items && state.items.length > 1) {
+      var isCartFlow = !!(window.FoxCod && window.FoxCod._cartItems && window.FoxCod._cartItems.length > 0);
+      if (isCartFlow && state.items && state.items.length > 0) {
+          state.items.forEach(function(item) {
+              lineItemsHtml +=
+                '<div style="display:flex; justify-content:space-between; margin-bottom:3px; font-size:12px; color:#4b5563;">' +
+                '   <span>' + item.quantity + ' × ' + item.title + '</span>' +
+                '   <span>' + formatMoney(item.price * item.quantity) + '</span>' +
+                '</div>';
+          });
+      } else if (!isCartFlow && state.items && state.items.length > 1) {
           state.items.forEach(function(item) {
               lineItemsHtml +=
                 '<div style="display:flex; justify-content:space-between; margin-bottom:3px; font-size:12px; color:#4b5563;">' +
@@ -5438,7 +5665,11 @@ function darkenColor(hex, percent) {
       // ── 1. Read offer quantity & discount ──
       var modal = form ? (form.closest('.cod-modal') || form) : null;
       var quantityOffersEl = modal ? modal.querySelector('.cod-quantity-offers') : null;
-      if (quantityOffersEl) {
+      
+      var cartItems = window.FoxCod && window.FoxCod._cartItems;
+      var isCartFlow = cartItems && cartItems.length > 0;
+      
+      if (quantityOffersEl && !isCartFlow) {
           try {
               var offerData = quantityOffersEl.getAttribute('data-selected-offer');
               if (offerData) {
@@ -5450,7 +5681,7 @@ function darkenColor(hex, percent) {
           } catch (e) {}
       }
       // Also check product page offers (for in_product_page placement)
-      if (state.quantity === 1 && state.discountPercent === 0) {
+      if (!isCartFlow && state.quantity === 1 && state.discountPercent === 0) {
           var productPageOffers = getProductPageOffersForConfig(config);
           if (productPageOffers) {
               try {
@@ -5476,8 +5707,28 @@ function darkenColor(hex, percent) {
       }
 
       // ── 2. Calculate subtotal from variant prices (never config.productPrice for bundles) ──
+      var cartItems = window.FoxCod && window.FoxCod._cartItems;
       var bundleVariants = window.FoxCod && window.FoxCod._selectedBundleVariants;
-      if (bundleVariants && bundleVariants.length > 1 && state.quantity > 1) {
+      
+      if (cartItems && cartItems.length > 0) {
+          // Cart page flow: compute totals from all cart items
+          var totalCartQty = 0;
+          cartItems.forEach(function(item) {
+              var q = parseInt(item.quantity) || 1;
+              var p = parseFloat(item.price) || 0;
+              state.items.push({
+                  title: item.title || '',
+                  price: p,
+                  variantId: item.variantId,
+                  productId: item.productId,
+                  quantity: q
+              });
+              state.subtotal += (p * q);
+              totalCartQty += q;
+          });
+          // Override quantity so 'Subtotal (N items)' shows total cart qty
+          state.quantity = totalCartQty;
+      } else if (bundleVariants && bundleVariants.length > 1 && state.quantity > 1) {
           bundleVariants.forEach(function(v) {
               state.items.push({
                   title: (config.productTitle || '') + ' — ' + (v.title || ''),
@@ -5622,9 +5873,18 @@ function darkenColor(hex, percent) {
           '   Order Summary' +
           '</div>';
 
-      // Per-variant line items for bundles
+      // Per-variant line items for bundles OR cart items
+      var cartItems = window.FoxCod && window.FoxCod._cartItems;
       var bundleVariants = window.FoxCod && window.FoxCod._selectedBundleVariants;
-      if (bundleVariants && bundleVariants.length > 1 && state.quantity > 1) {
+      
+      if (cartItems && cartItems.length > 0) {
+          cartItems.forEach(function(item) {
+              html += '<div style="display:flex; justify-content:space-between; margin-bottom:3px; font-size:12px; color:#4b5563;">' +
+                  '   <span>' + item.quantity + ' × ' + item.title + '</span>' +
+                  '   <span>' + formatMoney(item.price * item.quantity) + '</span>' +
+                  '</div>';
+          });
+      } else if (bundleVariants && bundleVariants.length > 1 && state.quantity > 1) {
           bundleVariants.forEach(function(bv) {
               html += '<div style="display:flex; justify-content:space-between; margin-bottom:3px; font-size:12px; color:#4b5563;">' +
                   '   <span>1 × ' + (config.productTitle || '') + ' — ' + (bv.title || '') + '</span>' +
@@ -5956,10 +6216,72 @@ function darkenColor(hex, percent) {
         return;
     }
 
+    // ── Guard: if this is a product-page form (has productId), clear any stale
+    // cart flow state left over from a previous cart COD order. Without this,
+    // _cartItems from the last cart order would corrupt the product-page pricing,
+    // payment methods, and button styling. ──
     var modal = getModalContainer(config);
     var overlay = getModalOverlay(config);
     var form = getOrderFormElement(config);
     var hasBundleOffersActive = !!getProductPageOffersForConfig(config);
+
+    if (config && config.productId) {
+        // Clear cart items ONLY IF this is a genuine product-page click.
+        // If it's a cart_drawer click on a product page, DO NOT clear the cart items!
+        if (window.FoxCod && !window.FoxCod._pendingCartFlow) {
+            window.FoxCod._cartItems = null;
+            window.FoxCod._orderSource = 'product_page';
+        } else if (window.FoxCod) {
+            // Consume the flag so subsequent manual clicks on the product page COD button
+            // correctly reset back to product_page flow.
+            window.FoxCod._pendingCartFlow = false;
+        }
+
+        // ── Restore the original product state from the data container ──
+        // If the user previously opened the modal via the cart drawer, the DOM and config
+        // were patched for the cart. We must restore them if this is a product page click.
+        var dataContainerEl = config.rootElement && config.rootElement.querySelector('.cod-form-data');
+        if (dataContainerEl) {
+            var isCartPageFlow = !!(window.FoxCod && window.FoxCod._cartItems && window.FoxCod._cartItems.length > 0);
+            if (!isCartPageFlow) {
+                var originalPrice = parseFloat(dataContainerEl.dataset.productPrice);
+                if (!isNaN(originalPrice)) config.productPrice = originalPrice;
+                if (dataContainerEl.dataset.productTitle) config.productTitle = dataContainerEl.dataset.productTitle;
+                config.quantity = 1;
+
+                var scopeEl = modal || form;
+                if (scopeEl) {
+                    var headerPriceEl = scopeEl.querySelector('.cod-product-price');
+                    if (headerPriceEl && !isNaN(originalPrice)) {
+                        headerPriceEl.textContent = formatMoney(originalPrice);
+                        headerPriceEl.style.display = '';
+                    }
+                    var headerTitleEl = scopeEl.querySelector('.cod-product-title');
+                    if (headerTitleEl && dataContainerEl.dataset.productTitle) {
+                        headerTitleEl.textContent = dataContainerEl.dataset.productTitle;
+                    }
+                    var headerImgEl = scopeEl.querySelector('.cod-product-image');
+                    if (headerImgEl && dataContainerEl.dataset.productImage) {
+                        headerImgEl.src = dataContainerEl.dataset.productImage;
+                    }
+                    // Restore product-specific UI elements hidden by cart flow
+                    scopeEl.querySelectorAll('.cod-tick-upsell-row').forEach(function(el) { el.style.removeProperty('display'); });
+                    scopeEl.querySelectorAll('.cod-quantity-offers').forEach(function(el) { el.style.removeProperty('display'); });
+                    scopeEl.querySelectorAll('.cod-qty-badge, .cod-product-qty').forEach(function(el) { el.style.removeProperty('display'); });
+                }
+                document.querySelectorAll('.cod-product-page-offers').forEach(function(el) { el.style.removeProperty('display'); });
+                
+                // Force re-render of order summary and payment options with the restored product state
+                setTimeout(function() {
+                    if (form) {
+                        try { restoreFoxCodCheckoutState(form, config); } catch(e) {}
+                        updateOrderSummaryWithTickUpsells(form, config);
+                        try { renderPaymentMethodOptions(form, config); } catch(e) { console.error('[COD Form] Error re-rendering payment options for product flow:', e); }
+                    }
+                }, 50);
+            }
+        }
+    }
     
     if (overlay) {
         console.log('[COD Form] Found overlay element:', overlay);
@@ -6056,6 +6378,25 @@ function darkenColor(hex, percent) {
         // Always re-apply submit button styles on modal open
         var submitBtn = form.querySelector('.cod-submit-btn');
         applySubmitButtonStyles(submitBtn, config);
+
+        // Always re-render payment method options on modal open so the correct
+        // seller-configured methods (Full Prepaid, Partial, COD) appear immediately
+        // without the customer needing to interact with the form first.
+        // Uses a short delay so the order summary DOM (#cod-summary-total) is
+        // already populated before the eligibility check runs.
+        setTimeout(function() {
+            if (form && form.isConnected) {
+                try { renderPaymentMethodOptions(form, config); } catch(e) {
+                    console.error('[COD Form] Error re-rendering payment options on open:', e);
+                }
+                // Re-apply submit button styles again after payment options render
+                // (in case the payment option card click listener overwrites it)
+                var sbtn = form.querySelector('.cod-submit-btn');
+                if (sbtn) {
+                    try { applySubmitButtonStyles(sbtn, config); } catch(e) {}
+                }
+            }
+        }, 80);
 
         // Keep quantity controls/badge hidden when bundle offers are active.
         var container = form.closest('.cod-form-container') || form.closest('.cod-modal') || form.parentElement;
@@ -6172,10 +6513,79 @@ function darkenColor(hex, percent) {
                 el.style.setProperty('display', 'none', 'important');
             });
             updateOrderSummaryWithTickUpsells(form, config);
+            try { renderPaymentMethodOptions(form, config); } catch(e) { console.error('[COD Form] Error re-rendering payment options for downsell flow:', e); }
         }, 50);
         return; // Skip offer syncing below
     }
     
+    // ── Cart page flow: skip product-page offer sync, just refresh the order summary ──
+    var isCartPageFlow = !!(window.FoxCod && window.FoxCod._cartItems && window.FoxCod._cartItems.length > 0);
+    if (isCartPageFlow) {
+        // Patch config so payment option cards that read config.productPrice get the right number
+        var cartSubtotal = window.FoxCod._cartItems.reduce(function(sum, item) {
+            return sum + (parseFloat(item.price) || 0) * (parseInt(item.quantity) || 1);
+        }, 0);
+        var cartTotalQty = window.FoxCod._cartItems.reduce(function(sum, item) { return sum + (parseInt(item.quantity) || 1); }, 0);
+        config.productPrice = cartSubtotal;
+        config.quantity = cartTotalQty;
+        config.productTitle = 'Cart Order (' + cartTotalQty + ' item' + (cartTotalQty !== 1 ? 's' : '') + ')';
+
+        // ── Immediately update the modal header price element ──
+        // The stored config had the product page price baked in; we must overwrite the DOM
+        // before the user sees it, otherwise the wrong price flashes in the header.
+        if (modal) {
+            var headerPriceEl = modal.querySelector('.cod-product-price');
+            if (headerPriceEl) {
+                headerPriceEl.textContent = formatMoney(cartSubtotal);
+                headerPriceEl.style.display = '';
+            }
+            var headerTitleEl = modal.querySelector('.cod-product-title');
+            if (headerTitleEl) {
+                headerTitleEl.textContent = config.productTitle;
+            }
+        }
+
+        // ── Hide product-specific elements that don't belong in a cart checkout ──
+        // The stored config belongs to the product page, so the rendered modal may
+        // already contain tick-upsells and bundle/quantity offer cards for that
+        // specific product. These must NOT appear in a cart-based order.
+        var scopeEl = modal || form;
+        if (scopeEl) {
+            // 1. Tick upsells (e.g. "Add Shipping Protection")
+            scopeEl.querySelectorAll('.cod-tick-upsell-row').forEach(function(el) {
+                el.style.setProperty('display', 'none', 'important');
+            });
+            // 2. Bundle / quantity offer cards
+            scopeEl.querySelectorAll('.cod-quantity-offers').forEach(function(el) {
+                el.style.setProperty('display', 'none', 'important');
+            });
+            // 3. Qty badge (shows "2x" for bundle offers) and qty stepper controls
+            scopeEl.querySelectorAll('.cod-qty-badge, .cod-product-qty').forEach(function(el) {
+                el.style.setProperty('display', 'none', 'important');
+            });
+        }
+        // Also hide product-page offer cards rendered outside the modal (in the block root)
+        document.querySelectorAll('.cod-product-page-offers').forEach(function(el) {
+            el.style.setProperty('display', 'none', 'important');
+        });
+
+        // Force re-render of order summary AND payment options with correct cart totals
+        setTimeout(function() {
+            if (form) {
+                // Restore any saved customer fields (name/phone/address etc.)
+                try { restoreFoxCodCheckoutState(form, config); } catch(e) {}
+                updateOrderSummaryWithTickUpsells(form, config);
+                try { renderPaymentMethodOptions(form, config); } catch(e) { console.error('[COD Form] Error re-rendering payment options for cart flow:', e); }
+                // Re-apply seller-configured submit button styling
+                var submitBtnCart = form.querySelector('.cod-submit-btn');
+                if (submitBtnCart) {
+                    try { applySubmitButtonStyles(submitBtnCart, config); } catch(e) {}
+                }
+            }
+        }, 50);
+        return;
+    }
+
     // Sync pre-selected offer from product page to the modal
     if (config && form) {
         setTimeout(function() {
@@ -6420,6 +6830,13 @@ function darkenColor(hex, percent) {
         saveFoxCodCheckoutState(form);
     }
 
+    // ── Clear cart flow state so a subsequent product-page modal open
+    //    doesn't inherit stale cart items / pricing from this session ──
+    if (window.FoxCod && window.FoxCod._cartItems) {
+        window.FoxCod._cartItems = null;
+        window.FoxCod._orderSource = null;
+    }
+
     if (modal) {
         modal.classList.remove('visible');
         setTimeout(function() { modal.style.display = 'none'; }, 300);
@@ -6445,6 +6862,14 @@ function darkenColor(hex, percent) {
    * Check if an upsell should show for the current product
    */
   function shouldShowUpsell(campaign, config) {
+      // Disable upsells on the Cart page checkout since the user is already checking out a full cart
+      if (!config.productId) return false;
+
+      // Disable upsells globally if we are currently checking out via a Cart flow
+      if (window.FoxCod && window.FoxCod._cartItems && window.FoxCod._cartItems.length > 0) {
+          return false;
+      }
+      
       if (campaign.show_condition_type === 'always') return true;
       if (campaign.show_condition_type === 'specific_products') {
           var currentId = String(config.productId);
@@ -6725,7 +7150,7 @@ function darkenColor(hex, percent) {
 
       // Show popup instantly — bg images use embedded data URIs
       var overlay = document.createElement('div');
-      overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2147483640; display: flex; align-items: center; justify-content: center; padding: 16px;';
+      overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2147483647; display: flex; align-items: center; justify-content: center; padding: 16px;';
       var modal = document.createElement('div');
       var isMobileUpsell = window.innerWidth <= 480;
       modal.style.cssText = 'background: #fff; border-radius: 24px; max-width: ' + (isMobileUpsell ? '340px' : '420px') + '; width: 100%; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.2); max-height: ' + (isMobileUpsell ? '85vh' : '90vh') + '; overflow-y: auto;';
@@ -6871,7 +7296,7 @@ function darkenColor(hex, percent) {
 
       // Show popup instantly — bg images use embedded data URIs
       var overlay = document.createElement('div');
-      overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2147483640; display: flex; align-items: center; justify-content: center; padding: 16px;';
+      overlay.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 2147483647; display: flex; align-items: center; justify-content: center; padding: 16px;';
       var modal = document.createElement('div');
       var isMobileDs = window.innerWidth <= 480;
       modal.style.cssText = 'background: #fff; border-radius: 24px; max-width: ' + (isMobileDs ? '360px' : '460px') + '; width: 100%; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.2); max-height: ' + (isMobileDs ? '85vh' : '90vh') + '; overflow-y: auto;';
@@ -7233,6 +7658,14 @@ function darkenColor(hex, percent) {
               variantNotes += '\n- Item ' + (idx + 1) + ': ' + v.title + ' (' + formatMoney(v.price) + ')';
           });
           payload.notes = (payload.notes ? payload.notes + '\n' : '') + variantNotes;
+      }
+      
+      // Cart items payload
+      if (window.FoxCod && window.FoxCod._cartItems) {
+          payload.cart_items = window.FoxCod._cartItems;
+          payload.order_source = window.FoxCod._orderSource || 'cart_page';
+      } else {
+          payload.order_source = 'product_page';
       }
 
       // Collect custom field values
