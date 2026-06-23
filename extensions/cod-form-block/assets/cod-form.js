@@ -7963,10 +7963,26 @@ function darkenColor(hex, percent) {
               '<div style="font-size:14px;color:#6b7280;line-height:1.6;">Please wait while we prepare your Shopify checkout...<br>Do not close or refresh this page.</div>',
           '</div>',
 
-          // Shopify badge (unchanged)
-          '<div style="display:flex;align-items:center;gap:6px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:99px;padding:8px 14px;">',
-              '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 11 2 2 4-4"/></svg>',
-              '<span style="font-size:12px;font-weight:600;color:#166534;">Secured by Shopify</span>',
+          // Bottom Badges Container (Side by side)
+          '<div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:12px;">',
+              // 100% Secured Badge
+              '<div style="display:flex;align-items:center;gap:6px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:999px;padding:6px 14px;">',
+                  '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 11 2 2 4-4"/></svg>',
+                  '<span style="font-size:12px;font-weight:600;color:#166534;">100% Secured</span>',
+              '</div>',
+
+              // Powered by Foxly COD (Pill Design - Blue)
+              '<div style="display:flex;align-items:center;gap:8px;background:#eff6ff;padding:4px 14px 4px 6px;border-radius:999px;border:1px solid #bfdbfe;box-shadow:0 1px 2px rgba(0,0,0,0.02);">',
+                  '<div style="display:flex;align-items:center;justify-content:center;width:24px;height:24px;background:#ffffff;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,0.1);overflow:hidden;">',
+                      (window.FoxCod && window.FoxCod.appLogoUrl 
+                          ? '<img src="' + window.FoxCod.appLogoUrl + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" />'
+                          : ''),
+                  '</div>',
+                  '<div style="display:flex;flex-direction:column;justify-content:center;line-height:1;text-align:left;">',
+                      '<span style="font-size:8px;font-weight:700;color:#3b82f6;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px;">Powered by</span>',
+                      '<span style="font-size:13px;font-weight:800;color:#1d4ed8;letter-spacing:-0.3px;">Foxly COD</span>',
+                  '</div>',
+              '</div>',
           '</div>',
       ].join('');
 

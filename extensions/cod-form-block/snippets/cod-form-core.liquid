@@ -362,6 +362,7 @@
     }
     window.FoxCod.branding = (brandingRaw && typeof brandingRaw === 'object') ? brandingRaw : null;
     console.log('[FoxCod] branding injected:', window.FoxCod.branding);
+    window.FoxCod.appLogoUrl = "{{ 'foxly-logo.jpeg' | asset_url }}";
     
     // Preload checkout logo if configured to avoid layout shift / delay
     if (window.FoxCod.branding && window.FoxCod.branding.checkout_redirect) {
@@ -373,6 +374,15 @@
         link.href = cr.logo_url;
         document.head.appendChild(link);
       }
+    }
+    
+    // Preload Foxly COD logo
+    if (window.FoxCod.appLogoUrl) {
+      var foxLink = document.createElement('link');
+      foxLink.rel = 'preload';
+      foxLink.as = 'image';
+      foxLink.href = window.FoxCod.appLogoUrl;
+      document.head.appendChild(foxLink);
     }
   } catch (e) {
     console.error('[FoxCod] Failed to parse settings:', e);
