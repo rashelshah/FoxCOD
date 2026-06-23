@@ -770,10 +770,10 @@
 
       var isOutOfViewport = false;
       if (!isElementRenderable(config.triggerElement)) {
-        isOutOfViewport = true;
+        isOutOfViewport = false;
       } else {
         var rect = config.triggerElement.getBoundingClientRect();
-        isOutOfViewport = rect.bottom < 0 || rect.top > (window.innerHeight || document.documentElement.clientHeight);
+        isOutOfViewport = rect.bottom < 0;
       }
 
       if (isOutOfViewport) {
