@@ -1448,9 +1448,26 @@ export default function UpsellDownsellPage() {
                                                                 }
 
                                                                 return (
-                                                                    <button style={base}>
-                                                                        {useCustom ? (fsb.buttonText || formSettings?.submit_button_text || 'Place COD Order') : (formSettings?.submit_button_text || 'Place Order')}
-                                                                    </button>
+                                                                    <>
+                                                                        <button style={base}>
+                                                                            {useCustom ? (fsb.buttonText || formSettings?.submit_button_text || 'Place COD Order') : (formSettings?.submit_button_text || 'Place Order')}
+                                                                        </button>
+                                                                        {/* Trust Badges */}
+                                                                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', marginTop: '10px', color: '#6b7280' }}>
+                                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                                                                                <span style={{ fontSize: '11.5px', fontWeight: 500 }}>Secure</span>
+                                                                            </div>
+                                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                                                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+                                                                                <span style={{ fontSize: '11.5px', fontWeight: 500 }}>Delivery</span>
+                                                                            </div>
+                                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                                                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                                                                <span style={{ fontSize: '11.5px', fontWeight: 500 }}>Verified</span>
+                                                                            </div>
+                                                                        </div>
+                                                                    </>
                                                                 );
                                                             })()}
                                                     </div>
