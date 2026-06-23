@@ -31,6 +31,7 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 interface CacheEntry<T> { value: T; expiresAt: number; }
 const _fraudSettingsCache = new Map<string, CacheEntry<any>>();
+const _partialPaymentSettingsCache = new Map<string, CacheEntry<any>>();
 
 async function getCachedFraudSettings(shop: string) {
     const now = Date.now();
@@ -38,6 +39,15 @@ async function getCachedFraudSettings(shop: string) {
     if (cached && cached.expiresAt > now) return cached.value;
     const settings = await getFraudProtectionSettings(shop);
     _fraudSettingsCache.set(shop, { value: settings, expiresAt: now + CACHE_TTL_MS });
+    return settings;
+}
+
+async function getCachedPartialPaymentSettings(shop: string) {
+    const now = Date.now();
+    const cached = _partialPaymentSettingsCache.get(shop);
+    if (cached && cached.expiresAt > now) return cached.value;
+    const settings = await getPartialPaymentSettings(shop);
+    _partialPaymentSettingsCache.set(shop, { value: settings, expiresAt: now + CACHE_TTL_MS });
     return settings;
 }
 
@@ -121,7 +131,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
                 const data = await res.text();
                 return new Response(data, {
                     headers: {
-                        "Content-Type": "application/json",
                         ...corsHeaders
                     }
                 });
@@ -273,7 +282,7 @@ async function handlePartialCodCheckout(request: Request, data: any) {
 
         const [fraudSettings, ppSettings] = await Promise.all([
             getCachedFraudSettings(shop),
-            getPartialPaymentSettings(shop),
+            getCachedPartialPaymentSettings(shop),
         ]);
 
         if (ppSettings) {
@@ -665,7 +674,7 @@ async function handleFullPrepaidCheckout(request: Request, data: any) {
         console.log('[Proxy Full Prepaid] Pricing — total:', totalOrderValue);
 
         // ── Prepaid Discount (after coupon) ─────────────────────────────────────────
-        const ppSettings = await getPartialPaymentSettings(shop);
+        const ppSettings = await getCachedPartialPaymentSettings(shop);
         let prepaidDiscountAmount = 0;
         let prepaidDiscountType: 'percentage' | 'fixed' | undefined;
         let prepaidDiscountValue: number | undefined;
@@ -867,10 +876,14 @@ async function handleRegularOrder(request: Request, data: any) {
 
     // ── 1. PARALLEL: Load fraud settings (cached) ──
     // Cache eliminates 200-400ms of DB/session round-trips on warm requests.
-    const [fraudSettings, ppSettings] = await Promise.all([
-        getCachedFraudSettings(data.shop),
-        getPartialPaymentSettings(data.shop),
-    ]);
+    const t_fraud = performance.now();
+    const fraudSettings = await getCachedFraudSettings(data.shop);
+    console.log(`[PERF] getCachedFraudSettings complete: ${performance.now() - t_fraud}ms`);
+
+    const t_partial = performance.now();
+    const ppSettings = await getCachedPartialPaymentSettings(data.shop);
+    console.log(`[PERF] getCachedPartialPaymentSettings complete: ${performance.now() - t_partial}ms`);
+    
     console.log('⏱ [Proxy] Fraud settings ready:', Date.now() - start, 'ms');
 
     // ── 2. FRAUD CHECKS ──
@@ -913,7 +926,9 @@ async function handleRegularOrder(request: Request, data: any) {
     let couponValue = 0; // The raw coupon value (e.g. 10 for 10%, or 50 for $50 off)
     let couponCode: string | null = null;
     if (data.couponCode) {
+        const t_coupon = performance.now();
         const couponResult = await validateCouponForShop(data.shop, data.couponCode, pricing.originalTotal, data);
+        console.log(`[PERF] validateCouponForShop total duration: ${performance.now() - t_coupon}ms`);
         if (!couponResult.valid) {
             return new Response(JSON.stringify({
                 success: false,
@@ -1110,7 +1125,9 @@ async function handleRegularOrder(request: Request, data: any) {
         ]
     };
 
+    const t_create_pending = performance.now();
     const graphqlResult = await createPendingOrder(paramsForGraphql);
+    console.log(`[PERF] createPendingOrder total duration: ${performance.now() - t_create_pending}ms`);
     console.log('⏱ [Proxy] Shopify API responded:', Date.now() - start, 'ms');
 
     if (!graphqlResult.success) {

@@ -130,8 +130,19 @@ async function findOrCreateCustomer(graphql: any, customerData: { firstName?: st
 
 export async function createPendingOrder(params: GraphQLOrderParams): Promise<GraphQLOrderResult> {
   const { shop } = params;
+  const t_admin = performance.now();
   const { admin } = await unauthenticated.admin(shop);
-  const graphql = admin.graphql;
+  console.log(`[PERF] unauthenticated.admin(shop) in createPendingOrder: ${performance.now() - t_admin}ms`);
+
+  const originalGraphql = admin.graphql;
+  const graphql = async (query: string, vars?: any) => {
+      const nameMatch = query.match(/(query|mutation)\s+(\w+)/);
+      const name = nameMatch ? nameMatch[2] : 'unknown';
+      const t0 = performance.now();
+      const res = await originalGraphql(query, vars);
+      console.log(`[PERF] ${name} GraphQL duration: ${performance.now() - t0}ms`);
+      return res;
+  };
 
   // 1. Map Line Items
   const draftLineItems = params.lineItems.map(item => {
@@ -190,12 +201,15 @@ export async function createPendingOrder(params: GraphQLOrderParams): Promise<Gr
   }
 
   // 4. Find or Create Customer to ensure it is linked in the Shopify Admin UI
-  const customerId = await findOrCreateCustomer(graphql, {
-    firstName: params.customer.firstName || params.billingAddress?.firstName || params.shippingAddress?.firstName,
-    lastName: params.customer.lastName || params.billingAddress?.lastName || params.shippingAddress?.lastName,
-    email: params.customer.email,
-    phone: params.customer.phone
-  });
+  let customerId = null;
+  if (!params.customer.email && params.customer.phone) {
+    customerId = await findOrCreateCustomer(graphql, {
+      firstName: params.customer.firstName || params.billingAddress?.firstName || params.shippingAddress?.firstName,
+      lastName: params.customer.lastName || params.billingAddress?.lastName || params.shippingAddress?.lastName,
+      email: params.customer.email,
+      phone: params.customer.phone
+    });
+  }
 
   // 5. Build Draft Order Input
   const draftOrderInput: Record<string, any> = {
@@ -303,7 +317,22 @@ export async function createPendingOrder(params: GraphQLOrderParams): Promise<Gr
 
   // 7. Apply shipping/billing address via orderUpdate
   if (shippingAddr) {
-    const updateRes = await graphql(`
+    console.log(
+      "[DEBUG SHIPPING ADDRESS]",
+      JSON.stringify(shippingAddr, null, 2)
+    );
+    console.log(
+      "[DEBUG ORDER UPDATE INPUT]",
+      JSON.stringify(
+        {
+          id: finalOrder.id,
+          shippingAddress: shippingAddr
+        },
+        null,
+        2
+      )
+    );
+    graphql(`
       mutation orderUpdate($input: OrderInput!) {
         orderUpdate(input: $input) {
           order { id }
@@ -317,14 +346,20 @@ export async function createPendingOrder(params: GraphQLOrderParams): Promise<Gr
           shippingAddress: shippingAddr
         }
       }
+    }).then(async (updateRes: any) => {
+      const updateData = await updateRes.json();
+      console.log(
+        "[DEBUG ORDER UPDATE RESPONSE]",
+        JSON.stringify(updateData, null, 2)
+      );
+      const updateErrors = updateData?.data?.orderUpdate?.userErrors || [];
+      if (updateErrors.length > 0) {
+        console.warn(`[GraphQL Order] orderUpdate (address bypass) failed:`, updateErrors.map((e: any) => e.message).join(', '));
+        // Non-fatal, the order is already created successfully.
+      }
+    }).catch((err: any) => {
+      console.warn(`[GraphQL Order] orderUpdate (address bypass) caught error:`, err);
     });
-    
-    const updateData = await updateRes.json();
-    const updateErrors = updateData?.data?.orderUpdate?.userErrors || [];
-    if (updateErrors.length > 0) {
-      console.warn(`[GraphQL Order] orderUpdate (address bypass) failed:`, updateErrors.map((e: any) => e.message).join(', '));
-      // Non-fatal, the order is already created successfully.
-    }
   }
 
   return {

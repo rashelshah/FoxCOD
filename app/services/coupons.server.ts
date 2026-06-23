@@ -417,7 +417,9 @@ query ProductCollections($ids: [ID!]!) {
 async function fetchCodeDiscountNodeByCode(shop: string, couponCode: string) {
     let admin: any;
     try {
+        const t_admin = performance.now();
         const result = await unauthenticated.admin(shop);
+        console.log(`[PERF] unauthenticated.admin(shop) in validateCouponForShop: ${performance.now() - t_admin}ms`);
         admin = result.admin;
     } catch (err: any) {
         console.error("❌ [Coupons] Failed to get admin client for shop:", shop, err?.message);
@@ -433,7 +435,9 @@ async function fetchCodeDiscountNodeByCode(shop: string, couponCode: string) {
 
     for (const attempt of attempts) {
         try {
+            const t_gql = performance.now();
             const response = await admin.graphql(attempt.query, { variables: { code: couponCode } });
+            console.log(`[PERF] ${attempt.fieldName} GraphQL duration: ${performance.now() - t_gql}ms`);
             const payload = await response.json();
             if (payload?.errors?.length) {
                 const errMsg = payload.errors.map((error: any) => error.message).join("; ");
@@ -484,10 +488,15 @@ async function getProductCollectionMap(shop: string, productIds: Array<string | 
     }
 
     try {
+        const t_admin = performance.now();
         const { admin } = await unauthenticated.admin(shop);
+        console.log(`[PERF] unauthenticated.admin(shop) in getProductCollectionMap: ${performance.now() - t_admin}ms`);
+        
+        const t_gql = performance.now();
         const response = await admin.graphql(SHOPIFY_PRODUCT_COLLECTIONS_QUERY, {
             variables: { ids: normalizedIds },
         });
+        console.log(`[PERF] ProductCollections GraphQL duration: ${performance.now() - t_gql}ms`);
         const payload: any = await response.json();
         if (payload?.errors?.length) {
             throw new Error(payload.errors.map((error: any) => error.message).join("; "));
