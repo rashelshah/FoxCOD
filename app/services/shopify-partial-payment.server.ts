@@ -346,7 +346,7 @@ async function createDraftOrderCheckout(
       const unitDiscount = nativePrice - item.price;
       totalLineItemDiscounts += unitDiscount * item.quantity;
       lineDiscount = {
-          value: parseFloat((unitDiscount * item.quantity).toFixed(2)), // Note: DraftOrderLineItemInput discount is total, not per-unit! Wait, no, is DraftOrderAppliedDiscountInput per unit or total? It's TOTAL for that line!
+          value: parseFloat(unitDiscount.toFixed(2)), // Note: DraftOrderAppliedDiscountInput FIXED_AMOUNT for a line item is applied per-unit by Shopify!
           valueType: "FIXED_AMOUNT",
           title: "Offer Discount"
       };

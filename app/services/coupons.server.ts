@@ -189,6 +189,14 @@ function buildOrderDiscountItems(
         const numericId = String(variantId).replace(/[^0-9]/g, '');
         const serverEntry = contextualPrices.get(numericId);
         if (!serverEntry || serverEntry.amount <= 0) return frontendPrice;
+        
+        // If the frontend price is lower than the server's market price,
+        // it means an Upsell or Downsell discount was applied by the offer engine.
+        // We must preserve this discounted price.
+        if (frontendPrice > 0 && frontendPrice < serverEntry.amount) {
+            return frontendPrice;
+        }
+        
         return serverEntry.amount;
     }
 

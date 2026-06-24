@@ -6987,7 +6987,7 @@ function darkenColor(hex, percent) {
       return true;
   }
 
-  function getMarketAwareOfferData(offer) {
+  function getMarketAwareOfferData(offer, campaignType) {
       if (!offer) return { originalPrice: 0, discountedPrice: 0, savings: 0, currencyCode: '', formattedOriginalPrice: '', formattedDiscountedPrice: '', formattedSavings: '' };
       
       var variantId = String(offer.upsell_variant_id || offer.variant_id || '');
@@ -6997,7 +6997,9 @@ function darkenColor(hex, percent) {
       var currencyCode = (contextualData && contextualData.currencyCode) || window.FoxCod.contextualPrices.currencyCode || (window.Shopify && window.Shopify.currency && window.Shopify.currency.active) || 'USD';
       
       var discountedPrice = originalPrice;
-      if (offer.discount_type === 'percentage') {
+      if (campaignType === 'tick_upsell') {
+          discountedPrice = originalPrice;
+      } else if (offer.discount_type === 'percentage') {
           discountedPrice = Math.round((originalPrice - originalPrice * (offer.discount_value || 0) / 100) * 100) / 100;
       } else {
           discountedPrice = Math.max(0, originalPrice - (offer.discount_value || 0));
@@ -7057,7 +7059,7 @@ function darkenColor(hex, percent) {
           var acceptBtn = design.acceptButton || {};
           (campaign.offers || []).forEach(function(offer) {
               console.log('[FOXCOD OFFER PRICING DEBUG]', { OFFER_TYPE: 'TICK_UPSELL', VARIANT_ID: offer.variant_id });
-              var offerData = getMarketAwareOfferData(offer);
+              var offerData = getMarketAwareOfferData(offer, 'tick_upsell');
               var offerPrice = offerData.discountedPrice;
               var borderStyle = acceptBtn.borderStyle || 'dashed';
               var borderColor = acceptBtn.borderColor || acceptBtn.bgColor || '#10b981';
@@ -7178,7 +7180,7 @@ function darkenColor(hex, percent) {
           (campaign.offers || []).forEach(function(offer) {
               var cb = form.querySelector('input[name="tick_upsell_' + campaign.id + '_' + offer.id + '"]');
               if (cb && cb.checked) {
-                  var offerData = getMarketAwareOfferData(offer);
+                  var offerData = getMarketAwareOfferData(offer, 'tick_upsell');
                   
                   var activeMarket = window.FoxCod.resolveActiveMarket ? window.FoxCod.resolveActiveMarket(null) : { country: 'UNKNOWN' };
                   console.log('[FOXCOD OFFER ACCEPT TRACE]', JSON.stringify({
@@ -7199,7 +7201,7 @@ function darkenColor(hex, percent) {
 
   function buildUpsellModalHTML(campaign, offer, offerIndex, config) {
       console.log('[FOXCOD OFFER PRICING DEBUG]', { OFFER_TYPE: 'UPSELL_MODAL', VARIANT_ID: offer.variant_id });
-      var offerData = getMarketAwareOfferData(offer);
+      var offerData = getMarketAwareOfferData(offer, campaign.type || 'click_upsell');
       
       var design = campaign.design || {};
       var timer = design.timer || {};
@@ -7321,7 +7323,7 @@ function darkenColor(hex, percent) {
       modal.querySelector('.cod-upsell-accept').addEventListener('click', function() {
           if (overlay._timerInterval) clearInterval(overlay._timerInterval);
           console.log('[COD Form] Upsell offer accepted:', offer.upsell_product_title);
-          var offerData = getMarketAwareOfferData(offer);
+          var offerData = getMarketAwareOfferData(offer, campaign.type || 'click_upsell');
           
           var activeMarket = window.FoxCod.resolveActiveMarket ? window.FoxCod.resolveActiveMarket(null) : { country: 'UNKNOWN' };
           console.log('[FOXCOD OFFER ACCEPT TRACE]', JSON.stringify({
@@ -7362,7 +7364,7 @@ function darkenColor(hex, percent) {
 
   function buildDownsellModalHTML(dsCampaign, offer, config) {
       console.log('[FOXCOD OFFER PRICING DEBUG]', { OFFER_TYPE: 'DOWNSELL_MODAL', VARIANT_ID: offer.variant_id });
-      var offerData = getMarketAwareOfferData(offer);
+      var offerData = getMarketAwareOfferData(offer, dsCampaign.type || 'downsell');
 
       var design = dsCampaign.design || {};
       var acceptBtn = design.acceptButton || {};
@@ -7488,7 +7490,7 @@ function darkenColor(hex, percent) {
           if (overlay._timerInterval) clearInterval(overlay._timerInterval);
           console.log('[COD Form] Downsell accepted:', offer.upsell_product_title);
           
-          var offerData = getMarketAwareOfferData(offer);
+          var offerData = getMarketAwareOfferData(offer, dsCampaign.type || 'downsell');
           var activeMarket = window.FoxCod.resolveActiveMarket ? window.FoxCod.resolveActiveMarket(null) : { country: 'UNKNOWN' };
           console.log('[FOXCOD OFFER ACCEPT TRACE]', JSON.stringify({
               offerId: offer.id,
