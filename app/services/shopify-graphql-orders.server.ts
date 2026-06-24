@@ -185,20 +185,19 @@ export async function createPendingOrder(params: GraphQLOrderParams): Promise<Gr
       nativePrice = params.nativePrices[numericId];
     }
 
-    // Shopify draft orders ignore appliedDiscount on variant line items.
-    // Instead of applying line-level discounts, we calculate the total subtotal
-    // using the native variant prices. Any difference between this native subtotal
-    // and the requested targetTotal will be covered by the unified order-level discount.
-    actualDiscountableSubtotal += nativePrice * item.quantity;
+    // Use priceOverride to directly lock in the discounted frontend price (itemPrice)
+    // This allows bundle and upsell discounts to reflect exactly on the line item
+    // instead of being merged into a single order-level unified discount.
+    actualDiscountableSubtotal += itemPrice * item.quantity;
 
     // For custom items without variantId
-    line.originalUnitPrice = nativePrice.toFixed(2);
+    line.originalUnitPrice = itemPrice.toFixed(2);
     
     // For variant items, Shopify Draft Orders ignore originalUnitPrice. We must use priceOverride.
     // Important: currencyCode MUST match presentmentCurrencyCode
     if (line.variantId) {
       line.priceOverride = {
-        amount: nativePrice.toFixed(2),
+        amount: itemPrice.toFixed(2),
         currencyCode: params.presentmentCurrencyCode || params.currency || 'USD'
       };
     }

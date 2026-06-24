@@ -340,22 +340,25 @@ async function createDraftOrderCheckout(
     const numericId = String(item.variantId || '').replace(/[^0-9]/g, '');
     const nativePrice = numericId ? (nativePrices[numericId] || item.price) : item.price;
     
-    // Shopify Draft Orders ignore line-level appliedDiscount for catalog variants.
-    // We calculate the subtotal using the native market price, and the final order-level
-    // discount (neededDiscount) will perfectly absorb the difference.
-    actualDiscountableSubtotal += nativePrice * item.quantity;
+    // Use priceOverride to directly lock in the discounted frontend price (item.price).
+    // This allows bundle and upsell discounts to reflect exactly on the line item
+    // instead of being merged into the order-level unified COD BALANCE discount.
+    actualDiscountableSubtotal += item.price * item.quantity;
 
     if (numericId) {
       return {
         variantId: `gid://shopify/ProductVariant/${numericId}`,
         quantity: item.quantity,
-        originalUnitPrice: nativePrice.toFixed(2)
+        priceOverride: {
+          amount: item.price.toFixed(2),
+          currencyCode: marketCurrencyCode || currency || 'USD'
+        }
       };
     } else {
       return {
         title: item.title || "Custom Item",
         quantity: item.quantity,
-        originalUnitPrice: nativePrice.toFixed(2)
+        originalUnitPrice: item.price.toFixed(2)
       };
     }
   });
