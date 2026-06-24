@@ -22,6 +22,11 @@ import {
 import { calculateOrderPricing, normalizeCouponCode, validateCouponForShop } from "../services/coupons.server";
 import { getPartialPaymentSettings } from "../services/partial-payment-settings.server";
 import { createPendingOrder } from "../services/shopify-graphql-orders.server";
+import {
+    resolveCountryForOrder,
+    getContextualPricesForVariants,
+    assertPricingConsistency,
+} from "../services/contextual-pricing.server";
 
 // CORS headers for storefront requests
 const corsHeaders = {
@@ -276,12 +281,30 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
 
         // ── 1. PARALLEL: Load fraud settings + form settings + partial payment settings ──
-        const [fraudSettings, formSettings, partialPaymentSettings] = await Promise.all([
+        const orderCountryPromise = resolveCountryForOrder({
+            customerCountry: body.customerCountry,
+            detectedCountry: body.detectedCountry,
+            shop: body.shop,
+        });
+
+        const [fraudSettings, formSettings, partialPaymentSettings, orderCountry] = await Promise.all([
             getFraudProtectionSettings(body.shop),
             getFormSettings(body.shop),
             getPartialPaymentSettings(body.shop),
+            orderCountryPromise,
         ]);
         console.log("⏱ [COD Order] Parallel fetch done:", Date.now() - start, "ms");
+
+        // ── Contextual Pricing ──────────────────────────────────────────────
+        const allVariantIds: any[] = [];
+        allVariantIds.push(body.variantId);
+        if (body.upsell_items) {
+            body.upsell_items.forEach((u: any) => allVariantIds.push(u.variant_id));
+        }
+
+        const contextualResult = await getContextualPricesForVariants(body.shop, allVariantIds, orderCountry);
+        // BACKEND AUTHORITY: override frontend currency with the one from contextual pricing
+        const currencyCode = contextualResult.currencyCode;
 
         if (!formSettings?.enabled) {
             return Response.json(
@@ -326,7 +349,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         // ── 3. BUILD SHOPIFY PAYLOAD ──
         const shippingPrice = body.shippingPrice || 0;
         const discountPercent = body.discountPercent || 0;
-        const pricing = calculateOrderPricing(body, partialPaymentSettings);
+        const pricing = calculateOrderPricing(body, partialPaymentSettings, contextualResult.prices);
         let totalPrice = pricing.originalTotal;
         let couponDiscount = 0;
         let couponType: "percentage" | "fixed" | null = null;
@@ -349,7 +372,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
         // Build notes
         let orderNotes = body.notes || '';
-        const currencyCode = body.currency || 'USD';
         const fmtPrice = (amt: number) => {
             try {
                 return new Intl.NumberFormat(undefined, { style: 'currency', currency: currencyCode }).format(amt);
@@ -417,6 +439,29 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         couponDiscount = Math.min(couponDiscount, totalPrice);
         totalPrice = Math.round((totalPrice + Number.EPSILON) * 100) / 100;
 
+        console.log('[FOXCOD PRICING DEBUG] API Create Order:', {
+            STORE_CURRENCY: contextualResult.storeCurrency,
+            MARKET_CURRENCY: currencyCode,
+            CUSTOMER_COUNTRY: orderCountry,
+            CONTEXTUAL_PRICES: Object.fromEntries(
+                Array.from(contextualResult.prices.entries()).map(([k, v]) => [k, `${v.amount} ${v.currencyCode}`])
+            ),
+            WIDGET_PRICE: body.price,
+            WIDGET_TOTAL: body.finalTotal,
+            SERVER_TOTAL: pricing.originalTotal,
+            BUNDLE_DISCOUNT: pricing.bundleDiscountAmount,
+            COUPON_DISCOUNT: couponDiscount,
+            COD_FEE: pricing.codFeeAmount,
+            SHIPPING: pricing.shippingPrice,
+        });
+
+        // ── Pricing Consistency Guard ──
+        assertPricingConsistency(
+            body.finalTotal, // frontend widget total
+            totalPrice,      // server contextual total
+            { shop: body.shop, country: orderCountry, flow: 'api_cod' }
+        );
+
         // ── 4. CALL SHOPIFY GRAPHQL API via centralized service ──
         const paramsForGraphql = {
             shop: body.shop,
@@ -440,7 +485,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 city: customer.city || '',
                 province: customer.state || '',
                 zip: customer.zipcode || '',
-                country: body.customerCountry || 'IN',
+                country: orderCountry,
                 phone: formattedPhone || '',
             } : undefined,
             tags: ['FoxlyCOD', 'COD'],

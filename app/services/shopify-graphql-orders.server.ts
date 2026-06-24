@@ -2,7 +2,20 @@ import { unauthenticated } from '../shopify.server';
 
 export interface GraphQLOrderParams {
   shop: string;
+  /**
+   * The market-resolved currency code for this order.
+   * MUST come from contextual pricing result — never from frontend payload.
+   * Used for:
+   *   - presentmentCurrencyCode on the draft order (locks Shopify's display currency)
+   *   - priceOverride.currencyCode on each line item
+   */
   currency?: string;
+  /**
+   * Explicitly set the draft order's presentment currency.
+   * When provided, takes priority over `currency` for presentmentCurrencyCode.
+   * Always derived from server-side contextual pricing — never from frontend.
+   */
+  presentmentCurrencyCode?: string;
   lineItems: Array<{
     variantId?: string | number | null;
     title?: string;
@@ -25,8 +38,10 @@ export interface GraphQLOrderParams {
   tags?: string[];
   note?: string;
   noteAttributes?: Array<{ key: string; value: string }>;
-  shippingLine?: { title: string; price: string };
+  shippingLine?: { title: string; price: string | number };
   discount?: { code: string; amount: number; valueType: 'FIXED_AMOUNT' | 'PERCENTAGE' };
+  nativePrices?: Record<string, number>;
+  targetTotal?: number;
 }
 
 export interface GraphQLOrderResult {
@@ -145,12 +160,15 @@ export async function createPendingOrder(params: GraphQLOrderParams): Promise<Gr
   };
 
   // 1. Map Line Items
+  let actualDiscountableSubtotal = 0;
+
   const draftLineItems = params.lineItems.map(item => {
     const line: any = { quantity: item.quantity };
     
     // Clean and validate variant ID
+    let numericId = '';
     if (item.variantId) {
-      const numericId = String(item.variantId).replace(/[^0-9]/g, '');
+      numericId = String(item.variantId).replace(/[^0-9]/g, '');
       if (numericId) {
         line.variantId = `gid://shopify/ProductVariant/${numericId}`;
       }
@@ -161,19 +179,71 @@ export async function createPendingOrder(params: GraphQLOrderParams): Promise<Gr
       line.title = item.title;
     }
 
-    // For custom items without variantId
-    line.originalUnitPrice = typeof item.price === 'number' ? item.price.toFixed(2) : String(item.price);
-    
-    // For variant items, Shopify Draft Orders ignore originalUnitPrice. We must use priceOverride.
-    if (line.variantId) {
-      line.priceOverride = {
-        amount: typeof item.price === 'number' ? item.price.toFixed(2) : String(item.price),
-        currencyCode: params.currency || 'USD'
+    const itemPrice = typeof item.price === 'number' ? item.price : parseFloat(String(item.price));
+    let nativePrice = itemPrice;
+    if (numericId && params.nativePrices && params.nativePrices[numericId] !== undefined) {
+      nativePrice = params.nativePrices[numericId];
+    }
+
+    let lineDiscount: any = undefined;
+    if (nativePrice > itemPrice + 0.01) {
+      const unitDiscount = nativePrice - itemPrice;
+      lineDiscount = {
+          value: parseFloat((unitDiscount * item.quantity).toFixed(2)),
+          valueType: "FIXED_AMOUNT",
+          title: "Offer Discount"
       };
+    }
+
+    // Since we apply a line-level discount, Shopify reduces the subtotal by that discount.
+    // So the actual discountable subtotal Shopify sees is the discounted item price.
+    actualDiscountableSubtotal += itemPrice * item.quantity;
+
+    // For variant items, Shopify Draft Orders ignore originalUnitPrice. We must use appliedDiscount if we want to change price.
+    line.originalUnitPrice = nativePrice.toFixed(2);
+    if (lineDiscount) {
+      line.appliedDiscount = lineDiscount;
     }
     
     return line;
   });
+
+  const discountableSubtotal = actualDiscountableSubtotal;
+  const shippingPrice = params.shippingLine ? parseFloat(String(params.shippingLine.price)) : 0;
+
+  // We rely on the frontend's finalTotal (which was already validated by assertPricingConsistency).
+  // If targetTotal is not provided, we fall back to a naive calculation using the line items' requested price.
+  let targetTotal = params.targetTotal;
+  if (targetTotal === undefined) {
+      let requestedSubtotal = 0;
+      params.lineItems.forEach(item => {
+          const itemPrice = typeof item.price === 'number' ? item.price : parseFloat(String(item.price));
+          requestedSubtotal += itemPrice * item.quantity;
+      });
+      targetTotal = requestedSubtotal + shippingPrice;
+      if (params.discount && params.discount.amount > 0) {
+          if (params.discount.valueType === 'PERCENTAGE') {
+              targetTotal -= requestedSubtotal * (params.discount.amount / 100);
+          } else {
+              targetTotal -= params.discount.amount;
+          }
+      }
+  }
+
+  const unifiedDiscountAmount = Math.max(0, discountableSubtotal + shippingPrice - targetTotal);
+
+  let appliedDiscount = undefined;
+  if (unifiedDiscountAmount > 0.01) {
+      let title = params.discount?.code ? params.discount.code : "Offers Applied";
+      if (params.discount?.code && unifiedDiscountAmount > params.discount.amount + 0.01) {
+          title = "Offers + " + params.discount.code;
+      }
+      appliedDiscount = {
+          title: title,
+          value: parseFloat(unifiedDiscountAmount.toFixed(2)),
+          valueType: "FIXED_AMOUNT"
+      };
+  }
 
   // 2. Map Shipping Address
   const formatAddress = (addr: any) => {
@@ -190,15 +260,7 @@ export async function createPendingOrder(params: GraphQLOrderParams): Promise<Gr
     };
   };
 
-  // 3. Map Discount
-  let appliedDiscount;
-  if (params.discount && params.discount.amount > 0) {
-    appliedDiscount = {
-      title: params.discount.code || "Discount",
-      value: params.discount.amount,
-      valueType: params.discount.valueType || 'FIXED_AMOUNT'
-    };
-  }
+  // 3. Map Discount (Unified discount is already calculated above as `appliedDiscount`)
 
   // 4. Find or Create Customer to ensure it is linked in the Shopify Admin UI
   let customerId = null;
@@ -212,6 +274,10 @@ export async function createPendingOrder(params: GraphQLOrderParams): Promise<Gr
   }
 
   // 5. Build Draft Order Input
+  // presentmentCurrencyCode locks the draft order (and resulting order) to the
+  // customer's market currency. This is the critical fix for multi-currency stores.
+  // It MUST come from the server-side contextual pricing result — never from frontend.
+  const resolvedPresentmentCurrency = params.presentmentCurrencyCode || params.currency || undefined;
   const draftOrderInput: Record<string, any> = {
     lineItems: draftLineItems,
     tags: params.tags || [],
@@ -219,6 +285,7 @@ export async function createPendingOrder(params: GraphQLOrderParams): Promise<Gr
     customAttributes: params.noteAttributes || [],
     email: params.customer.email || undefined,
     sourceName: "Foxly COD + Partial & Prepaid",
+    ...(resolvedPresentmentCurrency ? { presentmentCurrencyCode: resolvedPresentmentCurrency } : {}),
   };
 
   if (customerId) {

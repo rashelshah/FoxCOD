@@ -23,6 +23,11 @@ import {
 import { createPartialPaymentCheckout, createFullPrepaidCheckout } from "../services/shopify-partial-payment.server";
 import { getPartialPaymentSettings, isPaymentMethodEligible, getPrepaidDiscount } from "../services/partial-payment-settings.server";
 import { createPendingOrder } from "../services/shopify-graphql-orders.server";
+import {
+    resolveCountryForOrder,
+    getContextualPricesForVariants,
+    assertPricingConsistency,
+} from "../services/contextual-pricing.server";
 
 // ── In-process caches to avoid repeated DB/session round-trips ──
 // REST clients and fraud settings are stable per shop for minutes at a time.
@@ -191,6 +196,24 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
             });
         }
 
+        if (path.includes("contextual-prices")) {
+            const { getContextualPricesForVariants } = await import("../services/contextual-pricing.server");
+            const result = await getContextualPricesForVariants(data.shop, data.variantIds || [], data.marketCountry || 'US');
+            
+            // Format for frontend consumption
+            const pricesData: Record<string, any> = {};
+            result.prices.forEach((value, key) => {
+                pricesData[key] = { amount: value.amount, currencyCode: value.currencyCode };
+            });
+
+            return new Response(JSON.stringify({
+                success: true,
+                resolvedCountry: result.resolvedCountry,
+                currencyCode: result.currencyCode,
+                prices: pricesData
+            }), { headers: corsHeaders });
+        }
+
         // Route: Checkout Creation (Partial COD + Full Prepaid share one endpoint)
         const isCheckoutPath = path.includes("partial-cod") || path.includes("create-checkout");
         const isPartialCodPayload = data.paymentMethod === 'partial_cod' ||
@@ -262,6 +285,29 @@ async function handlePartialCodCheckout(request: Request, data: any) {
             partialCodFeeAmount,
         } = data;
 
+        // ── Contextual Pricing & Country Resolution ─────────────────────────
+        const orderCountry = await resolveCountryForOrder({
+            customerCountry: customerCountry || data.country,
+            detectedCountry: data.detectedCountry,
+            shop: shop,
+        });
+
+        const allVariantIds: any[] = [];
+        if (data.cart_items) {
+            data.cart_items.forEach((item: any) => allVariantIds.push(item.variantId || item.variant_id || item.id));
+        } else if (data.bundleVariants) {
+            data.bundleVariants.forEach((bv: any) => allVariantIds.push(bv.variantId || bv.variant_id || bv.id));
+        } else {
+            allVariantIds.push(variantId);
+        }
+        if (data.upsell_items) {
+            data.upsell_items.forEach((u: any) => allVariantIds.push(u.variant_id));
+        }
+
+        const contextualResult = await getContextualPricesForVariants(shop, allVariantIds, orderCountry);
+        // BACKEND AUTHORITY: override frontend currency with the one from contextual pricing
+        const currencyCode = contextualResult.currencyCode;
+
         // ── Validate required fields ────────────────────────────────────────
         // For cart page / cart drawer flow, cart_items replaces the single variantId
         const hasCartItems = Array.isArray(data.cart_items) && data.cart_items.length > 0;
@@ -286,12 +332,13 @@ async function handlePartialCodCheckout(request: Request, data: any) {
         ]);
 
         if (ppSettings) {
-            const pricing = calculateOrderPricing(data);
+            // Note: passing contextualResult.prices enforces server prices for eligibility subtotal calculation
+            const pricing = calculateOrderPricing(data, null, contextualResult.prices);
             const eligibility = isPaymentMethodEligible(ppSettings, 'partial_payment', {
                 orderTotal: pricing.originalTotal,
                 productId,
                 collectionIds: data.productCollectionIds || data.collectionIds || [],
-                country: data.detectedCountry || null,
+                country: orderCountry,
             });
 
             if (!eligibility.eligible) {
@@ -334,11 +381,10 @@ async function handlePartialCodCheckout(request: Request, data: any) {
         console.log('⏱ [Proxy Partial COD v2] Fraud checks done:', Date.now() - start, 'ms');
 
         // ── Pricing: base subtotal ──────────────────────────────────────────
-        const pricing = calculateOrderPricing(data);
+        const pricing = calculateOrderPricing(data, null, contextualResult.prices);
         let totalOrderValue = pricing.originalTotal;
         let couponDiscount = 0;
         let normalizedCouponCode = '';
-        const currencyCode = currency || 'INR';
 
         // ── Coupon validation ───────────────────────────────────────────────
         if (couponCode) {
@@ -382,6 +428,23 @@ async function handlePartialCodCheckout(request: Request, data: any) {
             '[Proxy Partial COD v2] Pricing — total:', totalOrderValue,
             'advance:', safeAdvance, 'remaining:', remainingAmount
         );
+
+        console.log('[FOXCOD PRICING DEBUG] Partial COD Checkout:', {
+            STORE_CURRENCY: contextualResult.storeCurrency,
+            MARKET_CURRENCY: currencyCode,
+            CUSTOMER_COUNTRY: orderCountry,
+            CONTEXTUAL_PRICES: Object.fromEntries(
+                Array.from(contextualResult.prices.entries()).map(([k, v]) => [k, `${v.amount} ${v.currencyCode}`])
+            ),
+            WIDGET_PRICE: price,
+            WIDGET_TOTAL: data.finalTotal,
+            SERVER_TOTAL: pricing.originalTotal,
+            BUNDLE_DISCOUNT: pricing.bundleDiscountAmount,
+            COUPON_DISCOUNT: couponDiscount,
+            PREPAID_DISCOUNT: partialDiscountAmount,
+            COD_FEE: pricing.codFeeAmount,
+            SHIPPING: pricing.shippingPrice,
+        });
 
         // ── Normalize customer name ─────────────────────────────────────────
         const nameStr = (customerName || 'Customer').trim();
@@ -472,6 +535,8 @@ async function handlePartialCodCheckout(request: Request, data: any) {
             shippingPrice: pricing.shippingPrice,
             shippingTitle: pricing.shippingTitle,
             codFeeAmount: parseFloat(partialCodFeeAmount) || 0,
+            detectedCountry: data.detectedCountry,
+            originalTotalBeforeDiscount: pricing.originalTotal,
         });
 
         console.log('⏱ [Proxy Partial COD v2] Checkout created:', Date.now() - start, 'ms');
@@ -607,6 +672,29 @@ async function handleFullPrepaidCheckout(request: Request, data: any) {
             currency,
         } = data;
 
+        // ── Contextual Pricing & Country Resolution ─────────────────────────
+        const orderCountry = await resolveCountryForOrder({
+            customerCountry: customerCountry || data.country,
+            detectedCountry: data.detectedCountry,
+            shop: shop,
+        });
+
+        const allVariantIds: any[] = [];
+        if (data.cart_items) {
+            data.cart_items.forEach((item: any) => allVariantIds.push(item.variantId || item.variant_id || item.id));
+        } else if (data.bundleVariants) {
+            data.bundleVariants.forEach((bv: any) => allVariantIds.push(bv.variantId || bv.variant_id || bv.id));
+        } else {
+            allVariantIds.push(variantId);
+        }
+        if (data.upsell_items) {
+            data.upsell_items.forEach((u: any) => allVariantIds.push(u.variant_id));
+        }
+
+        const contextualResult = await getContextualPricesForVariants(shop, allVariantIds, orderCountry);
+        // BACKEND AUTHORITY: override frontend currency with the one from contextual pricing
+        const currencyCode = contextualResult.currencyCode;
+
         // ── Validate required fields ────────────────────────────────────────
         // For cart page / cart drawer flow, cart_items replaces the single variantId
         const hasCartItems = Array.isArray(data.cart_items) && data.cart_items.length > 0;
@@ -650,11 +738,10 @@ async function handleFullPrepaidCheckout(request: Request, data: any) {
         console.log('⏱ [Proxy Full Prepaid] Fraud checks done:', Date.now() - start, 'ms');
 
         // ── Pricing ─────────────────────────────────────────────────────────
-        const pricing = calculateOrderPricing(data);
+        const pricing = calculateOrderPricing(data, null, contextualResult.prices);
         let totalOrderValue = pricing.originalTotal;
         let couponDiscount = 0;
         let normalizedCouponCode = '';
-        const currencyCode = currency || 'INR';
 
         // ── Coupon validation ────────────────────────────────────────────────
         if (couponCode) {
@@ -686,7 +773,7 @@ async function handleFullPrepaidCheckout(request: Request, data: any) {
                 orderTotal: totalOrderValue,
                 productId,
                 collectionIds: data.productCollectionIds || data.collectionIds || [],
-                country: data.detectedCountry || data.customerCountry || null,
+                country: orderCountry,
             });
 
             if (fpEligible.eligible) {
@@ -700,6 +787,23 @@ async function handleFullPrepaidCheckout(request: Request, data: any) {
                 }
             }
         }
+
+        console.log('[FOXCOD PRICING DEBUG] Full Prepaid Checkout:', {
+            STORE_CURRENCY: contextualResult.storeCurrency,
+            MARKET_CURRENCY: currencyCode,
+            CUSTOMER_COUNTRY: orderCountry,
+            CONTEXTUAL_PRICES: Object.fromEntries(
+                Array.from(contextualResult.prices.entries()).map(([k, v]) => [k, `${v.amount} ${v.currencyCode}`])
+            ),
+            WIDGET_PRICE: price,
+            WIDGET_TOTAL: data.finalTotal,
+            SERVER_TOTAL: pricing.originalTotal,
+            BUNDLE_DISCOUNT: pricing.bundleDiscountAmount,
+            COUPON_DISCOUNT: couponDiscount,
+            PREPAID_DISCOUNT: prepaidDiscountAmount,
+            COD_FEE: pricing.codFeeAmount,
+            SHIPPING: pricing.shippingPrice,
+        });
 
         // ── Normalize customer name ──────────────────────────────────────────
         const nameStr = (customerName || 'Customer').trim();
@@ -756,6 +860,7 @@ async function handleFullPrepaidCheckout(request: Request, data: any) {
             prepaidDiscountType,
             prepaidDiscountValue,
             originalTotalBeforeDiscount,
+            detectedCountry: data.detectedCountry,
         });
 
         const fullPrepaidRef = checkoutResult.partialPaymentReference; // FPAID-* reference
@@ -874,6 +979,29 @@ async function handleRegularOrder(request: Request, data: any) {
         }), { status: 400, headers: corsHeaders });
     }
 
+    // ── Contextual Pricing & Country Resolution ─────────────────────────
+    const orderCountry = await resolveCountryForOrder({
+        customerCountry: data.customerCountry || data.country,
+        detectedCountry: data.detectedCountry,
+        shop: data.shop,
+    });
+
+    const allVariantIds: any[] = [];
+    if (data.cart_items) {
+        data.cart_items.forEach((item: any) => allVariantIds.push(item.variantId || item.variant_id || item.id));
+    } else if (data.bundleVariants) {
+        data.bundleVariants.forEach((bv: any) => allVariantIds.push(bv.variantId || bv.variant_id || bv.id));
+    } else {
+        allVariantIds.push(data.variantId);
+    }
+    if (data.upsell_items) {
+        data.upsell_items.forEach((u: any) => allVariantIds.push(u.variant_id));
+    }
+
+    const contextualResult = await getContextualPricesForVariants(data.shop, allVariantIds, orderCountry);
+    // BACKEND AUTHORITY: override frontend currency with the one from contextual pricing
+    const currencyCode = contextualResult.currencyCode;
+
     // ── 1. PARALLEL: Load fraud settings (cached) ──
     // Cache eliminates 200-400ms of DB/session round-trips on warm requests.
     const t_fraud = performance.now();
@@ -919,7 +1047,7 @@ async function handleRegularOrder(request: Request, data: any) {
     const upsellItems = data.upsell_items || [];
     const shippingPrice = parseFloat(data.shippingPrice) || 0;
     const discountPercent = parseFloat(data.discountPercent) || 0;
-    const pricing = calculateOrderPricing(data, ppSettings);
+    const pricing = calculateOrderPricing(data, ppSettings, contextualResult.prices);
     let totalPrice = pricing.originalTotal;
     let couponDiscount = 0;
     let couponType: "percentage" | "fixed" | null = null;
@@ -950,7 +1078,7 @@ async function handleRegularOrder(request: Request, data: any) {
             orderTotal: pricing.originalTotal,
             productId: normalizedProductId,
             collectionIds: data.collectionIds || [],
-            country: data.detectedCountry || data.customerCountry || null,
+            country: orderCountry,
         });
         if (!eligibility.eligible) {
             return new Response(JSON.stringify({ success: false, error: eligibility.reason }), { status: 400, headers: corsHeaders });
@@ -959,7 +1087,6 @@ async function handleRegularOrder(request: Request, data: any) {
     
     // Build notes
     let orderNotes = data.notes || data.customerNotes || '';
-    const currencyCode = data.currency || 'USD';
     const fmtPrice = (amt: number) => { try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: currencyCode }).format(amt); } catch { return `${currencyCode} ${amt.toFixed(2)}`; } };
     if (upsellItems.length > 0) {
         const upsellNotes = 'UPSELL ITEMS:\n' + upsellItems.map((item: any) =>
@@ -1069,14 +1196,41 @@ async function handleRegularOrder(request: Request, data: any) {
     const firstName = nameParts[0] || 'Customer';
     const lastName = nameParts.slice(1).join(' ') || '';
     const formattedPhone = formatPhoneE164(data.customerPhone || '');
-    const orderCountry = data.customerCountry || 'IN';
     const shippingLabel = data.shippingLabel || (shippingPrice > 0 ? 'Shipping' : 'Free Shipping');
 
     // ── SAFETY: cap discount to never exceed the order total ──
     couponDiscount = Math.min(couponDiscount, totalPrice);
     totalPrice = Math.round((totalPrice + Number.EPSILON) * 100) / 100;
 
+    console.log('[FOXCOD PRICING DEBUG] Regular Order Checkout:', {
+        STORE_CURRENCY: contextualResult.storeCurrency,
+        MARKET_CURRENCY: currencyCode,
+        CUSTOMER_COUNTRY: orderCountry,
+        CONTEXTUAL_PRICES: Object.fromEntries(
+            Array.from(contextualResult.prices.entries()).map(([k, v]) => [k, `${v.amount} ${v.currencyCode}`])
+        ),
+        WIDGET_PRICE: data.price,
+        WIDGET_TOTAL: data.finalTotal,
+        SERVER_TOTAL: pricing.originalTotal,
+        BUNDLE_DISCOUNT: pricing.bundleDiscountAmount,
+        COUPON_DISCOUNT: couponDiscount,
+        COD_FEE: pricing.codFeeAmount,
+        SHIPPING: pricing.shippingPrice,
+    });
+
+    // ── Pricing Consistency Guard ──
+    assertPricingConsistency(
+        data.finalTotal, // frontend widget total
+        totalPrice,      // server contextual total
+        { shop: data.shop, country: orderCountry, flow: 'full_cod' }
+    );
+
     // ── 4. CALL SHOPIFY GRAPHQL API via centralized service ──
+    const nativePrices: Record<string, number> = {};
+    for (const [k, v] of contextualResult.prices.entries()) {
+        nativePrices[k] = v.amount;
+    }
+
     const paramsForGraphql = {
         shop: data.shop,
         lineItems: lineItems.map((li: any) => ({
@@ -1085,6 +1239,8 @@ async function handleRegularOrder(request: Request, data: any) {
             quantity: li.quantity,
             price: li.price
         })),
+        nativePrices: nativePrices,
+        targetTotal: totalPrice,
         currency: currencyCode,
         customer: {
             firstName: firstName,

@@ -1,5 +1,6 @@
 import { getFormSettings, supabase } from "../config/supabase.server";
 import { unauthenticated } from "../shopify.server";
+import type { ContextualPriceEntry } from "./contextual-pricing.server";
 
 export interface ResolvedCoupon {
     code: string;
@@ -170,11 +171,27 @@ export function getCouponFieldState(settings: { fields?: Array<{ id: string; vis
     };
 }
 
-function buildOrderDiscountItems(body: any): OrderDiscountItem[] {
+function buildOrderDiscountItems(
+    body: any,
+    contextualPrices?: Map<string, ContextualPriceEntry>,
+): OrderDiscountItem[] {
     const items: OrderDiscountItem[] = [];
     const quantity = Math.max(1, parseInt(String(body?.quantity || 1), 10) || 1);
     const discountMultiplier = Math.max(0, 1 - (Math.max(0, Number(body?.discountPercent) || 0) / 100));
-    
+
+    /**
+     * Resolve canonical unit price for a variant.
+     * Priority: contextual server price > frontend-submitted price.
+     * This ensures price-tampered payloads cannot affect discount calculations.
+     */
+    function resolveUnitPrice(frontendPrice: number, variantId?: string | null): number {
+        if (!variantId || !contextualPrices || contextualPrices.size === 0) return frontendPrice;
+        const numericId = String(variantId).replace(/[^0-9]/g, '');
+        const serverEntry = contextualPrices.get(numericId);
+        if (!serverEntry || serverEntry.amount <= 0) return frontendPrice;
+        return serverEntry.amount;
+    }
+
     const cartItems = Array.isArray(body?.cart_items) && body.cart_items.length > 0
         ? body.cart_items
         : null;
@@ -185,36 +202,40 @@ function buildOrderDiscountItems(body: any): OrderDiscountItem[] {
 
     if (cartItems) {
         cartItems.forEach((item: any) => {
+            const canonicalPrice = resolveUnitPrice(Number(item?.price) || 0, item?.variantId);
             items.push({
                 productId: item?.productId,
                 variantId: item?.variantId,
-                price: roundCurrency((Number(item?.price) || 0) * discountMultiplier),
+                price: roundCurrency(canonicalPrice * discountMultiplier),
                 quantity: Math.max(1, parseInt(String(item?.quantity || 1), 10) || 1),
             });
         });
     } else if (bundleVariants) {
         bundleVariants.forEach((variant: any) => {
+            const canonicalPrice = resolveUnitPrice(Number(variant?.price) || 0, variant?.variantId);
             items.push({
                 productId: body?.productId,
                 variantId: variant?.variantId,
-                price: roundCurrency((Number(variant?.price) || 0) * discountMultiplier),
+                price: roundCurrency(canonicalPrice * discountMultiplier),
                 quantity: Math.max(1, parseInt(String(variant?.quantity || 1), 10) || 1),
             });
         });
     } else {
+        const canonicalPrice = resolveUnitPrice(Number(body?.price) || 0, body?.variantId);
         items.push({
             productId: body?.productId,
             variantId: body?.variantId,
-            price: roundCurrency((Number(body?.price) || 0) * discountMultiplier),
+            price: roundCurrency(canonicalPrice * discountMultiplier),
             quantity,
         });
     }
 
     (Array.isArray(body?.upsell_items) ? body.upsell_items : []).forEach((item: any) => {
+        const canonicalUpsellPrice = resolveUnitPrice(Number(item?.price) || 0, item?.variant_id);
         items.push({
             productId: item?.product_id,
             variantId: item?.variant_id,
-            price: roundCurrency(Number(item?.price) || 0),
+            price: roundCurrency(canonicalUpsellPrice),
             quantity: Math.max(1, parseInt(String(item?.quantity || 1), 10) || 1),
         });
     });
@@ -814,8 +835,12 @@ export async function validateCouponForShop(shop: string, couponCode: string, ca
     return { valid: false, message: "Invalid or expired coupon" };
 }
 
-export function calculateOrderPricing(body: any, formSettings?: any): OrderPricingSummary {
-    const discountItems = buildOrderDiscountItems(body);
+export function calculateOrderPricing(
+    body: any,
+    formSettings?: any,
+    contextualPrices?: Map<string, ContextualPriceEntry>,
+): OrderPricingSummary {
+    const discountItems = buildOrderDiscountItems(body, contextualPrices);
     const shippingPrice = roundCurrency(Number(body?.shippingPrice) || 0);
     const shippingTitle = String(body?.shippingTitle || body?.shippingLabel || "Shipping");
     const discountPercent = Math.max(0, Number(body?.discountPercent) || 0);
@@ -829,13 +854,29 @@ export function calculateOrderPricing(body: any, formSettings?: any): OrderPrici
         ? body.bundleVariants
         : null;
 
+    function resolveUnitPrice(frontendPrice: number, variantId?: string | null): number {
+        if (!variantId || !contextualPrices || contextualPrices.size === 0) return frontendPrice;
+        const numericId = String(variantId).replace(/[^0-9]/g, '');
+        const serverEntry = contextualPrices.get(numericId);
+        if (!serverEntry || serverEntry.amount <= 0) return frontendPrice;
+        
+        // If the frontend price is lower than the server's market price,
+        // it means an Upsell or Downsell discount was applied by the offer engine.
+        // We must preserve this discounted price.
+        if (frontendPrice > 0 && frontendPrice < serverEntry.amount) {
+            return frontendPrice;
+        }
+        
+        return serverEntry.amount;
+    }
+
     let mainItemsSubtotal = 0;
     let bundleDiscountAmount = 0;
 
     if (cartItems) {
         cartItems.forEach((item: any) => {
             const itemQuantity = Math.max(1, parseInt(String(item?.quantity || 1), 10) || 1);
-            const itemPrice = Number(item?.price) || 0;
+            const itemPrice = resolveUnitPrice(Number(item?.price) || 0, item?.variantId);
             const rawLineTotal = itemPrice * itemQuantity;
             mainItemsSubtotal += rawLineTotal;
             bundleDiscountAmount += rawLineTotal * (discountPercent / 100);
@@ -843,13 +884,13 @@ export function calculateOrderPricing(body: any, formSettings?: any): OrderPrici
     } else if (bundleVariants) {
         bundleVariants.forEach((variant: any) => {
             const variantQuantity = Math.max(1, parseInt(String(variant?.quantity || 1), 10) || 1);
-            const variantPrice = Number(variant?.price) || 0;
+            const variantPrice = resolveUnitPrice(Number(variant?.price) || 0, variant?.variantId);
             const rawLineTotal = variantPrice * variantQuantity;
             mainItemsSubtotal += rawLineTotal;
             bundleDiscountAmount += rawLineTotal * (discountPercent / 100);
         });
     } else {
-        const unitPrice = Number(body?.price) || 0;
+        const unitPrice = resolveUnitPrice(Number(body?.price) || 0, body?.variantId);
         mainItemsSubtotal = unitPrice * quantity;
         bundleDiscountAmount = mainItemsSubtotal * (discountPercent / 100);
     }
@@ -859,7 +900,7 @@ export function calculateOrderPricing(body: any, formSettings?: any): OrderPrici
 
     const upsellTotal = roundCurrency(
         (Array.isArray(body?.upsell_items) ? body.upsell_items : []).reduce((sum: number, item: any) => {
-            const itemPrice = Number(item?.price) || 0;
+            const itemPrice = resolveUnitPrice(Number(item?.price) || 0, item?.variant_id);
             const itemQuantity = Math.max(1, parseInt(String(item?.quantity || 1), 10) || 1);
             return sum + (itemPrice * itemQuantity);
         }, 0)

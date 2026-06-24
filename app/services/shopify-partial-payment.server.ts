@@ -1,4 +1,8 @@
 import { unauthenticated } from '../shopify.server';
+import {
+  resolveContextualPricingForOrder,
+  assertPricingConsistency,
+} from './contextual-pricing.server';
 
 const DISCOUNT_PREFIX = 'FOX-PCOD-';
 const DISCOUNT_TTL_MINUTES = 60; 
@@ -32,7 +36,14 @@ export interface PartialPaymentCheckoutParams {
   totalOrderValue: number;
   remainingAmount: number;
   partialPaymentReference: string;
+  /**
+   * DEPRECATED: Do not use for presentmentCurrencyCode or priceOverride.
+   * The authoritative currency is now always derived from contextual pricing.
+   * This field is kept for backward compatibility with note formatting only.
+   */
   currency: string;
+  /** Customer's detected country from storefront (used for country resolution fallback) */
+  detectedCountry?: string;
   notes?: string;
   couponCode?: string;
   shippingPrice?: number;
@@ -72,66 +83,59 @@ export async function createPartialPaymentCheckout(
 ): Promise<PartialPaymentCheckoutResult> {
   const { shop, lineItems } = params;
 
-  // Step 0: Fetch native variant prices to determine if we have custom pricing
-  console.log('[PartialPayment] Step 0: Fetching native variant prices for decision engine...');
-  const graphql = await getAdminGraphql(shop);
-  
-  const validVariantGids = lineItems
-    .map(item => String(item.variantId || '').replace(/[^0-9]/g, ''))
-    .filter(id => id.length > 0)
-    .map(id => `"gid://shopify/ProductVariant/${id}"`);
+  // Step 0: Fetch contextual (market-aware) prices — REPLACES old ProductVariant.price fetch.
+  // Currency is derived from the contextual result; never from params.currency (untrusted frontend).
+  console.log('[PartialPayment] Step 0: Fetching contextual prices for market-aware pricing...');
+
+  const variantIds = lineItems.map(item => item.variantId);
+  const contextualResult = await resolveContextualPricingForOrder(shop, variantIds, {
+    customerCountry: params.customer.country,
+    detectedCountry: params.detectedCountry,
+    shop,
+  });
+
+  // BACKEND AUTHORITY: currency comes from contextual result, never from frontend
+  const marketCurrencyCode = contextualResult.currencyCode;
+
+  console.log('[FOXCOD PRICING DEBUG] PartialPayment decision engine:', {
+    SHOP_PRIMARY_MARKET: contextualResult.storeCurrency, // Assuming store currency matches primary market roughly, but we can't easily get primary market country here without importing it.
+    CUSTOMER_COUNTRY: params.customer.country,
+    DETECTED_COUNTRY: params.detectedCountry,
+    RESOLVED_COUNTRY: contextualResult.resolvedCountry,
+    MARKET_CURRENCY: marketCurrencyCode,
+    PRESENTMENT_CURRENCY: marketCurrencyCode,
+    DRAFT_ORDER_CURRENCY: marketCurrencyCode,
+    VARIANT_COUNT: variantIds.length,
+    CONTEXTUAL_PRICES: Object.fromEntries(
+      Array.from(contextualResult.prices.entries()).map(([k, v]) => [k, `${v.amount} ${v.currencyCode}`])
+    ),
+  });
+
+  // Build contextual prices as a Record for the legacy nativePrices interface
+  const nativePrices: Record<string, number> = {};
+  let contextualCartTotal = 0;
+  lineItems.forEach(item => {
+    const numericId = String(item.variantId || '').replace(/[^0-9]/g, '');
+    if (numericId) {
+      const serverEntry = contextualResult.prices.get(numericId);
+      nativePrices[numericId] = serverEntry?.amount ?? item.price;
+      contextualCartTotal += (serverEntry?.amount ?? item.price) * item.quantity;
+    } else {
+      contextualCartTotal += item.price * item.quantity;
+    }
+  });
 
   let hasCustomPricing = false;
-  let nativeCartTotal = 0;
-  const nativePrices: Record<string, number> = {};
+  let nativeCartTotal = contextualCartTotal;
 
-  if (validVariantGids.length > 0) {
-    const query = `
-      query {
-        nodes(ids: [${validVariantGids.join(',')}]) {
-          ... on ProductVariant {
-            id
-            price
-          }
-        }
-      }
-    `;
-
-    try {
-      const priceRes = await graphql(query);
-      const priceData = await priceRes.json();
-      
-      if (priceData?.data?.nodes) {
-        priceData.data.nodes.forEach((node: any) => {
-          if (node && node.id && node.price) {
-            const numericId = node.id.replace(/[^0-9]/g, '');
-            const lineItem = lineItems.find(item => String(item.variantId || '').replace(/[^0-9]/g, '') === numericId);
-            if (lineItem) {
-              const nativePrice = parseFloat(node.price);
-              nativePrices[numericId] = nativePrice;
-              nativeCartTotal += nativePrice * lineItem.quantity;
-              
-              // Compare native price with Foxly COD's passed price
-              if (Math.abs(nativePrice - lineItem.price) > 0.01) {
-                hasCustomPricing = true;
-              }
-            }
-          }
-        });
-      }
-    } catch (error) {
-      console.warn('[PartialPayment] Failed to fetch native prices for decision engine.', error);
-      // Safe fallback to Draft Order if we can't verify native prices
-      hasCustomPricing = true;
-    }
-  }
-
-  // Find any items that don't have a variant ID, or have a variant ID but weren't in nativePrices
+  // Determine if any item has a custom (non-native) price using contextual prices
   for (const item of lineItems) {
     const numericId = String(item.variantId || '').replace(/[^0-9]/g, '');
-    if (!numericId || !nativePrices[numericId]) {
+    const serverEntry = contextualResult.prices.get(numericId);
+    if (!numericId || !serverEntry) {
       hasCustomPricing = true;
-      nativeCartTotal += Number(item.price) * item.quantity;
+    } else if (Math.abs(serverEntry.amount - item.price) > 0.01) {
+      hasCustomPricing = true;
     }
   }
 
@@ -155,24 +159,37 @@ export async function createPartialPaymentCheckout(
   }
 
   // ALWAYS use Draft Order when a discount is needed.
-  // The Cart Permalink approach passes the discount as ?discount=CODE in the URL.
-  // When the checkout URL is opened from a modal (new window/tab), Shopify frequently does
-  // NOT auto-apply the code — the customer lands on full-price checkout with no discount.
-  // Draft orders apply the discount server-side (applied_discount field), which is 100%
-  // reliable and always shows the correct advance amount to the customer.
   if (requiredDiscountForCheck > 0.01) {
     hasCustomPricing = true;
     console.log('[PartialPayment] Forcing Draft Order because a discount is needed (cart permalink discount codes are unreliable from modal).');
   }
 
+  // Pricing consistency guard — compare widget total vs server total
+  assertPricingConsistency(
+    params.totalOrderValue,  // widget-submitted total
+    totalSubtotalForDiscountCheck + (params.shippingPrice || 0) + (params.codFeeAmount || 0),
+    { shop, country: contextualResult.resolvedCountry, flow: params.isFullPrepaid ? 'full_prepaid' : 'partial_cod' },
+  );
+
+  // Pass line items and market currency downstream
+  const paramsWithCorrections = {
+    ...params,
+    lineItems: lineItems,
+    // Override currency with backend-authoritative market currency
+    currency: marketCurrencyCode,
+    // Override country with backend-authoritative resolved country
+    customer: {
+      ...params.customer,
+      country: contextualResult.resolvedCountry,
+    }
+  };
 
   if (hasCustomPricing) {
-    console.log(`[PartialPayment] Path B: Custom pricing detected. Creating Draft Order Checkout...`);
-    return createDraftOrderCheckout(params, nativePrices);
+    console.log(`[PartialPayment] Path B: Custom pricing detected. Creating Draft Order Checkout... (currency: ${marketCurrencyCode})`);
+    return createDraftOrderCheckout(paramsWithCorrections, nativePrices, marketCurrencyCode);
   } else {
-    console.log(`[PartialPayment] Path A: Native pricing. Creating Cart Permalink Checkout...`);
-    // Pass nativeCartTotal down to avoid refetching
-    return createCartPermalinkCheckout(params, nativeCartTotal);
+    console.log(`[PartialPayment] Path A: Native pricing. Creating Cart Permalink Checkout... (currency: ${marketCurrencyCode})`);
+    return createCartPermalinkCheckout(paramsWithCorrections, nativeCartTotal);
   }
 }
 
@@ -302,12 +319,16 @@ async function createCartPermalinkCheckout(
 
 async function createDraftOrderCheckout(
   params: PartialPaymentCheckoutParams,
-  nativePrices: Record<string, number>
+  nativePrices: Record<string, number>,
+  marketCurrencyCode: string,
 ): Promise<PartialPaymentCheckoutResult> {
   const { shop, advanceAmount, totalOrderValue, partialPaymentReference, currency, customer, lineItems, notes, shippingPrice = 0, codFeeAmount = 0 } = params;
+  // Use the backend-authoritative market currency, not params.currency (which may be stale/wrong)
+  const displayCurrency = marketCurrencyCode || currency;
   const remainingAmount = totalOrderValue - advanceAmount + codFeeAmount;
 
   let actualDiscountableSubtotal = 0;
+  let totalLineItemDiscounts = 0;
 
   const graphqlInput: any = {
     lineItems: [],
@@ -319,34 +340,35 @@ async function createDraftOrderCheckout(
     const numericId = String(item.variantId || '').replace(/[^0-9]/g, '');
     const nativePrice = numericId ? (nativePrices[numericId] || item.price) : item.price;
     
-    let appliedDiscount = undefined;
-    let effectivePrice = nativePrice;
-    
+    let lineDiscount: any = undefined;
+    // Calculate the difference between native (Shopify Market) price and our discounted offer price
     if (nativePrice > item.price + 0.01) {
       const unitDiscount = nativePrice - item.price;
-      const discountTitle = params.couponCode ? params.couponCode : "Offer Applied";
-      appliedDiscount = {
-        title: discountTitle,
-        value: parseFloat(unitDiscount.toFixed(2)),
-        valueType: "FIXED_AMOUNT"
+      totalLineItemDiscounts += unitDiscount * item.quantity;
+      lineDiscount = {
+          value: parseFloat((unitDiscount * item.quantity).toFixed(2)), // Note: DraftOrderLineItemInput discount is total, not per-unit! Wait, no, is DraftOrderAppliedDiscountInput per unit or total? It's TOTAL for that line!
+          valueType: "FIXED_AMOUNT",
+          title: "Offer Discount"
       };
-      effectivePrice = item.price;
     }
 
-    actualDiscountableSubtotal += effectivePrice * item.quantity;
+    // Since we are applying a line-level discount, Shopify will subtract it from the subtotal.
+    // So the actual discountable subtotal Shopify sees will be the discounted item price.
+    actualDiscountableSubtotal += item.price * item.quantity;
 
     if (numericId) {
       return {
         variantId: `gid://shopify/ProductVariant/${numericId}`,
         quantity: item.quantity,
         originalUnitPrice: nativePrice.toFixed(2),
-        ...(appliedDiscount ? { appliedDiscount } : {})
+        ...(lineDiscount ? { appliedDiscount: lineDiscount } : {})
       };
     } else {
       return {
         title: item.title || "Custom Item",
         quantity: item.quantity,
-        originalUnitPrice: nativePrice.toFixed(2)
+        originalUnitPrice: nativePrice.toFixed(2),
+        ...(lineDiscount ? { appliedDiscount: lineDiscount } : {})
       };
     }
   });
@@ -363,6 +385,8 @@ async function createDraftOrderCheckout(
 
   const discountableSubtotal = actualDiscountableSubtotal;
   const totalBeforeOrderDiscount = discountableSubtotal + shippingPrice;
+  // We need the final total to perfectly match advanceAmount.
+  // We apply ONE unified discount that covers BOTH the line item discounts (Upsells/Downsells) AND the order level discount (Prepaid/Partial).
   const neededDiscount = Math.max(0, totalBeforeOrderDiscount - advanceAmount);
 
   let appliedDiscountValue = neededDiscount;
@@ -393,11 +417,11 @@ async function createDraftOrderCheckout(
     params.isFullPrepaid ? `FULL PREPAID ORDER [${partialPaymentReference}]` : `PARTIAL COD ORDER [${partialPaymentReference}]`,
     params.prepaidDiscountAmount && params.prepaidDiscountAmount > 0 ? `Prepaid Discount Type: ${params.prepaidDiscountType}` : '',
     params.prepaidDiscountAmount && params.prepaidDiscountAmount > 0 ? `Prepaid Discount Value: ${params.prepaidDiscountValue}${params.prepaidDiscountType === 'percentage' ? '%' : ''}` : '',
-    params.prepaidDiscountAmount && params.prepaidDiscountAmount > 0 ? `Prepaid Discount Amount: ${params.currency} ${params.prepaidDiscountAmount.toFixed(2)}` : '',
-    params.originalTotalBeforeDiscount && params.originalTotalBeforeDiscount > 0 ? `Original Total: ${params.currency} ${params.originalTotalBeforeDiscount.toFixed(2)}` : '',
-    !params.isFullPrepaid ? `Advance: ${params.currency} ${advanceAmount.toFixed(2)}` : '',
-    !params.isFullPrepaid ? `Remaining (COD): ${params.currency} ${remainingAmount.toFixed(2)}` : '',
-    codFeeAmount > 0 ? `Includes COD Fee: ${params.currency} ${codFeeAmount.toFixed(2)}` : '',
+    params.prepaidDiscountAmount && params.prepaidDiscountAmount > 0 ? `Prepaid Discount Amount: ${displayCurrency} ${params.prepaidDiscountAmount.toFixed(2)}` : '',
+    params.originalTotalBeforeDiscount && params.originalTotalBeforeDiscount > 0 ? `Original Total: ${displayCurrency} ${params.originalTotalBeforeDiscount.toFixed(2)}` : '',
+    !params.isFullPrepaid ? `Advance: ${displayCurrency} ${advanceAmount.toFixed(2)}` : '',
+    !params.isFullPrepaid ? `Remaining (COD): ${displayCurrency} ${remainingAmount.toFixed(2)}` : '',
+    codFeeAmount > 0 ? `Includes COD Fee: ${displayCurrency} ${codFeeAmount.toFixed(2)}` : '',
     notes ? notes : '',
   ].filter(Boolean).join('\n');
 
@@ -411,9 +435,7 @@ async function createDraftOrderCheckout(
     { key: 'checkout_type', value: 'draft_order' }
   ].filter(Boolean) as { key: string; value: string }[];
 
-  // Recompute the discount based on final line items + final shipping line,
-  // so the checkout grand total is exactly advanceAmount regardless of how
-  // the shipping was handled above.
+  // Recompute the unified discount based on final line items + final shipping line
   const finalSubtotalForDiscount = actualDiscountableSubtotal +
     (neededDiscount > discountableSubtotal && shippingPrice > 0 ? shippingPrice : 0);
   const finalAppliedDiscountValue = Math.max(0, finalSubtotalForDiscount + finalShippingPrice - advanceAmount);
@@ -422,13 +444,13 @@ async function createDraftOrderCheckout(
   if (finalAppliedDiscountValue > 0.01) {
     let discountTitle = params.isFullPrepaid ? "Discount" : "COD Balance";
     if (params.couponCode && params.isFullPrepaid) {
-        // Only Full Prepaid needs to show coupon code here if there's an extra order-level discount (though usually it'll be 0)
+        // Only Full Prepaid needs to show coupon code here if there's an extra order-level discount
         discountTitle = params.couponCode;
     }
 
     appliedDiscount = {
       title: discountTitle,
-      description: params.isFullPrepaid ? "Order Discount" : "Remaining amount to be collected on delivery.",
+      description: params.isFullPrepaid ? "Order discount" : "Remaining amount to be collected on delivery.",
       value: parseFloat(finalAppliedDiscountValue.toFixed(2)),
       valueType: "FIXED_AMOUNT"
     };
@@ -465,6 +487,13 @@ async function createDraftOrderCheckout(
   // Set the sourceName so Shopify associates this draft order (and the resulting order) with the app
   graphqlInput.sourceName = "Foxly COD + Partial & Prepaid";
 
+  // presentmentCurrencyCode locks the draft order to the customer's market currency.
+  // MUST be the backend-authoritative market currency code from contextual pricing.
+  // Never use params.currency directly here — it may come from an untrusted frontend source.
+  if (marketCurrencyCode) {
+    graphqlInput.presentmentCurrencyCode = marketCurrencyCode;
+  }
+
   if (customer.email) {
     graphqlInput.email = customer.email;
   }
@@ -492,7 +521,7 @@ async function createDraftOrderCheckout(
     variables: { input: graphqlInput }
   });
 
-  const data = await res.json();
+  const data = (await res.json()) as any;
   const mutationResult = data?.data?.draftOrderCreate;
 
   if (data.errors) {

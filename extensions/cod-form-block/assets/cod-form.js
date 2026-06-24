@@ -205,6 +205,100 @@
   }
 
   // =============================================
+  // GLOBAL STATE & HELPERS
+  // =============================================
+  window.FoxCod.contextualPrices = {
+    loaded: false,
+    currencyCode: null,
+    prices: {}
+  };
+
+  window.FoxCod.resolveActiveMarket = function(form) {
+      var countryInfo = window.FoxCod.CountryRestrictionEngine ? window.FoxCod.CountryRestrictionEngine.getCustomerCountry(form) : null;
+      var explicitFormCountry = (countryInfo && countryInfo.source === 'form') ? countryInfo.country : null;
+      return {
+          country:
+              explicitFormCountry ||
+              (window.Shopify && window.Shopify.country) ||
+              (window.Shopify && window.Shopify.routes && window.Shopify.routes.root && window.Shopify.routes.root !== '/' ? window.Shopify.routes.root.replace(/\//g, '').toUpperCase() : null) ||
+              window.FOXCOD_IP_COUNTRY ||
+              (countryInfo && countryInfo.country),
+          currency:
+              (window.Shopify && window.Shopify.currency && window.Shopify.currency.active) ||
+              (window.FoxCod && window.FoxCod.currencyConfig && window.FoxCod.currencyConfig.code)
+      };
+  };
+
+  window.FoxCod.fetchContextualPricesForOffers = function(form, config) {
+      if (window.FoxCod.contextualPrices.loaded) return Promise.resolve();
+
+      var variantIds = [];
+      if (config.upsellOffers) {
+          ['tick_upsells', 'click_upsells', 'downsells'].forEach(function(key) {
+              if (config.upsellOffers[key]) {
+                  config.upsellOffers[key].forEach(function(c) {
+                      if (c.offers) {
+                          c.offers.forEach(function(o) { 
+                              var vid = o.upsell_variant_id || o.variant_id;
+                              if (vid) variantIds.push(String(vid)); 
+                          });
+                      }
+                      // Downsell object is flat
+                      var downsellVid = c.upsell_variant_id || c.variant_id;
+                      if (downsellVid) variantIds.push(String(downsellVid));
+                  });
+              }
+          });
+      }
+      if (config.quantityOffers && config.quantityOffers.length > 0) {
+          config.quantityOffers.forEach(function(group) {
+              if (group.offers) {
+                  group.offers.forEach(function(o) {
+                      if (o.variant_id) variantIds.push(String(o.variant_id));
+                  });
+              }
+          });
+      }
+
+      // Filter uniques
+      variantIds = variantIds.filter(function(value, index, self) {
+          return self.indexOf(value) === index;
+      });
+
+      if (variantIds.length === 0) {
+          window.FoxCod.contextualPrices.loaded = true;
+          return Promise.resolve();
+      }
+
+      var activeMarket = window.FoxCod.resolveActiveMarket(form);
+      var shopDomain = window.Shopify && window.Shopify.shop;
+
+      return fetch('/apps/fox-cod/api/contextual-prices', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+              shop: shopDomain,
+              marketCountry: activeMarket.country || 'US',
+              variantIds: variantIds
+          })
+      })
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+          if (data && data.success && data.prices) {
+              window.FoxCod.contextualPrices.prices = data.prices;
+              if (data.currencyCode) {
+                  window.FoxCod.contextualPrices.currencyCode = data.currencyCode;
+              }
+          }
+          window.FoxCod.contextualPrices.loaded = true;
+      })
+      .catch(function(err) {
+          console.warn('[FoxCod] Failed to fetch contextual prices:', err);
+          window.FoxCod.contextualPrices.loaded = true; // prevent infinite retries
+      });
+  };
+
+  // =============================================
   // Track ViewContent on page load
   // =============================================
   if (!isShopifyEditor) {
@@ -1769,12 +1863,16 @@
   function initializeProduct(productId, config) {
     // Render the primary CTA directly inside the app block root.
     mountBlockRoot(productId, config, { loading: false });
-    mountRootOffers(productId, config);
+    
+    // Await prices before rendering offers
+    window.FoxCod.fetchContextualPricesForOffers(null, config).then(function() {
+        mountRootOffers(productId, config);
 
-    // Initialize the form structure and events
-    initForm(productId, config);
-    setupVariantObserver(config.rootElement, config.triggerElement, config);
-    ensureStickyButton(productId, config);
+        // Initialize the form structure and events
+        initForm(productId, config);
+        setupVariantObserver(config.rootElement, config.triggerElement, config);
+        ensureStickyButton(productId, config);
+    });
   }
 
   /**
@@ -6889,11 +6987,51 @@ function darkenColor(hex, percent) {
       return true;
   }
 
-  function getOfferPrice(offer) {
-      if (!offer) return 0;
-      var orig = offer.original_price || 0;
-      if (offer.discount_type === 'percentage') return Math.round((orig - orig * (offer.discount_value || 0) / 100) * 100) / 100;
-      return Math.max(0, orig - (offer.discount_value || 0));
+  function getMarketAwareOfferData(offer) {
+      if (!offer) return { originalPrice: 0, discountedPrice: 0, savings: 0, currencyCode: '', formattedOriginalPrice: '', formattedDiscountedPrice: '', formattedSavings: '' };
+      
+      var variantId = String(offer.upsell_variant_id || offer.variant_id || '');
+      var contextualData = window.FoxCod.contextualPrices.prices[variantId];
+      
+      var originalPrice = contextualData ? contextualData.amount : (offer.original_price || 0);
+      var currencyCode = (contextualData && contextualData.currencyCode) || window.FoxCod.contextualPrices.currencyCode || (window.Shopify && window.Shopify.currency && window.Shopify.currency.active) || 'USD';
+      
+      var discountedPrice = originalPrice;
+      if (offer.discount_type === 'percentage') {
+          discountedPrice = Math.round((originalPrice - originalPrice * (offer.discount_value || 0) / 100) * 100) / 100;
+      } else {
+          discountedPrice = Math.max(0, originalPrice - (offer.discount_value || 0));
+      }
+      
+      var savings = Math.max(0, originalPrice - discountedPrice);
+      
+      var activeMarket = window.FoxCod.resolveActiveMarket ? window.FoxCod.resolveActiveMarket(null) : { country: 'UNKNOWN' };
+
+      console.log('[FOXCOD OFFER PRICE TRACE]', JSON.stringify({
+          offerId: offer.id,
+          variantId: variantId,
+          offerType: offer.upsell_variant_id ? 'UPSELL_OR_DOWNSELL' : 'QUANTITY_OR_OTHER',
+          staticOriginalPrice: offer.original_price || 0,
+          contextualPrice: contextualData ? contextualData.amount : null,
+          selectedPriceSource: contextualData ? 'contextualPrices_cache' : 'fallback_static',
+          currencyCode: currencyCode,
+          marketCountry: activeMarket.country
+      }, null, 2));
+      
+      function fmtAmt(amt) {
+          try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: currencyCode }).format(amt); }
+          catch (e) { return formatMoney(amt); }
+      }
+      
+      return {
+          originalPrice: originalPrice,
+          discountedPrice: discountedPrice,
+          savings: savings,
+          currencyCode: currencyCode,
+          formattedOriginalPrice: fmtAmt(originalPrice),
+          formattedDiscountedPrice: fmtAmt(discountedPrice),
+          formattedSavings: fmtAmt(savings)
+      };
   }
 
   function renderTickUpsells(form, config) {
@@ -6918,7 +7056,9 @@ function darkenColor(hex, percent) {
           var design = campaign.design || {};
           var acceptBtn = design.acceptButton || {};
           (campaign.offers || []).forEach(function(offer) {
-              var offerPrice = offer.original_price || 0;
+              console.log('[FOXCOD OFFER PRICING DEBUG]', { OFFER_TYPE: 'TICK_UPSELL', VARIANT_ID: offer.variant_id });
+              var offerData = getMarketAwareOfferData(offer);
+              var offerPrice = offerData.discountedPrice;
               var borderStyle = acceptBtn.borderStyle || 'dashed';
               var borderColor = acceptBtn.borderColor || acceptBtn.bgColor || '#10b981';
               var borderWidth = acceptBtn.borderWidth || 2;
@@ -6994,15 +7134,18 @@ function darkenColor(hex, percent) {
               var title = document.createElement('div');
               title.style.cssText = 'font-weight: 600; font-size: ' + (design.headerTextSize || 14) + 'px; margin-bottom: 2px;';
               // Resolve {{title}} and {{price}} placeholders
-              var headerText = design.headerText || ('Add ' + (offer.upsell_product_title || 'this product') + ' for ' + formatMoney(offerPrice));
+              var headerText = design.headerText || ('Add ' + (offer.upsell_product_title || 'this product') + ' for ' + offerData.formattedDiscountedPrice);
               headerText = headerText.replace('{{title}}', offer.upsell_product_title || 'this product');
-              headerText = headerText.replace('{{price}}', formatMoney(offerPrice));
+              headerText = headerText.replace('{{price}}', offerData.formattedDiscountedPrice);
               title.textContent = headerText;
               info.appendChild(title);
 
               var priceDiv = document.createElement('div');
               priceDiv.style.cssText = 'font-size: 13px;';
-              priceDiv.innerHTML = '<strong style="color: #059669;">' + formatMoney(offerPrice) + '</strong>';
+              priceDiv.innerHTML = '<strong style="color: #059669;">' + offerData.formattedDiscountedPrice + '</strong>';
+              if (offerData.savings > 0) {
+                  priceDiv.innerHTML += ' <span style="text-decoration: line-through; opacity: 0.6; margin-left: 4px;">' + offerData.formattedOriginalPrice + '</span>';
+              }
               info.appendChild(priceDiv);
               row.appendChild(info);
 
@@ -7035,7 +7178,19 @@ function darkenColor(hex, percent) {
           (campaign.offers || []).forEach(function(offer) {
               var cb = form.querySelector('input[name="tick_upsell_' + campaign.id + '_' + offer.id + '"]');
               if (cb && cb.checked) {
-                  items.push({ product_id: offer.upsell_product_id, variant_id: offer.upsell_variant_id, title: offer.upsell_product_title, price: parseFloat(String(offer.price ?? offer.original_price ?? 0)), quantity: 1, type: 'tick_upsell' });
+                  var offerData = getMarketAwareOfferData(offer);
+                  
+                  var activeMarket = window.FoxCod.resolveActiveMarket ? window.FoxCod.resolveActiveMarket(null) : { country: 'UNKNOWN' };
+                  console.log('[FOXCOD OFFER ACCEPT TRACE]', JSON.stringify({
+                      offerId: offer.id,
+                      variantId: offer.upsell_variant_id,
+                      displayedPrice: offerData.discountedPrice,
+                      submittedPrice: offerData.discountedPrice,
+                      currencyCode: offerData.currencyCode,
+                      marketCountry: activeMarket.country
+                  }, null, 2));
+
+                  items.push({ product_id: offer.upsell_product_id, variant_id: offer.upsell_variant_id, title: offer.upsell_product_title, price: offerData.discountedPrice, quantity: 1, type: 'tick_upsell' });
               }
           });
       });
@@ -7043,14 +7198,18 @@ function darkenColor(hex, percent) {
   }
 
   function buildUpsellModalHTML(campaign, offer, offerIndex, config) {
+      console.log('[FOXCOD OFFER PRICING DEBUG]', { OFFER_TYPE: 'UPSELL_MODAL', VARIANT_ID: offer.variant_id });
+      var offerData = getMarketAwareOfferData(offer);
+      
       var design = campaign.design || {};
       var timer = design.timer || {};
       var discountTag = design.discountTag || {};
       var acceptBtn = design.acceptButton || {};
       var rejectBtn = design.rejectButton || {};
-      var offerPrice = getOfferPrice(offer);
-      var hasDiscount = offer.discount_value > 0;
-      var discountLabel = offer.discount_type === 'percentage' ? offer.discount_value + '%' : formatMoney(offer.discount_value);
+      
+      var offerPrice = offerData.discountedPrice;
+      var hasDiscount = offerData.savings > 0;
+      var discountLabel = offer.discount_type === 'percentage' ? offer.discount_value + '%' : offerData.formattedSavings;
 
       var rawBgImage = design.bgImage || '';
       var resolvedBgImage = resolveBgPreset(rawBgImage, config.appUrl);
@@ -7077,8 +7236,8 @@ function darkenColor(hex, percent) {
       }
 
       html += '<div style="margin-bottom: 20px;">';
-      if (hasDiscount) html += '<s style="color: #9ca3af; font-size: 14px; margin-right: 8px;">' + formatMoney(offer.original_price) + '</s>';
-      html += '<strong style="font-size: 20px; color: #1f2937;">' + formatMoney(offerPrice) + '</strong></div>';
+      if (hasDiscount) html += '<s style="color: #9ca3af; font-size: 14px; margin-right: 8px;">' + offerData.formattedOriginalPrice + '</s>';
+      html += '<strong style="font-size: 20px; color: #1f2937;">' + offerData.formattedDiscountedPrice + '</strong></div>';
 
       // Determine animation class for accept button
       var animClass = '';
@@ -7162,7 +7321,19 @@ function darkenColor(hex, percent) {
       modal.querySelector('.cod-upsell-accept').addEventListener('click', function() {
           if (overlay._timerInterval) clearInterval(overlay._timerInterval);
           console.log('[COD Form] Upsell offer accepted:', offer.upsell_product_title);
-          acceptedItems.push({ product_id: offer.upsell_product_id, variant_id: offer.upsell_variant_id, title: offer.upsell_product_title, price: getOfferPrice(offer), quantity: 1, type: 'click_upsell' });
+          var offerData = getMarketAwareOfferData(offer);
+          
+          var activeMarket = window.FoxCod.resolveActiveMarket ? window.FoxCod.resolveActiveMarket(null) : { country: 'UNKNOWN' };
+          console.log('[FOXCOD OFFER ACCEPT TRACE]', JSON.stringify({
+              offerId: offer.id,
+              variantId: offer.upsell_variant_id,
+              displayedPrice: offerData.discountedPrice,
+              submittedPrice: offerData.discountedPrice,
+              currencyCode: offerData.currencyCode,
+              marketCountry: activeMarket.country
+          }, null, 2));
+
+          acceptedItems.push({ product_id: offer.upsell_product_id, variant_id: offer.upsell_variant_id, title: offer.upsell_product_title, price: offerData.discountedPrice, quantity: 1, type: 'click_upsell' });
           overlay.remove();
           if (offerIndex + 1 < offers.length) {
               showOfferSequence(form, config, productId, campaign, offers, offerIndex + 1, acceptedItems, onComplete);
@@ -7190,13 +7361,17 @@ function darkenColor(hex, percent) {
   }
 
   function buildDownsellModalHTML(dsCampaign, offer, config) {
+      console.log('[FOXCOD OFFER PRICING DEBUG]', { OFFER_TYPE: 'DOWNSELL_MODAL', VARIANT_ID: offer.variant_id });
+      var offerData = getMarketAwareOfferData(offer);
+
       var design = dsCampaign.design || {};
       var acceptBtn = design.acceptButton || {};
       var rejectBtn = design.rejectButton || {};
-      var origPrice = offer.original_price || 0;
-      var offerPrice = getOfferPrice(offer);
-      var hasDiscount = offer.discount_value > 0;
-      var discountLabel = offer.discount_type === 'percentage' ? offer.discount_value + '%' : formatMoney(offer.discount_value);
+      
+      var origPrice = offerData.originalPrice;
+      var offerPrice = offerData.discountedPrice;
+      var hasDiscount = offerData.savings > 0;
+      var discountLabel = offer.discount_type === 'percentage' ? offer.discount_value + '%' : offerData.formattedSavings;
 
       // Icon helper
       var iconMap = { cart: '🛒', check: '✓', star: '⭐', gift: '🎁', heart: '❤️' };
@@ -7271,8 +7446,8 @@ function darkenColor(hex, percent) {
       // Price display - only show when product has a price
       if (origPrice > 0) {
           html += '<div style="margin-bottom: 20px;">';
-          if (hasDiscount) html += '<s style="color: #9ca3af; font-size: 14px; margin-right: 8px;">' + formatMoney(origPrice) + '</s>';
-          html += '<strong style="font-size: 20px; color: #1f2937;">' + formatMoney(offerPrice) + '</strong></div>';
+          if (hasDiscount) html += '<s style="color: #9ca3af; font-size: 14px; margin-right: 8px;">' + offerData.formattedOriginalPrice + '</s>';
+          html += '<strong style="font-size: 20px; color: #1f2937;">' + offerData.formattedDiscountedPrice + '</strong></div>';
       }
 
       // Accept button animation class
@@ -7312,7 +7487,19 @@ function darkenColor(hex, percent) {
       modal.querySelector('.cod-upsell-accept').addEventListener('click', function() {
           if (overlay._timerInterval) clearInterval(overlay._timerInterval);
           console.log('[COD Form] Downsell accepted:', offer.upsell_product_title);
-          acceptedItems.push({ product_id: offer.upsell_product_id, variant_id: offer.upsell_variant_id, title: offer.upsell_product_title, image: offer.upsell_product_image || '', price: getOfferPrice(offer), quantity: 1, type: 'downsell' });
+          
+          var offerData = getMarketAwareOfferData(offer);
+          var activeMarket = window.FoxCod.resolveActiveMarket ? window.FoxCod.resolveActiveMarket(null) : { country: 'UNKNOWN' };
+          console.log('[FOXCOD OFFER ACCEPT TRACE]', JSON.stringify({
+              offerId: offer.id,
+              variantId: offer.upsell_variant_id,
+              displayedPrice: offerData.discountedPrice,
+              submittedPrice: offerData.discountedPrice,
+              currencyCode: offerData.currencyCode,
+              marketCountry: activeMarket.country
+          }, null, 2));
+
+          acceptedItems.push({ product_id: offer.upsell_product_id, variant_id: offer.upsell_variant_id, title: offer.upsell_product_title, image: offer.upsell_product_image || '', price: offerData.discountedPrice, quantity: 1, type: 'downsell' });
           overlay.remove();
           onComplete(acceptedItems);
       });
@@ -7598,6 +7785,8 @@ function darkenColor(hex, percent) {
       // Build payload with proper field mapping
       var countryInfo = window.FoxCod.CountryRestrictionEngine.getCustomerCountry(form);
       
+      var activeMarket = window.FoxCod.resolveActiveMarket(form);
+      
       var stateInput = form.querySelector('[name="state"]');
       var stateName = '';
       if (stateInput && stateInput.tagName.toLowerCase() === 'select' && stateInput.options[stateInput.selectedIndex]) {
@@ -7626,16 +7815,26 @@ function darkenColor(hex, percent) {
           quantity: parseInt(formData.get('quantity') || ((form.closest('.cod-form-container') || form.parentElement).querySelector('.cod-product-qty .cod-qty-input') || {}).value || '1'),
           price: parseFloat(config.productPrice),
           productTitle: config.productTitle,
-          currency: (FoxCod.currencyConfig && FoxCod.currencyConfig.code) || 'USD',
+          currency: activeMarket.currency || 'USD',
           shippingLabel: '',
           shippingPrice: 0,
           discountPercent: 0,
           finalTotal: 0,
           upsell_items: getCheckedTickUpsells(form, config),
-          detectedCountry: countryInfo.country,
-          countryName: countryName || countryInfo.country,
-          countryDetectionSource: countryInfo.source
+          detectedCountry: activeMarket.country || countryInfo.country,
+          countryName: countryName || activeMarket.country || countryInfo.country,
+          countryDetectionSource: 'shopify_active_market'
       };
+      
+      console.log('[FOXCOD MARKET DEBUG]', {
+          activeMarketCountry: window.Shopify && window.Shopify.country,
+          activeMarketCurrency: window.Shopify && window.Shopify.currency && window.Shopify.currency.active,
+          localizationCountry: window.Shopify && window.Shopify.routes && window.Shopify.routes.root,
+          detectedCountry: window.FOXCOD_IP_COUNTRY || (countryInfo && countryInfo.country),
+          payloadCountry: payload.detectedCountry,
+          payloadCurrency: payload.currency,
+          widgetPrice: payload.price
+      });
 
       // Bundle variant items — when customer selected different variants per item
       if (window.FoxCod && window.FoxCod._selectedBundleVariants && window.FoxCod._selectedBundleVariants.length > 1) {

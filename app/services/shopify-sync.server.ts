@@ -17,6 +17,7 @@ import {
     supabase,
 } from '../config/supabase.server';
 import { createPendingOrder } from './shopify-graphql-orders.server';
+import { resolveCountryForOrder } from './contextual-pricing.server';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -139,8 +140,14 @@ export async function createShopifyOrderBackground(orderId: string): Promise<Sho
         const firstName = nameParts[0] || 'Customer';
         const lastName = nameParts.slice(1).join(' ') || '';
         const formattedPhone = formatPhoneE164(order.customer_phone || '');
-        const orderCountry: string = body?.customerCountry || 'IN';
         const customerAddress: string = order.customer_address || body?.customerAddress || body?.address || '';
+        
+        const orderCountry = await resolveCountryForOrder({
+            customerCountry: body?.customerCountry,
+            detectedCountry: body?.detectedCountry,
+            shop: order.shop_domain,
+        });
+        
         const customerCity: string = order.city || body?.customerCity || body?.city || '';
         const customerState: string = order.state || body?.customerState || body?.state || '';
         const customerZip: string = order.pincode || body?.customerZipcode || body?.zipcode || body?.zip || '';
@@ -253,6 +260,7 @@ export async function createShopifyOrderBackground(orderId: string): Promise<Sho
 
         const paramsForGraphql = {
             shop: order.shop_domain,
+            currency: currencyCode,
             lineItems: lineItems.map((li: any) => ({
                 variantId: li.variant_id,
                 title: li.title,
