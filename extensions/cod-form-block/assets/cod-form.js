@@ -35,6 +35,8 @@
   // PIXEL TRACKING — Script Loader & Event Dispatcher
   // =============================================
   var _pixelsLoaded = false;
+  var _activeConfigs = {}; // Global map of COD form configs for event delegation
+  var _activeConfigs = {}; // Global map of COD form configs for event delegation
 
   function loadPixelScripts() {
       if (_pixelsLoaded) return;
@@ -6770,8 +6772,9 @@ function darkenColor(hex, percent) {
   }
 
   function closeModal(productId, config, options) {
-    options = options || {};
-    var modal = getModalContainer(config);
+    try {
+      options = options || {};
+      var modal = getModalContainer(config);
     var overlay = getModalOverlay(config);
 
     // Check for downsell campaigns before closing
@@ -6962,6 +6965,18 @@ function darkenColor(hex, percent) {
 
     // Re-evaluate sticky button visibility after closing the modal.
     restoreTriggersAfterModal(config);
+    } catch(e) {
+        console.error('[COD Form] Error in closeModal:', e);
+        // Fallback: force close all modals just in case
+        document.querySelectorAll('.cod-modal.visible, .cod-form-container.cod-modal').forEach(function(el) {
+            el.classList.remove('visible');
+            el.style.display = 'none';
+        });
+        document.querySelectorAll('.cod-modal-overlay').forEach(function(el) {
+            el.style.display = 'none';
+        });
+        document.body.style.overflow = '';
+    }
   }
 
   // =============================================
@@ -8399,4 +8414,28 @@ function darkenColor(hex, percent) {
       });
   }
 
+
+
+  // Global Event Delegation for Close Buttons (Fail-safe against DOM cloning)
+  document.addEventListener('click', function(e) {
+      var btn = e.target.closest('.cod-close-btn');
+      if (btn) {
+          e.preventDefault();
+          var id = btn.getAttribute('data-cod-close');
+          var config = _activeConfigs[id];
+          if (config) {
+              closeModal(config.productId, config);
+          } else {
+              var modal = btn.closest('.cod-form-container.cod-modal');
+              if (modal) {
+                  modal.classList.remove('visible');
+                  setTimeout(function() { modal.style.display = 'none'; }, 300);
+                  var overlayId = modal.id.replace('cod-form-', 'cod-modal-overlay-');
+                  var overlay = document.getElementById(overlayId);
+                  if (overlay) overlay.style.display = 'none';
+                  document.body.style.overflow = '';
+              }
+          }
+      }
+  });
 })();
