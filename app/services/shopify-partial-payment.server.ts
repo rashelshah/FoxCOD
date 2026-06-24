@@ -340,35 +340,22 @@ async function createDraftOrderCheckout(
     const numericId = String(item.variantId || '').replace(/[^0-9]/g, '');
     const nativePrice = numericId ? (nativePrices[numericId] || item.price) : item.price;
     
-    let lineDiscount: any = undefined;
-    // Calculate the difference between native (Shopify Market) price and our discounted offer price
-    if (nativePrice > item.price + 0.01) {
-      const unitDiscount = nativePrice - item.price;
-      totalLineItemDiscounts += unitDiscount * item.quantity;
-      lineDiscount = {
-          value: parseFloat(unitDiscount.toFixed(2)), // Note: DraftOrderAppliedDiscountInput FIXED_AMOUNT for a line item is applied per-unit by Shopify!
-          valueType: "FIXED_AMOUNT",
-          title: "Offer Discount"
-      };
-    }
-
-    // Since we are applying a line-level discount, Shopify will subtract it from the subtotal.
-    // So the actual discountable subtotal Shopify sees will be the discounted item price.
-    actualDiscountableSubtotal += item.price * item.quantity;
+    // Shopify Draft Orders ignore line-level appliedDiscount for catalog variants.
+    // We calculate the subtotal using the native market price, and the final order-level
+    // discount (neededDiscount) will perfectly absorb the difference.
+    actualDiscountableSubtotal += nativePrice * item.quantity;
 
     if (numericId) {
       return {
         variantId: `gid://shopify/ProductVariant/${numericId}`,
         quantity: item.quantity,
-        originalUnitPrice: nativePrice.toFixed(2),
-        ...(lineDiscount ? { appliedDiscount: lineDiscount } : {})
+        originalUnitPrice: nativePrice.toFixed(2)
       };
     } else {
       return {
         title: item.title || "Custom Item",
         quantity: item.quantity,
-        originalUnitPrice: nativePrice.toFixed(2),
-        ...(lineDiscount ? { appliedDiscount: lineDiscount } : {})
+        originalUnitPrice: nativePrice.toFixed(2)
       };
     }
   });

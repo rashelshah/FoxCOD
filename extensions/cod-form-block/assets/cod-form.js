@@ -1280,6 +1280,18 @@
   function createOrderWithRetry(config, payload, retries) {
     var remainingRetries = typeof retries === 'number' ? retries : 2;
 
+    if (remainingRetries === (typeof retries === 'number' ? retries : 2)) {
+      console.log('[FOXCOD FRONTEND ORDER]', {
+        price: payload.price,
+        totalPrice: payload.finalTotal,
+        selectedVariantId: payload.variantId,
+        marketCountry: payload.detectedCountry,
+        currency: payload.currency,
+        codFee: payload.codFeeAmount,
+        shippingProtection: payload.shippingProtection
+      });
+    }
+
     return requestProxyJson(config, '/api/order', {
       method: 'POST',
       headers: {

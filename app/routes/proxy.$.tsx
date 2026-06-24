@@ -32,7 +32,7 @@ import {
 // ── In-process caches to avoid repeated DB/session round-trips ──
 // REST clients and fraud settings are stable per shop for minutes at a time.
 // Caching them eliminates 200-400ms of cold-start latency on every order.
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL_MS = 60 * 1000; // 1 minute
 
 interface CacheEntry<T> { value: T; expiresAt: number; }
 const _fraudSettingsCache = new Map<string, CacheEntry<any>>();
@@ -420,9 +420,10 @@ async function handlePartialCodCheckout(request: Request, data: any) {
             console.log('[Proxy Partial COD v2] Partial payment discount applied:', partialDiscountAmount);
         }
 
-        // Safety: advance must not exceed total
-        const safeAdvance = Math.min(parsedAdvance, totalOrderValue);
-        const remainingAmount = Math.max(totalOrderValue - safeAdvance, 0);
+        // Safety: advance must not exceed total + cod fee
+        const parsedCodFee = parseFloat(partialCodFeeAmount) || 0;
+        const safeAdvance = Math.min(parsedAdvance, totalOrderValue + parsedCodFee);
+        const remainingAmount = Math.max(totalOrderValue + parsedCodFee - safeAdvance, 0);
 
         console.log(
             '[Proxy Partial COD v2] Pricing — total:', totalOrderValue,
@@ -460,10 +461,12 @@ async function handlePartialCodCheckout(request: Request, data: any) {
         const discountMult = 1 - ((parseFloat(discountPercent) || 0) / 100);
         const storefrontLineItems = pricing.discountItems.map((item: any) => {
             let title = data.productTitle || 'Product';
+            let isUpsell = false;
             // Attempt to find specific titles if it's an upsell
             const upsellMatch = Array.isArray(upsell_items) && upsell_items.find((u: any) => toNumericVariantId(u.variant_id) === toNumericVariantId(item.variantId));
             if (upsellMatch && upsellMatch.title) {
                 title = upsellMatch.title;
+                isUpsell = true;
             }
             
             return {
@@ -472,17 +475,22 @@ async function handlePartialCodCheckout(request: Request, data: any) {
                 quantity: item.quantity,
                 price: item.price,
                 title,
+                isUpsell
             };
         });
 
-        // ── Distribute discounts across line items so Shopify Checkout shows it properly
+        // ── Distribute discounts across non-upsell line items so Shopify Checkout shows it properly
         const totalDiscountToDistribute = couponDiscount + partialDiscountAmount;
         if (totalDiscountToDistribute > 0) {
             let remainingDiscount = totalDiscountToDistribute;
-            const totalItemsPrice = storefrontLineItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            // Only distribute across NON-upsell items so tick upsells retain exact prices
+            const distributableItems = storefrontLineItems.filter(item => !item.isUpsell);
+            const itemsToDiscount = distributableItems.length > 0 ? distributableItems : storefrontLineItems;
+            
+            const totalItemsPrice = itemsToDiscount.reduce((sum, item) => sum + (item.price * item.quantity), 0);
             if (totalItemsPrice > 0) {
-                storefrontLineItems.forEach((item, index) => {
-                    if (index === storefrontLineItems.length - 1) {
+                itemsToDiscount.forEach((item, index) => {
+                    if (index === itemsToDiscount.length - 1) {
                         item.price = Math.max(0, item.price - (remainingDiscount / item.quantity));
                     } else {
                         const proportion = (item.price * item.quantity) / totalItemsPrice;
@@ -493,7 +501,6 @@ async function handlePartialCodCheckout(request: Request, data: any) {
                 });
             }
         }
-
         // ── Build notes ────────────────────────────────────────────────────
         const fmtAmt = (amt: number) => {
             try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: currencyCode }).format(amt); }

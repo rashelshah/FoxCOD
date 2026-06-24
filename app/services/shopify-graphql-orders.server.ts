@@ -185,24 +185,22 @@ export async function createPendingOrder(params: GraphQLOrderParams): Promise<Gr
       nativePrice = params.nativePrices[numericId];
     }
 
-    let lineDiscount: any = undefined;
-    if (nativePrice > itemPrice + 0.01) {
-      const unitDiscount = nativePrice - itemPrice;
-      lineDiscount = {
-          value: parseFloat((unitDiscount * item.quantity).toFixed(2)),
-          valueType: "FIXED_AMOUNT",
-          title: "Offer Discount"
-      };
-    }
+    // Shopify draft orders ignore appliedDiscount on variant line items.
+    // Instead of applying line-level discounts, we calculate the total subtotal
+    // using the native variant prices. Any difference between this native subtotal
+    // and the requested targetTotal will be covered by the unified order-level discount.
+    actualDiscountableSubtotal += nativePrice * item.quantity;
 
-    // Since we apply a line-level discount, Shopify reduces the subtotal by that discount.
-    // So the actual discountable subtotal Shopify sees is the discounted item price.
-    actualDiscountableSubtotal += itemPrice * item.quantity;
-
-    // For variant items, Shopify Draft Orders ignore originalUnitPrice. We must use appliedDiscount if we want to change price.
+    // For custom items without variantId
     line.originalUnitPrice = nativePrice.toFixed(2);
-    if (lineDiscount) {
-      line.appliedDiscount = lineDiscount;
+    
+    // For variant items, Shopify Draft Orders ignore originalUnitPrice. We must use priceOverride.
+    // Important: currencyCode MUST match presentmentCurrencyCode
+    if (line.variantId) {
+      line.priceOverride = {
+        amount: nativePrice.toFixed(2),
+        currencyCode: params.presentmentCurrencyCode || params.currency || 'USD'
+      };
     }
     
     return line;
@@ -240,6 +238,7 @@ export async function createPendingOrder(params: GraphQLOrderParams): Promise<Gr
       }
       appliedDiscount = {
           title: title,
+          description: "Order discount",
           value: parseFloat(unifiedDiscountAmount.toFixed(2)),
           valueType: "FIXED_AMOUNT"
       };
@@ -314,12 +313,22 @@ export async function createPendingOrder(params: GraphQLOrderParams): Promise<Gr
   // to bypass Shopify's strict shipping zone validations during draftOrderComplete.
   // We will append it via orderUpdate immediately after the order is completed.
 
+  console.log('[FOXCOD SHOPIFY PAYLOAD]', JSON.stringify(draftOrderInput, null, 2));
+  console.log('[DRAFT ORDER VARIABLES]', JSON.stringify({ variables: { input: draftOrderInput } }, null, 2));
+
   // 5. Execute draftOrderCreate
   const createRes = await graphql(`
     mutation draftOrderCreate($input: DraftOrderInput!) {
       draftOrderCreate(input: $input) {
         draftOrder {
           id
+          lineItems(first: 20) {
+            nodes {
+              title
+              quantity
+              originalUnitPrice
+            }
+          }
         }
         userErrors {
           field
@@ -330,6 +339,7 @@ export async function createPendingOrder(params: GraphQLOrderParams): Promise<Gr
   `, { variables: { input: draftOrderInput } });
 
   const createData = await createRes.json();
+  console.log('[DRAFT ORDER CREATE RESPONSE]', JSON.stringify(createData, null, 2));
   const createErrors = createData?.data?.draftOrderCreate?.userErrors || [];
   
   if (createErrors.length > 0) {
@@ -365,6 +375,7 @@ export async function createPendingOrder(params: GraphQLOrderParams): Promise<Gr
   `, { variables: { id: draftOrderId, paymentPending: true } });
 
   const completeData = await completeRes.json();
+  console.log('[DRAFT ORDER COMPLETE RESPONSE]', JSON.stringify(completeData, null, 2));
   const completeErrors = completeData?.data?.draftOrderComplete?.userErrors || [];
 
   if (completeErrors.length > 0) {

@@ -96,14 +96,8 @@ const GET_SHOP_PRIMARY_MARKET_QUERY = `#graphql
   query GetShopPrimaryMarket {
     shop {
       currencyCode
-      primaryMarket {
-        regions(first: 1) {
-          nodes {
-            ... on MarketRegionCountry {
-              code
-            }
-          }
-        }
+      billingAddress {
+        countryCodeV2
       }
     }
   }
@@ -125,9 +119,7 @@ async function getShopPrimaryMarketCountry(shop: string): Promise<string | null>
         const response = await admin.graphql(GET_SHOP_PRIMARY_MARKET_QUERY);
         const data = (await response.json()) as any;
 
-        const regions = data?.data?.shop?.primaryMarket?.regions?.nodes || [];
-        const firstRegion = regions[0];
-        const countryCode: string | null = firstRegion?.code || null;
+        const countryCode: string | null = data?.data?.shop?.billingAddress?.countryCodeV2 || null;
 
         const storeCurrency: string = data?.data?.shop?.currencyCode || 'USD';
 

@@ -455,6 +455,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             SHIPPING: pricing.shippingPrice,
         });
 
+        console.log('[FOXCOD API RECEIVED]', {
+            bodyPrice: body.price,
+            bodyTotalPrice: body.finalTotal,
+            lineItems,
+            pricing,
+            contextualResult
+        });
+
         // ── Pricing Consistency Guard ──
         assertPricingConsistency(
             body.finalTotal, // frontend widget total
@@ -510,6 +518,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                 { key: 'Final Total', value: fmtPrice(totalPrice) },
             ]
         };
+
+        console.log('[FOXCOD PENDING ORDER PARAMS]', {
+            nativePrices: (paramsForGraphql as any).nativePrices,
+            targetTotal: (paramsForGraphql as any).targetTotal,
+            lineItems: paramsForGraphql.lineItems,
+            totalPrice
+        });
 
         const graphqlResult = await createPendingOrder(paramsForGraphql);
         console.log('⏱ Shopify API responded:', Date.now() - start, 'ms');
