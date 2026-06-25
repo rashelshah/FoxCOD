@@ -8226,6 +8226,156 @@ function darkenColor(hex, percent) {
       if (overlay) overlay.remove();
   }
 
+  // ── COD Loader Flow ────────────────────────────────────────────────────────
+  var _codLoaderState = { progressTimer: null };
+
+  function showCodOrderLoader() {
+      if (!document.getElementById('foxcod-loader-css')) {
+          var css = document.createElement('style');
+          css.id = 'foxcod-loader-css';
+          css.textContent = '@keyframes foxcodPartialFadeIn{from{opacity:0}to{opacity:1}} @keyframes foxcodPartialSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}} .foxcod-progress-bar-fill { transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1); }';
+          document.head.appendChild(css);
+      }
+
+      var existing = document.getElementById('foxcod-order-loader');
+      if (existing) existing.remove();
+
+      var overlay = document.createElement('div');
+      overlay.id = 'foxcod-order-loader';
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:rgba(255,255,255,0.96);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;animation:foxcodPartialFadeIn 0.2s ease;';
+
+      var branding = (window.FoxCod && window.FoxCod.branding && window.FoxCod.branding.checkout_redirect) || null;
+      var useCustomLogo = branding && branding.display_mode === 'custom_logo' && branding.logo_url;
+      var logoSize = (branding && branding.logo_size) ? parseInt(branding.logo_size) : 72;
+      var outerSize = logoSize + 10;
+      var outerHalf = outerSize / 2;
+      var innerR = outerHalf - 3;
+
+      var spinnerSvg = '<svg id="foxcod-cod-spinner" style="position:absolute;inset:0;width:' + outerSize + 'px;height:' + outerSize + 'px;animation:foxcodPartialSpin 1.1s linear infinite;" viewBox="0 0 ' + outerSize + ' ' + outerSize + '" fill="none">'
+          + '<circle cx="' + outerHalf + '" cy="' + outerHalf + '" r="' + innerR + '" stroke="#e0e7ff" stroke-width="4"/>'
+          + '<path d="M3 ' + outerHalf + ' A' + innerR + ' ' + innerR + ' 0 0 1 ' + outerHalf + ' 3" stroke="#2563eb" stroke-width="4" stroke-linecap="round"/>'
+          + '</svg>';
+
+      var centerIcon;
+      if (useCustomLogo) {
+          var shapeRadius = branding.logo_shape === 'circle' ? '50%' : branding.logo_shape === 'rounded' ? '14px' : '0px';
+          var zoomScale = branding.logo_zoom ? branding.logo_zoom / 100 : 1;
+          var imgSize = Math.round(logoSize * 0.58 * zoomScale);
+          
+          if (branding.show_background) {
+              centerIcon = '<div style="background:white;box-shadow:0 4px 16px rgba(0,0,0,0.12);padding:8px;border-radius:' + shapeRadius + ';overflow:hidden;display:flex;align-items:center;justify-content:center;width:' + (imgSize + 16) + 'px;height:' + (imgSize + 16) + 'px;box-sizing:border-box;">'
+                  + '<img src="' + branding.logo_url + '" style="display:block;width:100%;height:100%;object-fit:' + (branding.logo_shape === 'circle' ? 'cover' : 'contain') + ';" loading="lazy" />'
+                  + '</div>';
+          } else {
+              centerIcon = '<div style="overflow:hidden;border-radius:' + shapeRadius + ';width:' + imgSize + 'px;height:' + imgSize + 'px;display:flex;align-items:center;justify-content:center;">'
+                  + '<img src="' + branding.logo_url + '" style="display:block;width:100%;height:100%;object-fit:' + (branding.logo_shape === 'circle' ? 'cover' : 'contain') + ';" loading="lazy" />'
+                  + '</div>';
+          }
+      } else {
+          centerIcon = '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
+      }
+
+      overlay.innerHTML = [
+          '<div style="position:relative;width:' + outerSize + 'px;height:' + outerSize + 'px;">',
+              spinnerSvg,
+              '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">',
+                  centerIcon,
+              '</div>',
+          '</div>',
+          '<div style="text-align:center;width:100%;max-width:300px;margin-top:10px;">',
+              '<div id="foxcod-cod-title" style="font-size:20px;font-weight:700;color:#111827;margin-bottom:6px;">Preparing your order...</div>',
+              '<div id="foxcod-cod-subtitle" style="font-size:14px;color:#6b7280;line-height:1.6;margin-bottom:20px;">We’re securely processing your details.</div>',
+              '<div id="foxcod-cod-progress-container" style="width:100%;height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden;margin-bottom:12px;">',
+                  '<div id="foxcod-cod-progress-fill" class="foxcod-progress-bar-fill" style="width:0%;height:100%;background:#2563eb;border-radius:3px;"></div>',
+              '</div>',
+              '<div id="foxcod-cod-error-actions" style="display:none;margin-top:20px;gap:10px;justify-content:center;">',
+                  '<button id="foxcod-cod-btn-back" style="padding:10px 16px;border:1px solid #d1d5db;border-radius:8px;background:white;color:#374151;font-weight:600;cursor:pointer;">Back</button>',
+                  '<button id="foxcod-cod-btn-retry" style="padding:10px 16px;border:none;border-radius:8px;background:#2563eb;color:white;font-weight:600;cursor:pointer;">Retry</button>',
+              '</div>',
+          '</div>',
+          '<div style="display:flex;align-items:center;gap:8px;background:#eff6ff;padding:4px 14px 4px 6px;border-radius:999px;border:1px solid #bfdbfe;box-shadow:0 1px 2px rgba(0,0,0,0.02);margin-top:10px;">',
+              '<div style="display:flex;align-items:center;justify-content:center;width:24px;height:24px;background:#ffffff;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,0.1);overflow:hidden;">',
+                  (window.FoxCod && window.FoxCod.appLogoUrl ? '<img src="' + window.FoxCod.appLogoUrl + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" />' : ''),
+              '</div>',
+              '<div style="display:flex;flex-direction:column;justify-content:center;line-height:1;text-align:left;">',
+                  '<span style="font-size:8px;font-weight:700;color:#3b82f6;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px;">Powered by</span>',
+                  '<span style="font-size:13px;font-weight:800;color:#1d4ed8;letter-spacing:-0.3px;">Foxly COD</span>',
+              '</div>',
+          '</div>',
+      ].join('');
+
+      document.body.appendChild(overlay);
+
+      document.getElementById('foxcod-cod-btn-back').onclick = function() { hideCodOrderLoader(); };
+
+      updateCodOrderLoader(0, 'Preparing your order...', 'We’re securely processing your details.');
+      
+      // Auto progress simulation
+      setTimeout(function() { updateCodOrderLoader(20, 'Preparing your order...', 'We’re securely processing your details.'); }, 50);
+      
+      _codLoaderState.progressTimer = setTimeout(function() {
+          updateCodOrderLoader(35, 'Creating your Cash on Delivery order...', 'Reserving your items and generating your order number.');
+          _codLoaderState.progressTimer = setTimeout(function() {
+              updateCodOrderLoader(50, 'Creating your Cash on Delivery order...', 'Reserving your items and generating your order number.');
+              _codLoaderState.progressTimer = setTimeout(function() {
+                  updateCodOrderLoader(65, 'Almost there...', 'Finalizing your order.');
+                  _codLoaderState.progressTimer = setTimeout(function() {
+                      updateCodOrderLoader(75, 'Almost there...', 'Finalizing your order.');
+                      _codLoaderState.progressTimer = setTimeout(function() {
+                          updateCodOrderLoader(80, 'Almost there...', 'Finalizing your order.');
+                      }, 1000);
+                  }, 1000);
+              }, 1000);
+          }, 1000);
+      }, 1000);
+
+      return overlay;
+  }
+
+  function updateCodOrderLoader(progress, title, subtitle) {
+      var fillEl = document.getElementById('foxcod-cod-progress-fill');
+      if (fillEl) fillEl.style.width = progress + '%';
+      
+      if (title) {
+          var titleEl = document.getElementById('foxcod-cod-title');
+          if (titleEl && titleEl.innerHTML !== title) titleEl.innerHTML = title;
+      }
+      if (subtitle) {
+          var subtitleEl = document.getElementById('foxcod-cod-subtitle');
+          if (subtitleEl && subtitleEl.innerHTML !== subtitle) subtitleEl.innerHTML = subtitle;
+      }
+  }
+
+  function hideCodOrderLoader() {
+      var overlay = document.getElementById('foxcod-order-loader');
+      if (overlay) overlay.remove();
+      clearTimeout(_codLoaderState.progressTimer);
+  }
+
+  function showCodOrderError(retryCallback) {
+      clearTimeout(_codLoaderState.progressTimer);
+
+      updateCodOrderLoader(0, 'We couldn’t create your order.', 'Your information is safe. Please try again.');
+      
+      var spinner = document.getElementById('foxcod-cod-spinner');
+      if (spinner) spinner.style.display = 'none';
+
+      var progressContainer = document.getElementById('foxcod-cod-progress-container');
+      if (progressContainer) progressContainer.style.display = 'none';
+
+      var actionsEl = document.getElementById('foxcod-cod-error-actions');
+      if (actionsEl) {
+          actionsEl.style.display = 'flex';
+          var retryBtn = document.getElementById('foxcod-cod-btn-retry');
+          if (retryBtn) {
+              retryBtn.onclick = function() {
+                  hideCodOrderLoader();
+                  if (retryCallback) retryCallback();
+              };
+          }
+      }
+  }
+
   /**
    * Submit Partial COD Checkout to backend, show loader, then redirect.
    * Called after the confirmation modal is accepted.
@@ -8371,11 +8521,18 @@ function darkenColor(hex, percent) {
       }
 
       // Full COD: Send to regular backend
+      showCodOrderLoader();
+      var retryFn = function() {
+          submitFullCodOrder(form, config, productId, payload, submitBtn, originalBtnText);
+      };
+
       createOrderWithRetry(config, payload, 2)
       .then(function(result) {
           console.log('[COD Form] Order response:', result);
           
           if (result.success) {
+              updateCodOrderLoader(100, 'Order confirmed!', 'Redirecting you to your order page...');
+              
               // ── Immediately show redirect feedback on the button ──
               submitBtn.textContent = 'Redirecting...';
               submitBtn.style.setProperty('opacity', '1', 'important');
@@ -8396,16 +8553,22 @@ function darkenColor(hex, percent) {
               console.log('[FoxCod Pixels] Correct Purchase total:', purchaseValue);
               foxCodTrackEvent('Purchase', { value: purchaseValue, currency: (FoxCod.currencyConfig && FoxCod.currencyConfig.code) || 'USD' });
 
-              // ── Save customer data + redirect ──
-              saveCustomerToLocalStorage(form);
-              localStorage.removeItem('foxcod_checkout_state');
-              handleOrderSuccess(config, form, submitBtn, originalBtnText, result);
+              setTimeout(function() {
+                  // ── Save customer data + redirect ──
+                  saveCustomerToLocalStorage(form);
+                  localStorage.removeItem('foxcod_checkout_state');
+                  handleOrderSuccess(config, form, submitBtn, originalBtnText, result);
+              }, 600);
           } else {
-              throw new Error(result.error || result.message || 'Order failed');
+              showCodOrderError(retryFn);
+              config._isSubmitting = false;
+              submitBtn.disabled = false;
+              submitBtn.textContent = originalBtnText;
           }
       })
       .catch(function(err) {
           console.error('[COD Form] Error:', err);
+          showCodOrderError(retryFn);
           config._isSubmitting = false;
           submitBtn.disabled = false;
           submitBtn.textContent = originalBtnText;
