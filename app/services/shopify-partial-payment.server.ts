@@ -569,6 +569,25 @@ export async function createFullPrepaidCheckout(
   });
 }
 
+/**
+ * Native COD Checkout
+ * Uses the exact same infrastructure as Full Prepaid, but specifically for Cash on Delivery.
+ * The customer isn't paying upfront via Foxly; they pay 100% on delivery via Shopify Checkout.
+ */
+export async function createNativeCodCheckout(
+  params: Omit<PartialPaymentCheckoutParams, 'advanceAmount' | 'remainingAmount' | 'partialPaymentReference' | 'isFullPrepaid'>
+): Promise<PartialPaymentCheckoutResult> {
+  const reference = 'NCOD-' + Date.now().toString(36).toUpperCase() + randomSuffix(4);
+
+  return createPartialPaymentCheckout({
+    ...params,
+    advanceAmount: params.totalOrderValue,
+    remainingAmount: 0,
+    partialPaymentReference: reference,
+    isFullPrepaid: false
+  });
+}
+
 // ── Discount Cleanup ───────────────────────────────────────────────────────
 
 export async function cleanupPartialPaymentDiscounts(

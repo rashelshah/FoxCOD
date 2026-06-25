@@ -288,6 +288,11 @@ export async function createShopifyOrderBackground(orderId: string): Promise<Sho
             shippingLine: { title: shippingLabel, price: shippingPrice.toFixed(2) }
         };
 
+        /*
+        ========================================================
+        LEGACY DIRECT COD ORDER FLOW
+        Temporarily disabled for Shopify App Review compliance.
+        
         const graphqlResult = await createPendingOrder(paramsForGraphql);
         console.log('[SYNC] Shopify response received for order', id);
 
@@ -297,6 +302,12 @@ export async function createShopifyOrderBackground(orderId: string): Promise<Sho
 
         const shopifyOrderId = graphqlResult.orderId!;
         const shopifyOrderName = graphqlResult.orderName || '';
+        ========================================================
+        */
+        
+        const shopifyOrderId = "DISABLED";
+        const shopifyOrderName = "DISABLED";
+        throw new Error('Direct order creation is disabled for App Review compliance.');
 
         console.log('[SYNC] Shopify success:', shopifyOrderName, '— writing to DB...');
 

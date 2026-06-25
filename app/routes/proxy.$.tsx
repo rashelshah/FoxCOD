@@ -20,7 +20,7 @@ import {
     buildCatalogOrCustomLineItem,
     sanitizeVariantPricedLineItems,
 } from "../services/shopify-sync.server";
-import { createPartialPaymentCheckout, createFullPrepaidCheckout } from "../services/shopify-partial-payment.server";
+import { createPartialPaymentCheckout, createFullPrepaidCheckout, createNativeCodCheckout } from "../services/shopify-partial-payment.server";
 import { getPartialPaymentSettings, isPaymentMethodEligible, getPrepaidDiscount } from "../services/partial-payment-settings.server";
 import { createPendingOrder } from "../services/shopify-graphql-orders.server";
 import {
@@ -218,10 +218,14 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         const isCheckoutPath = path.includes("partial-cod") || path.includes("create-checkout");
         const isPartialCodPayload = data.paymentMethod === 'partial_cod' ||
             (data.advanceAmount !== undefined && data.advanceAmount !== null && parseFloat(data.advanceAmount) > 0);
+        const isNativeCodPayload = data.paymentMethod === 'native_cod';
         const isFullPrepaidPayload = data.paymentMethod === 'full_prepaid';
 
-        if (isCheckoutPath || isPartialCodPayload || isFullPrepaidPayload) {
+        if (isCheckoutPath || isPartialCodPayload || isFullPrepaidPayload || isNativeCodPayload) {
             switch (data.paymentMethod) {
+                case 'native_cod':
+                    console.log('[Proxy] ✅ Matched Native COD route');
+                    return await handleNativeCodCheckout(request, data);
                 case 'full_prepaid':
                     console.log('[Proxy] ✅ Matched Full Prepaid route');
                     return await handleFullPrepaidCheckout(request, data);
@@ -1289,6 +1293,11 @@ async function handleRegularOrder(request: Request, data: any) {
     };
 
     const t_create_pending = performance.now();
+    /*
+    ========================================================
+    LEGACY DIRECT COD ORDER FLOW
+    Temporarily disabled for Shopify App Review compliance.
+    
     const graphqlResult = await createPendingOrder(paramsForGraphql);
     console.log(`[PERF] createPendingOrder total duration: ${performance.now() - t_create_pending}ms`);
     console.log('⏱ [Proxy] Shopify API responded:', Date.now() - start, 'ms');
@@ -1397,4 +1406,253 @@ async function handleRegularOrder(request: Request, data: any) {
         orderName: shopifyOrderName,
         orderStatusUrl,
     }), { headers: corsHeaders });
+    ========================================================
+    */
+
+    return new Response(JSON.stringify({
+        success: false,
+        error: "Direct order creation is disabled. Please refresh the page and try again.",
+    }), { status: 200, headers: corsHeaders });
+}
+
+// ─── Handle Native COD Checkout ───────────────────────────────────────────────
+// Customer pays 100% on delivery, but uses Shopify Checkout.
+async function handleNativeCodCheckout(request: Request, data: any) {
+    const start = Date.now();
+    console.log('[Proxy Native COD] Starting checkout flow');
+
+    try {
+        const {
+            shop,
+            productId,
+            variantId,
+            productTitle,
+            quantity,
+            price,
+            customerName,
+            customerPhone,
+            customerAddress,
+            customerEmail,
+            customerCity,
+            customerState,
+            customerZipcode,
+            customerCountry,
+            shippingPrice,
+            notes,
+            couponCode,
+            upsell_items,
+            currency,
+        } = data;
+
+        // ── Contextual Pricing & Country Resolution ─────────────────────────
+        const orderCountry = await resolveCountryForOrder({
+            customerCountry: customerCountry || data.country,
+            detectedCountry: data.detectedCountry,
+            shop: shop,
+        });
+
+        const allVariantIds: any[] = [];
+        if (data.cart_items) {
+            data.cart_items.forEach((item: any) => allVariantIds.push(item.variantId || item.variant_id || item.id));
+        } else if (data.bundleVariants) {
+            data.bundleVariants.forEach((bv: any) => allVariantIds.push(bv.variantId || bv.variant_id || bv.id));
+        } else {
+            allVariantIds.push(variantId);
+        }
+        if (data.upsell_items) {
+            data.upsell_items.forEach((u: any) => allVariantIds.push(u.variant_id));
+        }
+
+        const contextualResult = await getContextualPricesForVariants(shop, allVariantIds, orderCountry);
+        const currencyCode = contextualResult.currencyCode;
+
+        // ── Validate required fields ────────────────────────────────────────
+        const hasCartItems = Array.isArray(data.cart_items) && data.cart_items.length > 0;
+        if (!shop || (!variantId && !hasCartItems)) {
+            return new Response(JSON.stringify({
+                success: false,
+                error: 'Missing required fields: shop, variantId',
+            }), { status: 400, headers: corsHeaders });
+        }
+
+        // ── Fraud Protection ────────────────────────────────────────────────
+        const clientIp =
+            request.headers.get('x-shopify-client-ip')
+            || request.headers.get('cf-connecting-ip')
+            || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+            || request.headers.get('x-real-ip')
+            || 'unknown';
+
+        const fraudSettings = await getCachedFraudSettings(shop);
+
+        try {
+            const fraudResult = await validateOrderAgainstFraudRulesWithSettings({
+                phone: customerPhone,
+                email: customerEmail,
+                ip: clientIp,
+                zipcode: customerZipcode,
+                quantity: parseInt(quantity) || 1,
+                shopDomain: shop,
+            }, fraudSettings);
+
+            if (!fraudResult.allowed) {
+                console.warn('[Proxy Native COD] Blocked by fraud protection:', fraudResult.message);
+                return new Response(JSON.stringify({
+                    success: false,
+                    error: fraudResult.message,
+                }), { status: 403, headers: corsHeaders });
+            }
+        } catch (fraudErr: any) {
+            console.error('[Proxy Native COD] Fraud check error (allowing order):', fraudErr.message);
+        }
+
+        // ── Pricing ─────────────────────────────────────────────────────────
+        const pricing = calculateOrderPricing(data, null, contextualResult.prices);
+        let totalOrderValue = pricing.originalTotal; // Already includes COD fee
+        let couponDiscount = 0;
+        let normalizedCouponCode = '';
+
+        // ── Coupon validation ────────────────────────────────────────────────
+        if (couponCode) {
+            const couponResult = await validateCouponForShop(shop, couponCode, pricing.originalTotal, data);
+            if (!couponResult.valid) {
+                return new Response(JSON.stringify({
+                    success: false,
+                    error: couponResult.message || 'Invalid coupon',
+                }), { status: 400, headers: corsHeaders });
+            }
+            couponDiscount = couponResult.discount;
+            totalOrderValue = couponResult.finalTotal;
+            normalizedCouponCode = normalizeCouponCode(couponCode);
+        }
+
+        // ── Normalize customer name ──────────────────────────────────────────
+        const nameStr = (customerName || 'Customer').trim();
+        const nameParts = nameStr.split(/\s+/);
+        const firstName = nameParts[0] || 'Customer';
+        const lastName = nameParts.slice(1).join(' ') || '';
+        const formattedPhone = formatPhoneE164(customerPhone || '');
+
+        // ── Build line items ─────────────────────────────────────────────────
+        const storefrontLineItems = pricing.discountItems.map((item: any) => {
+            let title = data.productTitle || 'Product';
+            const upsellMatch = Array.isArray(upsell_items) && upsell_items.find(
+                (u: any) => toNumericVariantId(u.variant_id) === toNumericVariantId(item.variantId)
+            );
+            if (upsellMatch && upsellMatch.title) title = upsellMatch.title;
+            return { variantId: item.variantId, productId: item.productId, quantity: item.quantity, price: item.price, title };
+        });
+
+        // ── Build notes ──────────────────────────────────────────────────────
+        const fmtAmt = (amt: number) => {
+            try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: currencyCode }).format(amt); }
+            catch { return `${currencyCode} ${amt.toFixed(2)}`; }
+        };
+        const orderNotes = [
+            notes || '',
+            `Cash on Delivery`,
+            normalizedCouponCode ? `Coupon: ${normalizedCouponCode} (-${fmtAmt(couponDiscount)})` : '',
+        ].filter(Boolean).join('\n');
+
+        // ── Create Shopify Checkout ──────────────────────────────────────────
+        const checkoutResult = await createNativeCodCheckout({
+            shop,
+            customer: {
+                firstName,
+                lastName,
+                email: customerEmail || '',
+                phone: formattedPhone || customerPhone || '',
+                address1: customerAddress || '',
+                city: customerCity || '',
+                province: customerState || '',
+                country: customerCountry || '',
+                zip: customerZipcode || '',
+            },
+            lineItems: storefrontLineItems,
+            totalOrderValue,
+            currency: currencyCode,
+            notes: orderNotes,
+            couponCode: normalizedCouponCode || undefined,
+            shippingPrice: pricing.shippingPrice,
+            shippingTitle: pricing.shippingTitle,
+            originalTotalBeforeDiscount: pricing.originalTotal,
+            detectedCountry: data.detectedCountry,
+            codFeeAmount: pricing.codFeeAmount,
+        });
+
+        const nativeCodRef = checkoutResult.partialPaymentReference;
+
+        // ── Non-blocking DB log ──────────────────────────────────────────────
+        Promise.resolve(
+            logOrder({
+                shop_domain: shop,
+                customer_name: nameStr,
+                customer_phone: customerPhone || '',
+                customer_address: customerAddress || '',
+                customer_email: customerEmail || '',
+                notes: orderNotes,
+                city: customerCity || '',
+                state: customerState || '',
+                pincode: customerZipcode || '',
+                product_id: productId || variantId,
+                product_title: productTitle || 'Product',
+                variant_id: variantId,
+                quantity: parseInt(quantity) || 1,
+                price: String(price),
+                shipping_label: data.shippingLabel || '',
+                shipping_price: parseFloat(shippingPrice) || 0,
+                coupon_code: normalizedCouponCode || undefined,
+                discount_amount: couponDiscount || undefined,
+                original_total: pricing.originalTotal,
+                final_total: totalOrderValue,
+                currency: currencyCode,
+                is_full_prepaid: false,
+                is_partial_cod: false,
+                payment_method: 'native_cod' as any,
+                order_payload: {
+                    ...data,
+                    checkout_id: checkoutResult.checkoutId,
+                    checkout_url: checkoutResult.checkoutUrl,
+                    discount_code: checkoutResult.discountCode,
+                    couponCode: normalizedCouponCode || '',
+                    discountAmount: couponDiscount,
+                    originalTotal: pricing.originalTotal,
+                    finalTotal: totalOrderValue,
+                },
+            })
+        ).catch(() => {});
+
+        // ── Non-blocking Google Sheets sync ────────────────────────────────
+        syncOrderToGoogleSheets(shop, {
+            orderId: nativeCodRef,
+            orderName: nativeCodRef,
+            customerName: nameStr,
+            phone: customerPhone || '',
+            email: customerEmail || '',
+            address: customerAddress || '',
+            city: customerCity || '',
+            state: customerState || '',
+            pincode: customerZipcode || '',
+            product: productTitle || 'Product',
+            quantity: parseInt(quantity) || 1,
+            totalPrice: totalOrderValue.toString(),
+            paymentMethod: 'full_cod',
+            status: 'checkout_pending',
+        }).catch(() => {});
+
+        return new Response(JSON.stringify({
+            success: true,
+            checkoutUrl: checkoutResult.checkoutUrl,
+            partialPaymentReference: nativeCodRef,
+            discountCode: checkoutResult.discountCode,
+            discountExpiresAt: checkoutResult.discountExpiresAt,
+        }), { headers: corsHeaders });
+
+    } catch (error: any) {
+        console.error('[Proxy Native COD] ❌ Unexpected error:', error?.message);
+        return new Response(JSON.stringify({
+            success: false,
+            error: error.message || 'Unable to create checkout. Please try again.',
+        }), { status: 200, headers: corsHeaders });
+    }
 }

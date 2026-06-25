@@ -526,6 +526,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             totalPrice
         });
 
+        /*
+        ========================================================
+        LEGACY DIRECT COD ORDER FLOW
+        Temporarily disabled for Shopify App Review compliance.
+        
         const graphqlResult = await createPendingOrder(paramsForGraphql);
         console.log('⏱ Shopify API responded:', Date.now() - start, 'ms');
 
@@ -586,6 +591,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             orderName: shopifyOrderName,
             orderStatusUrl,
         }, { headers: corsHeaders });
+        ========================================================
+        */
+
+        return Response.json({
+            success: false,
+            error: "Direct order creation is disabled. Please refresh the page and try again.",
+        }, { status: 400, headers: corsHeaders });
 
     } catch (error: any) {
         console.error("[COD Order] Error:", error);

@@ -8,6 +8,14 @@
 (function() {
   'use strict';
 
+  /*
+  TEMPORARY APP REVIEW IMPLEMENTATION
+  Shopify App Review requires COD orders to use Shopify Checkout.
+  Legacy direct order creation flow has been preserved below and can be restored by setting:
+  USE_NATIVE_COD_CHECKOUT = false
+  */
+  const USE_NATIVE_COD_CHECKOUT = true;
+
   // Ensure FoxCod.pixelTracking always exists
   window.FoxCod = window.FoxCod || {};
   window.FoxCod.pixelTracking = window.FoxCod.pixelTracking || {};
@@ -8495,6 +8503,53 @@ function darkenColor(hex, percent) {
   }
 
   /**
+   * Submit Native COD Checkout
+   * Creates a standard Shopify Checkout with all details prefilled,
+   * without applying any prepaid discounts, allowing the user to select
+   * Cash on Delivery natively on the checkout page.
+   */
+  function submitNativeCodCheckout(form, config, payload, submitBtn, originalBtnText) {
+      var nativeCodPayload = Object.assign({}, payload, {
+          paymentMethod: 'native_cod'
+      });
+
+      console.log('[COD Form] Native COD checkout payload:', nativeCodPayload);
+      
+      // Reuse existing loader for consistent UX
+      showCodOrderLoader();
+      updateCodOrderLoader(50, 'Creating your secure checkout...', 'Preparing your Cash on Delivery order.');
+
+      requestProxyJson(config, '/api/partial-cod/create-checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(nativeCodPayload)
+      })
+      .then(function(result) {
+          if (result && result.success && result.checkoutUrl) {
+              updateCodOrderLoader(100, 'Redirecting...', 'Opening Shopify’s secure checkout.');
+              window.location.href = result.checkoutUrl;
+          } else {
+              hideCodOrderLoader();
+              config._isSubmitting = false;
+              submitBtn.disabled = false;
+              submitBtn.textContent = originalBtnText;
+              submitBtn.style.removeProperty('opacity');
+              setFormMessage(form, 'error', (result && result.error) || 'Unable to start checkout. Please try again.');
+              setBlockStatus(config, 'Checkout could not be started. Please try again.', 'warning');
+          }
+      })
+      .catch(function(err) {
+          hideCodOrderLoader();
+          config._isSubmitting = false;
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalBtnText;
+          submitBtn.style.removeProperty('opacity');
+          setFormMessage(form, 'error', err.message || 'Network error. Please try again.');
+          setBlockStatus(config, 'Checkout request failed. The form is still available to try again.', 'warning');
+      });
+  }
+
+  /**
    * Submit Full COD Order (called after upsell flow completes)
    */
   function submitFullCodOrder(form, config, productId, payload, submitBtn, originalBtnText) {
@@ -8520,6 +8575,25 @@ function darkenColor(hex, percent) {
           console.log('[COD Form] Recalculated finalTotal with upsells:', payload.finalTotal, 'upsellTotal:', upsellTotal);
       }
 
+      if (typeof USE_NATIVE_COD_CHECKOUT !== 'undefined' && USE_NATIVE_COD_CHECKOUT) {
+          submitNativeCodCheckout(form, config, payload, submitBtn, originalBtnText);
+          return;
+      }
+
+      /*
+      ========================================================
+      LEGACY DIRECT COD ORDER FLOW
+      Temporarily disabled for Shopify App Review compliance.
+      Flow:
+      COD Form
+      → Validate Form
+      → Create Pending Order
+      → Create Shopify Order
+      → Redirect to Order Status Page
+      DO NOT DELETE.
+      May be restored in future releases.
+      ========================================================
+      
       // Full COD: Send to regular backend
       showCodOrderLoader();
       var retryFn = function() {
@@ -8575,6 +8649,7 @@ function darkenColor(hex, percent) {
           setFormMessage(form, 'error', err.message || 'Something went wrong. Please try again.');
           setBlockStatus(config, 'Order submission failed, but the checkout block is still active for another attempt.', 'warning');
       });
+      */
   }
 
 
