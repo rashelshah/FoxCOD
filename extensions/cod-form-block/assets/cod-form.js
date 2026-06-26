@@ -8128,7 +8128,7 @@ function darkenColor(hex, percent) {
       if (!document.getElementById('foxcod-partial-loader-css')) {
           var css = document.createElement('style');
           css.id = 'foxcod-partial-loader-css';
-          css.textContent = '@keyframes foxcodPartialFadeIn{from{opacity:0}to{opacity:1}} @keyframes foxcodPartialSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}';
+          css.textContent = '@keyframes foxcodPartialFadeIn{from{opacity:0}to{opacity:1}} @keyframes foxcodBouncingDots{0%,80%,100%{transform:scale(0);opacity:0.3}40%{transform:scale(1);opacity:1}} @keyframes foxcodLogoFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}} .foxcod-dot{width:8px;height:8px;background-color:#2563eb;border-radius:50%;animation:foxcodBouncingDots 1.4s infinite ease-in-out both} .foxcod-dot:nth-child(1){animation-delay:-0.32s} .foxcod-dot:nth-child(2){animation-delay:-0.16s} .foxcod-dot:nth-child(3){animation-delay:0s}';
           document.head.appendChild(css);
       }
 
@@ -8137,78 +8137,65 @@ function darkenColor(hex, percent) {
 
       var overlay = document.createElement('div');
       overlay.id = 'foxcod-partial-loader';
-      overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:rgba(255,255,255,0.96);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;animation:foxcodPartialFadeIn 0.2s ease;';
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:rgba(255,255,255,0.96);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;animation:foxcodPartialFadeIn 0.2s ease;';
 
       // ── Read branding config ──────────────────────────────────────────────
       var branding = (window.FoxCod && window.FoxCod.branding && window.FoxCod.branding.checkout_redirect) || null;
       var useCustomLogo = branding && branding.display_mode === 'custom_logo' && branding.logo_url;
       var logoSize = (branding && branding.logo_size) ? parseInt(branding.logo_size) : 72;
-      var outerSize = logoSize + 10;
-      var outerHalf = outerSize / 2;
-      var innerR = outerHalf - 3;
-
-      // ── Spinner ring (always shown) ──────────────────────────────────────
-      var spinnerSvg = '<svg style="position:absolute;inset:0;width:' + outerSize + 'px;height:' + outerSize + 'px;animation:foxcodPartialSpin 1.1s linear infinite;" viewBox="0 0 ' + outerSize + ' ' + outerSize + '" fill="none">'
-          + '<circle cx="' + outerHalf + '" cy="' + outerHalf + '" r="' + innerR + '" stroke="#e0e7ff" stroke-width="4"/>'
-          + '<path d="M3 ' + outerHalf + ' A' + innerR + ' ' + innerR + ' 0 0 1 ' + outerHalf + ' 3" stroke="#2563eb" stroke-width="4" stroke-linecap="round"/>'
-          + '</svg>';
 
       // ── Center icon: custom logo OR lock SVG ─────────────────────────────
       var centerIcon;
       if (useCustomLogo) {
-          var shapeRadius = branding.logo_shape === 'circle' ? '50%' : branding.logo_shape === 'rounded' ? '14px' : '0px';
+          var shapeRadius = branding.logo_shape === 'circle' ? '50%' : branding.logo_shape === 'rounded' ? '24px' : '0px';
           var zoomScale = branding.logo_zoom ? branding.logo_zoom / 100 : 1;
-          var imgSize = Math.round(logoSize * 0.58 * zoomScale);
+          var imgSize = Math.round(logoSize * zoomScale);
           
-          if (branding.show_background) {
-              centerIcon = '<div style="background:white;box-shadow:0 4px 16px rgba(0,0,0,0.12);padding:8px;border-radius:' + shapeRadius + ';overflow:hidden;display:flex;align-items:center;justify-content:center;width:' + (imgSize + 16) + 'px;height:' + (imgSize + 16) + 'px;box-sizing:border-box;">'
-                  + '<img id="foxcod-brand-logo" src="' + branding.logo_url + '" '
-                  + 'style="display:block;width:100%;height:100%;object-fit:' + (branding.logo_shape === 'circle' ? 'cover' : 'contain') + ';" '
-                  + 'loading="lazy" '
-                  + 'onerror="this.style.display=\'none\';var fb=document.getElementById(\'foxcod-lock-fallback\');if(fb)fb.style.display=\'flex\';" />'
-                  + '</div>';
-          } else {
-              centerIcon = '<div style="overflow:hidden;border-radius:' + shapeRadius + ';width:' + imgSize + 'px;height:' + imgSize + 'px;display:flex;align-items:center;justify-content:center;">'
-                  + '<img id="foxcod-brand-logo" src="' + branding.logo_url + '" '
-                  + 'style="display:block;width:100%;height:100%;object-fit:' + (branding.logo_shape === 'circle' ? 'cover' : 'contain') + ';" '
-                  + 'loading="lazy" '
-                  + 'onerror="this.style.display=\'none\';var fb=document.getElementById(\'foxcod-lock-fallback\');if(fb)fb.style.display=\'flex\';" />'
-                  + '</div>';
-          }
-          
-          centerIcon += '<div id="foxcod-lock-fallback" style="display:none;align-items:center;justify-content:center;">'
+          var bgPadding = branding.show_background ? 16 : 0;
+          var containerSize = imgSize + (bgPadding * 2);
+          var bgStyle = branding.show_background 
+              ? 'background:linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%);' 
+              : 'background:transparent;';
+          var animStyle = branding.animate_logo ? 'animation:foxcodLogoFloat 2s ease-in-out infinite;' : '';
+
+          centerIcon = '<div style="' + bgStyle + animStyle + 'padding:' + bgPadding + 'px;border-radius:' + shapeRadius + ';overflow:hidden;display:flex;align-items:center;justify-content:center;width:' + containerSize + 'px;height:' + containerSize + 'px;box-sizing:border-box;margin:0 auto;">'
+              + '<img id="foxcod-brand-logo" src="' + branding.logo_url + '" '
+              + 'style="display:block;width:100%;height:100%;object-fit:' + (branding.logo_shape === 'circle' ? 'cover' : 'contain') + ';border-radius:' + shapeRadius + ';" '
+              + 'loading="lazy" '
+              + 'onerror="this.style.display=\'none\';var fb=document.getElementById(\'foxcod-lock-fallback\');if(fb)fb.style.display=\'flex\';" />'
+              + '<div id="foxcod-lock-fallback" style="display:none;align-items:center;justify-content:center;">'
               + '<svg width="' + Math.round(logoSize * 0.5) + '" height="' + Math.round(logoSize * 0.5) + '" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>'
+              + '</div>'
               + '</div>';
       } else {
           // Default Shopify lock icon
-          centerIcon = '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
+          centerIcon = '<div style="background:linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%);padding:24px;border-radius:24px;display:flex;align-items:center;justify-content:center;width:80px;height:80px;box-sizing:border-box;margin:0 auto;">'
+              + '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>'
+              + '</div>';
       }
 
       overlay.innerHTML = [
-          // Animated lock/logo icon with spinner ring
-          '<div style="position:relative;width:' + outerSize + 'px;height:' + outerSize + 'px;">',
-              spinnerSvg,
-              '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">',
-                  centerIcon,
-              '</div>',
-          '</div>',
+          centerIcon,
 
           // Text (unchanged)
           '<div style="text-align:center;">',
               '<div style="font-size:20px;font-weight:700;color:#111827;margin-bottom:6px;">Redirecting to secure checkout</div>',
               '<div style="font-size:14px;color:#6b7280;line-height:1.6;">Please wait while we prepare your Shopify checkout...<br>Do not close or refresh this page.</div>',
+              '<div style="display:flex;justify-content:center;align-items:center;gap:6px;margin-top:24px;">',
+                  '<div class="foxcod-dot"></div><div class="foxcod-dot"></div><div class="foxcod-dot"></div>',
+              '</div>',
           '</div>',
 
           // Bottom Badges Container (Side by side)
           '<div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:12px;">',
               // 100% Secured Badge
-              '<div style="display:flex;align-items:center;gap:6px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:999px;padding:6px 14px;">',
+              '<div style="display:flex;align-items:center;gap:6px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:999px;padding:6px 14px;white-space:nowrap;">',
                   '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 11 2 2 4-4"/></svg>',
                   '<span style="font-size:12px;font-weight:600;color:#166534;">100% Secured</span>',
               '</div>',
 
               // Powered by Foxly COD (Pill Design - Blue)
-              '<div style="display:flex;align-items:center;gap:8px;background:#eff6ff;padding:4px 14px 4px 6px;border-radius:999px;border:1px solid #bfdbfe;box-shadow:0 1px 2px rgba(0,0,0,0.02);">',
+              '<div style="display:flex;align-items:center;gap:8px;background:#eff6ff;padding:4px 14px 4px 6px;border-radius:999px;border:1px solid #bfdbfe;box-shadow:0 1px 2px rgba(0,0,0,0.02);white-space:nowrap;">',
                   '<div style="display:flex;align-items:center;justify-content:center;width:24px;height:24px;background:#ffffff;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,0.1);overflow:hidden;">',
                       (window.FoxCod && window.FoxCod.appLogoUrl 
                           ? '<img src="' + window.FoxCod.appLogoUrl + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" />'
@@ -8241,7 +8228,7 @@ function darkenColor(hex, percent) {
       if (!document.getElementById('foxcod-loader-css')) {
           var css = document.createElement('style');
           css.id = 'foxcod-loader-css';
-          css.textContent = '@keyframes foxcodPartialFadeIn{from{opacity:0}to{opacity:1}} @keyframes foxcodPartialSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}} .foxcod-progress-bar-fill { transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1); }';
+          css.textContent = '@keyframes foxcodPartialFadeIn{from{opacity:0}to{opacity:1}} @keyframes foxcodBouncingDots{0%,80%,100%{transform:scale(0);opacity:0.3}40%{transform:scale(1);opacity:1}} @keyframes foxcodLogoFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}} .foxcod-dot{width:8px;height:8px;background-color:#2563eb;border-radius:50%;animation:foxcodBouncingDots 1.4s infinite ease-in-out both} .foxcod-dot:nth-child(1){animation-delay:-0.32s} .foxcod-dot:nth-child(2){animation-delay:-0.16s} .foxcod-dot:nth-child(3){animation-delay:0s}';
           document.head.appendChild(css);
       }
 
@@ -8250,58 +8237,48 @@ function darkenColor(hex, percent) {
 
       var overlay = document.createElement('div');
       overlay.id = 'foxcod-order-loader';
-      overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:rgba(255,255,255,0.96);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;animation:foxcodPartialFadeIn 0.2s ease;';
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:rgba(255,255,255,0.96);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;animation:foxcodPartialFadeIn 0.2s ease;';
 
       var branding = (window.FoxCod && window.FoxCod.branding && window.FoxCod.branding.checkout_redirect) || null;
       var useCustomLogo = branding && branding.display_mode === 'custom_logo' && branding.logo_url;
       var logoSize = (branding && branding.logo_size) ? parseInt(branding.logo_size) : 72;
-      var outerSize = logoSize + 10;
-      var outerHalf = outerSize / 2;
-      var innerR = outerHalf - 3;
-
-      var spinnerSvg = '<svg id="foxcod-cod-spinner" style="position:absolute;inset:0;width:' + outerSize + 'px;height:' + outerSize + 'px;animation:foxcodPartialSpin 1.1s linear infinite;" viewBox="0 0 ' + outerSize + ' ' + outerSize + '" fill="none">'
-          + '<circle cx="' + outerHalf + '" cy="' + outerHalf + '" r="' + innerR + '" stroke="#e0e7ff" stroke-width="4"/>'
-          + '<path d="M3 ' + outerHalf + ' A' + innerR + ' ' + innerR + ' 0 0 1 ' + outerHalf + ' 3" stroke="#2563eb" stroke-width="4" stroke-linecap="round"/>'
-          + '</svg>';
 
       var centerIcon;
       if (useCustomLogo) {
-          var shapeRadius = branding.logo_shape === 'circle' ? '50%' : branding.logo_shape === 'rounded' ? '14px' : '0px';
+          var shapeRadius = branding.logo_shape === 'circle' ? '50%' : branding.logo_shape === 'rounded' ? '24px' : '0px';
           var zoomScale = branding.logo_zoom ? branding.logo_zoom / 100 : 1;
-          var imgSize = Math.round(logoSize * 0.58 * zoomScale);
+          var imgSize = Math.round(logoSize * zoomScale);
           
-          if (branding.show_background) {
-              centerIcon = '<div style="background:white;box-shadow:0 4px 16px rgba(0,0,0,0.12);padding:8px;border-radius:' + shapeRadius + ';overflow:hidden;display:flex;align-items:center;justify-content:center;width:' + (imgSize + 16) + 'px;height:' + (imgSize + 16) + 'px;box-sizing:border-box;">'
-                  + '<img src="' + branding.logo_url + '" style="display:block;width:100%;height:100%;object-fit:' + (branding.logo_shape === 'circle' ? 'cover' : 'contain') + ';" loading="lazy" />'
-                  + '</div>';
-          } else {
-              centerIcon = '<div style="overflow:hidden;border-radius:' + shapeRadius + ';width:' + imgSize + 'px;height:' + imgSize + 'px;display:flex;align-items:center;justify-content:center;">'
-                  + '<img src="' + branding.logo_url + '" style="display:block;width:100%;height:100%;object-fit:' + (branding.logo_shape === 'circle' ? 'cover' : 'contain') + ';" loading="lazy" />'
-                  + '</div>';
-          }
+          var bgPadding = branding.show_background ? 16 : 0;
+          var containerSize = imgSize + (bgPadding * 2);
+          var bgStyle = branding.show_background 
+              ? 'background:linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%);' 
+              : 'background:transparent;';
+          var animStyle = branding.animate_logo ? 'animation:foxcodLogoFloat 2s ease-in-out infinite;' : '';
+              
+          centerIcon = '<div style="' + bgStyle + animStyle + 'padding:' + bgPadding + 'px;border-radius:' + shapeRadius + ';overflow:hidden;display:flex;align-items:center;justify-content:center;width:' + containerSize + 'px;height:' + containerSize + 'px;box-sizing:border-box;margin:0 auto;">'
+              + '<img src="' + branding.logo_url + '" style="display:block;width:100%;height:100%;object-fit:' + (branding.logo_shape === 'circle' ? 'cover' : 'contain') + ';border-radius:' + shapeRadius + ';" loading="lazy" />'
+              + '</div>';
       } else {
-          centerIcon = '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
+          centerIcon = '<div style="background:linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%);padding:24px;border-radius:24px;display:flex;align-items:center;justify-content:center;width:80px;height:80px;box-sizing:border-box;margin:0 auto;">'
+              + '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>'
+              + '</div>';
       }
 
       overlay.innerHTML = [
-          '<div style="position:relative;width:' + outerSize + 'px;height:' + outerSize + 'px;">',
-              spinnerSvg,
-              '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">',
-                  centerIcon,
-              '</div>',
-          '</div>',
-          '<div style="text-align:center;width:100%;max-width:300px;margin-top:10px;">',
+          centerIcon,
+          '<div style="text-align:center;width:100%;max-width:300px;">',
               '<div id="foxcod-cod-title" style="font-size:20px;font-weight:700;color:#111827;margin-bottom:6px;">Preparing your order...</div>',
               '<div id="foxcod-cod-subtitle" style="font-size:14px;color:#6b7280;line-height:1.6;margin-bottom:20px;">We’re securely processing your details.</div>',
-              '<div id="foxcod-cod-progress-container" style="width:100%;height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden;margin-bottom:12px;">',
-                  '<div id="foxcod-cod-progress-fill" class="foxcod-progress-bar-fill" style="width:0%;height:100%;background:#2563eb;border-radius:3px;"></div>',
+              '<div id="foxcod-cod-dots-container" style="display:flex;justify-content:center;align-items:center;gap:6px;margin-bottom:12px;">',
+                  '<div class="foxcod-dot"></div><div class="foxcod-dot"></div><div class="foxcod-dot"></div>',
               '</div>',
               '<div id="foxcod-cod-error-actions" style="display:none;margin-top:20px;gap:10px;justify-content:center;">',
                   '<button id="foxcod-cod-btn-back" style="padding:10px 16px;border:1px solid #d1d5db;border-radius:8px;background:white;color:#374151;font-weight:600;cursor:pointer;">Back</button>',
                   '<button id="foxcod-cod-btn-retry" style="padding:10px 16px;border:none;border-radius:8px;background:#2563eb;color:white;font-weight:600;cursor:pointer;">Retry</button>',
               '</div>',
           '</div>',
-          '<div style="display:flex;align-items:center;gap:8px;background:#eff6ff;padding:4px 14px 4px 6px;border-radius:999px;border:1px solid #bfdbfe;box-shadow:0 1px 2px rgba(0,0,0,0.02);margin-top:10px;">',
+          '<div style="display:flex;align-items:center;gap:8px;background:#eff6ff;padding:4px 14px 4px 6px;border-radius:999px;border:1px solid #bfdbfe;box-shadow:0 1px 2px rgba(0,0,0,0.02);margin-top:10px;white-space:nowrap;">',
               '<div style="display:flex;align-items:center;justify-content:center;width:24px;height:24px;background:#ffffff;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,0.1);overflow:hidden;">',
                   (window.FoxCod && window.FoxCod.appLogoUrl ? '<img src="' + window.FoxCod.appLogoUrl + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" />' : ''),
               '</div>',
@@ -8341,9 +8318,6 @@ function darkenColor(hex, percent) {
   }
 
   function updateCodOrderLoader(progress, title, subtitle) {
-      var fillEl = document.getElementById('foxcod-cod-progress-fill');
-      if (fillEl) fillEl.style.width = progress + '%';
-      
       if (title) {
           var titleEl = document.getElementById('foxcod-cod-title');
           if (titleEl && titleEl.innerHTML !== title) titleEl.innerHTML = title;
@@ -8365,11 +8339,8 @@ function darkenColor(hex, percent) {
 
       updateCodOrderLoader(0, 'We couldn’t create your order.', 'Your information is safe. Please try again.');
       
-      var spinner = document.getElementById('foxcod-cod-spinner');
-      if (spinner) spinner.style.display = 'none';
-
-      var progressContainer = document.getElementById('foxcod-cod-progress-container');
-      if (progressContainer) progressContainer.style.display = 'none';
+      var dotsContainer = document.getElementById('foxcod-cod-dots-container');
+      if (dotsContainer) dotsContainer.style.display = 'none';
 
       var actionsEl = document.getElementById('foxcod-cod-error-actions');
       if (actionsEl) {

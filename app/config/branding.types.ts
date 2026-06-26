@@ -13,6 +13,8 @@ export interface BrandingCheckoutRedirect {
     show_background: boolean;
     /** Which icon to show on the redirect screen */
     display_mode: 'lock_icon' | 'custom_logo';
+    /** Whether the logo should smoothly animate up and down */
+    animate_logo?: boolean;
 }
 
 /**

@@ -90,7 +90,16 @@ async function uploadLogoToShopify(admin: any, file: File): Promise<string> {
     const fileCreateRes = await admin.graphql(`
         mutation FileCreate($files: [FileCreateInput!]!) {
             fileCreate(files: $files) {
-                files { id fileStatus }
+                files {
+                    id
+                    fileStatus
+                    alt
+                    ... on MediaImage {
+                        image {
+                            url
+                        }
+                    }
+                }
                 userErrors { field message }
             }
         }
@@ -107,8 +116,41 @@ async function uploadLogoToShopify(admin: any, file: File): Promise<string> {
     const fileUserErrors = fileCreateData?.data?.fileCreate?.userErrors;
     if (fileUserErrors?.length) throw new Error(`Shopify fileCreate error: ${fileUserErrors[0].message}`);
 
-    // 4. Return the CDN URL (resourceUrl is the permanent public URL)
-    return target.resourceUrl;
+    const createdFile = fileCreateData?.data?.fileCreate?.files?.[0];
+    if (!createdFile) throw new Error('No file returned from fileCreate');
+
+    let fileId = createdFile.id;
+    let finalUrl = createdFile.image?.url;
+    let status = createdFile.fileStatus;
+    let attempts = 0;
+
+    // 4. Poll until the file is READY and has a URL
+    while ((status !== 'READY' || !finalUrl) && attempts < 15) {
+        await new Promise(res => setTimeout(res, 1000));
+        const pollRes = await admin.graphql(`
+            query {
+                node(id: "${fileId}") {
+                    ... on MediaImage {
+                        fileStatus
+                        image { url }
+                    }
+                }
+            }
+        `);
+        const pollData = await pollRes.json();
+        const node = pollData?.data?.node;
+        if (node) {
+            status = node.fileStatus;
+            finalUrl = node.image?.url;
+        }
+        attempts++;
+    }
+
+    if (!finalUrl) {
+        throw new Error('Timeout waiting for Shopify to process the uploaded image.');
+    }
+
+    return finalUrl;
 }
 
 // ── BRANDING METAFIELD SYNC ──
@@ -791,6 +833,22 @@ export default function AppSettingsPage() {
                                                             />
                                                         </InlineStack>
                                                     </Card>
+
+                                                    {/* Logo Animation */}
+                                                    <Card>
+                                                        <InlineStack align="space-between" blockAlign="center">
+                                                            <BlockStack gap="200">
+                                                                <Text variant="headingMd" as="h2">Logo Animation</Text>
+                                                                <Text variant="bodySm" tone="subdued" as="p">Make the logo smoothly animate up and down</Text>
+                                                            </BlockStack>
+                                                            <Checkbox
+                                                                label="Enable Animation"
+                                                                labelHidden
+                                                                checked={cr.animate_logo}
+                                                                onChange={(v) => updateCheckoutRedirect({ animate_logo: v })}
+                                                            />
+                                                        </InlineStack>
+                                                    </Card>
                                                 </>
                                             )}
 
@@ -811,44 +869,61 @@ export default function AppSettingsPage() {
                                             <div className="preview-phone">
                                                 <div className="preview-phone-screen preview-compact" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px 16px', background: 'white', minHeight: '380px' }}>
                                                     <div className="brd-preview-bg" style={{ width: '100%' }}>
-                                                        {/* Spinner ring + icon */}
-                                                        <div style={{ position: 'relative', width: `${logoSize + 10}px`, height: `${logoSize + 10}px`, flexShrink: 0, margin: '0 auto' }}>
-                                                            {/* Animated spinner ring */}
-                                                            <svg style={{ position: 'absolute', inset: 0, width: `${logoSize + 10}px`, height: `${logoSize + 10}px`, animation: 'brd-spin 1.1s linear infinite' }} viewBox={`0 0 ${logoSize + 10} ${logoSize + 10}`} fill="none">
-                                                                <circle cx={(logoSize + 10) / 2} cy={(logoSize + 10) / 2} r={(logoSize + 10) / 2 - 3} stroke="#e0e7ff" strokeWidth="4"/>
-                                                                <path d={`M3 ${(logoSize + 10) / 2} A${(logoSize + 10) / 2 - 3} ${(logoSize + 10) / 2 - 3} 0 0 1 ${(logoSize + 10) / 2} 3`} stroke="#2563eb" strokeWidth="4" strokeLinecap="round"/>
-                                                            </svg>
-                                                            {/* Center icon */}
-                                                            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                                {showCustomLogo ? (() => {
-                                                                    const zoomScale = cr.logo_zoom ? cr.logo_zoom / 100 : 1;
-                                                                    const imgSize = Math.round(logoSize * 0.58 * zoomScale);
-                                                                    return (
-                                                                        <div style={{ borderRadius: logoShapeBorderRadius, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', ...(cr.show_background ? { background: 'white', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', borderRadius: '14px', padding: '8px', width: `${imgSize + 16}px`, height: `${imgSize + 16}px`, boxSizing: 'border-box' } : { width: `${imgSize}px`, height: `${imgSize}px` }) }}>
-                                                                            <img
-                                                                                src={logoUrl}
-                                                                                alt="Logo preview"
-                                                                                style={{ width: '100%', height: '100%', objectFit: cr.logo_shape === 'circle' ? 'cover' : 'contain', borderRadius: logoShapeBorderRadius, display: 'block' }}
-                                                                                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                                                                            />
-                                                                        </div>
-                                                                    );
-                                                                })() : (
-                                                                    <svg width={logoSize * 0.5} height={logoSize * 0.5} viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                                        <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
-                                                                    </svg>
-                                                                )}
-                                                            </div>
+                                                        {/* Center icon */}
+                                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                            {showCustomLogo ? (() => {
+                                                                const shapeRadius = cr.logo_shape === 'circle' ? '50%' : cr.logo_shape === 'rounded' ? '24px' : '0px';
+                                                                const zoomScale = cr.logo_zoom ? cr.logo_zoom / 100 : 1;
+                                                                const imgSize = Math.round(logoSize * zoomScale);
+                                                                const bgPadding = cr.show_background ? 16 : 0;
+                                                                const containerSize = imgSize + (bgPadding * 2);
+                                                                const bgStyle = cr.show_background ? { background: 'linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%)' } : { background: 'transparent' };
+                                                                const animStyle = cr.animate_logo ? { animation: 'foxcodLogoFloat 2s ease-in-out infinite' } : {};
+
+                                                                return (
+                                                                    <div style={{ padding: `${bgPadding}px`, borderRadius: shapeRadius, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', width: `${containerSize}px`, height: `${containerSize}px`, boxSizing: 'border-box', margin: '0 auto', ...bgStyle, ...animStyle }}>
+                                                                        <img
+                                                                            src={logoUrl}
+                                                                            alt="Logo preview"
+                                                                            style={{ display: 'block', width: '100%', height: '100%', objectFit: cr.logo_shape === 'circle' ? 'cover' : 'contain', borderRadius: shapeRadius }}
+                                                                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                                                        />
+                                                                    </div>
+                                                                );
+                                                            })() : (
+                                                                <div style={{ background: 'linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%)', padding: '24px', borderRadius: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '80px', height: '80px', boxSizing: 'border-box', margin: '0 auto' }}>
+                                                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                         {/* Text */}
-                                                        <div style={{ textAlign: 'center', marginTop: '20px' }}>
+                                                        <div style={{ textAlign: 'center', marginTop: '12px' }}>
                                                             <div style={{ fontSize: 16, fontWeight: 700, color: '#111827', marginBottom: 4 }}>Redirecting to secure checkout</div>
                                                             <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>Please wait while we prepare your Shopify checkout…</div>
+                                                            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', marginTop: '24px' }}>
+                                                                <div className="foxcod-dot-preview"></div>
+                                                                <div className="foxcod-dot-preview" style={{ animationDelay: '-0.16s' }}></div>
+                                                                <div className="foxcod-dot-preview" style={{ animationDelay: '0s' }}></div>
+                                                            </div>
                                                         </div>
-                                                        {/* Shopify badge */}
-                                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 99, padding: '6px 12px', marginTop: '20px', width: 'fit-content', margin: '20px auto 0' }}>
-                                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 11 2 2 4-4"/></svg>
-                                                            <span style={{ fontSize: 11, fontWeight: 600, color: '#166534' }}>Secured by Shopify</span>
+                                                        {/* Bottom Badges Container (Side by side) */}
+                                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginTop: '12px' }}>
+                                                            {/* 100% Secured Badge */}
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 999, padding: '6px 14px' }}>
+                                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 11 2 2 4-4"/></svg>
+                                                                <span style={{ fontSize: 12, fontWeight: 600, color: '#166534', whiteSpace: 'nowrap' }}>100% Secured</span>
+                                                            </div>
+
+                                                            {/* Powered by Foxly COD */}
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#eff6ff', padding: '4px 14px 4px 6px', borderRadius: 999, border: '1px solid #bfdbfe', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
+                                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 24, height: 24, background: '#ffffff', borderRadius: '50%', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
+                                                                    <img src="/foxly-logo.jpeg" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%', display: 'block' }} />
+                                                                </div>
+                                                                <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', lineHeight: 1, textAlign: 'left', whiteSpace: 'nowrap' }}>
+                                                                    <span style={{ fontSize: 8, fontWeight: 700, color: '#3b82f6', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 2 }}>Powered by</span>
+                                                                    <span style={{ fontSize: 13, fontWeight: 800, color: '#1d4ed8', letterSpacing: '-0.3px' }}>Foxly COD</span>
+                                                                </div>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -884,6 +959,10 @@ const styles = `
     .preview-phone-screen.preview-compact { min-height: auto; max-height: none; padding: 20px 16px; }
 
     @keyframes brd-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    @keyframes foxcodBouncingDotsPreview { 0%, 80%, 100% { transform: scale(0); opacity: 0.3; } 40% { transform: scale(1); opacity: 1; } }
+    @keyframes foxcodLogoFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+    .foxcod-dot-preview { width: 8px; height: 8px; background-color: #2563eb; border-radius: 50%; animation: foxcodBouncingDotsPreview 1.4s infinite ease-in-out both; }
+    .foxcod-dot-preview:nth-child(1) { animation-delay: -0.32s; }
 
     .as-page { display: flex; flex-direction: column; min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f6f6f7; }
     .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
