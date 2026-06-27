@@ -49,6 +49,8 @@ export interface GraphQLOrderResult {
   orderId?: string;
   orderName?: string;
   orderStatusUrl?: string;
+  /** Shopify-hosted invoice URL returned by draftOrderInvoiceSend. */
+  invoiceUrl?: string;
   error?: string;
 }
 
@@ -308,9 +310,11 @@ export async function createPendingOrder(params: GraphQLOrderParams): Promise<Gr
     draftOrderInput.billingAddress = billingAddr;
   }
   
-  // NOTE: For COD, we intentionally OMIT shippingAddress during draftOrderCreate
-  // to bypass Shopify's strict shipping zone validations during draftOrderComplete.
-  // We will append it via orderUpdate immediately after the order is completed.
+  // Provide the shipping address directly in draftOrderCreate
+  // so the Shopify checkout (via invoice URL) is fully pre-populated.
+  if (shippingAddr) {
+    draftOrderInput.shippingAddress = shippingAddr;
+  }
 
   console.log('[FOXCOD SHOPIFY PAYLOAD]', JSON.stringify(draftOrderInput, null, 2));
   console.log('[DRAFT ORDER VARIABLES]', JSON.stringify({ variables: { input: draftOrderInput } }, null, 2));
@@ -353,17 +357,27 @@ export async function createPendingOrder(params: GraphQLOrderParams): Promise<Gr
     return { success: false, error: 'Failed to create draft order.' };
   }
 
-  // 6. Execute draftOrderComplete with paymentPending: true
-  const completeRes = await graphql(`
-    mutation draftOrderComplete($id: ID!, $paymentPending: Boolean!) {
-      draftOrderComplete(id: $id, paymentPending: $paymentPending) {
+  // Extract numeric ID for DB logging / backward-compat
+  const numericDraftOrderId = String(draftOrderId).split('/').pop() || '';
+  console.log('[FOXCOD] Draft Order Created', {
+    draftOrderId,
+    shop: params.shop,
+    lineItemsCount: params.lineItems?.length ?? 0,
+    total: params.targetTotal
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // 6. Execute draftOrderInvoiceSend
+  //    Generates a Shopify-hosted invoice URL for the draft order.
+  //    The customer is redirected to this URL; Shopify controls all subsequent
+  //    navigation (including advancing to the Order Confirmation / Thank You page).
+  // ─────────────────────────────────────────────────────────────────────────
+  const invoiceSendRes = await graphql(`
+    mutation DraftOrderInvoiceSend($id: ID!, $email: EmailInput) {
+      draftOrderInvoiceSend(id: $id, email: $email) {
         draftOrder {
           id
-          order {
-            id
-            name
-            statusPageUrl
-          }
+          invoiceUrl
         }
         userErrors {
           field
@@ -371,78 +385,40 @@ export async function createPendingOrder(params: GraphQLOrderParams): Promise<Gr
         }
       }
     }
-  `, { variables: { id: draftOrderId, paymentPending: true } });
+  `, {
+    variables: {
+      id: draftOrderId,
+      // Pass customer email if available so Shopify can also send the invoice email.
+      // If email is absent, Shopify uses whatever is stored on the draft order.
+      ...(params.customer.email ? { email: { to: params.customer.email } } : {}),
+    },
+  });
 
-  const completeData = await completeRes.json();
-  console.log('[DRAFT ORDER COMPLETE RESPONSE]', JSON.stringify(completeData, null, 2));
-  const completeErrors = completeData?.data?.draftOrderComplete?.userErrors || [];
+  const invoiceSendData = await invoiceSendRes.json();
+  console.log('[DRAFT ORDER INVOICE SEND RESPONSE]', JSON.stringify(invoiceSendData, null, 2));
 
-  if (completeErrors.length > 0) {
-    const errorMsg = completeErrors.map((e: any) => e.message).join(', ');
-    console.error(`[GraphQL Order] draftOrderComplete failed: ${errorMsg}`);
-    return { success: false, error: `Draft completion failed: ${errorMsg}` };
+  const invoiceSendErrors = invoiceSendData?.data?.draftOrderInvoiceSend?.userErrors || [];
+  if (invoiceSendErrors.length > 0) {
+    const errorMsg = invoiceSendErrors.map((e: any) => e.message).join(', ');
+    console.error(`[GraphQL Order] draftOrderInvoiceSend failed: ${errorMsg}`);
+    return { success: false, error: `Invoice send failed: ${errorMsg}` };
   }
 
-  const finalOrder = completeData?.data?.draftOrderComplete?.draftOrder?.order;
-  if (!finalOrder) {
-    console.error(`[GraphQL Order] draftOrderComplete returned no final order.`);
-    return { success: false, error: 'Failed to complete draft order.' };
+  const invoiceUrl = invoiceSendData?.data?.draftOrderInvoiceSend?.draftOrder?.invoiceUrl;
+  if (!invoiceUrl) {
+    console.error(`[GraphQL Order] draftOrderInvoiceSend returned no invoiceUrl.`);
+    return { success: false, error: 'Invoice URL not returned by Shopify.' };
   }
-
-  // Extract the raw numeric ID to preserve backward compatibility across the app
-  const numericOrderId = String(finalOrder.id).split('/').pop() || '';
-
-  // 7. Apply shipping/billing address via orderUpdate
-  if (shippingAddr) {
-    console.log(
-      "[DEBUG SHIPPING ADDRESS]",
-      JSON.stringify(shippingAddr, null, 2)
-    );
-    console.log(
-      "[DEBUG ORDER UPDATE INPUT]",
-      JSON.stringify(
-        {
-          id: finalOrder.id,
-          shippingAddress: shippingAddr
-        },
-        null,
-        2
-      )
-    );
-    graphql(`
-      mutation orderUpdate($input: OrderInput!) {
-        orderUpdate(input: $input) {
-          order { id }
-          userErrors { field message }
-        }
-      }
-    `, {
-      variables: {
-        input: {
-          id: finalOrder.id,
-          shippingAddress: shippingAddr
-        }
-      }
-    }).then(async (updateRes: any) => {
-      const updateData = await updateRes.json();
-      console.log(
-        "[DEBUG ORDER UPDATE RESPONSE]",
-        JSON.stringify(updateData, null, 2)
-      );
-      const updateErrors = updateData?.data?.orderUpdate?.userErrors || [];
-      if (updateErrors.length > 0) {
-        console.warn(`[GraphQL Order] orderUpdate (address bypass) failed:`, updateErrors.map((e: any) => e.message).join(', '));
-        // Non-fatal, the order is already created successfully.
-      }
-    }).catch((err: any) => {
-      console.warn(`[GraphQL Order] orderUpdate (address bypass) caught error:`, err);
-    });
-  }
+  console.log('[FOXCOD API] Returning Response', {
+    success: true,
+    orderType: 'cod',
+    draftOrderId,
+    invoiceUrl
+  });
 
   return {
     success: true,
-    orderId: numericOrderId,
-    orderName: finalOrder.name,
-    orderStatusUrl: finalOrder.statusPageUrl
+    orderId: numericDraftOrderId,
+    invoiceUrl,
   };
 }

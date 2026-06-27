@@ -526,10 +526,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             totalPrice
         });
 
-        /*
-        ========================================================
-        LEGACY DIRECT COD ORDER FLOW
-        Temporarily disabled for Shopify App Review compliance.
+        // ========================================================
+        // LEGACY DIRECT COD ORDER FLOW
+        // Temporarily disabled for Shopify App Review compliance.
         
         const graphqlResult = await createPendingOrder(paramsForGraphql);
         console.log('⏱ Shopify API responded:', Date.now() - start, 'ms');
@@ -545,9 +544,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         const shopifyOrderId = graphqlResult.orderId!;
         const shopifyOrderName = graphqlResult.orderName || '';
         const orderStatusUrl = graphqlResult.orderStatusUrl || null;
+        const invoiceUrl = graphqlResult.invoiceUrl || null;
 
-        console.log("[COD] Shopify Order Created:", shopifyOrderName);
-        console.log("[COD] Order Status URL:", orderStatusUrl);
+        console.log("[COD] Shopify Draft Order ID:", shopifyOrderId);
+        console.log("[COD] Invoice URL:", invoiceUrl);
+        if (invoiceUrl) {
+            console.log("[FOXCOD] Redirecting customer");
+        }
 
         // ── 5. SAVE ORDER TO DB (with Shopify IDs) ──
         const orderLog = await logOrderWithShopifyIds({
@@ -583,21 +586,26 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
         console.log("⏱ [COD Order] Total time:", Date.now() - start, "ms");
 
+        console.log('[FOXCOD API] Sending response to frontend:', {
+            success: true,
+            draftOrderId: shopifyOrderId,
+            invoiceUrl
+        });
+        console.log('[FOXCOD API] Response returned successfully');
+
         return Response.json({
             success: true,
+            orderType: 'cod',
             orderId: orderLog.id,
+            draftOrderId: shopifyOrderId,
+            invoiceUrl,
+            // Backward-compatible fields (invoiceUrl flow: orderStatusUrl will be null)
             shopifyOrderId,
             shopifyOrderName,
             orderName: shopifyOrderName,
             orderStatusUrl,
         }, { headers: corsHeaders });
-        ========================================================
-        */
-
-        return Response.json({
-            success: false,
-            error: "Direct order creation is disabled. Please refresh the page and try again.",
-        }, { status: 400, headers: corsHeaders });
+        // ========================================================
 
     } catch (error: any) {
         console.error("[COD Order] Error:", error);

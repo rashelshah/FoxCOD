@@ -972,8 +972,50 @@ async function handleFullPrepaidCheckout(request: Request, data: any) {
 //   3. Shopify API call (direct, from request data — no DB round-trip)
 //   4. Save order to DB (1 call, with Shopify IDs included)
 //   5. Non-blocking: customer upsert + Sheets sync
-// ──────────────────────────────────────────────────────────────────────────────
+// ─── Pre-fill Shopify Checkout URL ──────────────────────────────────────────────
+function appendCheckoutParams(invoiceUrl: string, formData: any): string {
+    try {
+        const url = new URL(invoiceUrl);
 
+        const nameStr = (formData.customerName || 'Customer').trim();
+        const nameParts = nameStr.split(/\s+/);
+        const firstName = nameParts[0] || 'Customer';
+        const lastName = nameParts.slice(1).join(" ") || "";
+
+        if (formData.customerEmail) {
+            url.searchParams.set("checkout[email]", formData.customerEmail);
+        }
+        
+        url.searchParams.set("checkout[shipping_address][first_name]", firstName);
+        url.searchParams.set("checkout[shipping_address][last_name]", lastName);
+        
+        if (formData.customerAddress) {
+            url.searchParams.set("checkout[shipping_address][address1]", formData.customerAddress);
+        }
+
+        if (formData.customerCity) {
+            url.searchParams.set("checkout[shipping_address][city]", formData.customerCity);
+        }
+        
+        if (formData.customerZipcode) {
+            url.searchParams.set("checkout[shipping_address][zip]", formData.customerZipcode);
+        }
+        
+        const orderCountry = formData.customerCountry || formData.country || 'US';
+        url.searchParams.set("checkout[shipping_address][country]", orderCountry);
+
+        if (formData.customerState) {
+            url.searchParams.set("checkout[shipping_address][province]", formData.customerState);
+        }
+
+        return url.toString();
+    } catch (e) {
+        console.error("[Proxy] Failed to append checkout params", e);
+        return invoiceUrl; // fallback to original url if parsing fails
+    }
+}
+
+// ─── Handle Regular COD Order ─────────────────────────────────────────────────
 async function handleRegularOrder(request: Request, data: any) {
     const start = Date.now();
     console.log('⏱ [Proxy] Start order for shop:', data.shop);
@@ -1293,10 +1335,9 @@ async function handleRegularOrder(request: Request, data: any) {
     };
 
     const t_create_pending = performance.now();
-    /*
-    ========================================================
-    LEGACY DIRECT COD ORDER FLOW
-    Temporarily disabled for Shopify App Review compliance.
+    // ========================================================
+    // LEGACY DIRECT COD ORDER FLOW
+    // Temporarily disabled for Shopify App Review compliance.
     
     const graphqlResult = await createPendingOrder(paramsForGraphql);
     console.log(`[PERF] createPendingOrder total duration: ${performance.now() - t_create_pending}ms`);
@@ -1310,56 +1351,25 @@ async function handleRegularOrder(request: Request, data: any) {
         }), { status: 200, headers: corsHeaders }); // Status 200 so UI gets the error message
     }
 
-    const shopifyOrderId = graphqlResult.orderId!;
-    const shopifyOrderName = graphqlResult.orderName || '';
-    const orderStatusUrl = graphqlResult.orderStatusUrl || null;
+    const shopifyDraftOrderId = graphqlResult.orderId!;
+    let invoiceUrl = graphqlResult.invoiceUrl || null;
 
-    console.log('[COD] Shopify Order Created:', shopifyOrderName);
-    console.log('[COD] Order Status URL:', orderStatusUrl);
-    console.log('⏱ [Proxy] Shopify order created in:', Date.now() - start, 'ms — returning to frontend now');
+    if (invoiceUrl) {
+        invoiceUrl = appendCheckoutParams(invoiceUrl, data);
+    }
 
-    // ── 5. FIRE-AND-FORGET: Save order to DB ──
-    // We already have the Shopify order confirmed — don't block the frontend
-    // redirect on a DB write. Log asynchronously; the order is safe in Shopify.
-    Promise.resolve(
-        logOrderWithShopifyIds({
-            shop_domain: data.shop,
-            customer_name: customerName,
-            customer_phone: data.customerPhone || '',
-            customer_address: data.customerAddress || '',
-            customer_email: data.customerEmail || '',
-            notes: orderNotes,
-            city: data.customerCity || '',
-            state: data.customerState || '',
-            pincode: data.customerZipcode || '',
-            product_id: normalizedProductId,
-            product_title: data.productTitle || 'Product',
-            variant_id: data.variantId || '',
-            quantity: parseInt(data.quantity) || 1,
-            price: totalPrice.toString(),
-            shipping_label: data.shippingLabel || '',
-            shipping_price: shippingPrice,
-            coupon_code: couponCode || undefined,
-            discount_amount: couponDiscount || undefined,
-            original_total: pricing.originalTotal,
-            final_total: totalPrice,
-            currency: currencyCode,
-            order_payload: {
-                ...data,
-                couponCode: couponCode || '',
-                discountAmount: couponDiscount,
-                originalTotal: pricing.originalTotal,
-                finalTotal: totalPrice,
-            },
-        }, shopifyOrderId, shopifyOrderName)
-    ).then(() => {
-        console.log('⏱ [Proxy] DB save done (async):', Date.now() - start, 'ms');
-    }).catch((dbErr: any) => {
-        // Shopify order already created — DB failure is non-fatal
-        console.error('[Proxy] ⚠️ DB save failed (Shopify order exists, order is safe):', dbErr.message);
+    console.log('[COD] Draft Order ID:', shopifyDraftOrderId);
+    console.log('[COD] Invoice URL:', invoiceUrl);
+    console.log('[FOXCOD API] Sending response to frontend:', {
+        success: true,
+        draftOrderId: shopifyDraftOrderId,
+        invoiceUrl,
     });
+    console.log('⏱ [Proxy] Shopify draft order created in:', Date.now() - start, 'ms — returning to frontend now');
 
-    // ── 6. NON-BLOCKING: Customer upsert + Google Sheets sync ──
+    console.log('⏱ [Proxy] Shopify draft order created in:', Date.now() - start, 'ms — returning to frontend now');
+
+    // ── 6. NON-BLOCKING: Customer upsert ──
     // Fire-and-forget — do NOT await
     if (data.customerPhone && data.customerPhone.trim()) {
         Promise.resolve(
@@ -1379,40 +1389,24 @@ async function handleRegularOrder(request: Request, data: any) {
         ).catch((err: any) => console.error('[Proxy] Customer upsert error (non-blocking):', err.message));
     }
 
-    syncOrderToGoogleSheets(data.shop, {
-        orderId: shopifyOrderId,
-        orderName: shopifyOrderName,
-        customerName: data.customerName || '',
-        phone: data.customerPhone || '',
-        email: data.customerEmail || '',
-        address: data.customerAddress || '',
-        city: data.customerCity || '',
-        state: data.customerState || '',
-        pincode: data.customerZipcode || '',
-        product: data.productTitle || 'Product',
-        quantity: parseInt(data.quantity) || 1,
-        totalPrice: totalPrice.toString(),
-        paymentMethod: 'full_cod',
-    }).catch(err => {
-        console.error('[Proxy] Google Sheets sync error (non-blocking):', err.message);
-    });
-
     console.log('⏱ [Proxy] Total time to response:', Date.now() - start, 'ms');
 
     return new Response(JSON.stringify({
         success: true,
-        shopifyOrderId,
-        shopifyOrderName,
-        orderName: shopifyOrderName,
-        orderStatusUrl,
+        checkoutUrl: invoiceUrl,
+        draftOrderId: shopifyDraftOrderId,
     }), { headers: corsHeaders });
-    ========================================================
-    */
+
+    console.log('⏱ [Proxy] Total time to response:', Date.now() - start, 'ms');
+    console.log('[FOXCOD API] Response returned successfully');
 
     return new Response(JSON.stringify({
-        success: false,
-        error: "Direct order creation is disabled. Please refresh the page and try again.",
-    }), { status: 200, headers: corsHeaders });
+        success: true,
+        orderType: 'cod',
+        draftOrderId: shopifyDraftOrderId,
+        invoiceUrl,
+    }), { headers: corsHeaders });
+    // ========================================================
 }
 
 // ─── Handle Native COD Checkout ───────────────────────────────────────────────

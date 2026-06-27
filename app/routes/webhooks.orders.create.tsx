@@ -1,6 +1,7 @@
 import type { ActionFunctionArgs } from "react-router";
 import { authenticate, unauthenticated } from "../shopify.server";
 import { logOrder, type OrderLogEntry } from "../config/supabase.server";
+import { syncOrderToGoogleSheets } from "../services/google-sheets.server";
 
 /**
  * Webhook Handler: orders/create
@@ -37,15 +38,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const pcodCode = discountCodes.find((dc: any) => dc.code?.startsWith("FOX-PCOD-"));
     const pcodApp = discountApps.find((da: any) => da.code?.startsWith("FOX-PCOD-") || da.title?.startsWith("FoxlyCOD Partial Payment"));
     
-    const isFullPrepaid = fullPrepaidAttr?.value === "true" || (payload.tags && payload.tags.includes("FoxlyCOD, Full Prepaid"));
-    const isPartialCod = !isFullPrepaid && (partialCodAttr?.value === "true" || !!pcodCode || !!pcodApp);
+    const isFullPrepaid = fullPrepaidAttr?.value === "true" || (payload.tags && payload.tags.includes("FoxlyCOD, Full Prepaid")) || (payload.tags && payload.tags.includes("Full Prepaid"));
+    const isPartialCod = !isFullPrepaid && (partialCodAttr?.value === "true" || !!pcodCode || !!pcodApp || (payload.tags && payload.tags.includes("Partial COD")));
+    const isRegularCod = !isPartialCod && !isFullPrepaid && payload.tags && payload.tags.includes("COD");
 
-    if (!isPartialCod && !isFullPrepaid) {
-      console.log("[Webhook] Not a partial COD or Full Prepaid order, skipping");
+    if (!isPartialCod && !isFullPrepaid && !isRegularCod) {
+      console.log("[Webhook] Not a FoxlyCOD order (Partial/Full/Regular), skipping");
       return new Response(null, { status: 200 });
     }
 
-    console.log("[Webhook] Detected Special COD order:", payload.name, "| isFullPrepaid:", isFullPrepaid);
+    console.log("[Webhook] Detected FoxlyCOD order:", payload.name, "| isFullPrepaid:", isFullPrepaid, "| isPartialCod:", isPartialCod, "| isRegularCod:", isRegularCod);
 
     const getAttrValue = (key: string) => {
       const attr = noteAttributes.find((attribute: any) => attribute.name === key);
@@ -106,16 +108,43 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       orderLogEntry.is_full_prepaid = true;
       orderLogEntry.advance_amount = advanceAmount;
       orderLogEntry.remaining_cod_amount = remainingAmount; // Should be 0
-    } else {
+    } else if (isPartialCod) {
       orderLogEntry.payment_method = 'partial_cod';
       orderLogEntry.is_partial_cod = true;
       orderLogEntry.advance_amount = advanceAmount;
       orderLogEntry.remaining_cod_amount = remainingAmount;
+    } else if (isRegularCod) {
+      orderLogEntry.payment_method = 'cod'; // Note: logOrder expects 'cod' for regular cod
+      orderLogEntry.is_partial_cod = false;
+      orderLogEntry.is_full_prepaid = false;
+      orderLogEntry.advance_amount = 0;
+      orderLogEntry.remaining_cod_amount = parseFloat(payload.total_price) || 0;
     }
 
     console.log("[Webhook] Logging special COD order:", orderLogEntry);
     await logOrder(orderLogEntry);
     console.log("[Webhook] Special COD order logged successfully:", payload.name);
+
+    // Sync to Google Sheets
+    syncOrderToGoogleSheets(shop, {
+      orderId: payload.id?.toString(),
+      orderName: payload.name,
+      customerName: orderLogEntry.customer_name,
+      phone: orderLogEntry.customer_phone,
+      email: orderLogEntry.customer_email || '',
+      address: orderLogEntry.customer_address,
+      city: orderLogEntry.city || '',
+      state: orderLogEntry.state || '',
+      pincode: orderLogEntry.pincode || '',
+      product: orderLogEntry.product_title,
+      quantity: orderLogEntry.quantity,
+      totalPrice: orderLogEntry.price,
+      paymentMethod: orderLogEntry.payment_method === 'full_prepaid' ? 'full_prepaid' : 
+                     orderLogEntry.payment_method === 'partial_cod' ? 'partial_cod' : 'full_cod',
+      status: 'pending',
+    }).catch((err) => {
+      console.error('[Webhook] Google Sheets sync error (non-blocking):', err.message);
+    });
 
     // ── Apply Order Edit to Fix Order Total and Payment Status ──
     let graphqlAdmin = admin;

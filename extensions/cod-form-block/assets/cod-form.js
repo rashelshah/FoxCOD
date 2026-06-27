@@ -14,7 +14,7 @@
   Legacy direct order creation flow has been preserved below and can be restored by setting:
   USE_NATIVE_COD_CHECKOUT = false
   */
-  const USE_NATIVE_COD_CHECKOUT = true;
+  const USE_NATIVE_COD_CHECKOUT = false;
 
   // Ensure FoxCod.pixelTracking always exists
   window.FoxCod = window.FoxCod || {};
@@ -1364,11 +1364,19 @@
       submitBtn.disabled = true;
     }
 
-    // ── Redirect to Shopify native Order Status page ──
+    // ── Primary path: redirect to Shopify invoice URL (draftOrderInvoiceSend flow) ──
+    var invoiceUrl = result && result.invoiceUrl;
+    if (invoiceUrl) {
+      console.log('[FOXCOD] Redirecting customer');
+      window.location.assign(invoiceUrl);
+      return;
+    }
+
+    // ── Fallback: redirect to Shopify native Order Status page ──
     var orderStatusUrl = result && result.orderStatusUrl;
 
     if (orderStatusUrl) {
-      // Primary path: use Shopify-provided order_status_url
+      // Use replace so the loader page is not in the browser history
       window.location.replace(orderStatusUrl);
       return;
     }
@@ -8273,9 +8281,10 @@ function darkenColor(hex, percent) {
               '<div id="foxcod-cod-dots-container" style="display:flex;justify-content:center;align-items:center;gap:6px;margin-bottom:12px;">',
                   '<div class="foxcod-dot"></div><div class="foxcod-dot"></div><div class="foxcod-dot"></div>',
               '</div>',
-              '<div id="foxcod-cod-error-actions" style="display:none;margin-top:20px;gap:10px;justify-content:center;">',
+              '<div id="foxcod-cod-error-actions" style="display:none;margin-top:20px;gap:10px;justify-content:center;flex-wrap:wrap;">',
                   '<button id="foxcod-cod-btn-back" style="padding:10px 16px;border:1px solid #d1d5db;border-radius:8px;background:white;color:#374151;font-weight:600;cursor:pointer;">Back</button>',
                   '<button id="foxcod-cod-btn-retry" style="padding:10px 16px;border:none;border-radius:8px;background:#2563eb;color:white;font-weight:600;cursor:pointer;">Retry</button>',
+                  '<button id="foxcod-cod-btn-continue" style="display:none;padding:10px 20px;border:none;border-radius:8px;background:#16a34a;color:white;font-weight:600;cursor:pointer;">Continue to Checkout →</button>',
               '</div>',
           '</div>',
           '<div style="display:flex;align-items:center;gap:8px;background:#eff6ff;padding:4px 14px 4px 6px;border-radius:999px;border:1px solid #bfdbfe;box-shadow:0 1px 2px rgba(0,0,0,0.02);margin-top:10px;white-space:nowrap;">',
@@ -8307,7 +8316,7 @@ function darkenColor(hex, percent) {
                   _codLoaderState.progressTimer = setTimeout(function() {
                       updateCodOrderLoader(75, 'Almost there...', 'Finalizing your order.');
                       _codLoaderState.progressTimer = setTimeout(function() {
-                          updateCodOrderLoader(80, 'Almost there...', 'Finalizing your order.');
+                      updateCodOrderLoader(80, 'Almost there...', 'Finalizing your order.');
                       }, 1000);
                   }, 1000);
               }, 1000);
@@ -8334,23 +8343,48 @@ function darkenColor(hex, percent) {
       clearTimeout(_codLoaderState.progressTimer);
   }
 
-  function showCodOrderError(retryCallback) {
+  function showCodOrderError(retryCallback, invoiceUrl) {
       clearTimeout(_codLoaderState.progressTimer);
 
-      updateCodOrderLoader(0, 'We couldn’t create your order.', 'Your information is safe. Please try again.');
-      
+      // If we already have an invoiceUrl, the order was created — just redirect failed.
+      // Show a targeted message + Continue to Checkout instead of Retry.
+      var hasInvoice = !!invoiceUrl;
+
+      updateCodOrderLoader(0,
+          hasInvoice ? 'Redirect timed out.' : 'We couldn\'t create your order.',
+          hasInvoice ? 'Your order was created. Tap below to go to checkout.' : 'Your information is safe. Please try again.'
+      );
+
       var dotsContainer = document.getElementById('foxcod-cod-dots-container');
       if (dotsContainer) dotsContainer.style.display = 'none';
 
       var actionsEl = document.getElementById('foxcod-cod-error-actions');
       if (actionsEl) {
           actionsEl.style.display = 'flex';
+
           var retryBtn = document.getElementById('foxcod-cod-btn-retry');
-          if (retryBtn) {
-              retryBtn.onclick = function() {
-                  hideCodOrderLoader();
-                  if (retryCallback) retryCallback();
-              };
+          var continueBtn = document.getElementById('foxcod-cod-btn-continue');
+
+          if (hasInvoice) {
+              // Hide Retry — we must NOT create another draft order
+              if (retryBtn) retryBtn.style.display = 'none';
+              if (continueBtn) {
+                  continueBtn.style.display = 'inline-block';
+                  continueBtn.onclick = function() {
+                      console.log('[FOXCOD FRONTEND] Continue to Checkout clicked:', invoiceUrl);
+                      window.location.assign(invoiceUrl);
+                  };
+              }
+          } else {
+              // Standard retry — create a new draft order
+              if (retryBtn) {
+                  retryBtn.style.display = 'inline-block';
+                  retryBtn.onclick = function() {
+                      hideCodOrderLoader();
+                      if (retryCallback) retryCallback();
+                  };
+              }
+              if (continueBtn) continueBtn.style.display = 'none';
           }
       }
   }
@@ -8551,19 +8585,18 @@ function darkenColor(hex, percent) {
           return;
       }
 
-      /*
-      ========================================================
-      LEGACY DIRECT COD ORDER FLOW
-      Temporarily disabled for Shopify App Review compliance.
-      Flow:
-      COD Form
-      → Validate Form
-      → Create Pending Order
-      → Create Shopify Order
-      → Redirect to Order Status Page
-      DO NOT DELETE.
-      May be restored in future releases.
-      ========================================================
+      // ========================================================
+      // LEGACY DIRECT COD ORDER FLOW
+      // Temporarily disabled for Shopify App Review compliance.
+      // Flow:
+      // COD Form
+      // → Validate Form
+      // → Create Pending Order
+      // → Create Shopify Order
+      // → Redirect to Order Status Page
+      // DO NOT DELETE.
+      // May be restored in future releases.
+      // ========================================================
       
       // Full COD: Send to regular backend
       showCodOrderLoader();
@@ -8576,14 +8609,38 @@ function darkenColor(hex, percent) {
           console.log('[COD Form] Order response:', result);
           
           if (result.success) {
-              updateCodOrderLoader(100, 'Order confirmed!', 'Redirecting you to your order page...');
-              
-              // ── Immediately show redirect feedback on the button ──
+              // ── Step 1: Log full API response ──
+              console.log('[FOXCOD FRONTEND] API Response', result);
+
+              // ── Validate: must have invoiceUrl ──
+              if (!result.invoiceUrl) {
+                  console.error('[FOXCOD FRONTEND] API Response missing invoiceUrl — entering error state');
+                  showCodOrderError(retryFn);
+                  config._isSubmitting = false;
+                  submitBtn.disabled = false;
+                  submitBtn.textContent = originalBtnText;
+                  return;
+              }
+
+              console.log('[FOXCOD FRONTEND] Draft Order', result.draftOrderId);
+              console.log('[FOXCOD FRONTEND] Invoice URL', result.invoiceUrl);
+
+              var invoiceUrl = result.invoiceUrl;
+
+              // ── Persist to sessionStorage for recovery ──
+              try {
+                  sessionStorage.setItem('foxcodDraftId', result.draftOrderId || '');
+                  sessionStorage.setItem('foxcodInvoiceUrl', invoiceUrl);
+              } catch (e) { /* sessionStorage may be unavailable */ }
+
+              // ── Step 2: Fast Loader & Redirect ──
+              clearTimeout(_codLoaderState.progressTimer);
+              updateCodOrderLoader(60, 'Creating your order...', 'Preparing secure checkout...');
+
               submitBtn.textContent = 'Redirecting...';
               submitBtn.style.setProperty('opacity', '1', 'important');
 
               // ── Pixel Tracking: Purchase ──
-              // Use payload.finalTotal which includes upsells, or read from DOM, or compute fallback
               var purchaseValue = payload.finalTotal || 0;
               if (!purchaseValue) {
                   var summaryTotalEl = form.querySelector('#cod-summary-total');
@@ -8591,25 +8648,30 @@ function darkenColor(hex, percent) {
                       purchaseValue = parseFloat(summaryTotalEl.textContent.replace(/[^0-9.]/g, '')) || 0;
                   }
               }
-              // Fallback: compute from payload if still no value
               if (!purchaseValue) {
                   purchaseValue = ((payload.price || 0) * (payload.quantity || 1)) + (payload.shippingPrice || 0);
               }
-              console.log('[FoxCod Pixels] Correct Purchase total:', purchaseValue);
               foxCodTrackEvent('Purchase', { value: purchaseValue, currency: (FoxCod.currencyConfig && FoxCod.currencyConfig.code) || 'USD' });
 
               setTimeout(function() {
-                  // ── Save customer data + redirect ──
                   saveCustomerToLocalStorage(form);
                   localStorage.removeItem('foxcod_checkout_state');
-                  handleOrderSuccess(config, form, submitBtn, originalBtnText, result);
-              }, 600);
+
+                  updateCodOrderLoader(95, 'Redirecting...', 'Taking you to secure checkout...');
+
+                  setTimeout(function() {
+                      console.log('[FOXCOD FRONTEND] Redirecting to Invoice URL', invoiceUrl);
+                      window.location.replace(invoiceUrl);
+                  }, 200); // Wait 200ms on final text before replacing window
+              }, 300); // 300ms total initial loader state
+
           } else {
               showCodOrderError(retryFn);
               config._isSubmitting = false;
               submitBtn.disabled = false;
               submitBtn.textContent = originalBtnText;
           }
+
       })
       .catch(function(err) {
           console.error('[COD Form] Error:', err);
@@ -8620,7 +8682,6 @@ function darkenColor(hex, percent) {
           setFormMessage(form, 'error', err.message || 'Something went wrong. Please try again.');
           setBlockStatus(config, 'Order submission failed, but the checkout block is still active for another attempt.', 'warning');
       });
-      */
   }
 
 
