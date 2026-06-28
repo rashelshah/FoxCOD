@@ -8399,7 +8399,7 @@ function darkenColor(hex, percent) {
       clearTimeout(_codLoaderState.progressTimer);
   }
 
-  function showCodOrderError(retryCallback, statusPageUrl) {
+  function showCodOrderError(retryCallback, statusPageUrl, errorMessage) {
       clearTimeout(_codLoaderState.progressTimer);
 
       // If we already have a statusPageUrl, the order was created — just redirect failed.
@@ -8408,7 +8408,7 @@ function darkenColor(hex, percent) {
 
       updateCodOrderLoader(0,
           hasStatusPage ? 'Redirect timed out.' : 'We couldn\'t create your order.',
-          hasStatusPage ? 'Your order was created. Tap below to view your order.' : 'Your information is safe. Please try again.'
+          errorMessage || (hasStatusPage ? 'Your order was created. Tap below to view your order.' : 'Your information is safe. Please try again.')
       );
 
       var dotsContainer = document.getElementById('foxcod-cod-dots-container');
