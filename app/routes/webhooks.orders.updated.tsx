@@ -10,7 +10,7 @@
 import type { ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import { supabase } from "../config/supabase.server";
-import { editInventory, isInventoryEventProcessed, markInventoryEventProcessed, buildInventoryMetadata } from "../services/inventory-sync.server";
+import { editInventory, buildInventoryMetadata } from "../services/inventory-sync.server";
 
 /**
  * Extract numeric order ID from either plain number or GID format.
@@ -65,28 +65,21 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       console.warn("[Webhook] Missing x-shopify-webhook-id header");
     }
 
-    const alreadyProcessed = await isInventoryEventProcessed(webhookId || "");
-    if (!alreadyProcessed) {
-      const lineItems = payload.line_items || [];
-      const newItemsRaw = lineItems.map((item: any) => ({
-        variantId: item.variant_id,
-        quantity: item.quantity,
-        title: item.title,
-        sku: item.sku
-      }));
-      
-      const newItems = await buildInventoryMetadata(shop, newItemsRaw);
+    const lineItems = payload.line_items || [];
+    const newItemsRaw = lineItems.map((item: any) => ({
+      variantId: item.variant_id,
+      quantity: item.quantity,
+      title: item.title,
+      sku: item.sku
+    }));
+    
+    const newItems = await buildInventoryMetadata(shop, newItemsRaw);
 
-      if (newItems.length > 0) {
-        console.log(`[Webhook] Order ${payload.id} updated. Checking for inventory edits...`);
-        
-        // ONLY edit existing reservations. Do not fallback deduct.
-        await editInventory(shop, numericId, newItems);
-      }
+    if (newItems.length > 0) {
+      console.log(`[Webhook] Order ${payload.id} updated. Checking for inventory edits...`);
       
-      await markInventoryEventProcessed(webhookId || "", "orders/updated", numericId);
-    } else {
-      console.log(`[Webhook] Order ${payload.id} update already processed (idempotency hit). Skipping inventory edit check.`);
+      // editInventory contains its own idempotency check via tryReserveInventoryEvent
+      await editInventory(shop, numericId, newItems);
     }
 
     const { data, error } = await supabase

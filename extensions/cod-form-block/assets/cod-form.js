@@ -588,6 +588,8 @@
       if (!enableCartPage) return;
 
       var debounceTimer;
+      var injectCount = 0;
+      var injectResetTimer;
       var observer = new MutationObserver(function() {
           clearTimeout(debounceTimer);
           debounceTimer = setTimeout(injectCartButtons, 300);
@@ -596,10 +598,21 @@
       injectCartButtons();
 
       function injectCartButtons() {
+          if (injectCount > 15) {
+              console.warn('[FoxlyCOD] Detected rapid re-rendering of cart drawer. Stopping button injection to prevent mobile crash.');
+              return;
+          }
+          
+          clearTimeout(injectResetTimer);
+          injectResetTimer = setTimeout(function() { injectCount = 0; }, 3000);
+          
           var checkoutBtns = document.querySelectorAll('button[name="checkout"], input[name="checkout"], .cart__checkout-button, .cart-drawer__checkout');
+          var injectedThisTime = false;
           
           checkoutBtns.forEach(function(btn) {
               if (btn.parentNode.querySelector('.foxcod-cart-button-wrapper')) return;
+              
+              injectedThisTime = true;
               
               // Hide standard checkout button as requested
               btn.style.display = 'none';
@@ -766,6 +779,10 @@
               // Insert ABOVE the checkout button
               btn.parentNode.insertBefore(wrapper, btn);
           });
+          
+          if (injectedThisTime) {
+              injectCount++;
+          }
       }
   }
 
@@ -1086,14 +1103,21 @@
     syncFoxCodButtons(config);
 
     if (!config._stickyVisibilityHandler) {
+      var ticking = false;
       config._stickyVisibilityHandler = function() {
-        if (config._stickyButton && typeof config._stickyButton._updateVisibility === 'function') {
-          config._stickyButton._updateVisibility();
+        if (!ticking) {
+          window.requestAnimationFrame(function() {
+            if (config._stickyButton && typeof config._stickyButton._updateVisibility === 'function') {
+              config._stickyButton._updateVisibility();
+            }
+            ticking = false;
+          });
+          ticking = true;
         }
       };
       window.addEventListener('scroll', config._stickyVisibilityHandler, { passive: true });
-      window.addEventListener('resize', config._stickyVisibilityHandler);
-      window.addEventListener('orientationchange', config._stickyVisibilityHandler);
+      window.addEventListener('resize', config._stickyVisibilityHandler, { passive: true });
+      window.addEventListener('orientationchange', config._stickyVisibilityHandler, { passive: true });
       window.addEventListener('load', config._stickyVisibilityHandler);
     }
 
