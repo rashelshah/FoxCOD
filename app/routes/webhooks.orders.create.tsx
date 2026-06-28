@@ -1,7 +1,8 @@
 import type { ActionFunctionArgs } from "react-router";
 import { authenticate, unauthenticated } from "../shopify.server";
-import { logOrder, type OrderLogEntry } from "../config/supabase.server";
+import { logOrder, logOrderWithShopifyIds, type OrderLogEntry, supabase } from "../config/supabase.server";
 import { syncOrderToGoogleSheets } from "../services/google-sheets.server";
+import { parseInventoryMetadata, deductInventory } from "../services/inventory-sync.server";
 
 /**
  * Webhook Handler: orders/create
@@ -17,6 +18,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   const { topic, shop, payload, admin } = await authenticate.webhook(request);
 
+  console.log(`[WEBHOOK RECEIVED] ${JSON.stringify({ topic, orderId: payload.id, fulfillmentId: undefined, payload: { source: payload.source_name, tags: payload.tags, financialStatus: payload.financial_status } })}`);
+  console.log(`[ORDER CREATED] ${JSON.stringify({ orderId: payload.id, source: payload.source_name, tags: payload.tags, financialStatus: payload.financial_status, fulfillmentStatus: payload.fulfillment_status })}`);
   console.log(`[Webhook] Received ${topic} for ${shop}`);
   console.log(
     "[Webhook] Order payload:",
@@ -42,12 +45,22 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const isPartialCod = !isFullPrepaid && (partialCodAttr?.value === "true" || !!pcodCode || !!pcodApp || (payload.tags && payload.tags.includes("Partial COD")));
     const isRegularCod = !isPartialCod && !isFullPrepaid && payload.tags && payload.tags.includes("COD");
 
-    if (!isPartialCod && !isFullPrepaid && !isRegularCod) {
-      console.log("[Webhook] Not a FoxlyCOD order (Partial/Full/Regular), skipping");
+    const customAttributes = payload.note_attributes || [];
+    const inventoryMetadata = parseInventoryMetadata(customAttributes);
+
+    if (!isPartialCod && !isFullPrepaid && !isRegularCod && inventoryMetadata.length === 0) {
+      console.log("[Webhook] Not a FoxlyCOD order and no inventory metadata, skipping");
       return new Response(null, { status: 200 });
     }
 
-    console.log("[Webhook] Detected FoxlyCOD order:", payload.name, "| isFullPrepaid:", isFullPrepaid, "| isPartialCod:", isPartialCod, "| isRegularCod:", isRegularCod);
+    console.log("[Webhook] Detected FoxlyCOD order:", payload.name, "| isFullPrepaid:", isFullPrepaid, "| isPartialCod:", isPartialCod, "| isRegularCod:", isRegularCod, "| hasInventory:", inventoryMetadata.length > 0);
+
+    // ── Idempotency & Inventory Deduction ──
+    if (inventoryMetadata.length > 0) {
+      console.log(`[Webhook] Order ${payload.id} has inventory metadata for ${inventoryMetadata.length} variants. Deducting inventory...`);
+      await deductInventory(shop, String(payload.id), inventoryMetadata);
+      console.log(`[Webhook] Successfully evaluated inventory for ${payload.id}`);
+    }
 
     const getAttrValue = (key: string) => {
       const attr = noteAttributes.find((attribute: any) => attribute.name === key);
@@ -122,7 +135,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
 
     console.log("[Webhook] Logging special COD order:", orderLogEntry);
-    await logOrder(orderLogEntry);
+    await logOrderWithShopifyIds(orderLogEntry, payload.id.toString(), payload.name);
     console.log("[Webhook] Special COD order logged successfully:", payload.name);
 
     // Sync to Google Sheets

@@ -23,8 +23,8 @@ const shopify = shopifyApp({
     : {}),
   hooks: {
     afterAuth: async ({ session }) => {
-      shopify.registerWebhooks({ session });
-
+      const webhookResponses = await shopify.registerWebhooks({ session });
+      console.log("[WEBHOOK REGISTERED]", webhookResponses);
       try {
         const { getFormSettings, saveFormSettings, DEFAULT_BLOCKS, DEFAULT_STYLES, DEFAULT_BUTTON_STYLES } = await import("./config/supabase.server");
         const { getPartialPaymentSettings, savePartialPaymentSettings } = await import("./services/partial-payment-settings.server");

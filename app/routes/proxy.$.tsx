@@ -23,6 +23,8 @@ import {
 import { createPartialPaymentCheckout, createFullPrepaidCheckout, createNativeCodCheckout } from "../services/shopify-partial-payment.server";
 import { getPartialPaymentSettings, isPaymentMethodEligible, getPrepaidDiscount } from "../services/partial-payment-settings.server";
 import { createPendingOrder } from "../services/shopify-graphql-orders.server";
+import { buildInventoryMetadata, checkInventoryAvailability, deductInventory } from "../services/inventory-sync.server";
+import { acquireReservations, releaseReservations } from "../services/inventory-reservation.server";
 import {
     resolveCountryForOrder,
     getContextualPricesForVariants,
@@ -144,6 +146,37 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
             console.error('[Proxy] Failed to fetch static data:', e);
         }
         return new Response("[]", { status: 404, headers: corsHeaders });
+    }
+
+    // Thank You Page (Fallback when statusPageUrl is missing)
+    if (path === "thank-you") {
+        const orderId = url.searchParams.get("order_id") || "Unknown";
+        
+        const liquidHtml = `
+<div class="foxcod-thank-you-container" style="max-width: 600px; margin: 40px auto; padding: 30px; text-align: center; background: #fff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+  <svg style="width: 64px; height: 64px; color: #10b981; margin: 0 auto 20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+  </svg>
+  <h1 style="font-size: 28px; font-weight: bold; margin-bottom: 10px; color: #111827;">Order Confirmed!</h1>
+  <p style="font-size: 16px; color: #4b5563; margin-bottom: 24px;">Thank you for your purchase. Your order is being processed.</p>
+  
+  <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin-bottom: 30px;">
+    <p style="font-size: 14px; color: #6b7280; margin: 0 0 5px 0;">Order Reference</p>
+    <p style="font-size: 20px; font-weight: bold; color: #111827; margin: 0;">#\${orderId}</p>
+  </div>
+  
+  <p style="font-size: 14px; color: #4b5563; margin-bottom: 30px;">Please prepare the exact amount for Cash on Delivery.</p>
+  
+  <a href="/" style="display: inline-block; background: #000; color: #fff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: bold; transition: background 0.2s;">Continue Shopping</a>
+</div>
+        `;
+
+        return new Response(liquidHtml, {
+            headers: {
+                "Content-Type": "application/liquid; charset=utf-8",
+                "Access-Control-Allow-Origin": "*"
+            },
+        });
     }
 
     return new Response(JSON.stringify({
@@ -1168,6 +1201,13 @@ async function handleRegularOrder(request: Request, data: any) {
     // Build line items directly from request data
     const mainVariantId = toNumericVariantId(data.variantId);
     const discountMultiplier = 1 - (discountPercent / 100);
+    
+    // Distribute coupon discount proportionally across merchandise line items
+    const couponMultiplier = (couponDiscount > 0 && pricing.merchandiseTotal > 0)
+        ? Math.max(0, 1 - (couponDiscount / pricing.merchandiseTotal))
+        : 1;
+        
+    const finalMultiplier = discountMultiplier * couponMultiplier;
     const lineItems: Array<Record<string, any>> = [];
 
     const cartItems: Array<any> =
@@ -1183,7 +1223,7 @@ async function handleRegularOrder(request: Request, data: any) {
             const rawVariantId = item?.variantId ?? item?.variant_id ?? item?.id ?? null;
             const itemVariantId = toNumericVariantId(rawVariantId) || mainVariantId;
             const originalPrice = parseFloat(String(item.price || 0));
-            const discountedPrice = (originalPrice * discountMultiplier).toFixed(2);
+            const discountedPrice = (originalPrice * finalMultiplier).toFixed(2);
             lineItems.push(buildCatalogOrCustomLineItem({
                 variantId: itemVariantId,
                 title: item.title || 'Cart Item',
@@ -1196,7 +1236,7 @@ async function handleRegularOrder(request: Request, data: any) {
             const rawBundleVariantId = bv?.variantId ?? bv?.variant_id ?? bv?.id ?? null;
             const bvVariantId = toNumericVariantId(rawBundleVariantId) || mainVariantId;
             const originalPrice = parseFloat(String(bv.price || 0));
-            const discountedPrice = (originalPrice * discountMultiplier).toFixed(2);
+            const discountedPrice = (originalPrice * finalMultiplier).toFixed(2);
             lineItems.push(buildCatalogOrCustomLineItem({
                 variantId: bvVariantId,
                 title: bv.title || 'Bundle Item',
@@ -1206,7 +1246,7 @@ async function handleRegularOrder(request: Request, data: any) {
         }
     } else {
         const originalPrice = parseFloat(String(data.price || 0));
-        const discountedPrice = (originalPrice * discountMultiplier).toFixed(2);
+        const discountedPrice = (originalPrice * finalMultiplier).toFixed(2);
         lineItems.push(buildCatalogOrCustomLineItem({
             variantId: mainVariantId,
             title: data.productTitle || 'Product',
@@ -1231,11 +1271,13 @@ async function handleRegularOrder(request: Request, data: any) {
     if (Array.isArray(data.upsell_items)) {
         data.upsell_items.forEach((item: any) => {
             try {
+                const originalUpsellPrice = parseFloat(String(item.price || 0));
+                const discountedUpsellPrice = (originalUpsellPrice * couponMultiplier).toFixed(2);
                 lineItems.push(buildCatalogOrCustomLineItem({
                     variantId: toNumericVariantId(item.variant_id),
                     title: item.title || 'Upsell Item',
                     quantity: item.quantity || 1,
-                    price: parseFloat(String(item.price || 0)).toFixed(2),
+                    price: discountedUpsellPrice,
                 }));
             } catch (e: any) {
                 console.error('[Proxy] Upsell item error:', e?.message);
@@ -1290,7 +1332,9 @@ async function handleRegularOrder(request: Request, data: any) {
             variantId: li.variant_id,
             title: li.title,
             quantity: li.quantity,
-            price: li.price
+            price: li.price,
+            requiresShipping: li.requires_shipping,
+            taxable: li.taxable
         })),
         nativePrices: nativePrices,
         targetTotal: totalPrice,
@@ -1334,12 +1378,34 @@ async function handleRegularOrder(request: Request, data: any) {
         ]
     };
 
+    // ── 4.1 BUILD INVENTORY METADATA & LOCK ──
+    const inventoryMetadata = await buildInventoryMetadata(data.shop, lineItems.map((li: any) => ({
+        variantId: li.variant_id,
+        title: li.title,
+        quantity: li.quantity
+    })));
+
+    const inventoryCheck = await checkInventoryAvailability(data.shop, inventoryMetadata);
+    if (!inventoryCheck.allowed) {
+        return new Response(JSON.stringify({
+            success: false,
+            error: inventoryCheck.reason || 'Insufficient inventory available.'
+        }), { status: 400, headers: corsHeaders });
+    }
+
+    const orderReference = `foxcod_${Date.now()}_${(data.customerPhone || '').slice(-4) || 'xxx'}`;
+    await acquireReservations(orderReference, inventoryMetadata);
+    
+    // Add inventory metadata to params
+    (paramsForGraphql as any).inventoryMetadata = inventoryMetadata;
+
     const t_create_pending = performance.now();
-    // ========================================================
-    // LEGACY DIRECT COD ORDER FLOW
-    // Temporarily disabled for Shopify App Review compliance.
     
     const graphqlResult = await createPendingOrder(paramsForGraphql);
+    
+    // Release locks immediately after API call finishes (webhook handles deduction if successful)
+    await releaseReservations(orderReference);
+
     console.log(`[PERF] createPendingOrder total duration: ${performance.now() - t_create_pending}ms`);
     console.log('⏱ [Proxy] Shopify API responded:', Date.now() - start, 'ms');
 
@@ -1351,24 +1417,24 @@ async function handleRegularOrder(request: Request, data: any) {
         }), { status: 200, headers: corsHeaders }); // Status 200 so UI gets the error message
     }
 
-    const shopifyDraftOrderId = graphqlResult.orderId!;
-    let invoiceUrl = graphqlResult.invoiceUrl || null;
+    const shopifyOrderId = graphqlResult.orderId!;
+    const shopifyOrderName = graphqlResult.orderName || '';
+    const statusPageUrl = graphqlResult.statusPageUrl || null;
 
-    if (invoiceUrl) {
-        invoiceUrl = appendCheckoutParams(invoiceUrl, data);
-    }
-
-    console.log('[COD] Draft Order ID:', shopifyDraftOrderId);
-    console.log('[COD] Invoice URL:', invoiceUrl);
+    console.log(`[ORDER CREATED] ${JSON.stringify({ orderId: shopifyOrderId, source: 'proxy', paymentMethod: data.paymentMethod })}`);
+    console.log('[COD] Order ID:', shopifyOrderId);
+    console.log('[COD] Native Status Page URL:', statusPageUrl);
     console.log('[FOXCOD API] Sending response to frontend:', {
         success: true,
-        draftOrderId: shopifyDraftOrderId,
-        invoiceUrl,
+        orderId: shopifyOrderId,
+        orderName: shopifyOrderName,
+        statusPageUrl,
     });
-    console.log('⏱ [Proxy] Shopify draft order created in:', Date.now() - start, 'ms — returning to frontend now');
+    console.log('⏱ [Proxy] Shopify order created in:', Date.now() - start, 'ms — returning to frontend now');
 
-    console.log('⏱ [Proxy] Shopify draft order created in:', Date.now() - start, 'ms — returning to frontend now');
-
+    // ── 5.5 INVENTORY DEDUCTION (REMOVED) ──
+    // Inventory deduction is now solely handled by the ORDERS_CREATE webhook 
+    // to guarantee idempotency and a single source of truth.
     // ── 6. NON-BLOCKING: Customer upsert ──
     // Fire-and-forget — do NOT await
     if (data.customerPhone && data.customerPhone.trim()) {
@@ -1389,24 +1455,73 @@ async function handleRegularOrder(request: Request, data: any) {
         ).catch((err: any) => console.error('[Proxy] Customer upsert error (non-blocking):', err.message));
     }
 
-    console.log('⏱ [Proxy] Total time to response:', Date.now() - start, 'ms');
+    // ── 7. NON-BLOCKING: Log to DB & Google Sheets ──
+    const finalTotalValue = (pricing.originalTotal + pricing.codFeeAmount) - couponDiscount + shippingPrice;
+    
+    Promise.resolve(
+        logOrderWithShopifyIds({
+            shop_domain: data.shop,
+            customer_name: data.customerName || '',
+            customer_phone: data.customerPhone || '',
+            customer_address: data.customerAddress || '',
+            customer_email: data.customerEmail || '',
+            notes: orderNotes,
+            city: data.customerCity || '',
+            state: data.customerState || '',
+            pincode: data.customerZipcode || '',
+            product_id: normalizedProductId || mainVariantId,
+            product_title: data.productTitle || 'Product',
+            variant_id: mainVariantId || undefined,
+            quantity: parseInt(data.quantity) || 1,
+            price: String(data.price || 0),
+            shipping_label: data.shippingLabel || '',
+            shipping_price: shippingPrice,
+            coupon_code: couponCode || undefined,
+            discount_amount: couponDiscount ? String(couponDiscount) : undefined,
+            original_total: pricing.originalTotal,
+            final_total: finalTotalValue,
+            currency: currencyCode,
+            is_full_prepaid: false,
+            is_partial_cod: false,
+            payment_method: 'cod' as any,
+            order_payload: {
+                ...data,
+                shopifyOrderId: shopifyOrderId,
+                discount_code: couponCode,
+                discountAmount: couponDiscount,
+                originalTotal: pricing.originalTotal,
+                finalTotal: finalTotalValue,
+            },
+        }, shopifyOrderId, shopifyOrderName)
+    ).catch(() => {});
 
-    return new Response(JSON.stringify({
-        success: true,
-        checkoutUrl: invoiceUrl,
-        draftOrderId: shopifyDraftOrderId,
-    }), { headers: corsHeaders });
+    syncOrderToGoogleSheets(data.shop, {
+        orderId: shopifyOrderId,
+        orderName: shopifyOrderName,
+        customerName: data.customerName || '',
+        phone: data.customerPhone || '',
+        email: data.customerEmail || '',
+        address: data.customerAddress || '',
+        city: data.customerCity || '',
+        state: data.customerState || '',
+        pincode: data.customerZipcode || '',
+        product: data.productTitle || 'Product',
+        quantity: parseInt(data.quantity) || 1,
+        totalPrice: finalTotalValue.toString(),
+        paymentMethod: 'full_cod',
+        status: 'pending',
+    }).catch(() => {});
 
     console.log('⏱ [Proxy] Total time to response:', Date.now() - start, 'ms');
-    console.log('[FOXCOD API] Response returned successfully');
 
     return new Response(JSON.stringify({
         success: true,
         orderType: 'cod',
-        draftOrderId: shopifyDraftOrderId,
-        invoiceUrl,
+        orderId: shopifyOrderId,
+        orderName: shopifyOrderName,
+        statusPageUrl,
     }), { headers: corsHeaders });
-    // ========================================================
+
 }
 
 // ─── Handle Native COD Checkout ───────────────────────────────────────────────

@@ -382,7 +382,8 @@ async function getNextOrderNumber(shopDomain: string): Promise<number> {
  * Maps OrderLogEntry fields to order_logs schema (total_price, customer_notes)
  */
 export async function logOrder(order: OrderLogEntry) {
-    const totalPrice = order.price ? parseFloat(String(order.price)) : 0;
+    const parsedPrice = order.price ? parseFloat(String(order.price)) : 0;
+    const totalPrice = isNaN(parsedPrice) ? 0 : parsedPrice;
     const insertPayload: Record<string, unknown> = {
         shop_domain: order.shop_domain,
         customer_name: order.customer_name,
@@ -443,7 +444,8 @@ export async function logOrderWithShopifyIds(
     shopifyOrderId: string,
     shopifyOrderName: string
 ) {
-    const totalPrice = order.price ? parseFloat(String(order.price)) : 0;
+    const parsedPrice = order.price ? parseFloat(String(order.price)) : 0;
+    const totalPrice = isNaN(parsedPrice) ? 0 : parsedPrice;
     const insertPayload: Record<string, unknown> = {
         shop_domain: order.shop_domain,
         customer_name: order.customer_name,

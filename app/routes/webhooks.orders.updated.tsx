@@ -10,6 +10,7 @@
 import type { ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import { supabase } from "../config/supabase.server";
+import { editInventory, isInventoryEventProcessed, markInventoryEventProcessed, buildInventoryMetadata } from "../services/inventory-sync.server";
 
 /**
  * Extract numeric order ID from either plain number or GID format.
@@ -38,8 +39,13 @@ function mapShopifyStatus(payload: any): string {
 }
 
 export const action = async ({ request }: ActionFunctionArgs) => {
+  try {
+    require('fs').appendFileSync('/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/webhook-debug.log', `[${new Date().toISOString()}] Webhook triggered for orders/updated\n`);
+  } catch (e) {}
+  
   const { topic, shop, payload } = await authenticate.webhook(request);
 
+  console.log(`[WEBHOOK RECEIVED] ${JSON.stringify({ topic, orderId: payload.id, fulfillmentId: undefined, payload: { source: payload.source_name, tags: payload.tags, financialStatus: payload.financial_status } })}`);
   console.log(`[Webhook] Received ${topic} for ${shop}`);
 
   try {
@@ -53,6 +59,35 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     console.log(
       `[Webhook] financial_status=${payload.financial_status}, fulfillment_status=${payload.fulfillment_status}, cancelled_at=${payload.cancelled_at}`,
     );
+
+    const webhookId = request.headers.get("x-shopify-webhook-id");
+    if (!webhookId) {
+      console.warn("[Webhook] Missing x-shopify-webhook-id header");
+    }
+
+    const alreadyProcessed = await isInventoryEventProcessed(webhookId || "");
+    if (!alreadyProcessed) {
+      const lineItems = payload.line_items || [];
+      const newItemsRaw = lineItems.map((item: any) => ({
+        variantId: item.variant_id,
+        quantity: item.quantity,
+        title: item.title,
+        sku: item.sku
+      }));
+      
+      const newItems = await buildInventoryMetadata(shop, newItemsRaw);
+
+      if (newItems.length > 0) {
+        console.log(`[Webhook] Order ${payload.id} updated. Checking for inventory edits...`);
+        
+        // ONLY edit existing reservations. Do not fallback deduct.
+        await editInventory(shop, numericId, newItems);
+      }
+      
+      await markInventoryEventProcessed(webhookId || "", "orders/updated", numericId);
+    } else {
+      console.log(`[Webhook] Order ${payload.id} update already processed (idempotency hit). Skipping inventory edit check.`);
+    }
 
     const { data, error } = await supabase
       .from("order_logs")

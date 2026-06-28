@@ -534,7 +534,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         console.log('⏱ Shopify API responded:', Date.now() - start, 'ms');
 
         if (!graphqlResult.success) {
-            console.error('[COD Order] ❌ Shopify order creation failed');
+            console.error('[COD Order] ❌ Shopify order creation failed:', graphqlResult.error);
+            try {
+                require('fs').appendFileSync('/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/scratch-error.log', `[${new Date().toISOString()}] GraphQL Error: ${graphqlResult.error}\n`);
+            } catch(e) {}
             return Response.json({
                 success: false,
                 error: graphqlResult.error || "Failed to create order. Please try again.",
@@ -543,8 +546,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
         const shopifyOrderId = graphqlResult.orderId!;
         const shopifyOrderName = graphqlResult.orderName || '';
-        const orderStatusUrl = graphqlResult.orderStatusUrl || null;
-        const invoiceUrl = graphqlResult.invoiceUrl || null;
+        const orderStatusUrl = graphqlResult.statusPageUrl || null;
+        const invoiceUrl = null;
 
         console.log("[COD] Shopify Draft Order ID:", shopifyOrderId);
         console.log("[COD] Invoice URL:", invoiceUrl);
@@ -610,6 +613,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     } catch (error: any) {
         console.error("[COD Order] Error:", error);
         console.log("⏱ [COD Order] Failed at:", Date.now() - start, "ms");
+        try {
+            require('fs').appendFileSync('/Users/rashelshah/Desktop/codes/fox-cod-first-test-app/scratch-error.log', `[${new Date().toISOString()}] Catch Error: ${error.message}\n${error.stack}\n`);
+        } catch(e) {}
 
         return Response.json({
             success: false,

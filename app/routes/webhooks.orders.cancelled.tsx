@@ -10,6 +10,7 @@
 import type { ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import { supabase } from "../config/supabase.server";
+import { parseInventoryMetadata, cancelInventory } from "../services/inventory-sync.server";
 
 function extractNumericId(id: any): string {
     const s = String(id);
@@ -20,10 +21,20 @@ function extractNumericId(id: any): string {
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { topic, shop, payload } = await authenticate.webhook(request);
 
+  console.log(`[WEBHOOK RECEIVED] ${JSON.stringify({ topic, orderId: payload.id, fulfillmentId: undefined, payload: { source: payload.source_name, tags: payload.tags, financialStatus: payload.financial_status } })}`);
   console.log(`[Webhook] Received ${topic} for ${shop} - order: ${payload.name}`);
 
   try {
     const numericId = extractNumericId(payload.id);
+    const webhookId = request.headers.get("x-shopify-webhook-id");
+    if (!webhookId) {
+      console.warn("[Webhook] Missing x-shopify-webhook-id header");
+    }
+
+    // ── Inventory Restoration ──
+    console.log(`[Webhook] Order ${payload.id} restoring cancelled inventory...`);
+    await cancelInventory(shop, numericId);
+    console.log(`[Webhook] Successfully restored inventory for cancelled order ${payload.id}`);
 
     const { data, error } = await supabase
       .from("order_logs")

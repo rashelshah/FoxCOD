@@ -5,14 +5,11 @@ export interface GraphQLOrderParams {
   /**
    * The market-resolved currency code for this order.
    * MUST come from contextual pricing result — never from frontend payload.
-   * Used for:
-   *   - presentmentCurrencyCode on the draft order (locks Shopify's display currency)
-   *   - priceOverride.currencyCode on each line item
    */
   currency?: string;
   /**
-   * Explicitly set the draft order's presentment currency.
-   * When provided, takes priority over `currency` for presentmentCurrencyCode.
+   * Explicitly set the order's presentment currency.
+   * When provided, takes priority over `currency`.
    * Always derived from server-side contextual pricing — never from frontend.
    */
   presentmentCurrencyCode?: string;
@@ -20,12 +17,11 @@ export interface GraphQLOrderParams {
     variantId?: string | number | null;
     title?: string;
     quantity: number;
-    price: string | number; // originalUnitPrice
-    appliedDiscount?: {
-      value: number;
-      valueType: 'PERCENTAGE' | 'FIXED_AMOUNT';
-      title?: string;
-    };
+    price: string | number;
+    /** true for product items (default), false only for COD fee */
+    requiresShipping?: boolean;
+    /** true for product items (default), false only for COD fee */
+    taxable?: boolean;
   }>;
   customer: {
     firstName?: string;
@@ -39,112 +35,118 @@ export interface GraphQLOrderParams {
   note?: string;
   noteAttributes?: Array<{ key: string; value: string }>;
   shippingLine?: { title: string; price: string | number };
-  discount?: { code: string; amount: number; valueType: 'FIXED_AMOUNT' | 'PERCENTAGE' };
-  nativePrices?: Record<string, number>;
-  targetTotal?: number;
+  /** Pre-built inventory metadata from buildInventoryMetadata() — embedded in customAttributes */
+  inventoryMetadata?: import('./inventory-sync.server').InventoryLineItem[];
 }
 
 export interface GraphQLOrderResult {
   success: boolean;
   orderId?: string;
   orderName?: string;
-  orderStatusUrl?: string;
-  /** Shopify-hosted invoice URL returned by draftOrderInvoiceSend. */
-  invoiceUrl?: string;
+  /** Shopify order status page URL — used for customer redirect. */
+  statusPageUrl?: string | null;
   error?: string;
 }
 
 /**
- * Creates a Shopify Order by utilizing the Draft Order flow (draftOrderCreate -> draftOrderComplete).
- * This completely replaces the legacy REST orders.json API and satisfies App Store Requirement 2.2.4.
- * 
- * Key benefits of Draft Order flow:
- * 1. Supports guest checkout (no existing customer ID required).
- * 2. Permits exact variant price overrides via originalUnitPrice (unlike orderCreate).
- * 3. Safely reserves inventory and fires standard webhooks upon completion.
+ * Find or create a Shopify customer by email/phone.
+ * Links the order to an existing Shopify customer record for CRM continuity.
  */
-async function findOrCreateCustomer(graphql: any, customerData: { firstName?: string, lastName?: string, email?: string, phone?: string }) {
+async function findOrCreateCustomer(
+  graphql: any,
+  customerData: { firstName?: string; lastName?: string; email?: string; phone?: string }
+) {
   const email = customerData.email?.trim();
   const phone = customerData.phone?.trim();
-
   const firstName = customerData.firstName?.trim();
   const lastName = customerData.lastName?.trim();
 
   if (!email && !phone && !firstName && !lastName) return null;
 
   try {
-    // 1. Search for existing customer (only if email or phone is provided)
     if (email || phone) {
       let queryStr = '';
       if (email) queryStr += `email:${email}`;
       if (phone) queryStr += (queryStr ? ' OR ' : '') + `phone:${phone}`;
-      
-      const searchRes = await graphql(`
-        query findCustomer($query: String!) {
+
+      const searchRes = await graphql(
+        `query findCustomer($query: String!) {
           customers(first: 1, query: $query) {
             edges { node { id } }
           }
-        }
-      `, { variables: { query: queryStr } });
-      
+        }`,
+        { variables: { query: queryStr } }
+      );
+
       const searchData = await searchRes.json();
       const edges = searchData?.data?.customers?.edges || [];
       if (edges.length > 0) {
         const existingId = edges[0].node.id;
-        
-        // Update the existing customer with the name from the form
+
+        // Update name if provided
         if (firstName || lastName) {
-          await graphql(`
-            mutation customerUpdate($input: CustomerInput!) {
-              customerUpdate(input: $input) {
-                customer { id }
-              }
+          await graphql(
+            `mutation customerUpdate($input: CustomerInput!) {
+              customerUpdate(input: $input) { customer { id } }
+            }`,
+            {
+              variables: {
+                input: {
+                  id: existingId,
+                  firstName: firstName || '',
+                  lastName: lastName || '',
+                },
+              },
             }
-          `, {
-            variables: {
-              input: {
-                id: existingId,
-                firstName: firstName || '',
-                lastName: lastName || ''
-              }
-            }
-          });
+          );
         }
-        
+
         return existingId;
       }
     }
 
-    // 2. Create customer if not found
-    const createRes = await graphql(`
-      mutation customerCreate($input: CustomerInput!) {
+    // Create new customer
+    const createRes = await graphql(
+      `mutation customerCreate($input: CustomerInput!) {
         customerCreate(input: $input) {
           customer { id }
           userErrors { field message }
         }
+      }`,
+      {
+        variables: {
+          input: {
+            firstName: firstName || '',
+            lastName: lastName || '',
+            email: email || undefined,
+            phone: phone || undefined,
+          },
+        },
       }
-    `, {
-      variables: {
-        input: {
-          firstName: firstName || '',
-          lastName: lastName || '',
-          email: email || undefined,
-          phone: phone || undefined,
-        }
-      }
-    });
-    
+    );
+
     const createData = await createRes.json();
-    const customer = createData?.data?.customerCreate?.customer;
-    if (customer) {
-      return customer.id;
-    }
+    return createData?.data?.customerCreate?.customer?.id || null;
   } catch (err) {
-    console.warn("[GraphQL Order] Error finding or creating customer (scopes might be missing):", err);
+    console.warn('[GraphQL Order] Error finding/creating customer (scopes may be missing):', err);
+    return null;
   }
-  return null;
 }
 
+/**
+ * Creates a Shopify order using the orderCreate mutation with custom sale line items.
+ *
+ * Architecture:
+ *   - All line items are custom sale items (no variantId) to allow exact custom pricing.
+ *   - Pricing: priceSet with shopMoney + presentmentMoney (preserves multi-currency).
+ *   - taxable: false only for COD Fee line items; products default to true.
+ *   - requiresShipping: false only for COD Fee line items; products default to true.
+ *   - Inventory: tracked separately via _foxcod_inventory customAttribute,
+ *     deducted by the orders/create webhook via inventory-sync.server.ts.
+ *   - statusPageUrl: returned from the created order for customer redirect.
+ *
+ * This completely replaces the draftOrderCreate + draftOrderInvoiceSend flow.
+ */
 export async function createPendingOrder(params: GraphQLOrderParams): Promise<GraphQLOrderResult> {
   const { shop } = params;
   const t_admin = performance.now();
@@ -153,99 +155,64 @@ export async function createPendingOrder(params: GraphQLOrderParams): Promise<Gr
 
   const originalGraphql = admin.graphql;
   const graphql = async (query: string, vars?: any) => {
-      const nameMatch = query.match(/(query|mutation)\s+(\w+)/);
-      const name = nameMatch ? nameMatch[2] : 'unknown';
-      const t0 = performance.now();
-      const res = await originalGraphql(query, vars);
-      console.log(`[PERF] ${name} GraphQL duration: ${performance.now() - t0}ms`);
-      return res;
+    const nameMatch = query.match(/(query|mutation)\s+(\w+)/);
+    const name = nameMatch ? nameMatch[2] : 'unknown';
+    const t0 = performance.now();
+    const res = await originalGraphql(query, vars);
+    console.log(`[PERF] ${name} GraphQL duration: ${performance.now() - t0}ms`);
+    return res;
   };
 
-  // 1. Map Line Items
-  let actualDiscountableSubtotal = 0;
+  const currencyCode = params.presentmentCurrencyCode || params.currency || 'USD';
 
-  const draftLineItems = params.lineItems.map(item => {
-    const line: any = { quantity: item.quantity };
-    
-    // Clean and validate variant ID
-    let numericId = '';
+  // ── 1. Map line items as custom sale items (no variantId) ──
+  // This is the only architecture that preserves custom pricing, contextual
+  // prices, discounts, COD fees, and multi-currency. See implementation plan.
+  const orderLineItems = params.lineItems.map((item) => {
+    const priceAmount = (
+      typeof item.price === 'number' ? item.price : parseFloat(String(item.price))
+    ).toFixed(2);
+
+    const lineItemInput: any = {
+      quantity: item.quantity,
+      priceSet: {
+        shopMoney: { amount: priceAmount, currencyCode },
+        presentmentMoney: { amount: priceAmount, currencyCode },
+      },
+      // requiresShipping defaults to true; only COD Fee sets it to false
+      requiresShipping: item.requiresShipping !== false,
+      // taxable defaults to true (Shopify's default); only COD Fee sets it to false
+      taxable: item.taxable !== false,
+    };
+
     if (item.variantId) {
-      numericId = String(item.variantId).replace(/[^0-9]/g, '');
-      if (numericId) {
-        line.variantId = `gid://shopify/ProductVariant/${numericId}`;
-      }
-    }
-    
-    // Pass custom title if provided or if it's a custom line item
-    if (item.title) {
-      line.title = item.title;
+      // Ensure variantId is a proper GraphQL GID
+      const vid = String(item.variantId);
+      lineItemInput.variantId = vid.includes('gid://') ? vid : `gid://shopify/ProductVariant/${vid}`;
+    } else {
+      lineItemInput.title = item.title || 'Product';
     }
 
-    const itemPrice = typeof item.price === 'number' ? item.price : parseFloat(String(item.price));
-    let nativePrice = itemPrice;
-    if (numericId && params.nativePrices && params.nativePrices[numericId] !== undefined) {
-      nativePrice = params.nativePrices[numericId];
-    }
-
-    // Use priceOverride to directly lock in the discounted frontend price (itemPrice)
-    // This allows bundle and upsell discounts to reflect exactly on the line item
-    // instead of being merged into a single order-level unified discount.
-    actualDiscountableSubtotal += itemPrice * item.quantity;
-
-    // For custom items without variantId
-    line.originalUnitPrice = itemPrice.toFixed(2);
-    
-    // For variant items, Shopify Draft Orders ignore originalUnitPrice. We must use priceOverride.
-    // Important: currencyCode MUST match presentmentCurrencyCode
-    if (line.variantId) {
-      line.priceOverride = {
-        amount: itemPrice.toFixed(2),
-        currencyCode: params.presentmentCurrencyCode || params.currency || 'USD'
-      };
-    }
-    
-    return line;
+    return lineItemInput;
   });
 
-  const discountableSubtotal = actualDiscountableSubtotal;
-  const shippingPrice = params.shippingLine ? parseFloat(String(params.shippingLine.price)) : 0;
+  // ── 2. Build customAttributes ──
+  // _foxcod_inventory carries variant metadata for the inventory sync webhook.
+  // This is the critical link between the order and inventory tracking.
+  const customAttributes: Array<{ key: string; value: string }> = [
+    { key: 'Order Source', value: 'FoxlyCOD' },
+    ...(params.noteAttributes || []).filter((a) => a.key !== 'Order Source'),
+  ];
 
-  // We rely on the frontend's finalTotal (which was already validated by assertPricingConsistency).
-  // If targetTotal is not provided, we fall back to a naive calculation using the line items' requested price.
-  let targetTotal = params.targetTotal;
-  if (targetTotal === undefined) {
-      let requestedSubtotal = 0;
-      params.lineItems.forEach(item => {
-          const itemPrice = typeof item.price === 'number' ? item.price : parseFloat(String(item.price));
-          requestedSubtotal += itemPrice * item.quantity;
-      });
-      targetTotal = requestedSubtotal + shippingPrice;
-      if (params.discount && params.discount.amount > 0) {
-          if (params.discount.valueType === 'PERCENTAGE') {
-              targetTotal -= requestedSubtotal * (params.discount.amount / 100);
-          } else {
-              targetTotal -= params.discount.amount;
-          }
-      }
+  if (params.inventoryMetadata && params.inventoryMetadata.length > 0) {
+    customAttributes.push({
+      key: '_foxcod_inventory',
+      value: JSON.stringify(params.inventoryMetadata),
+    });
+    console.log('[GraphQL Order] Embedding inventory metadata for', params.inventoryMetadata.length, 'variants');
   }
 
-  const unifiedDiscountAmount = Math.max(0, discountableSubtotal + shippingPrice - targetTotal);
-
-  let appliedDiscount = undefined;
-  if (unifiedDiscountAmount > 0.01) {
-      let title = params.discount?.code ? params.discount.code : "Offers Applied";
-      if (params.discount?.code && unifiedDiscountAmount > params.discount.amount + 0.01) {
-          title = "Offers + " + params.discount.code;
-      }
-      appliedDiscount = {
-          title: title,
-          description: "Order discount",
-          value: parseFloat(unifiedDiscountAmount.toFixed(2)),
-          valueType: "FIXED_AMOUNT"
-      };
-  }
-
-  // 2. Map Shipping Address
+  // ── 3. Format addresses ──
   const formatAddress = (addr: any) => {
     if (!addr) return undefined;
     return {
@@ -260,76 +227,63 @@ export async function createPendingOrder(params: GraphQLOrderParams): Promise<Gr
     };
   };
 
-  // 3. Map Discount (Unified discount is already calculated above as `appliedDiscount`)
-
-  // 4. Find or Create Customer to ensure it is linked in the Shopify Admin UI
-  let customerId = null;
-  if (!params.customer.email && params.customer.phone) {
-    customerId = await findOrCreateCustomer(graphql, {
-      firstName: params.customer.firstName || params.billingAddress?.firstName || params.shippingAddress?.firstName,
-      lastName: params.customer.lastName || params.billingAddress?.lastName || params.shippingAddress?.lastName,
-      email: params.customer.email,
-      phone: params.customer.phone
-    });
-  }
-
-  // 5. Build Draft Order Input
-  // presentmentCurrencyCode locks the draft order (and resulting order) to the
-  // customer's market currency. This is the critical fix for multi-currency stores.
-  // It MUST come from the server-side contextual pricing result — never from frontend.
-  const resolvedPresentmentCurrency = params.presentmentCurrencyCode || params.currency || undefined;
-  const draftOrderInput: Record<string, any> = {
-    lineItems: draftLineItems,
-    tags: params.tags || [],
-    note: params.note || '',
-    customAttributes: params.noteAttributes || [],
-    email: params.customer.email || undefined,
-    sourceName: "Foxly COD + Partial & Prepaid",
-    ...(resolvedPresentmentCurrency ? { presentmentCurrencyCode: resolvedPresentmentCurrency } : {}),
-  };
-
-  if (customerId) {
-    draftOrderInput.purchasingEntity = { customerId };
-  }
-
-  if (params.shippingLine) {
-    draftOrderInput.shippingLine = {
-      title: params.shippingLine.title,
-      price: typeof params.shippingLine.price === 'number' ? params.shippingLine.price.toFixed(2) : String(params.shippingLine.price)
-    };
-  }
-
-  if (appliedDiscount) {
-    draftOrderInput.appliedDiscount = appliedDiscount;
-  }
-
   const shippingAddr = formatAddress(params.shippingAddress);
   const billingAddr = formatAddress(params.billingAddress) || shippingAddr;
-  
-  if (billingAddr) {
-    draftOrderInput.billingAddress = billingAddr;
-  }
-  
-  // Provide the shipping address directly in draftOrderCreate
-  // so the Shopify checkout (via invoice URL) is fully pre-populated.
-  if (shippingAddr) {
-    draftOrderInput.shippingAddress = shippingAddr;
-  }
 
-  console.log('[FOXCOD SHOPIFY PAYLOAD]', JSON.stringify(draftOrderInput, null, 2));
-  console.log('[DRAFT ORDER VARIABLES]', JSON.stringify({ variables: { input: draftOrderInput } }, null, 2));
+  // ── 4. Find or create customer ──
+  const customerId = await findOrCreateCustomer(graphql, params.customer);
 
-  // 5. Execute draftOrderCreate
-  const createRes = await graphql(`
-    mutation draftOrderCreate($input: DraftOrderInput!) {
-      draftOrderCreate(input: $input) {
-        draftOrder {
+  // ── 5. Build shipping lines ──
+  const shippingLines = params.shippingLine
+    ? [
+        {
+          title: params.shippingLine.title,
+          priceSet: {
+            shopMoney: {
+              amount:
+                typeof params.shippingLine.price === 'number'
+                  ? params.shippingLine.price.toFixed(2)
+                  : String(params.shippingLine.price),
+              currencyCode,
+            },
+          },
+        },
+      ]
+    : [];
+
+  // ── 6. Build orderCreate input ──
+  const orderInput: Record<string, any> = {
+    currency: currencyCode,
+    financialStatus: 'PENDING',
+    lineItems: orderLineItems,
+    customAttributes,
+    tags: params.tags || [],
+    note: params.note || '',
+    email: params.customer.email || undefined,
+    shippingLines,
+    ...(shippingAddr ? { shippingAddress: shippingAddr } : {}),
+    ...(billingAddr ? { billingAddress: billingAddr } : {}),
+    ...(customerId ? { customerId } : {}),
+  };
+
+  console.log('[FOXCOD SHOPIFY PAYLOAD]', JSON.stringify(orderInput, null, 2));
+
+  // ── 7. Execute orderCreate ──
+  const createRes = await graphql(
+    `mutation orderCreate($order: OrderCreateOrderInput!) {
+      orderCreate(order: $order) {
+        order {
           id
+          name
+          statusPageUrl
+          displayFinancialStatus
           lineItems(first: 20) {
             nodes {
               title
               quantity
-              originalUnitPrice
+              originalUnitPriceSet {
+                shopMoney { amount currencyCode }
+              }
             }
           }
         }
@@ -338,87 +292,40 @@ export async function createPendingOrder(params: GraphQLOrderParams): Promise<Gr
           message
         }
       }
-    }
-  `, { variables: { input: draftOrderInput } });
+    }`,
+    { variables: { order: orderInput } }
+  );
 
   const createData = await createRes.json();
-  console.log('[DRAFT ORDER CREATE RESPONSE]', JSON.stringify(createData, null, 2));
-  const createErrors = createData?.data?.draftOrderCreate?.userErrors || [];
-  
+  console.log('[ORDER CREATE RESPONSE]', JSON.stringify(createData, null, 2));
+
+  const createErrors = createData?.data?.orderCreate?.userErrors || [];
   if (createErrors.length > 0) {
-    const errorMsg = createErrors.map((e: any) => e.message).join(', ');
-    console.error(`[GraphQL Order] draftOrderCreate failed: ${errorMsg}`);
+    const errorMsg = createErrors.map((e: any) => `${e.field?.join('.') || 'field'}: ${e.message}`).join(', ');
+    console.error('[GraphQL Order] orderCreate failed:', errorMsg);
     return { success: false, error: errorMsg };
   }
 
-  const draftOrderId = createData?.data?.draftOrderCreate?.draftOrder?.id;
-  if (!draftOrderId) {
-    console.error(`[GraphQL Order] draftOrderCreate returned no ID.`);
-    return { success: false, error: 'Failed to create draft order.' };
+  const order = createData?.data?.orderCreate?.order;
+  if (!order?.id) {
+    console.error('[GraphQL Order] orderCreate returned no order ID');
+    return { success: false, error: 'Failed to create order — no ID returned.' };
   }
 
-  // Extract numeric ID for DB logging / backward-compat
-  const numericDraftOrderId = String(draftOrderId).split('/').pop() || '';
-  console.log('[FOXCOD] Draft Order Created', {
-    draftOrderId,
-    shop: params.shop,
-    lineItemsCount: params.lineItems?.length ?? 0,
-    total: params.targetTotal
-  });
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // 6. Execute draftOrderInvoiceSend
-  //    Generates a Shopify-hosted invoice URL for the draft order.
-  //    The customer is redirected to this URL; Shopify controls all subsequent
-  //    navigation (including advancing to the Order Confirmation / Thank You page).
-  // ─────────────────────────────────────────────────────────────────────────
-  const invoiceSendRes = await graphql(`
-    mutation DraftOrderInvoiceSend($id: ID!, $email: EmailInput) {
-      draftOrderInvoiceSend(id: $id, email: $email) {
-        draftOrder {
-          id
-          invoiceUrl
-        }
-        userErrors {
-          field
-          message
-        }
-      }
-    }
-  `, {
-    variables: {
-      id: draftOrderId,
-      // Pass customer email if available so Shopify can also send the invoice email.
-      // If email is absent, Shopify uses whatever is stored on the draft order.
-      ...(params.customer.email ? { email: { to: params.customer.email } } : {}),
-    },
-  });
-
-  const invoiceSendData = await invoiceSendRes.json();
-  console.log('[DRAFT ORDER INVOICE SEND RESPONSE]', JSON.stringify(invoiceSendData, null, 2));
-
-  const invoiceSendErrors = invoiceSendData?.data?.draftOrderInvoiceSend?.userErrors || [];
-  if (invoiceSendErrors.length > 0) {
-    const errorMsg = invoiceSendErrors.map((e: any) => e.message).join(', ');
-    console.error(`[GraphQL Order] draftOrderInvoiceSend failed: ${errorMsg}`);
-    return { success: false, error: `Invoice send failed: ${errorMsg}` };
-  }
-
-  const invoiceUrl = invoiceSendData?.data?.draftOrderInvoiceSend?.draftOrder?.invoiceUrl;
-  if (!invoiceUrl) {
-    console.error(`[GraphQL Order] draftOrderInvoiceSend returned no invoiceUrl.`);
-    return { success: false, error: 'Invoice URL not returned by Shopify.' };
-  }
-  console.log('[FOXCOD API] Returning Response', {
-    success: true,
-    orderType: 'cod',
-    draftOrderId,
-    invoiceUrl
+  const numericOrderId = String(order.id).split('/').pop() || '';
+  console.log('[FOXCOD] Order Created', {
+    orderId: order.id,
+    name: order.name,
+    statusPageUrl: order.statusPageUrl,
+    financialStatus: order.displayFinancialStatus,
+    shop,
+    lineItemsCount: params.lineItems.length,
   });
 
   return {
     success: true,
-    orderId: numericDraftOrderId,
-    invoiceUrl,
+    orderId: numericOrderId,
+    orderName: order.name || '',
+    statusPageUrl: order.statusPageUrl || null,
   };
 }

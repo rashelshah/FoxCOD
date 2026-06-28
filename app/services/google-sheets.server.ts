@@ -356,7 +356,7 @@ export async function syncOrderToGoogleSheets(
         product: string;
         quantity: number;
         totalPrice: string;
-        paymentMethod: 'full_cod' | 'partial_cod';
+        paymentMethod: 'full_cod' | 'partial_cod' | 'full_prepaid';
         status?: string;
     }
 ): Promise<boolean> {
