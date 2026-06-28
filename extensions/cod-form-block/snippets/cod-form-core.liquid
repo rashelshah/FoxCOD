@@ -327,8 +327,8 @@
     var ppRaw = {{ shop.metafields.fox_cod.partial_payment_settings_json.value | json | default: 'null' }};
     if (!ppRaw) {
       ppRaw = {
-        enabled: true,
-        full_prepaid_enabled: true,
+        enabled: false,
+        full_prepaid_enabled: false,
         pure_cod_enabled: true,
         payment_options: [{ id: 'opt_10pct', label: 'Pay 10% Now', type: 'percentage', value: 10 }]
       };
