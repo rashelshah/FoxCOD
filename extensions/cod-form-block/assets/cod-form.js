@@ -586,15 +586,46 @@
       if (!dataContainer) return;
       var enableCartPage = dataContainer.dataset.enableCartPage === 'true';
       if (!enableCartPage) return;
-
+      
       var debounceTimer;
       var injectCount = 0;
       var injectResetTimer;
-      var observer = new MutationObserver(function() {
+      
+      // Instead of observing document.body (which causes massive CPU spikes if theme mutates DOM continuously),
+      // we monkey-patch fetch and XHR to detect when the cart is updated over the network.
+      
+      function triggerCartInject() {
           clearTimeout(debounceTimer);
           debounceTimer = setTimeout(injectCartButtons, 300);
-      });
-      observer.observe(document.body, { childList: true, subtree: true });
+      }
+
+      if (!window._foxcodNetworkPatched) {
+          window._foxcodNetworkPatched = true;
+          
+          // Patch fetch
+          var originalFetch = window.fetch;
+          window.fetch = function() {
+              var url = arguments[0];
+              if (typeof url === 'string' && (url.indexOf('/cart') !== -1 || url.indexOf('section_id') !== -1)) {
+                  triggerCartInject();
+                  setTimeout(triggerCartInject, 1000); // secondary check
+              }
+              return originalFetch.apply(this, arguments);
+          };
+          
+          // Patch XHR
+          var originalXhrOpen = XMLHttpRequest.prototype.open;
+          XMLHttpRequest.prototype.open = function() {
+              var url = arguments[1];
+              if (typeof url === 'string' && (url.indexOf('/cart') !== -1 || url.indexOf('section_id') !== -1)) {
+                  this.addEventListener('load', function() {
+                      triggerCartInject();
+                      setTimeout(triggerCartInject, 1000);
+                  });
+              }
+              return originalXhrOpen.apply(this, arguments);
+          };
+      }
       injectCartButtons();
 
       function injectCartButtons() {
