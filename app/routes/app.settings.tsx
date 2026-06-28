@@ -1441,8 +1441,9 @@ const PreviewDisplay = memo(({
 
                                             // Payment Mode section field
                                             if (field.id === 'payment_mode') {
-                                                const showFullPrepaid = true;
-                                                const showPartial = true;
+                                                const showFullPrepaid = partialPaymentSettings?.full_prepaid_enabled ?? false;
+                                                const showPartial = partialPaymentSettings?.enabled ?? false;
+                                                const showPureCod = partialPaymentSettings?.pure_cod_enabled ?? true;
                                                 const remainingCod = Math.max(0, total - (partialCodAdvanceAmount || 0));
 
                                                 return (
@@ -1558,6 +1559,7 @@ const PreviewDisplay = memo(({
                                                             )}
 
                                                             {/* 3. Cash on Delivery */}
+                                                            {showPureCod && (
                                                             <label style={{
                                                                 display: 'flex', flexDirection: 'column', background: '#fff7ed', borderRadius: '10px',
                                                                 border: '2px solid #fed7aa', cursor: 'default', position: 'relative', overflow: 'visible'
@@ -1601,6 +1603,7 @@ const PreviewDisplay = memo(({
                                                                     </div>
                                                                 )}
                                                             </label>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 );

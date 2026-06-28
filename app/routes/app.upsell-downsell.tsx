@@ -1041,8 +1041,9 @@ export default function UpsellDownsellPage() {
 
                                                                     // Payment Mode section field
                                                                     if (field.id === 'payment_mode') {
-                                                                        const showFullPrepaid = true;
-                                                                        const showPartial = true;
+                                                                        const showFullPrepaid = partialPaymentSettings?.full_prepaid_enabled ?? false;
+                                                                        const showPartial = partialPaymentSettings?.enabled ?? false;
+                                                                        const showPureCod = partialPaymentSettings?.pure_cod_enabled ?? true;
                                                                         const partialCodAdvanceAmount = formSettings?.partial_cod_advance_amount || 100;
 
                                                                         const unitPrice = 1999;
@@ -1166,6 +1167,7 @@ export default function UpsellDownsellPage() {
                                                                                     )}
 
                                                                                     {/* 3. Cash on Delivery */}
+                                                                                    {showPureCod && (
                                                                                     <label style={{
                                                                                         display: 'flex', flexDirection: 'column', background: '#fff7ed', borderRadius: '10px',
                                                                                         border: '2px solid #fed7aa', cursor: 'default', position: 'relative', overflow: 'visible'
@@ -1210,6 +1212,7 @@ export default function UpsellDownsellPage() {
                                                                                             </div>
                                                                                         )}
                                                                                     </label>
+                                                                                    )}
                                                                                 </div>
                                                                             </div>
                                                                         );
