@@ -357,18 +357,6 @@ export default function Index() {
           gap: 20px;
           margin-bottom: 28px;
         }
-
-        @media (max-width: 1100px) {
-          .stats-grid {
-            grid-template-columns: repeat(2, 1fr);
-          }
-        }
-
-        @media (max-width: 900px) {
-          .stats-grid {
-            grid-template-columns: repeat(2, 1fr);
-          }
-        }
         
         .stat-card {
           background: white;

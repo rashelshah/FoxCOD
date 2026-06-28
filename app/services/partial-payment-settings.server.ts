@@ -219,9 +219,9 @@ export async function syncPartialPaymentToMetafield(
       partial_payment_discount_value: settings.partial_payment_discount_value ?? 0,
     }
     : {
-      enabled: true,
+      enabled: false,
       payment_options: DEFAULT_PAYMENT_OPTIONS,
-      full_prepaid_enabled: true,
+      full_prepaid_enabled: false,
       prepaid_discount_enabled: false,
       pure_cod_enabled: true,
       pure_cod_fee_enabled: false,
