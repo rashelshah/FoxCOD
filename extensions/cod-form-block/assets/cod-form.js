@@ -1060,12 +1060,14 @@
     }
 
     function hideStickyButton() {
+      if (stickyBtn.style.display === 'none') return;
       stickyBtn.classList.remove('visible');
       stickyBtn.style.setProperty('display', 'none', 'important');
       stickyBtn.setAttribute('aria-hidden', 'true');
     }
 
     function showStickyButton() {
+      if (stickyBtn.classList.contains('visible') && stickyBtn.style.display !== 'none') return;
       stickyBtn.style.removeProperty('display');
       stickyBtn.classList.add('visible');
       stickyBtn.setAttribute('aria-hidden', 'false');
@@ -1999,6 +2001,10 @@
       
       function updateButtonState(variantId) {
           if (!variantId) return;
+          // Prevent unnecessary DOM mutations if the variant hasn't actually changed
+          if (config._lastVariantId === String(variantId)) return;
+          config._lastVariantId = String(variantId);
+          
           var v = variants.find(function(vr) { return String(vr.id) === String(variantId); });
           if (v) {
               config._isSoldOut = !v.available;
