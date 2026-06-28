@@ -5534,7 +5534,11 @@ function darkenColor(hex, percent) {
                   } else if (row.classList.contains('pm-partial')) {
                       row.style.borderColor = isChecked ? '#2563eb' : '#bfdbfe';
                   } else if (row.classList.contains('pm-cod')) {
-                      row.style.borderColor = isChecked ? '#ea580c' : '#fed7aa';
+                      if (typeof isOnlyCodEnabled !== 'undefined' && isOnlyCodEnabled) {
+                          row.style.borderColor = isChecked ? '#22c55e' : '#bbf7d0';
+                      } else {
+                          row.style.borderColor = isChecked ? '#ea580c' : '#fed7aa';
+                      }
                   }
               });
 
