@@ -1072,7 +1072,10 @@
     var stickyBtn = config._stickyButton;
     if (!stickyBtn || !stickyBtn.isConnected) {
       stickyBtn = config.triggerElement.cloneNode(true);
-      stickyBtn.className = 'foxcod-block-trigger cod-buy-btn sticky-mobile ' + getButtonAnimationClasses(config);
+      // DO NOT apply button animations (pulse/shake/bounce) to the sticky mobile button.
+      // Applying CSS transforms to a fixed 100% width bottom element pushes it into the iOS safe area,
+      // which triggers a fatal layout loop in Safari and Chrome on iOS, instantly crashing the tab.
+      stickyBtn.className = 'foxcod-block-trigger cod-buy-btn sticky-mobile';
       stickyBtn.dataset.codOpen = productId;
       stickyBtn.setAttribute('aria-hidden', 'true');
       stickyBtn.style.setProperty('display', 'none', 'important');
