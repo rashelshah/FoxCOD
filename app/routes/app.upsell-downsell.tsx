@@ -1046,6 +1046,17 @@ export default function UpsellDownsellPage() {
                                                                         const showPureCod = partialPaymentSettings?.pure_cod_enabled ?? true;
                                                                         const partialCodAdvanceAmount = formSettings?.partial_cod_advance_amount || 100;
 
+                                                                        const onlyCod = !showFullPrepaid && !showPartial && showPureCod;
+                                                                        const codBg = onlyCod ? '#f0fdf4' : '#fff7ed';
+                                                                        const codBorder = onlyCod ? '#22c55e' : '#fed7aa';
+                                                                        const codTagBg = onlyCod ? '#22c55e' : '#ea580c';
+                                                                        const codIconColor = onlyCod ? '#16a34a' : '#ea580c';
+                                                                        const codIconBg = onlyCod ? '#dcfce7' : '#ffedd5';
+                                                                        const codTitleColor = onlyCod ? '#166534' : '#9a3412';
+                                                                        const codSubtitleColor = onlyCod ? '#16a34a' : '#ea580c';
+                                                                        const codFeeBg = onlyCod ? '#dcfce7' : '#ffedd5';
+                                                                        const codFeeColor = onlyCod ? '#166534' : '#9a3412';
+
                                                                         const unitPrice = 1999;
                                                                         const shippingEnabled = formSettings?.shipping_options?.enabled;
                                                                         const shippingOption = formSettings?.shipping_options?.options?.find((o: any) => o.id === formSettings?.shipping_options?.defaultOption);
@@ -1169,12 +1180,12 @@ export default function UpsellDownsellPage() {
                                                                                     {/* 3. Cash on Delivery */}
                                                                                     {showPureCod && (
                                                                                     <label style={{
-                                                                                        display: 'flex', flexDirection: 'column', background: '#fff7ed', borderRadius: '10px',
-                                                                                        border: '2px solid #fed7aa', cursor: 'default', position: 'relative', overflow: 'visible'
+                                                                                        display: 'flex', flexDirection: 'column', background: codBg, borderRadius: '10px',
+                                                                                        border: `2px solid ${codBorder}`, cursor: 'default', position: 'relative', overflow: 'visible'
                                                                                     }}>
                                                                                         {partialPaymentSettings?.payment_method_tags?.pure_cod?.enabled && (
                                                                                             <div style={{
-                                                                                                position: 'absolute', top: '-10px', left: '16px', background: '#ea580c', color: 'white',
+                                                                                                position: 'absolute', top: '-10px', left: '16px', background: codTagBg, color: 'white',
                                                                                                 fontSize: '9px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', letterSpacing: '0.05em',
                                                                                                 display: 'flex', alignItems: 'center', gap: '4px', textTransform: 'uppercase'
                                                                                             }}>
@@ -1183,15 +1194,15 @@ export default function UpsellDownsellPage() {
                                                                                         )}
                                                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: partialPaymentSettings?.payment_method_tags?.pure_cod?.enabled ? '18px 10px 8px 10px' : '8px 10px' }}>
                                                                                             {/* Icon */}
-                                                                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '24px', height: '24px', borderRadius: '6px', color: '#ea580c', backgroundColor: '#ffedd5' }}>
+                                                                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '24px', height: '24px', borderRadius: '6px', color: codIconColor, backgroundColor: codIconBg }}>
                                                                                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1" ry="1" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
                                                                                             </div>
 
                                                                                             {/* Center text */}
                                                                                             <div style={{ flex: 1, minWidth: 0 }}>
-                                                                                                <div style={{ fontWeight: 700, fontSize: '11px', color: '#9a3412', lineHeight: 1.1 }}>Cash on Delivery</div>
+                                                                                                <div style={{ fontWeight: 700, fontSize: '11px', color: codTitleColor, lineHeight: 1.1 }}>Cash on Delivery</div>
                                                                                             {partialPaymentSettings?.show_pure_cod_subtitle !== false && partialPaymentSettings?.pure_cod_subtitle && (
-                                                                                                <div style={{ color: '#ea580c', fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>{partialPaymentSettings.pure_cod_subtitle}</div>
+                                                                                                <div style={{ color: codSubtitleColor, fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>{partialPaymentSettings.pure_cod_subtitle}</div>
                                                                                             )}
 
                                                                                             </div>
@@ -1199,15 +1210,15 @@ export default function UpsellDownsellPage() {
                                                                                             {/* Right side pricing */}
                                                                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                                                                                                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                                                                                                    <div style={{ background: '#ffedd5', color: '#9a3412', fontSize: '9px', fontWeight: 600, padding: '2px 6px', borderRadius: '99px', lineHeight: 1 }}>+ {fmtCurrency(20)} COD fee</div>
-                                                                                                    <span style={{ fontWeight: 800, fontSize: '12px', color: '#9a3412' }}>{fmtCurrency(total)}</span>
+                                                                                                    <div style={{ background: codFeeBg, color: codFeeColor, fontSize: '9px', fontWeight: 600, padding: '2px 6px', borderRadius: '99px', lineHeight: 1 }}>+ {fmtCurrency(20)} COD fee</div>
+                                                                                                    <span style={{ fontWeight: 800, fontSize: '12px', color: codTitleColor }}>{fmtCurrency(total)}</span>
                                                                                                 </div>
                                                                                                 <input type="radio" name="tick-preview-payment" disabled style={{ width: '14px', height: '14px', margin: 0 }} />
                                                                                             </div>
                                                                                         </div>
                                                                                         {/* Info Bar */}
                                                                                         {partialPaymentSettings?.payment_method_descriptions?.pure_cod?.enabled && (
-                                                                                            <div style={{ background: '#ffedd5', padding: '5px 8px', borderBottomLeftRadius: '8px', borderBottomRightRadius: '8px', fontSize: '8.5px', color: '#9a3412', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500 }}>
+                                                                                            <div style={{ background: codFeeBg, padding: '5px 8px', borderBottomLeftRadius: '8px', borderBottomRightRadius: '8px', fontSize: '8.5px', color: codFeeColor, display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500 }}>
                                                                                                 {partialPaymentSettings?.payment_method_descriptions?.pure_cod?.text}
                                                                                             </div>
                                                                                         )}
