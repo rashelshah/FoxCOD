@@ -50,6 +50,7 @@ export interface PartialPaymentCheckoutParams {
   shippingTitle?: string;
   codFeeAmount?: number;
   isFullPrepaid?: boolean;
+  isNativeCod?: boolean;
   prepaidDiscountAmount?: number;
   prepaidDiscountType?: 'percentage' | 'fixed';
   prepaidDiscountValue?: number;
@@ -467,7 +468,7 @@ async function createDraftOrderCheckout(
   graphqlInput.customAttributes = customAttributes;
   graphqlInput.tags = params.isFullPrepaid
     ? (params.prepaidDiscountAmount && params.prepaidDiscountAmount > 0 ? ["FoxlyCOD", "Full Prepaid", "Prepaid Discount"] : ["FoxlyCOD", "Full Prepaid"])
-    : ["FoxlyCOD", "Partial COD", "Pending Advance"];
+    : params.isNativeCod ? ["FoxlyCOD", "COD"] : ["FoxlyCOD", "Partial COD", "Pending Advance"];
 
   if (Object.keys(cleanAddressInput).length > 0) {
     graphqlInput.shippingAddress = cleanAddressInput;
@@ -584,7 +585,8 @@ export async function createNativeCodCheckout(
     advanceAmount: params.totalOrderValue,
     remainingAmount: 0,
     partialPaymentReference: reference,
-    isFullPrepaid: false
+    isFullPrepaid: false,
+    isNativeCod: true
   });
 }
 

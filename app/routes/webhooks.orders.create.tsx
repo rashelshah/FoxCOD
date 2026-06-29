@@ -188,7 +188,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           {
             variables: { 
               id: `gid://shopify/Order/${payload.id}`,
-              tags: isFullPrepaid ? ["FoxlyCOD", "Full Prepaid"] : ["FoxlyCOD", "Partial COD", "Pending Advance"]
+              tags: isFullPrepaid ? ["FoxlyCOD", "Full Prepaid"] : isPartialCod ? ["FoxlyCOD", "Partial COD", "Pending Advance"] : ["FoxlyCOD", "COD"]
             },
           }
         );
