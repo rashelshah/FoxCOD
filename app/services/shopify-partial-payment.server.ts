@@ -474,6 +474,7 @@ async function createDraftOrderCheckout(
   if (Object.keys(cleanAddressInput).length > 0) {
     graphqlInput.shippingAddress = cleanAddressInput;
     graphqlInput.billingAddress = cleanAddressInput;
+    graphqlInput.useCustomerDefaultAddress = false;
   }
 
   // Set the sourceName so Shopify associates this draft order (and the resulting order) with the app

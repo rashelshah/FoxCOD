@@ -215,6 +215,7 @@ export async function createPendingOrder(params: GraphQLOrderParams): Promise<Gr
   // ── 3. Format addresses ──
   const formatAddress = (addr: any) => {
     if (!addr) return undefined;
+    const isCode = addr.country && addr.country.length === 2;
     return {
       firstName: addr.first_name || addr.firstName,
       lastName: addr.last_name || addr.lastName,
@@ -222,7 +223,8 @@ export async function createPendingOrder(params: GraphQLOrderParams): Promise<Gr
       city: addr.city,
       province: addr.province,
       zip: addr.zip,
-      country: addr.country,
+      country: isCode ? undefined : addr.country,
+      countryCode: isCode ? addr.country.toUpperCase() : undefined,
       phone: addr.phone,
     };
   };
@@ -260,6 +262,7 @@ export async function createPendingOrder(params: GraphQLOrderParams): Promise<Gr
     tags: params.tags || [],
     note: params.note || '',
     email: params.customer.email || undefined,
+    phone: params.customer.phone || undefined,
     shippingLines,
     ...(shippingAddr ? { shippingAddress: shippingAddr } : {}),
     ...(billingAddr ? { billingAddress: billingAddr } : {}),
