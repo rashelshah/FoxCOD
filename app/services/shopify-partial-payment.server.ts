@@ -3,6 +3,7 @@ import {
   resolveContextualPricingForOrder,
   assertPricingConsistency,
 } from './contextual-pricing.server';
+import { findOrCreateCustomer } from './shopify-graphql-orders.server';
 
 const DISCOUNT_PREFIX = 'FOX-PCOD-';
 const DISCOUNT_TTL_MINUTES = 60; 
@@ -485,11 +486,20 @@ async function createDraftOrderCheckout(
     graphqlInput.presentmentCurrencyCode = marketCurrencyCode;
   }
 
-  if (customer.email) {
+  const graphql = await getAdminGraphql(shop);
+
+  const customerId = await findOrCreateCustomer(graphql, {
+    firstName: customer.firstName,
+    lastName: customer.lastName,
+    email: customer.email,
+    phone: customer.phone
+  });
+
+  if (customerId) {
+    graphqlInput.purchasingEntity = { customerId };
+  } else if (customer.email) {
     graphqlInput.email = customer.email;
   }
-
-  const graphql = await getAdminGraphql(shop);
   
   const query = `
     mutation draftOrderCreate($input: DraftOrderInput!) {

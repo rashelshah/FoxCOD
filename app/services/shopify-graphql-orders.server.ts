@@ -52,7 +52,7 @@ export interface GraphQLOrderResult {
  * Find or create a Shopify customer by email/phone.
  * Links the order to an existing Shopify customer record for CRM continuity.
  */
-async function findOrCreateCustomer(
+export async function findOrCreateCustomer(
   graphql: any,
   customerData: { firstName?: string; lastName?: string; email?: string; phone?: string }
 ) {
