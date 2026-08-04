@@ -425,6 +425,7 @@ export default function QuantityOffersPage() {
     const navigation = useNavigation();
     const shopify = useAppBridge();
     const isSaving = navigation.state === "submitting";
+    const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
 
     // Dynamic currency formatter
     const fmtCurrency = useCallback((amount: number) => {
@@ -1079,7 +1080,7 @@ export default function QuantityOffersPage() {
 
                     {/* Live Preview */}
                     <div className="qo-preview">
-                        <div className="preview-label">
+                        <div className="preview-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <span>Live Preview</span>
                         </div>
                         <div className="preview-panel">
@@ -1090,12 +1091,50 @@ export default function QuantityOffersPage() {
                                 .template-cards .cod-ribbon-wrap{top:-6px!important;overflow:visible!important}
                                 .template-cards .cod-ribbon-badge{padding:3px 10px!important;font-size:9px!important;letter-spacing:.3px!important;border-radius:0 0 10px 10px!important;overflow:visible!important}
                             ` }} />
-                            <div className="preview-header">
+                            <div className="preview-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <h3>{activeGroup?.placement === 'in_product_page' ? 'Product Page Preview' : 'Bundle Offers Preview'}</h3>
+                                <div style={{ display: 'flex', background: '#f3f4f6', padding: '4px', borderRadius: '8px', gap: '4px' }}>
+                                    <button
+                                        onClick={(e) => { e.preventDefault(); setPreviewDevice('desktop'); }}
+                                        style={{
+                                            background: previewDevice === 'desktop' ? '#ffffff' : 'transparent',
+                                            border: 'none',
+                                            borderRadius: '6px',
+                                            padding: '4px 8px',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            fontSize: '12px',
+                                            fontWeight: previewDevice === 'desktop' ? 600 : 400,
+                                            color: previewDevice === 'desktop' ? '#111827' : '#6b7280',
+                                            boxShadow: previewDevice === 'desktop' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s ease'
+                                        }}
+                                    >
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+                                    </button>
+                                    <button
+                                        onClick={(e) => { e.preventDefault(); setPreviewDevice('mobile'); }}
+                                        style={{
+                                            background: previewDevice === 'mobile' ? '#ffffff' : 'transparent',
+                                            border: 'none',
+                                            borderRadius: '6px',
+                                            padding: '4px 8px',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            fontSize: '12px',
+                                            fontWeight: previewDevice === 'mobile' ? 600 : 400,
+                                            color: previewDevice === 'mobile' ? '#111827' : '#6b7280',
+                                            boxShadow: previewDevice === 'mobile' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s ease'
+                                        }}
+                                    >
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+                                    </button>
+                                </div>
                             </div>
-                            <div className="preview-content">
-                                <div className="preview-phone">
-                                    <div className="preview-phone-screen">
+                            <div className="preview-content" style={previewDevice === 'desktop' ? { display: 'flex', justifyContent: 'center', alignItems: 'flex-start', background: '#f3f4f6', padding: '32px 16px', borderRadius: '12px', minHeight: '550px' } : {}}>
+                                <div className={previewDevice === 'mobile' ? "preview-phone" : "preview-desktop"} style={previewDevice === 'desktop' ? { width: '100%', maxWidth: '800px', margin: '0 auto', position: 'relative' } : {}}>
+                                    <div className="preview-phone-screen" style={previewDevice === 'desktop' ? { background: '#ffffff', borderRadius: '12px', height: 'auto', maxHeight: 'none', padding: '24px', maskImage: 'none', WebkitMaskImage: 'none', overflow: 'visible', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' } : {}}>
                                         {/* In Product Page placement: show offers on the product page itself */}
                                         {activeGroup && activeGroup.placement === 'in_product_page' ? (
                                             <div style={{ padding: '16px' }}>
@@ -1237,7 +1276,7 @@ export default function QuantityOffersPage() {
                                                     const shadowOpacity = clamped === 0 ? 0 : 0.05 + (clamped / 100) * 0.25;
                                                     const base: any = {
                                                         background: bg,
-                                                        borderRadius: br,
+                                                        borderRadius: previewDevice === 'desktop' ? '24px' : '0px',
                                                         padding: '16px',
                                                         transition: 'all 0.3s ease',
                                                         boxShadow: clamped > 0 ? `0 10px 25px rgba(0,0,0,${shadowOpacity.toFixed(2)})` : 'none',

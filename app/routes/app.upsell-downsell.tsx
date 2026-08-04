@@ -313,6 +313,7 @@ export default function UpsellDownsellPage() {
     const navigation = useNavigation();
     const shopify = useAppBridge();
     const isSaving = navigation.state === "submitting";
+    const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
 
     // Dynamic currency formatter
     const fmtCurrency = useCallback((amount: number) => {
@@ -754,21 +755,29 @@ export default function UpsellDownsellPage() {
                                 <div>
                                     <div className="pv-wrap">
                                         <div className="pv-panel">
-                                            <div className="pv-panel-header">
+                                            <div className="pv-panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                 <h3>Live Preview</h3>
+                                                <div style={{ display: 'flex', background: '#f3f4f6', padding: '4px', borderRadius: '8px', gap: '4px' }}>
+                                                    <button onClick={(e) => { e.preventDefault(); setPreviewDevice('desktop'); }} style={{ background: previewDevice === 'desktop' ? '#ffffff' : 'transparent', border: 'none', borderRadius: '6px', padding: '4px 8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: previewDevice === 'desktop' ? 600 : 400, color: previewDevice === 'desktop' ? '#111827' : '#6b7280', boxShadow: previewDevice === 'desktop' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', cursor: 'pointer', transition: 'all 0.2s ease' }} >
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+                                                    </button>
+                                                    <button onClick={(e) => { e.preventDefault(); setPreviewDevice('mobile'); }} style={{ background: previewDevice === 'mobile' ? '#ffffff' : 'transparent', border: 'none', borderRadius: '6px', padding: '4px 8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: previewDevice === 'mobile' ? 600 : 400, color: previewDevice === 'mobile' ? '#111827' : '#6b7280', boxShadow: previewDevice === 'mobile' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', cursor: 'pointer', transition: 'all 0.2s ease' }} >
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+                                                    </button>
+                                                </div>
                                             </div>
-                                            <div className="pv-phone">
-                                                <div className="pv-phone-screen" ref={tickPreviewRef}>
+                                            <div style={previewDevice === 'desktop' ? { display: 'flex', justifyContent: 'center', alignItems: 'flex-start', background: '#f3f4f6', padding: '32px 16px', borderRadius: '12px', minHeight: '550px' } : {}}>
+                                                <div className={previewDevice === 'mobile' ? "pv-phone" : "preview-desktop"} style={previewDevice === 'desktop' ? { width: '100%', maxWidth: '520px', margin: '0 auto', position: 'relative' } : {}}>
+                                                    <div className="pv-phone-screen" ref={tickPreviewRef} style={previewDevice === 'desktop' ? { background: '#ffffff', borderRadius: '12px', height: 'auto', maxHeight: 'none', padding: '24px', maskImage: 'none', WebkitMaskImage: 'none', overflow: 'visible', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' } : {}}>
 
                                                     {/* Product Section + Form Modal - same structure as Form Builder */}
                                                     <div className="tick-pv-product" style={(() => {
                                                         const ms = formSettings?.modal_style === 'modern' ? 'glassmorphism' : (formSettings?.modal_style || 'glassmorphism');
                                                         const fs: any = formSettings?.styles || {};
                                                         const bg = fs.background || fs.backgroundColor || '#ffffff';
-                                                        const br = (fs.borderRadius || 12) + 'px';
                                                         const base: any = {
                                                             background: bg,
-                                                            borderRadius: br,
+                                                            borderRadius: previewDevice === 'desktop' ? '24px' : '0px',
                                                             padding: '16px',
                                                             transition: 'all 0.3s ease',
                                                         };
@@ -1490,6 +1499,7 @@ export default function UpsellDownsellPage() {
                                         </div>
                                     </div>
                                 </div>
+                            </div>
                             </>
                         ) : editing.type === 'downsell' ? (
                             /* ==================== DOWNSELL EDITOR (EasySell-style) ==================== */
@@ -1795,11 +1805,20 @@ export default function UpsellDownsellPage() {
                                 <div>
                                     <div className="pv-wrap">
                                         <div className="pv-panel">
-                                            <div className="pv-panel-header">
+                                            <div className="pv-panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                 <h3>Live Preview</h3>
+                                                <div style={{ display: 'flex', background: '#f3f4f6', padding: '4px', borderRadius: '8px', gap: '4px' }}>
+                                                    <button onClick={(e) => { e.preventDefault(); setPreviewDevice('desktop'); }} style={{ background: previewDevice === 'desktop' ? '#ffffff' : 'transparent', border: 'none', borderRadius: '6px', padding: '4px 8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: previewDevice === 'desktop' ? 600 : 400, color: previewDevice === 'desktop' ? '#111827' : '#6b7280', boxShadow: previewDevice === 'desktop' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', cursor: 'pointer', transition: 'all 0.2s ease' }} >
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+                                                    </button>
+                                                    <button onClick={(e) => { e.preventDefault(); setPreviewDevice('mobile'); }} style={{ background: previewDevice === 'mobile' ? '#ffffff' : 'transparent', border: 'none', borderRadius: '6px', padding: '4px 8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: previewDevice === 'mobile' ? 600 : 400, color: previewDevice === 'mobile' ? '#111827' : '#6b7280', boxShadow: previewDevice === 'mobile' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', cursor: 'pointer', transition: 'all 0.2s ease' }} >
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+                                                    </button>
+                                                </div>
                                             </div>
-                                            <div className="pv-phone">
-                                                <div className="pv-phone-screen" style={{ height: 'auto', minHeight: 0 }}>
+                                            <div style={previewDevice === 'desktop' ? { display: 'flex', justifyContent: 'center', alignItems: 'flex-start', background: '#f3f4f6', padding: '32px 16px', borderRadius: '12px', minHeight: '550px' } : {}}>
+                                                <div className={previewDevice === 'mobile' ? "pv-phone" : "preview-desktop"} style={previewDevice === 'desktop' ? { width: '100%', maxWidth: '520px', margin: '0 auto', position: 'relative' } : {}}>
+                                                    <div className="pv-phone-screen" style={previewDevice === 'desktop' ? { background: '#ffffff', borderRadius: '12px', height: 'auto', maxHeight: 'none', padding: '24px', maskImage: 'none', WebkitMaskImage: 'none', overflow: 'visible', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' } : { height: 'auto', minHeight: 0 }}>
                                                     {/* Downsell popup preview */}
                                                     {(() => {
                                                         const d = editing.design;
@@ -1830,7 +1849,7 @@ export default function UpsellDownsellPage() {
                                                         return (
                                                             <div style={{
                                                                 ...bgStyle,
-                                                                borderRadius: 16,
+                                                                borderRadius: previewDevice === 'desktop' ? '24px' : '0px',
                                                                 overflow: 'hidden',
                                                                 boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
                                                                 border: '1px solid #e5e7eb',
@@ -1943,6 +1962,7 @@ export default function UpsellDownsellPage() {
                                                             </div>
                                                         );
                                                     })()}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -2264,15 +2284,26 @@ export default function UpsellDownsellPage() {
                                 <div>
                                     <div className="pv-wrap">
                                         <div className="pv-panel">
-                                            <div className="pv-panel-header">
-                                                <h3>Live Preview</h3>
-                                                <span className="pv-badge">Offer #{(expandedOfferIdx >= 0 ? expandedOfferIdx : 0) + 1}</span>
+                                            <div className="pv-panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <h3>Live Preview</h3>
+                                                    <span className="pv-badge">Offer #{(expandedOfferIdx >= 0 ? expandedOfferIdx : 0) + 1}</span>
+                                                </div>
+                                                <div style={{ display: 'flex', background: '#f3f4f6', padding: '4px', borderRadius: '8px', gap: '4px' }}>
+                                                    <button onClick={(e) => { e.preventDefault(); setPreviewDevice('desktop'); }} style={{ background: previewDevice === 'desktop' ? '#ffffff' : 'transparent', border: 'none', borderRadius: '6px', padding: '4px 8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: previewDevice === 'desktop' ? 600 : 400, color: previewDevice === 'desktop' ? '#111827' : '#6b7280', boxShadow: previewDevice === 'desktop' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', cursor: 'pointer', transition: 'all 0.2s ease' }} >
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+                                                    </button>
+                                                    <button onClick={(e) => { e.preventDefault(); setPreviewDevice('mobile'); }} style={{ background: previewDevice === 'mobile' ? '#ffffff' : 'transparent', border: 'none', borderRadius: '6px', padding: '4px 8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: previewDevice === 'mobile' ? 600 : 400, color: previewDevice === 'mobile' ? '#111827' : '#6b7280', boxShadow: previewDevice === 'mobile' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', cursor: 'pointer', transition: 'all 0.2s ease' }} >
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+                                                    </button>
+                                                </div>
                                             </div>
-                                            <div className="pv-phone">
-                                                <div className="pv-phone-screen" style={{ height: '560px' }}>
+                                            <div style={previewDevice === 'desktop' ? { display: 'flex', justifyContent: 'center', alignItems: 'flex-start', background: '#f3f4f6', padding: '32px 16px', borderRadius: '12px', minHeight: '550px' } : {}}>
+                                                <div className={previewDevice === 'mobile' ? "pv-phone" : "preview-desktop"} style={previewDevice === 'desktop' ? { width: '100%', maxWidth: '520px', margin: '0 auto', position: 'relative' } : {}}>
+                                                    <div className="pv-phone-screen" style={previewDevice === 'desktop' ? { background: '#ffffff', borderRadius: '12px', height: 'auto', maxHeight: 'none', padding: '24px', maskImage: 'none', WebkitMaskImage: 'none', overflow: 'visible', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' } : { height: '560px' }}>
                                                     <div className="pv-modal" style={editing.design.bgImage
-                                                        ? { backgroundImage: `url(${editing.design.bgImage})`, backgroundSize: 'cover', backgroundPosition: 'center' }
-                                                        : { background: editing.design.bgColor }
+                                                        ? { backgroundImage: `url(${editing.design.bgImage})`, backgroundSize: 'cover', backgroundPosition: 'center', borderRadius: previewDevice === 'desktop' ? '24px' : '0px' }
+                                                        : { background: editing.design.bgColor, borderRadius: previewDevice === 'desktop' ? '24px' : '0px' }
                                                     }>
                                                         <div className="pv-header">
                                                             <h2 style={{ fontSize: editing.design.headerTextSize, color: editing.design.headerTextColor, fontWeight: editing.design.headerBold ? 700 : 400 }}>{editing.design.headerText || "You've unlocked a special deal"}</h2>
@@ -2306,6 +2337,7 @@ export default function UpsellDownsellPage() {
                                                         <button className="pv-reject" style={{ background: editing.design.rejectButton.bgColor, color: editing.design.rejectButton.textColor, fontSize: editing.design.rejectButton.textSize, borderRadius: editing.design.rejectButton.borderRadius, borderWidth: editing.design.rejectButton.borderWidth, borderStyle: 'solid', borderColor: editing.design.rejectButton.borderColor, boxShadow: editing.design.rejectButton.shadow ? '0 4px 12px rgba(0,0,0,0.15)' : 'none' }}>
                                                             {editing.design.rejectButton.text}
                                                         </button>
+                                                    </div>
                                                     </div>
                                                 </div>
                                             </div>
