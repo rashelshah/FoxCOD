@@ -219,7 +219,7 @@ const S = `
 .pp-title p { font-size: 14px; color: #6b7280; margin: 0; }
 
 /* ── Tabs ── */
-.tabs { display: flex; gap: 4px; margin-bottom: 24px; background: #ffffff; padding: 6px; border-radius: 10px; border: 1px solid #e5e7eb; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05); }
+.tabs { position: sticky; top: 16px; z-index: 40; display: flex; gap: 4px; margin-bottom: 24px; background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); padding: 6px; border-radius: 10px; border: 1px solid rgba(229, 231, 235, 0.8); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025); }
 .tab { flex: 1; padding: 10px 16px; border: none; background: transparent; border-radius: 6px; font-size: 13px; font-weight: 500; color: #4b5563; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s ease; }
 .tab:hover { background: #f9fafb; color: #111827; }
 .tab.active { background: #f3f4f6; color: #111827; box-shadow: none; font-weight: 600; }

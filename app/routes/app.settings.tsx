@@ -38,6 +38,7 @@ import {
     importShippingRatesFromShopify,
     type ShippingRate,
 } from "../services/shipping-rates.server";
+import { extractThemeSettings } from "../utils/themeExtraction";
 import {
     type FormField,
     type ContentBlocks,
@@ -419,6 +420,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     const formData = await request.formData();
     const actionType = formData.get("action_type") as string;
+
+    // Handle theme extraction action
+    if (actionType === "extract_theme") {
+        try {
+            const profile = await extractThemeSettings(admin, session);
+            return { success: true, actionType: "extract_theme", profile };
+        } catch (error: any) {
+            console.error("Theme extraction failed:", error);
+            return { success: false, actionType: "extract_theme", error: error.message };
+        }
+    }
 
     // Handle shipping rates specific actions
     if (actionType === "create_shipping_rate") {
@@ -1158,7 +1170,7 @@ const PreviewDisplay = memo(({
                                 padding: previewDevice === 'desktop' ? '24px 20px' : '16px',
                                 position: 'relative',
                                 background: formStyles?.background || formStyles?.backgroundImage || formStyles?.backgroundColor || 'transparent',
-                                borderRadius: previewDevice === 'desktop' ? '24px' : (formStyles?.borderRadius || borderRadius) + 'px',
+                                borderRadius: previewDevice === 'desktop' ? '24px' : '0px',
                                 ...(modalStyle === 'glassmorphism' ? { backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.3)', boxShadow: formStyles?.shadow ? '0 8px 32px rgba(0,0,0,0.1)' : 'none' } : modalStyle === 'minimal' ? { border: '1px solid #e5e7eb', boxShadow: 'none' } : { boxShadow: formStyles?.shadow ? '0 10px 25px rgba(0,0,0,0.1)' : 'none' }),
                             }}>
                                 {previewDevice === 'desktop' && activeTab !== 'button' && (
@@ -2402,7 +2414,10 @@ export default function SettingsPage() {
     const shopify = useAppBridge();
 
     const isSubmitting = navigation.state === "submitting";
+    const isExtractingTheme = navigation.state === "submitting" && navigation.formData?.get("action_type") === "extract_theme";
     const [activeTab, setActiveTab] = useState<'button' | 'form' | 'style' | 'shipping'>('button');
+    const [themeApplied, setThemeApplied] = useState(false);
+    const [themeDebugInfo, setThemeDebugInfo] = useState<any>(null);
 
     // Accordion state: track which section is expanded per tab (only one at a time)
     const [expandedSection, setExpandedSection] = useState<Record<string, string>>({
@@ -2712,6 +2727,48 @@ export default function SettingsPage() {
             lastProcessedActionRef.current = actionData;
 
             if (actionData.success) {
+                if (actionData.actionType === "extract_theme") {
+                    const profile = (actionData as any).profile;
+                    console.log('[FoxCOD] Full actionData:', JSON.stringify(actionData));
+                    setThemeDebugInfo(profile);
+                    if (profile && Object.keys(profile.colors || {}).length > 0) {
+                        // Start from DEFAULT_STYLES to avoid inheriting old preset colors
+                        setFormStyles({
+                            ...DEFAULT_STYLES,
+                            themeKey: 'custom',
+                            background: profile.colors.background || DEFAULT_STYLES.background,
+                            backgroundColor: profile.colors.background || DEFAULT_STYLES.backgroundColor,
+                            fieldBackgroundColor: profile.colors.background || DEFAULT_STYLES.fieldBackgroundColor,
+                            textColor: profile.colors.text || DEFAULT_STYLES.textColor,
+                            primaryColor: profile.colors.button || profile.colors.primary || DEFAULT_STYLES.borderColor,
+                            buttonColor: profile.colors.button || profile.colors.primary || DEFAULT_STYLES.buttonColor || '#000000',
+                            buttonTextColor: profile.colors.buttonText || DEFAULT_STYLES.textColor,
+                            borderColor: profile.colors.border || profile.colors.button || profile.colors.primary || DEFAULT_STYLES.borderColor,
+                            labelColor: profile.colors.text || DEFAULT_STYLES.labelColor,
+                            iconColor: profile.colors.button || profile.colors.primary || DEFAULT_STYLES.iconColor,
+                            priceColor: profile.colors.button || profile.colors.primary || DEFAULT_STYLES.priceColor,
+                            borderRadius: profile.styles?.borderRadius ? parseInt(profile.styles.borderRadius) : DEFAULT_STYLES.borderRadius,
+                        });
+                        // Also update the COD button color (uses primaryColor state)
+                        const extractedBtnColor = profile.colors.button || profile.colors.primary;
+                        if (extractedBtnColor) {
+                            setPrimaryColor(extractedBtnColor);
+                        }
+                        setButtonStylesState((prev: any) => ({
+                            ...prev,
+                            backgroundColor: profile.colors.button || profile.colors.primary || prev.backgroundColor,
+                            textColor: profile.colors.buttonText || '#ffffff',
+                            borderRadius: profile.styles?.borderRadius ? parseInt(profile.styles.borderRadius) : prev.borderRadius,
+                        }));
+                        setThemeApplied(true);
+                        shopify.toast.show(`✓ ${profile.themeClassification || 'Website'} Theme Applied!`);
+                    } else {
+                        shopify.toast.show(`Theme extracted but colors empty. Check debug panel.`, { duration: 4000, isError: true });
+                    }
+                    return;
+                }
+
+                // save action
                 const currentSettings = {
                     enabled, button_text: buttonText, primary_color: primaryColor, required_fields: requiredFields,
                     max_quantity: maxQuantity, button_style: buttonStyle, button_size: buttonSize, button_position: buttonPosition,
@@ -2727,8 +2784,8 @@ export default function SettingsPage() {
                     form_submit_button: formSubmitButtonState
                 };
                 setSavedSettingsString(JSON.stringify(currentSettings));
-                setSaveError(null); // Clear any previous errors
-                shopify.toast.show('Settings saved!', { duration: 3000 });
+                shopify.toast.show("Settings saved successfully!");
+                setSaveError(null);
             } else if (actionData.error) {
                 // Handle error case - actionData.error might be an object or string
                 const errorMsg = typeof actionData.error === 'string'
@@ -2846,6 +2903,12 @@ export default function SettingsPage() {
     }, []);
 
     // Handle save
+    const handleExtractTheme = useCallback(() => {
+        const formData = new FormData();
+        formData.append("action_type", "extract_theme");
+        submit(formData, { method: "post" });
+    }, [submit]);
+
     const handleSave = useCallback(() => {
         const formData = new FormData();
         formData.append("enabled", enabled.toString());
@@ -4793,6 +4856,44 @@ export default function SettingsPage() {
 
                                     {/* Field Styling */}
                                     <AccordionSection id="field-styling" tab="form" title="Field Styling" helperText="Changes the styling of the form fields" expandedSection={expandedSection} toggleSection={toggleSection}>
+                                        
+                                        {/* Auto Theme Matching removed as per user request — button moved to Style Preset header */}
+
+                                        {/* Debug: show extracted profile */}
+                                        {themeDebugInfo && (
+                                            <div style={{ background: '#f0fdf4', borderRadius: '8px', padding: '12px 16px', marginBottom: '20px', border: '1px solid #bbf7d0', fontSize: '12px' }}>
+                                                <p style={{ margin: '0 0 6px 0', fontWeight: 600, color: '#166534' }}>
+                                                    ✓ Theme: <strong>{themeDebugInfo.debug?.themeName || 'Unknown'}</strong> — {themeDebugInfo.themeClassification || 'Modern'}
+                                                </p>
+                                                {/* Extracted colors */}
+                                                <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#374151', fontWeight: 600 }}>Extracted colors:</p>
+                                                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                                                    {Object.entries(themeDebugInfo.colors || {}).map(([key, val]: any) => (
+                                                        <span key={key} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#fff', padding: '2px 8px', borderRadius: '4px', border: '1px solid #d1fae5' }}>
+                                                            <span style={{ width: 12, height: 12, borderRadius: '50%', background: val as string, border: '1px solid #ccc', display: 'inline-block' }} />
+                                                            <span style={{ color: '#374151' }}>{key}: {val as string}</span>
+                                                        </span>
+                                                    ))}
+                                                    {Object.keys(themeDebugInfo.colors || {}).length === 0 && (
+                                                        <span style={{ color: '#dc2626' }}>⚠ No colors extracted</span>
+                                                    )}
+                                                </div>
+                                                {/* Raw settings values - KEY diagnostic info */}
+                                                {themeDebugInfo.debug?.settingsValues && Object.keys(themeDebugInfo.debug.settingsValues).length > 0 && (
+                                                    <>
+                                                        <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#374151', fontWeight: 600 }}>Raw theme settings (color/accent/button keys):</p>
+                                                        <div style={{ background: '#fff', borderRadius: '4px', padding: '6px 8px', border: '1px solid #d1fae5', fontFamily: 'monospace', maxHeight: '120px', overflowY: 'auto' }}>
+                                                            {Object.entries(themeDebugInfo.debug.settingsValues).map(([k, v]: any) => (
+                                                                <div key={k} style={{ color: '#374151', lineHeight: 1.6 }}>
+                                                                    <span style={{ color: '#7c3aed' }}>{k}</span>: <span style={{ color: '#059669' }}>{JSON.stringify(v)}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </div>
+                                        )}
+
                                         {/* ── Style Preset Gallery ── */}
                                         {(() => {
                                             const presetList = [
@@ -4845,7 +4946,18 @@ export default function SettingsPage() {
 
                                             return (
                                                 <div className="input-group">
-                                                    <label className="input-label">Style Preset</label>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                                                        <label className="input-label" style={{ margin: 0 }}>Style Preset</label>
+                                                        <Button
+                                                            size="micro"
+                                                            variant="primary"
+                                                            onClick={handleExtractTheme}
+                                                            loading={isExtractingTheme}
+                                                            tone={themeApplied ? "success" : undefined}
+                                                        >
+                                                            {themeApplied ? "✓ Store Theme Applied" : "✨ Match Store Theme"}
+                                                        </Button>
+                                                    </div>
                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                                                         {/* Category tabs */}
                                                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
