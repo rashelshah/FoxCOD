@@ -1,0 +1,24 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "2c77be43017090aaa5bc6df6a2646edb"
+name = "Foxly COD + Partial & Prepaid"
+application_url = "https://fox-cod.vercel.app"
+embedded = true
+
+[webhooks]
+api_version = "2026-07"
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "read_customers,write_customers,read_discounts,write_discounts,write_draft_orders,read_files,write_files,read_fulfillments,write_inventory,read_inventory,write_order_edits,read_orders,write_orders,read_products,unauthenticated_read_product_listings"
+optional_scopes = [ ]
+use_legacy_install_flow = false
+
+[auth]
+redirect_urls = [
+  "https://fox-cod.vercel.app/auth/login",
+  "https://fox-cod.vercel.app/auth/callback"
+]
+
+[build]
+automatically_update_urls_on_dev = false

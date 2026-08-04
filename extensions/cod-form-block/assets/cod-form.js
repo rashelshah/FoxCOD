@@ -5367,7 +5367,7 @@ function darkenColor(hex, percent) {
           html += '</div></div>';
           var prepaidDesc = ppSettings && ppSettings.payment_method_descriptions && ppSettings.payment_method_descriptions.full_prepaid ? ppSettings.payment_method_descriptions.full_prepaid : { enabled: true, text: 'Pay now, save more, receive sooner' };
           if (prepaidDesc.enabled) {
-              html += '<div style="background: #dcfce7; padding: 10px 12px; font-size: 10px; color: #166534; display: flex; justify-content: center; align-items: center; font-weight: 500; width: 100%; box-sizing: border-box; margin: 0; border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;">' + prepaidDesc.text + '</div>';
+              html += '<div style="background: #dcfce7; padding: 4px 12px; font-size: 11px; color: #166534; text-align: center; font-weight: 500; width: 100%; box-sizing: border-box; margin: 0; border-radius: 0 0 10.5px 10.5px;">' + prepaidDesc.text + '</div>';
           }
           html += '</label>';
       }
@@ -5432,7 +5432,7 @@ function darkenColor(hex, percent) {
           html += '</div></div>';
           var partialDesc = ppSettings && ppSettings.payment_method_descriptions && ppSettings.payment_method_descriptions.partial_payment ? ppSettings.payment_method_descriptions.partial_payment : { enabled: true, text: 'Secure your order • Avoid fake cancellations' };
           if (partialDesc.enabled) {
-              html += '<div style="background: #dbeafe; padding: 10px 12px; font-size: 10px; color: #1e40af; display: flex; justify-content: center; align-items: center; font-weight: 500; width: 100%; box-sizing: border-box; margin: 0; border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;">' + partialDesc.text + '</div>';
+              html += '<div style="background: #dbeafe; padding: 4px 12px; font-size: 11px; color: #1e40af; text-align: center; font-weight: 500; width: 100%; box-sizing: border-box; margin: 0; border-radius: 0 0 10.5px 10.5px;">' + partialDesc.text + '</div>';
           }
           html += '</label>';
       }
@@ -5491,7 +5491,7 @@ function darkenColor(hex, percent) {
           html += '</div></div>';
           var codDesc = ppSettings && ppSettings.payment_method_descriptions && ppSettings.payment_method_descriptions.pure_cod ? ppSettings.payment_method_descriptions.pure_cod : { enabled: true, text: 'Higher return risk • Slightly slower processing' };
           if (codDesc.enabled) {
-              html += '<div style="background: ' + theme.footerBg + '; padding: 10px 12px; font-size: 10px; color: ' + theme.footerColor + '; display: flex; justify-content: center; align-items: center; font-weight: 500; width: 100%; box-sizing: border-box; margin: 0; border-bottom-left-radius: 10px; border-bottom-right-radius: 10px;">' + codDesc.text + '</div>';
+              html += '<div style="background: ' + theme.footerBg + '; padding: 4px 12px; font-size: 11px; color: ' + theme.footerColor + '; text-align: center; font-weight: 500; width: 100%; box-sizing: border-box; margin: 0; border-radius: 0 0 10.5px 10.5px;">' + codDesc.text + '</div>';
           }
           html += '</label>';
       }

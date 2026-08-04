@@ -760,6 +760,7 @@ const PreviewDisplay = memo(({
     fields, formStyles, buttonStylesState, blocks, shippingOpts, shippingRates, shippingRatesEnabled, activeTab,
     fmtCurrency, currencySymbol, formSubmitButtonState, partialCodEnabled, partialCodAdvanceAmount, partialPaymentSettings
 }: any) => {
+    const [previewDevice, setPreviewDevice] = useState<'mobile' | 'desktop'>('mobile');
 
     // Calculate button styles - sync with storefront
     const getButtonStyle = () => {
@@ -1082,15 +1083,55 @@ const PreviewDisplay = memo(({
 
     return (
         <div className="preview-panel">
-            <div className="preview-header">
-                <h3>Live Preview</h3>
-                <span style={{ fontSize: '11px', color: '#6b7280', background: '#f3f4f6', padding: '4px 8px', borderRadius: '6px' }}>
-                    {getAnimationLabel()} | {modalStyle.charAt(0).toUpperCase() + modalStyle.slice(1)}
-                </span>
+            <div className="preview-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <h3 style={{ margin: 0 }}>Live Preview</h3>
+                    <span style={{ fontSize: '11px', color: '#6b7280', background: '#f3f4f6', padding: '4px 8px', borderRadius: '6px' }}>
+                        {getAnimationLabel()} | {modalStyle.charAt(0).toUpperCase() + modalStyle.slice(1)}
+                    </span>
+                </div>
+                <div style={{ display: 'flex', background: '#f3f4f6', padding: '4px', borderRadius: '8px', gap: '4px' }}>
+                    <button
+                        onClick={(e) => { e.preventDefault(); setPreviewDevice('desktop'); }}
+                        style={{
+                            background: previewDevice === 'desktop' ? '#ffffff' : 'transparent',
+                            border: 'none',
+                            borderRadius: '6px',
+                            padding: '6px 10px',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: '12px',
+                            fontWeight: previewDevice === 'desktop' ? 600 : 400,
+                            color: previewDevice === 'desktop' ? '#111827' : '#6b7280',
+                            boxShadow: previewDevice === 'desktop' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease'
+                        }}
+                    >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+                    </button>
+                    <button
+                        onClick={(e) => { e.preventDefault(); setPreviewDevice('mobile'); }}
+                        style={{
+                            background: previewDevice === 'mobile' ? '#ffffff' : 'transparent',
+                            border: 'none',
+                            borderRadius: '6px',
+                            padding: '6px 10px',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: '12px',
+                            fontWeight: previewDevice === 'mobile' ? 600 : 400,
+                            color: previewDevice === 'mobile' ? '#111827' : '#6b7280',
+                            boxShadow: previewDevice === 'mobile' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease'
+                        }}
+                    >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+                    </button>
+                </div>
             </div>
-            <div className="preview-content">
-                <div className="preview-phone">
-                    <div className={`preview-phone-screen ${activeTab === 'button' && enabled ? 'preview-compact' : ''}`}>
+            <div className="preview-content" style={previewDevice === 'desktop' ? { display: 'flex', justifyContent: 'center', alignItems: 'flex-start', background: '#f3f4f6', padding: '32px 16px', borderRadius: '12px', minHeight: '550px' } : {}}>
+                <div className={previewDevice === 'mobile' ? "preview-phone" : "preview-desktop"} style={previewDevice === 'desktop' ? { width: '100%', maxWidth: '520px', margin: '0 auto', position: 'relative' } : {}}>
+                    <div className={`preview-phone-screen ${activeTab === 'button' && enabled ? 'preview-compact' : ''}`} style={previewDevice === 'desktop' ? { background: 'transparent', height: 'auto', maxHeight: 'none', padding: '0', maskImage: 'none', WebkitMaskImage: 'none', overflow: 'visible' } : {}}>
                         {!enabled ? (
                             <div style={{
                                 display: 'flex',
@@ -1114,11 +1155,17 @@ const PreviewDisplay = memo(({
                             </div>
                         ) : (
                             <div className="preview-product" style={activeTab === 'button' ? { padding: '24px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' } : {
-                                padding: '16px',
+                                padding: previewDevice === 'desktop' ? '24px 20px' : '16px',
+                                position: 'relative',
                                 background: formStyles?.background || formStyles?.backgroundImage || formStyles?.backgroundColor || 'transparent',
-                                borderRadius: (formStyles?.borderRadius || borderRadius) + 'px',
+                                borderRadius: previewDevice === 'desktop' ? '24px' : (formStyles?.borderRadius || borderRadius) + 'px',
                                 ...(modalStyle === 'glassmorphism' ? { backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.3)', boxShadow: formStyles?.shadow ? '0 8px 32px rgba(0,0,0,0.1)' : 'none' } : modalStyle === 'minimal' ? { border: '1px solid #e5e7eb', boxShadow: 'none' } : { boxShadow: formStyles?.shadow ? '0 10px 25px rgba(0,0,0,0.1)' : 'none' }),
                             }}>
+                                {previewDevice === 'desktop' && activeTab !== 'button' && (
+                                    <div style={{ position: 'absolute', top: '12px', right: '12px', width: '28px', height: '28px', borderRadius: '50%', background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 10 }}>
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                    </div>
+                                )}
                                 {/* Product Info - horizontal layout matching storefront mobile */}
                                 {activeTab !== 'button' && (
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingBottom: '12px', borderBottom: '1px solid rgba(0,0,0,0.08)', marginBottom: '8px', position: 'relative' }}>

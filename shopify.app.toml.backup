@@ -1,6 +1,6 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
-client_id = "2c77be43017090aaa5bc6df6a2646edb"
+client_id = "7c386161d2e35b3ec0a4fcbe0a8f4045"
 name = "Foxly COD + Partial & Prepaid"
 application_url = "https://fox-cod.vercel.app"
 embedded = true
