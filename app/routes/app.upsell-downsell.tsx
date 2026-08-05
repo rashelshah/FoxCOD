@@ -768,16 +768,21 @@ export default function UpsellDownsellPage() {
                                             </div>
                                             <div style={previewDevice === 'desktop' ? { display: 'flex', justifyContent: 'center', alignItems: 'flex-start', background: '#f3f4f6', padding: '32px 16px', borderRadius: '12px', minHeight: '550px' } : {}}>
                                                 <div className={previewDevice === 'mobile' ? "pv-phone" : "preview-desktop"} style={previewDevice === 'desktop' ? { width: '100%', maxWidth: '520px', margin: '0 auto', position: 'relative' } : {}}>
-                                                    <div className="pv-phone-screen" ref={tickPreviewRef} style={previewDevice === 'desktop' ? { background: '#ffffff', borderRadius: '12px', height: 'auto', maxHeight: 'none', padding: '24px', maskImage: 'none', WebkitMaskImage: 'none', overflow: 'visible', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' } : {}}>
+                                                    <div className="pv-phone-screen" ref={tickPreviewRef} style={previewDevice === 'desktop' ? { background: '#ffffff', borderRadius: '12px', height: 'auto', maxHeight: 'none', padding: '24px', maskImage: 'none', WebkitMaskImage: 'none', overflow: 'visible', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' } : {
+                                                        ...((formSettings?.form_type || 'popup') === 'popup' ? { background: '#f3f4f6', display: 'flex', flexDirection: 'column', paddingTop: '12px' } : {})
+                                                    }}>
 
                                                     {/* Product Section + Form Modal - same structure as Form Builder */}
                                                     <div className="tick-pv-product" style={(() => {
                                                         const ms = formSettings?.modal_style === 'modern' ? 'glassmorphism' : (formSettings?.modal_style || 'glassmorphism');
                                                         const fs: any = formSettings?.styles || {};
                                                         const bg = fs.background || fs.backgroundColor || '#ffffff';
+                                                        const formType = formSettings?.form_type || 'popup';
                                                         const base: any = {
                                                             background: bg,
-                                                            borderRadius: previewDevice === 'desktop' ? '24px' : '0px',
+                                                            borderRadius: previewDevice === 'desktop' ? '24px' : formType === 'popup' ? `${fs.borderRadius || 16}px ${fs.borderRadius || 16}px 0 0` : '0px',
+                                                            margin: previewDevice === 'mobile' && formType === 'popup' ? 'auto 10px 0 10px' : '0',
+                                                            flexShrink: 0,
                                                             padding: '16px',
                                                             transition: 'all 0.3s ease',
                                                         };

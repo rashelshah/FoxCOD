@@ -770,7 +770,7 @@ const PreviewDisplay = memo(({
     notesPlaceholder, submitButtonText,
     primaryColor, buttonStyle, buttonSize, borderRadius, modalStyle, animationStyle,
     fields, formStyles, buttonStylesState, blocks, shippingOpts, shippingRates, shippingRatesEnabled, activeTab,
-    fmtCurrency, currencySymbol, formSubmitButtonState, partialCodEnabled, partialCodAdvanceAmount, partialPaymentSettings
+    fmtCurrency, currencySymbol, formSubmitButtonState, partialCodEnabled, partialCodAdvanceAmount, partialPaymentSettings, formType
 }: any) => {
     const [previewDevice, setPreviewDevice] = useState<'mobile' | 'desktop'>('mobile');
 
@@ -1143,7 +1143,9 @@ const PreviewDisplay = memo(({
             </div>
             <div className="preview-content" style={previewDevice === 'desktop' ? { display: 'flex', justifyContent: 'center', alignItems: 'flex-start', background: '#f3f4f6', padding: '32px 16px', borderRadius: '12px', minHeight: '550px' } : {}}>
                 <div className={previewDevice === 'mobile' ? "preview-phone" : "preview-desktop"} style={previewDevice === 'desktop' ? { width: '100%', maxWidth: '520px', margin: '0 auto', position: 'relative' } : {}}>
-                    <div className={`preview-phone-screen ${activeTab === 'button' && enabled ? 'preview-compact' : ''}`} style={previewDevice === 'desktop' ? { background: 'transparent', height: 'auto', maxHeight: 'none', padding: '0', maskImage: 'none', WebkitMaskImage: 'none', overflow: 'visible' } : {}}>
+                    <div className={`preview-phone-screen ${activeTab === 'button' && enabled ? 'preview-compact' : ''}`} style={previewDevice === 'desktop' ? { background: 'transparent', height: 'auto', maxHeight: 'none', padding: '0', maskImage: 'none', WebkitMaskImage: 'none', overflow: 'visible' } : {
+                        ...(formType === 'popup' && activeTab !== 'button' && enabled ? { background: '#f3f4f6', display: 'flex', flexDirection: 'column', paddingTop: '12px' } : {})
+                    }}>
                         {!enabled ? (
                             <div style={{
                                 display: 'flex',
@@ -1170,7 +1172,9 @@ const PreviewDisplay = memo(({
                                 padding: previewDevice === 'desktop' ? '24px 20px' : '16px',
                                 position: 'relative',
                                 background: formStyles?.background || formStyles?.backgroundImage || formStyles?.backgroundColor || 'transparent',
-                                borderRadius: previewDevice === 'desktop' ? '24px' : '0px',
+                                borderRadius: previewDevice === 'desktop' ? '24px' : formType === 'popup' ? `${borderRadius || 16}px ${borderRadius || 16}px 0 0` : '0px',
+                                margin: previewDevice === 'mobile' && formType === 'popup' ? 'auto 10px 0 10px' : '0',
+                                flexShrink: 0,
                                 ...(modalStyle === 'glassmorphism' ? { backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.3)', boxShadow: formStyles?.shadow ? '0 8px 32px rgba(0,0,0,0.1)' : 'none' } : modalStyle === 'minimal' ? { border: '1px solid #e5e7eb', boxShadow: 'none' } : { boxShadow: formStyles?.shadow ? '0 10px 25px rgba(0,0,0,0.1)' : 'none' }),
                             }}>
                                 {previewDevice === 'desktop' && activeTab !== 'button' && (
@@ -2467,7 +2471,7 @@ export default function SettingsPage() {
     const [borderRadius, setBorderRadius] = useState(settings.border_radius || 12);
 
     // New advanced feature state
-    const [formType, setFormType] = useState<'popup' | 'embedded'>(settings.form_type || 'popup');
+    const [formType, setFormType] = useState<'popup' | 'embedded' | 'full_screen'>(settings.form_type || 'popup');
     // Merge saved fields with DEFAULT_FIELDS so newly added fields (e.g. shipping, order_summary) are always present
     // Also absorb any legacy custom_fields into the main fields array
     const mergeFieldsWithDefaults = (savedFields: FormField[] | undefined, legacyCustomFields?: FormField[]): FormField[] => {
@@ -4306,6 +4310,12 @@ export default function SettingsPage() {
                             Form Fields
                         </button>
                         <button
+                            className={`tab ${activeTab === 'style' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('style')}
+                        >
+                            Styles
+                        </button>
+                        <button
                             className={`tab ${activeTab === 'shipping' ? 'active' : ''}`}
                             onClick={() => setActiveTab('shipping')}
                         >
@@ -5776,7 +5786,7 @@ export default function SettingsPage() {
                             {activeTab === 'style' && (
                                 <>
                                     {/* Form Animation (Default Open) */}
-                                    <AccordionSection id="form-animation" tab="style" title="Form Animation" expandedSection={expandedSection} toggleSection={toggleSection}>
+                                    {false && <AccordionSection id="form-animation" tab="style" title="Form Animation" expandedSection={expandedSection} toggleSection={toggleSection}>
                                         <p className="setting-helper" style={{ marginBottom: 12 }}>Choose the modal style and entry animation for the COD form.</p>
                                         <div className="input-group">
                                             <label className="input-label">Modal Style</label>
@@ -5806,24 +5816,31 @@ export default function SettingsPage() {
                                                 ))}
                                             </div>
                                         </div>
-                                    </AccordionSection>
+                                    </AccordionSection>}
 
                                     {/* Form Shape */}
                                     <AccordionSection id="form-shape" tab="style" title="Form Shape" expandedSection={expandedSection} toggleSection={toggleSection}>
                                         <div className="input-group">
-                                            <label className="input-label">Border Radius (px)</label>
-                                            <div style={{ padding: '0 8px', width: '100%' }}>
-                                                <RangeSlider
-                                                    labelHidden
-                                                    label="Border Radius"
-                                                    min={0}
-                                                    max={24}
-                                                    value={borderRadius}
-                                                    onChange={(val) => setBorderRadius(Number(val))}
-                                                    output
-                                                />
+                                            <label className="input-label">Form Type</label>
+                                            <div className="style-options">
+                                                {['popup', 'full_screen'].map((type) => (
+                                                    <button
+                                                        key={type}
+                                                        className={`style-option ${formType === type ? 'active' : ''}`}
+                                                        onClick={() => {
+                                                            setFormType(type as any);
+                                                            if (type === 'full_screen') {
+                                                                setBorderRadius(0);
+                                                            } else {
+                                                                setBorderRadius(16);
+                                                            }
+                                                        }}
+                                                    >
+                                                        {type === 'popup' ? 'Pop up' : 'Full Screen'}
+                                                    </button>
+                                                ))}
                                             </div>
-                                            <p className="setting-helper">Controls the roundness of the modal corners.</p>
+                                            <p className="setting-helper">Choose how the form appears on mobile devices.</p>
                                         </div>
                                     </AccordionSection>
 
@@ -5867,6 +5884,7 @@ export default function SettingsPage() {
                         <div className="builder-right" style={activeTab === 'shipping' ? { display: 'none' } : undefined}>
                             <PreviewDisplay
                                 enabled={enabled}
+                                formType={formType}
                                 showProductImage={showProductImage}
                                 showPrice={showPrice}
                                 buttonText={buttonText}

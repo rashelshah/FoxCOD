@@ -1134,7 +1134,9 @@ export default function QuantityOffersPage() {
                             </div>
                             <div className="preview-content" style={previewDevice === 'desktop' ? { display: 'flex', justifyContent: 'center', alignItems: 'flex-start', background: '#f3f4f6', padding: '32px 16px', borderRadius: '12px', minHeight: '550px' } : {}}>
                                 <div className={previewDevice === 'mobile' ? "preview-phone" : "preview-desktop"} style={previewDevice === 'desktop' ? { width: '100%', maxWidth: '800px', margin: '0 auto', position: 'relative' } : {}}>
-                                    <div className="preview-phone-screen" style={previewDevice === 'desktop' ? { background: '#ffffff', borderRadius: '12px', height: 'auto', maxHeight: 'none', padding: '24px', maskImage: 'none', WebkitMaskImage: 'none', overflow: 'visible', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' } : {}}>
+                                    <div className="preview-phone-screen" style={previewDevice === 'desktop' ? { background: '#ffffff', borderRadius: '12px', height: 'auto', maxHeight: 'none', padding: '24px', maskImage: 'none', WebkitMaskImage: 'none', overflow: 'visible', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' } : {
+                                        ...((formSettings?.form_type || 'popup') === 'popup' && activeGroup?.placement !== 'in_product_page' ? { background: '#f3f4f6', display: 'flex', flexDirection: 'column', paddingTop: '12px' } : {})
+                                    }}>
                                         {/* In Product Page placement: show offers on the product page itself */}
                                         {activeGroup && activeGroup.placement === 'in_product_page' ? (
                                             <div style={{ padding: '16px' }}>
@@ -1274,9 +1276,12 @@ export default function QuantityOffersPage() {
                                                     const sliderVal = typeof rawShadow === 'number' ? rawShadow : (fs.shadow ? 35 : 0);
                                                     const clamped = Math.max(0, Math.min(100, sliderVal));
                                                     const shadowOpacity = clamped === 0 ? 0 : 0.05 + (clamped / 100) * 0.25;
+                                                    const formType = formSettings?.form_type || 'popup';
                                                     const base: any = {
                                                         background: bg,
-                                                        borderRadius: previewDevice === 'desktop' ? '24px' : '0px',
+                                                        borderRadius: previewDevice === 'desktop' ? '24px' : formType === 'popup' ? `${fs.borderRadius || 16}px ${fs.borderRadius || 16}px 0 0` : '0px',
+                                                        margin: previewDevice === 'mobile' && formType === 'popup' ? 'auto 10px 0 10px' : '0',
+                                                        flexShrink: 0,
                                                         padding: '16px',
                                                         transition: 'all 0.3s ease',
                                                         boxShadow: clamped > 0 ? `0 10px 25px rgba(0,0,0,${shadowOpacity.toFixed(2)})` : 'none',
