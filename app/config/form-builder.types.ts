@@ -38,6 +38,9 @@ export interface ContentBlocks {
     cart_quantity_offers: boolean;
     buyer_marketing: boolean;
     enable_state_province?: boolean;
+    show_form_title?: boolean;
+    show_form_description?: boolean;
+    show_trust_badge?: boolean;
 }
 
 /**
@@ -172,6 +175,9 @@ export const DEFAULT_BLOCKS: ContentBlocks = {
     cart_quantity_offers: false,
     buyer_marketing: false,
     enable_state_province: true,
+    show_form_title: true,
+    show_form_description: true,
+    show_trust_badge: true,
 };
 
 /**

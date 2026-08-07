@@ -1253,27 +1253,32 @@ const PreviewDisplay = memo(({
                                 {/* Only show form when NOT on button tab */}
                                 {activeTab !== 'button' && (
                                     <div className="preview-modal" style={{ ...getModalStyle(), marginTop: '0', background: 'transparent', boxShadow: 'none', border: 'none', backdropFilter: 'none', padding: '0 0 16px 0' }}>
-                                        <div className="preview-modal-title" style={{
-                                            fontWeight: 700,
-                                            fontSize: '16px',
-                                            marginBottom: '6px',
-                                            color: formStyles?.textColor || '#111',
-                                            textAlign: 'center',
-                                            fontFamily: formStyles?.fontFamily || 'Inter'
-                                        }}>
-                                            {formTitle || 'Cash on Delivery'}
-                                        </div>
-                                        <div className="preview-modal-subtitle" style={{
-                                            fontSize: '12px',
-                                            color: '#36383dff',
-                                            marginBottom: '16px',
-                                            textAlign: 'center',
-                                            lineHeight: '1.4',
-                                            fontFamily: formStyles?.fontFamily || 'Inter'
-                                        }}>
-                                            {formSubtitle || 'Fill in your details to place a COD order'}
-                                        </div>
-                                        <div className="cod-trust-badge-band" style={{
+                                        {blocks?.show_form_title !== false && (
+                                            <div className="preview-modal-title" style={{
+                                                fontWeight: 700,
+                                                fontSize: '16px',
+                                                marginBottom: '6px',
+                                                color: formStyles?.textColor || '#111',
+                                                textAlign: 'center',
+                                                fontFamily: formStyles?.fontFamily || 'Inter'
+                                            }}>
+                                                {formTitle || 'Cash on Delivery'}
+                                            </div>
+                                        )}
+                                        {blocks?.show_form_description !== false && (
+                                            <div className="preview-modal-subtitle" style={{
+                                                fontSize: '12px',
+                                                color: '#36383dff',
+                                                marginBottom: '16px',
+                                                textAlign: 'center',
+                                                lineHeight: '1.4',
+                                                fontFamily: formStyles?.fontFamily || 'Inter'
+                                            }}>
+                                                {formSubtitle || 'Fill in your details to place a COD order'}
+                                            </div>
+                                        )}
+                                        {blocks?.show_trust_badge !== false && (
+                                            <div className="cod-trust-badge-band" style={{
                                             display: 'flex',
                                             alignItems: 'center',
                                             justifyContent: 'center',
@@ -1307,6 +1312,7 @@ const PreviewDisplay = memo(({
                                                 <span style={{ color: '#000000', marginLeft: '2px' }}>Fast Delivery</span>
                                             </div>
                                         </div>
+                                        )}
 
                                         {/* Dynamic Fields based on visibility and drag-drop order */}
                                         {visibleFields.map((field: FormField) => {
@@ -1855,20 +1861,22 @@ const PreviewDisplay = memo(({
                                         </button>
 
                                         {/* Trust Badges */}
-                                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', marginTop: '10px', color: '#6b7280' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-                                                <span style={{ fontSize: '11.5px', fontWeight: 500 }}>Secure</span>
+                                        {blocks?.show_trust_badge !== false && (
+                                            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', marginTop: '10px', color: '#6b7280' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                                                    <span style={{ fontSize: '11.5px', fontWeight: 500 }}>Secure</span>
+                                                </div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+                                                    <span style={{ fontSize: '11.5px', fontWeight: 500 }}>Delivery</span>
+                                                </div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                                    <span style={{ fontSize: '11.5px', fontWeight: 500 }}>Verified</span>
+                                                </div>
                                             </div>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
-                                                <span style={{ fontSize: '11.5px', fontWeight: 500 }}>Delivery</span>
-                                            </div>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                                                <span style={{ fontSize: '11.5px', fontWeight: 500 }}>Verified</span>
-                                            </div>
-                                        </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -5340,25 +5348,45 @@ export default function SettingsPage() {
 
                                     {/* Form Content */}
                                     <AccordionSection id="form-content" tab="form" title="Form Header and Submit button" helperText="Customize the form title, description, and the submit button text and style shown in the COD form." expandedSection={expandedSection} toggleSection={toggleSection}>
-                                        <div className="input-group">
-                                            <label className="input-label">Form Title</label>
-                                            <input
-                                                type="text"
-                                                className="input-field"
-                                                value={formTitle}
-                                                onChange={(e) => setFormTitle(e.target.value)}
-                                                placeholder="Cash on Delivery Order"
-                                            />
+                                        <div className="toggle-option" style={{ marginBottom: '16px' }} onClick={() => setBlocks(prev => ({ ...prev, show_form_title: !(prev.show_form_title ?? true) }))}>
+                                            <span className="toggle-option-label">Show Form Title</span>
+                                            <div className={`mini-toggle ${blocks?.show_form_title !== false ? 'on' : 'off'}`} />
                                         </div>
-                                        <div className="input-group" style={{ marginBottom: '16px' }}>
-                                            <label className="input-label" style={{ marginBottom: '6px' }}>Form Description</label>
-                                            <textarea
-                                                className="input-field"
-                                                value={formSubtitle}
-                                                onChange={(e) => setFormSubtitle(e.target.value)}
-                                                placeholder="Fill in your details to place a COD order"
-                                                rows={2}
-                                            />
+
+                                        {blocks?.show_form_title !== false && (
+                                            <div className="input-group">
+                                                <label className="input-label">Form Title</label>
+                                                <input
+                                                    type="text"
+                                                    className="input-field"
+                                                    value={formTitle}
+                                                    onChange={(e) => setFormTitle(e.target.value)}
+                                                    placeholder="Cash on Delivery Order"
+                                                />
+                                            </div>
+                                        )}
+                                        
+                                        <div className="toggle-option" style={{ marginBottom: '16px', marginTop: '16px' }} onClick={() => setBlocks(prev => ({ ...prev, show_form_description: !(prev.show_form_description ?? true) }))}>
+                                            <span className="toggle-option-label">Show Form Description</span>
+                                            <div className={`mini-toggle ${blocks?.show_form_description !== false ? 'on' : 'off'}`} />
+                                        </div>
+
+                                        {blocks?.show_form_description !== false && (
+                                            <div className="input-group" style={{ marginBottom: '16px' }}>
+                                                <label className="input-label" style={{ marginBottom: '6px' }}>Form Description</label>
+                                                <textarea
+                                                    className="input-field"
+                                                    value={formSubtitle}
+                                                    onChange={(e) => setFormSubtitle(e.target.value)}
+                                                    placeholder="Fill in your details to place a COD order"
+                                                    rows={2}
+                                                />
+                                            </div>
+                                        )}
+                                        
+                                        <div className="toggle-option" style={{ marginBottom: '16px', marginTop: '16px' }} onClick={() => setBlocks(prev => ({ ...prev, show_trust_badge: !(prev.show_trust_badge ?? true) }))}>
+                                            <span className="toggle-option-label">Show Trust Banner</span>
+                                            <div className={`mini-toggle ${blocks?.show_trust_badge !== false ? 'on' : 'off'}`} />
                                         </div>
                                         <div className="input-group" style={{ marginBottom: '16px' }}>
                                             <label className="input-label" style={{ marginBottom: '6px' }}>Form Header & Description Font</label>

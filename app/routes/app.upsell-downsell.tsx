@@ -845,19 +845,21 @@ export default function UpsellDownsellPage() {
                                                         </div>
 
                                                         {/* Form Title */}
-                                                        <div style={{
-                                                            fontWeight: 700,
-                                                            fontSize: '16px',
-                                                            marginBottom: '4px',
-                                                            color: (formSettings?.styles as any)?.textColor || '#111',
-                                                            textAlign: 'center',
-                                                            fontFamily: formSettings?.styles?.fontFamily || 'Inter',
-                                                        }}>
-                                                            {formSettings?.form_title || 'Cash on Delivery Order'}
-                                                        </div>
+                                                        {formSettings?.blocks?.show_form_title !== false && (
+                                                            <div style={{
+                                                                fontWeight: 700,
+                                                                fontSize: '16px',
+                                                                marginBottom: '4px',
+                                                                color: (formSettings?.styles as any)?.textColor || '#111',
+                                                                textAlign: 'center',
+                                                                fontFamily: formSettings?.styles?.fontFamily || 'Inter',
+                                                            }}>
+                                                                {formSettings?.form_title || 'Cash on Delivery Order'}
+                                                            </div>
+                                                        )}
 
                                                         {/* Form Subtitle */}
-                                                        {formSettings?.form_subtitle && (
+                                                        {formSettings?.blocks?.show_form_description !== false && formSettings?.form_subtitle && (
                                                             <div style={{
                                                                     fontSize: '13px',
                                                                     color: '#6b7280',
@@ -868,40 +870,42 @@ export default function UpsellDownsellPage() {
                                                                     {formSettings.form_subtitle}
                                                                 </div>
                                                             )}
-                                                            <div className="cod-trust-badge-band" style={{
-                                                                display: 'flex',
-                                                                alignItems: 'center',
-                                                                justifyContent: 'center',
-                                                                flexWrap: 'nowrap',
-                                                                backgroundColor: '#EBF8EE',
-                                                                borderRadius: '8px',
-                                                                padding: '6px 4px',
-                                                                margin: '12px 0 16px 0',
-                                                                gap: 'clamp(3px, 1.2vw, 8px)',
-                                                                fontFamily: formSettings?.styles?.fontFamily || 'Inter',
-                                                                fontSize: 'clamp(6.2px, 1.3vw, 8px)',
-                                                                fontWeight: 600,
-                                                                color: '#000000',
-                                                                border: '1px solid #d1fae5',
-                                                                whiteSpace: 'nowrap',
-                                                                overflow: 'hidden',
-                                                                boxSizing: 'border-box',
-                                                                letterSpacing: '-0.25px',
-                                                                wordSpacing: '-0.5px'
-                                                            }}>
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '1px', whiteSpace: 'nowrap' }}>
-                                                                    <svg width="7.5" height="7.5" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 11 2 2 4-4"></path></svg>
-                                                                    <span style={{ color: '#000000', marginLeft: '2px' }}>100% Secure Order</span>
+                                                            {formSettings?.blocks?.show_trust_badge !== false && (
+                                                                <div className="cod-trust-badge-band" style={{
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'center',
+                                                                    flexWrap: 'nowrap',
+                                                                    backgroundColor: '#EBF8EE',
+                                                                    borderRadius: '8px',
+                                                                    padding: '6px 4px',
+                                                                    margin: '12px 0 16px 0',
+                                                                    gap: 'clamp(3px, 1.2vw, 8px)',
+                                                                    fontFamily: formSettings?.styles?.fontFamily || 'Inter',
+                                                                    fontSize: 'clamp(6.2px, 1.3vw, 8px)',
+                                                                    fontWeight: 600,
+                                                                    color: '#000000',
+                                                                    border: '1px solid #d1fae5',
+                                                                    whiteSpace: 'nowrap',
+                                                                    overflow: 'hidden',
+                                                                    boxSizing: 'border-box',
+                                                                    letterSpacing: '-0.25px',
+                                                                    wordSpacing: '-0.5px'
+                                                                }}>
+                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '1px', whiteSpace: 'nowrap' }}>
+                                                                        <svg width="7.5" height="7.5" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 11 2 2 4-4"></path></svg>
+                                                                        <span style={{ color: '#000000', marginLeft: '2px' }}>100% Secure Order</span>
+                                                                    </div>
+                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '1px', whiteSpace: 'nowrap' }}>
+                                                                        <svg width="7.5" height="7.5" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                                                                        <span style={{ color: '#000000', marginLeft: '2px' }}>Instant Confirmation</span>
+                                                                    </div>
+                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '1px', whiteSpace: 'nowrap' }}>
+                                                                        <svg width="7.5" height="7.5" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+                                                                        <span style={{ color: '#000000', marginLeft: '2px' }}>Fast Delivery</span>
+                                                                    </div>
                                                                 </div>
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '1px', whiteSpace: 'nowrap' }}>
-                                                                    <svg width="7.5" height="7.5" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
-                                                                    <span style={{ color: '#000000', marginLeft: '2px' }}>Instant Confirmation</span>
-                                                                </div>
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '1px', whiteSpace: 'nowrap' }}>
-                                                                    <svg width="7.5" height="7.5" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
-                                                                    <span style={{ color: '#000000', marginLeft: '2px' }}>Fast Delivery</span>
-                                                                </div>
-                                                            </div>
+                                                            )}
 
                                                             {/* Dynamic Form Fields - from Form Builder (including shipping/order summary in drag-drop order) */}
                                                             {(mergedFields as any[])
