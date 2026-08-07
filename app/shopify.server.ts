@@ -112,7 +112,31 @@ const shopify = shopifyApp({
 export default shopify;
 export const apiVersion = ApiVersion.October25;
 export const addDocumentResponseHeaders = shopify.addDocumentResponseHeaders;
-export const authenticate = shopify.authenticate;
+
+/**
+ * Every route under app/routes/app.tsx's layout — plus the layout route
+ * itself — calls authenticate.admin(request) on each navigation. React
+ * Router runs all matched loaders for a navigation concurrently but passes
+ * them the SAME Request instance, so without this cache the layout and the
+ * leaf route each independently re-verify the session token JWT and re-load
+ * the session from Supabase for the exact same request — doubling that cost
+ * on every tab switch for no reason. Keyed by Request identity, so it only
+ * ever dedupes within a single navigation and never leaks across requests.
+ */
+const authenticateAdminCache = new WeakMap<Request, ReturnType<typeof shopify.authenticate.admin>>();
+function cachedAuthenticateAdmin(request: Request) {
+  let result = authenticateAdminCache.get(request);
+  if (!result) {
+    result = shopify.authenticate.admin(request);
+    authenticateAdminCache.set(request, result);
+  }
+  return result;
+}
+
+export const authenticate = {
+  ...shopify.authenticate,
+  admin: cachedAuthenticateAdmin,
+};
 export const unauthenticated = shopify.unauthenticated;
 export const login = shopify.login;
 export const registerWebhooks = shopify.registerWebhooks;

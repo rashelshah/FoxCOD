@@ -4,12 +4,12 @@
  * EasySell-inspired design with comprehensive options
  */
 
-import { useState, useCallback, memo, useDeferredValue, useEffect, useRef, useMemo } from "react";
+import { useState, useCallback, memo, useDeferredValue, useEffect, useRef, useMemo, Suspense } from "react";
 import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
-import { useLoaderData, useSubmit, useNavigation, Link, useActionData } from "react-router";
+import { useLoaderData, useSubmit, useNavigation, Link, useActionData, Await } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
-import { RangeSlider, Button, InlineStack, Modal, Text, Icon, Select, TextField, ColorPicker, Banner, Popover, ActionList, Badge } from "@shopify/polaris";
+import { RangeSlider, Button, InlineStack, Modal, Text, Icon, Select, TextField, ColorPicker, Banner, Popover, ActionList, Badge, Spinner } from "@shopify/polaris";
 import { EditIcon, DeleteIcon, ViewIcon, HideIcon, StarFilledIcon, ResetIcon, PlusIcon } from "@shopify/polaris-icons";
 import {
     DndContext,
@@ -28,7 +28,7 @@ import {
     verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { getFormSettings, saveFormSettings, type FormSettings } from "../config/supabase.server";
+import { getFormSettings, saveFormSettings, getCachedShopCurrency, type FormSettings } from "../config/supabase.server";
 import { getPartialPaymentSettings, type PartialPaymentSettings } from "../services/partial-payment-settings.server";
 import {
     getShippingRates,
@@ -277,14 +277,11 @@ async function syncShippingRatesToMetafields(shopDomain: string, admin: any) {
 }
 
 /**
- * Loader: Fetch current settings from Supabase
+ * Fetch products for the product selector (Shipping Rate modal). Only needed once the
+ * merchant opens that picker, so the loader returns this as an un-awaited promise and
+ * streams it in rather than blocking the page's initial render on it.
  */
-export const loader = async ({ request }: LoaderFunctionArgs) => {
-    const { session, admin } = await authenticate.admin(request);
-    const shopDomain = session.shop;
-
-    // Fetch products from Shopify for the product selector
-    let products: any[] = [];
+async function fetchSettingsProducts(admin: any): Promise<any[]> {
     try {
         const productsResponse = await admin.graphql(`
             query GetProducts($first: Int!) {
@@ -308,7 +305,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             }
         `, { variables: { first: 50 } });
         const productsData = await productsResponse.json();
-        products = productsData.data?.products?.edges?.map((edge: any) => ({
+        return productsData.data?.products?.edges?.map((edge: any) => ({
             id: edge.node.id,
             title: edge.node.title,
             handle: edge.node.handle,
@@ -316,10 +313,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         })) || [];
     } catch (e) {
         console.warn('[Settings] Could not fetch products:', e);
+        return [];
     }
+}
 
-    // Fetch collections from Shopify for the collection selector in shipping
-    let collections: any[] = [];
+/**
+ * Fetch collections for the collection selector (Shipping Rate modal). Same deferred
+ * rationale as fetchSettingsProducts above.
+ */
+async function fetchSettingsCollections(admin: any): Promise<any[]> {
     try {
         const collectionsResponse = await admin.graphql(`
             query GetCollections($first: Int!) {
@@ -338,7 +340,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             }
         `, { variables: { first: 100 } });
         const collectionsData = await collectionsResponse.json();
-        collections = collectionsData.data?.collections?.edges?.map((edge: any) => ({
+        return collectionsData.data?.collections?.edges?.map((edge: any) => ({
             id: edge.node.id,
             title: edge.node.title,
             handle: edge.node.handle,
@@ -346,13 +348,22 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         })) || [];
     } catch (e) {
         console.warn('[Settings] Could not fetch collections:', e);
+        return [];
     }
+}
 
-    const [settings, shippingRates, partialPaymentSettings] = await Promise.all([
-        getFormSettings(shopDomain),
-        getShippingRates(shopDomain),
-        getPartialPaymentSettings(shopDomain),
-    ]);
+/**
+ * Loader: Fetch current settings from Supabase
+ */
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+    const { session, admin } = await authenticate.admin(request);
+    const shopDomain = session.shop;
+
+    // Not awaited: these only matter once the merchant opens the Shipping Rate
+    // modal's product/collection pickers, so they stream in behind the rest of
+    // the page instead of blocking first paint.
+    const products = fetchSettingsProducts(admin);
+    const collections = fetchSettingsCollections(admin);
 
     let appUrl = process.env.SHOPIFY_APP_URL || '';
     if (!appUrl) {
@@ -360,13 +371,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         appUrl = url.origin;
     }
 
-    // Query shop currency from Shopify Admin API
-    let shopCurrency = 'USD';
-    try {
-        const currencyRes = await admin.graphql(`{ shop { currencyCode } }`);
-        const currencyData = await currencyRes.json();
-        shopCurrency = currencyData?.data?.shop?.currencyCode || 'USD';
-    } catch (e) { console.log('Error fetching shop currency:', e); }
+    const [settings, shippingRates, partialPaymentSettings, shopCurrency] = await Promise.all([
+        getFormSettings(shopDomain),
+        getShippingRates(shopDomain),
+        getPartialPaymentSettings(shopDomain),
+        getCachedShopCurrency(shopDomain, admin),
+    ]);
 
     const merged = settings
         ? {
@@ -5991,40 +6001,52 @@ export default function SettingsPage() {
                     </Modal.Section>
                 </Modal>
 
-                {/* Shipping Rate Modal */}
+                {/* Shipping Rate Modal — products/collections stream in lazily, so wrap in Suspense */}
                 {showShippingRateModal && (
-                    <ShippingRateModal
-                        rate={editingRate}
-                        products={products}
-                        collections={collections}
-                        currencySymbol={currencySymbol}
-                        onClose={() => {
-                            setShowShippingRateModal(false);
-                            setEditingRate(null);
-                        }}
-                        onSave={(rateData) => {
-                            // Queue operation for save bar (don't submit immediately)
-                            if (editingRate?.id) {
-                                setPendingShippingOps(prev => [...prev, { type: 'update', rateId: editingRate.id, rateData }]);
-                                // Optimistically update UI
-                                setShippingRates(prev => prev.map(r => r.id === editingRate.id ? { ...r, ...rateData, id: r.id } : r));
-                            } else {
-                                const tempId = `temp_${Date.now()}`;
-                                setPendingShippingOps(prev => [...prev, { type: 'create', rateData, rateId: tempId }]);
-                                // Optimistically update UI
-                                const newRate: ShippingRate = {
-                                    ...rateData,
-                                    id: tempId,
-                                    shop_domain: shop,
-                                    created_at: new Date().toISOString(),
-                                    updated_at: new Date().toISOString(),
-                                };
-                                setShippingRates(prev => [newRate, ...prev]);
-                            }
-                            setShowShippingRateModal(false);
-                            setEditingRate(null);
-                        }}
-                    />
+                    <Suspense fallback={
+                        <Modal open title="Shipping Rate" onClose={() => { setShowShippingRateModal(false); setEditingRate(null); }}>
+                            <Modal.Section>
+                                <InlineStack align="center"><Spinner accessibilityLabel="Loading products and collections" size="small" /></InlineStack>
+                            </Modal.Section>
+                        </Modal>
+                    }>
+                        <Await resolve={Promise.all([products, collections])}>
+                            {([resolvedProducts, resolvedCollections]: [any[], any[]]) => (
+                                <ShippingRateModal
+                                    rate={editingRate}
+                                    products={resolvedProducts}
+                                    collections={resolvedCollections}
+                                    currencySymbol={currencySymbol}
+                                    onClose={() => {
+                                        setShowShippingRateModal(false);
+                                        setEditingRate(null);
+                                    }}
+                                    onSave={(rateData) => {
+                                        // Queue operation for save bar (don't submit immediately)
+                                        if (editingRate?.id) {
+                                            setPendingShippingOps(prev => [...prev, { type: 'update', rateId: editingRate.id, rateData }]);
+                                            // Optimistically update UI
+                                            setShippingRates(prev => prev.map(r => r.id === editingRate.id ? { ...r, ...rateData, id: r.id } : r));
+                                        } else {
+                                            const tempId = `temp_${Date.now()}`;
+                                            setPendingShippingOps(prev => [...prev, { type: 'create', rateData, rateId: tempId }]);
+                                            // Optimistically update UI
+                                            const newRate: ShippingRate = {
+                                                ...rateData,
+                                                id: tempId,
+                                                shop_domain: shop,
+                                                created_at: new Date().toISOString(),
+                                                updated_at: new Date().toISOString(),
+                                            };
+                                            setShippingRates(prev => [newRate, ...prev]);
+                                        }
+                                        setShowShippingRateModal(false);
+                                        setEditingRate(null);
+                                    }}
+                                />
+                            )}
+                        </Await>
+                    </Suspense>
                 )}
 
                 {/* Import from Shopify Modal */}

@@ -1,5 +1,6 @@
+import { useEffect } from "react";
 import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
-import { Outlet, useLoaderData, useRouteError } from "react-router";
+import { Outlet, useLoaderData, useLocation, useNavigation, useRouteError } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
 
@@ -7,6 +8,7 @@ import { authenticate } from "../shopify.server";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 import { AppProvider as PolarisAppProvider } from "@shopify/polaris";
 import enTranslations from "@shopify/polaris/locales/en.json";
+import { getSkeletonForPath, skeletonShimmerCSS } from "./PageSkeletons";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
@@ -21,12 +23,43 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
+// Shopify doesn't reliably include `shop`/`host` on every embedded navigation
+// that reloads the iframe (e.g. clicking the app name in Admin's sidebar from
+// a subpage) — see routes/_index/route.tsx, which falls back to these when
+// its own URL is missing them. Every real /app/* load DOES carry them, so
+// cache the latest ones here for that fallback to use.
+const SHOP_STORAGE_KEY = "foxCodShop";
+const HOST_STORAGE_KEY = "foxCodHost";
+
 export default function App() {
   const { apiKey } = useLoaderData<typeof loader>();
+  const navigation = useNavigation();
+  const location = useLocation();
+
+  // Only swap in a skeleton for an actual tab-to-tab navigation — navigation.state
+  // also goes "loading" during the revalidation after a same-page form submit (e.g.
+  // clicking Save), and we don't want a full-page skeleton flashing over a form the
+  // merchant is actively editing in that case.
+  const isRouteChanging =
+    navigation.state === "loading" &&
+    navigation.location.pathname !== location.pathname;
+
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const shop = params.get("shop");
+      const host = params.get("host");
+      if (shop) sessionStorage.setItem(SHOP_STORAGE_KEY, shop);
+      if (host) sessionStorage.setItem(HOST_STORAGE_KEY, host);
+    } catch {
+      // sessionStorage unavailable (e.g. privacy mode) — harmless, just no fallback cache.
+    }
+  }, [location.search]);
 
   return (
     <PolarisAppProvider i18n={enTranslations}>
       <AppProvider embedded apiKey={apiKey}>
+        <style>{skeletonShimmerCSS}</style>
         <s-app-nav>
           <s-link href="/app/settings">Form Builder</s-link>
           <s-link href="/app/quantity-offers">Bundle Offers</s-link>
@@ -37,7 +70,7 @@ export default function App() {
           <s-link href="/app/integrations">Integrations</s-link>
           <s-link href="/app/app-settings">Settings</s-link>
         </s-app-nav>
-        <Outlet />
+        {isRouteChanging ? getSkeletonForPath(navigation.location.pathname) : <Outlet />}
       </AppProvider>
     </PolarisAppProvider>
   );

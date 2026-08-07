@@ -8,10 +8,21 @@ import type { LoaderFunctionArgs } from "react-router";
 import { useLoaderData, Link, useNavigate } from "react-router";
 import { Button, InlineStack, Card, BlockStack, ProgressBar, Text } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
-import { getFormSettings, saveShop, getOrderStats } from "../config/supabase.server";
+import { getFormSettings, saveShop, getOrderStats, getCachedShopCurrency } from "../config/supabase.server";
 
 const FOX_COD_EXTENSION_UID = "87e0c6dc-4f49-e6ce-990c-7f93eadc93f862473f7f";
 const FOX_COD_EMBED_HANDLE = "cod-form-embed";
+
+const DASHBOARD_FONTS_HREF = "https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Playfair+Display:wght@700&display=swap";
+
+export const links = () => [
+  { rel: "preconnect", href: "https://fonts.googleapis.com" },
+  { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" as const },
+  // Discovered from <head> and fetched in parallel with the page — unlike the previous
+  // @import inside a runtime-injected <style> tag, which couldn't start loading until
+  // React rendered and blocked CSS parsing until the import resolved.
+  { rel: "stylesheet", href: DASHBOARD_FONTS_HREF },
+];
 
 
 
@@ -44,28 +55,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
   const shopDomain = session.shop;
 
-  // Query shop currency from Shopify Admin API
-  let shopCurrency = 'USD';
-  try {
-    const currencyRes = await admin.graphql(`{ shop { currencyCode } }`);
-    const currencyData = await currencyRes.json();
-    shopCurrency = currencyData?.data?.shop?.currencyCode || 'USD';
-  } catch (e) { console.log('Error fetching shop currency:', e); }
-
-  // Save/update shop in Supabase on each visit
-  try {
-    if (session.accessToken) {
-      await saveShop(shopDomain, session.accessToken, session.scope || "");
-    }
-  } catch (error) {
-    console.log("Error saving shop to Supabase:", error);
+  // Best-effort sync of shop token/scope — doesn't affect what the page renders,
+  // so it isn't awaited before returning.
+  if (session.accessToken) {
+    saveShop(shopDomain, session.accessToken, session.scope || "").catch((error) => {
+      console.log("Error saving shop to Supabase:", error);
+    });
   }
 
-  // Get current settings
-  const settings = await getFormSettings(shopDomain);
-
-  // Get order statistics from Shopify Orders API via SDK
-  let stats = {
+  const defaultStats = {
     totalOrders: 0,
     pendingOrders: 0,
     totalRevenue: 0,
@@ -76,12 +74,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     ordersByStatus: {} as Record<string, number>,
   };
 
-  try {
-    const supabaseStats = await getOrderStats(shopDomain);
-    stats = { ...stats, ...supabaseStats };
-  } catch (error) {
-    console.log("Error fetching Supabase order stats:", error);
-  }
+  const [shopCurrency, settings, supabaseStats] = await Promise.all([
+    getCachedShopCurrency(shopDomain, admin),
+    getFormSettings(shopDomain),
+    getOrderStats(shopDomain).catch((error) => {
+      console.log("Error fetching Supabase order stats:", error);
+      return null;
+    }),
+  ]);
+
+  const stats = supabaseStats ? { ...defaultStats, ...supabaseStats } : defaultStats;
 
   return {
     shop: shopDomain,
@@ -136,8 +138,6 @@ export default function Index() {
         }
         
         /* Welcome Banner - Premium Orange Theme */
-        @import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Playfair+Display:wght@700&display=swap');
-        
         .welcome-banner {
           background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
           border-radius: 20px;

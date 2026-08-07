@@ -12,39 +12,61 @@ import { type UpsellCampaign, type UpsellType, type CampaignOffer, type Campaign
 import { ColorSelector, colorSelectorStyles } from "./ColorSelector";
 import { Page, Layout, Tabs, Card, Button, Badge, EmptyState, Text, InlineStack, BlockStack, Box, Divider, TextField, Select, ButtonGroup, Banner, LegacyCard, RangeSlider, Modal } from "@shopify/polaris";
 import { EditIcon, DeleteIcon } from "@shopify/polaris-icons";
-import { getFormSettings } from "../config/supabase.server";
+import { getFormSettings, getCachedShopCurrency } from "../config/supabase.server";
 import { DEFAULT_FIELDS } from "../config/form-builder.types";
 import { getPartialPaymentSettings } from "../services/partial-payment-settings.server";
+
+/**
+ * Enrich every campaign's offers with their Shopify product data in a single
+ * batched GraphQL request (aliased per offer), instead of firing one
+ * admin.graphql call per offer (N+1).
+ */
+async function enrichCampaignsWithProducts(admin: any, campaigns: any[]): Promise<any[]> {
+    const targets: { campaignIdx: number; offerIdx: number; alias: string }[] = [];
+    const fields: string[] = [];
+
+    campaigns.forEach((c: any, ci: number) => {
+        (c.offers || []).forEach((o: any, oi: number) => {
+            if (!o.upsell_product_id) return;
+            const pid = o.upsell_product_id.includes('gid://') ? o.upsell_product_id : `gid://shopify/Product/${o.upsell_product_id}`;
+            const alias = `p${ci}_${oi}`;
+            targets.push({ campaignIdx: ci, offerIdx: oi, alias });
+            fields.push(`${alias}: product(id: "${pid}") { id title featuredImage { url } variants(first: 10) { edges { node { id title price compareAtPrice image { url } } } } }`);
+        });
+    });
+
+    let productsByAlias: Record<string, any> = {};
+    if (fields.length > 0) {
+        try {
+            const res = await admin.graphql(`query { ${fields.join('\n')} }`);
+            const r = await res.json();
+            productsByAlias = r.data || {};
+        } catch (e) {
+            console.warn('[Upsell] Failed to batch-fetch offer products:', e);
+        }
+    }
+
+    return campaigns.map((c: any, ci: number) => {
+        if (!c.offers || c.offers.length === 0) return c;
+        const enrichedOffers = c.offers.map((o: any, oi: number) => {
+            const product = productsByAlias[`p${ci}_${oi}`];
+            return product ? { ...o, _selectedProduct: product } : o;
+        });
+        return { ...c, offers: enrichedOffers };
+    });
+}
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const { session, admin } = await authenticate.admin(request);
     const shopDomain = session.shop;
     const campaigns = await getUpsellCampaigns(shopDomain);
-    // Fetch product details for offers
-    const enriched = await Promise.all(campaigns.map(async (c: any) => {
-        if (!c.offers || c.offers.length === 0) return c;
-        const enrichedOffers = await Promise.all(c.offers.map(async (o: any) => {
-            if (!o.upsell_product_id) return o;
-            try {
-                const pid = o.upsell_product_id.includes('gid://') ? o.upsell_product_id : `gid://shopify/Product/${o.upsell_product_id}`;
-                const res = await admin.graphql(`query($id:ID!){product(id:$id){id title featuredImage{url} variants(first:10){edges{node{id title price compareAtPrice image{url}}}}}}`, { variables: { id: pid } });
-                const r = await res.json();
-                if (r.data?.product) return { ...o, _selectedProduct: r.data.product };
-            } catch (e) { /* skip */ }
-            return o;
-        }));
-        return { ...c, offers: enrichedOffers };
-    }));
-    const formSettings = await getFormSettings(shopDomain);
-    const partialPaymentSettings = await getPartialPaymentSettings(shopDomain);
 
-    // Query shop currency from Shopify Admin API
-    let shopCurrency = 'USD';
-    try {
-        const currencyRes = await admin.graphql(`{ shop { currencyCode } }`);
-        const currencyData = await currencyRes.json();
-        shopCurrency = currencyData?.data?.shop?.currencyCode || 'USD';
-    } catch (e) { console.log('Error fetching shop currency:', e); }
+    const [enriched, formSettings, shopCurrency, partialPaymentSettings] = await Promise.all([
+        enrichCampaignsWithProducts(admin, campaigns),
+        getFormSettings(shopDomain),
+        getCachedShopCurrency(shopDomain, admin),
+        getPartialPaymentSettings(shopDomain),
+    ]);
 
     return { shopDomain, campaigns: enriched, formSettings, shopCurrency, partialPaymentSettings };
 };

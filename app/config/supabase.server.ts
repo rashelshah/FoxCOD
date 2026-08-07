@@ -63,6 +63,33 @@ export async function saveShop(shopDomain: string, accessToken: string, scope?: 
 }
 
 /**
+ * In-memory cache for shop currency, keyed by shop domain.
+ * Avoids a live Shopify GraphQL round-trip on every single page navigation —
+ * currency changes essentially never, so a short TTL is safe.
+ */
+const SHOP_CURRENCY_TTL_MS = 10 * 60 * 1000;
+const shopCurrencyCache = new Map<string, { value: string; expires: number }>();
+
+export async function getCachedShopCurrency(shopDomain: string, admin: any, fallback = 'USD'): Promise<string> {
+    const cached = shopCurrencyCache.get(shopDomain);
+    if (cached && cached.expires > Date.now()) {
+        return cached.value;
+    }
+
+    let currency = fallback;
+    try {
+        const res = await admin.graphql(`{ shop { currencyCode } }`);
+        const data = await res.json();
+        currency = data?.data?.shop?.currencyCode || fallback;
+    } catch (e) {
+        console.log('Error fetching shop currency:', e);
+    }
+
+    shopCurrencyCache.set(shopDomain, { value: currency, expires: Date.now() + SHOP_CURRENCY_TTL_MS });
+    return currency;
+}
+
+/**
  * Get shop data by domain
  */
 export async function getShop(shopDomain: string) {

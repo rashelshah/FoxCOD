@@ -13,6 +13,7 @@ import type { LoaderFunctionArgs, ActionFunctionArgs } from 'react-router';
 import { useLoaderData, useSubmit, useNavigation, useActionData, Link } from 'react-router';
 import { useAppBridge } from '@shopify/app-bridge-react';
 import { authenticate } from '../shopify.server';
+import { getCachedShopCurrency } from '../config/supabase.server';
 import {
   getPartialPaymentSettings,
   savePartialPaymentSettings,
@@ -53,7 +54,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session, admin } = await authenticate.admin(request);
   const shopDomain = session.shop;
 
-  let settings = await getPartialPaymentSettings(shopDomain);
+  const [settingsResult, shopCurrency] = await Promise.all([
+    getPartialPaymentSettings(shopDomain),
+    getCachedShopCurrency(shopDomain, admin, 'INR'),
+  ]);
+  let settings = settingsResult;
 
   // First-visit defaults
   if (!settings) {
@@ -137,13 +142,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       };
     }
   }
-  // Shop currency
-  let shopCurrency = 'INR';
-  try {
-    const res = await admin.graphql(`{ shop { currencyCode } }`);
-    const d = await res.json();
-    shopCurrency = d?.data?.shop?.currencyCode || 'INR';
-  } catch (_e) { /* ignore */ }
 
   return { settings, shopDomain, shopCurrency };
 };

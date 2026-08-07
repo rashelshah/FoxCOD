@@ -1,9 +1,6 @@
-import { Links, Meta, Outlet, Scripts, ScrollRestoration, useNavigation } from "react-router";
+import { Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
 
 export default function App() {
-  const navigation = useNavigation();
-  const isLoading = navigation.state === "loading";
-
   return (
     <html lang="en">
       <head>
@@ -29,43 +26,7 @@ export default function App() {
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
           }
-          
-          /* Page transition overlay */
-          .page-loading-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: linear-gradient(90deg, #202223, #000000, #202223);
-            background-size: 200% 100%;
-            animation: shimmer 1.5s infinite linear;
-            z-index: 9999;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.3s ease;
-          }
-          
-          .page-loading-overlay[data-loading="true"] {
-            opacity: 1;
-          }
-          
-          @keyframes shimmer {
-            0% { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
-          }
-          
-          /* Smooth page content fade */
-          .page-content {
-            opacity: 1;
-            transition: opacity 0.15s ease;
-          }
-          
-          .page-content[data-loading="true"] {
-            opacity: 0.7;
-            pointer-events: none;
-          }
-          
+
           /* Faster link transitions */
           a {
             transition: color 0.1s ease, opacity 0.1s ease;
@@ -82,10 +43,7 @@ export default function App() {
         `}} />
       </head>
       <body>
-        <div className="page-loading-overlay" data-loading={isLoading} />
-        <div className="page-content" data-loading={isLoading}>
-          <Outlet />
-        </div>
+        <Outlet />
         <ScrollRestoration />
         <Scripts />
       </body>

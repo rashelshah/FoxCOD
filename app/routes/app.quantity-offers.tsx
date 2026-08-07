@@ -42,7 +42,7 @@ import {
     createDefaultOfferGroup,
 } from "../config/quantity-offers.types";
 import { supabase } from "../config/supabase.server";
-import { getFormSettings } from "../config/supabase.server";
+import { getFormSettings, getCachedShopCurrency } from "../config/supabase.server";
 import { DEFAULT_FIELDS } from "../config/form-builder.types";
 import { getPartialPaymentSettings } from "../services/partial-payment-settings.server";
 
@@ -68,13 +68,17 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const { session, admin } = await authenticate.admin(request);
     const shopDomain = session.shop;
 
-    const { data: offerGroups } = await supabase
-        .from("quantity_offer_groups")
-        .select("*")
-        .eq("shop_domain", shopDomain)
-        .order("updated_at", { ascending: false });
-
-    const formSettings = await getFormSettings(shopDomain);
+    const [offerGroupsResult, formSettings, shopCurrency, partialPaymentSettings] = await Promise.all([
+        supabase
+            .from("quantity_offer_groups")
+            .select("*")
+            .eq("shop_domain", shopDomain)
+            .order("updated_at", { ascending: false }),
+        getFormSettings(shopDomain),
+        getCachedShopCurrency(shopDomain, admin),
+        getPartialPaymentSettings(shopDomain),
+    ]);
+    const offerGroups = offerGroupsResult.data;
 
     // Fetch product details for groups with product_ids
     const groupsWithProducts = await Promise.all(
@@ -130,15 +134,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             return group;
         })
     );
-    // Query shop currency from Shopify Admin API
-    let shopCurrency = 'USD';
-    try {
-        const currencyRes = await admin.graphql(`{ shop { currencyCode } }`);
-        const currencyData = await currencyRes.json();
-        shopCurrency = currencyData?.data?.shop?.currencyCode || 'USD';
-    } catch (e) { console.log('Error fetching shop currency:', e); }
-
-    const partialPaymentSettings = await getPartialPaymentSettings(shopDomain);
 
     return { shopDomain, offerGroups: groupsWithProducts, formSettings, shopCurrency, partialPaymentSettings };
 };
