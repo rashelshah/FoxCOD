@@ -292,6 +292,20 @@ export async function extractThemeSettings(admin: AdminApiContext, session: Sess
         if (fallbackBodyFontRaw) profile.fonts.body = extractFontFamily(fallbackBodyFontRaw);
         if (fallbackHeadingFontRaw) profile.fonts.heading = extractFontFamily(fallbackHeadingFontRaw);
 
+        // Last resort for themes using a key name we don't already know
+        // about: scan every settings key for anything shaped like a Shopify
+        // font-picker value ("some_slug_n4") whose name suggests body vs
+        // heading — same defensive-scanning approach already used above for
+        // colors (scanForButtonColor / scanForBgColor / scanForTextColor).
+        if (!profile.fonts.body) {
+          const scannedBody = scanForFont(current, ['body', 'base', 'paragraph', 'text']);
+          if (scannedBody) profile.fonts.body = extractFontFamily(scannedBody);
+        }
+        if (!profile.fonts.heading) {
+          const scannedHeading = scanForFont(current, ['head', 'title']);
+          if (scannedHeading) profile.fonts.heading = extractFontFamily(scannedHeading);
+        }
+
         if (current.buttons_radius !== undefined) {
           profile.styles.borderRadius = `${current.buttons_radius}px`;
         }
@@ -469,8 +483,19 @@ export async function extractThemeSettings(admin: AdminApiContext, session: Sess
           }
         }
         
-        if (allRootVars['--font-body-family']) profile.fonts.body = allRootVars['--font-body-family'].replace(/['"]/g, '').split(',')[0].trim();
-        if (allRootVars['--font-heading-family']) profile.fonts.heading = allRootVars['--font-heading-family'].replace(/['"]/g, '').split(',')[0].trim();
+        // CSS-var font names are only a fallback for when settings_data.json
+        // didn't already resolve one — settings_data.json's value is the
+        // theme's own configured picker choice and should win. Overwriting
+        // it unconditionally here was also a real bug: extractCssVariables()
+        // doesn't evaluate nested var(...) references, so a rule like
+        // "--font-body-family: var(--font-primary);" would get captured
+        // literally as the string "var(--font-primary)" and clobber a good
+        // font with garbage. isPlausibleFontName() rejects that along with
+        // generic bare keywords ("sans-serif", "inherit", etc).
+        const cssBodyFont = allRootVars['--font-body-family']?.replace(/['"]/g, '').split(',')[0].trim();
+        const cssHeadingFont = allRootVars['--font-heading-family']?.replace(/['"]/g, '').split(',')[0].trim();
+        if (!profile.fonts.body && cssBodyFont && isPlausibleFontName(cssBodyFont)) profile.fonts.body = cssBodyFont;
+        if (!profile.fonts.heading && cssHeadingFont && isPlausibleFontName(cssHeadingFont)) profile.fonts.heading = cssHeadingFont;
         
         const radiusVar = allRootVars['--buttons-radius'] || allRootVars['--border-radius-base'] || allRootVars['--border-radius'] || allRootVars['--radius-button'];
         // Only apply CSS radius if it wasn't already found in settings_data.json
@@ -508,6 +533,51 @@ export async function extractThemeSettings(admin: AdminApiContext, session: Sess
   }
 
   return profile;
+}
+
+/**
+ * Rejects CSS custom-property font values that aren't an actual font name —
+ * either a generic CSS keyword ("sans-serif", "inherit", ...) or an
+ * unresolved var(...) reference our regex-based CSS var scan couldn't
+ * evaluate (extractCssVariables only reads literal `--x: value;` pairs, it
+ * doesn't resolve nested variable references).
+ */
+const GENERIC_FONT_KEYWORDS = new Set([
+  'serif', 'sans-serif', 'monospace', 'cursive', 'fantasy', 'system-ui',
+  'inherit', 'initial', 'unset', 'revert', 'revert-layer', 'none',
+]);
+function isPlausibleFontName(name: string): boolean {
+  if (!name) return false;
+  const normalized = name.trim().toLowerCase();
+  if (!normalized) return false;
+  if (normalized.includes('var(')) return false;
+  if (GENERIC_FONT_KEYWORDS.has(normalized)) return false;
+  return true;
+}
+
+// A Shopify font-picker value: one or more underscore-joined slug words,
+// then a trailing style+weight code — "josefin_slab_n7", "inter_n4".
+const SHOPIFY_FONT_PICKER_PATTERN = /^[a-z0-9-]+(?:_[a-z0-9-]+)*_[ni]\d$/i;
+
+/**
+ * Scans every top-level settings_data.json key for one whose name contains
+ * "font" plus one of `keywords` (e.g. "body"/"base" for body copy,
+ * "head"/"title" for headings) and whose value looks like an actual
+ * Shopify font-picker value — used when none of the theme-family-specific
+ * key names we already check (type_body_font, type_base_font, ...) exist,
+ * so an unfamiliar theme's font can still usually be found.
+ */
+function scanForFont(settings: Record<string, any>, keywords: string[]): string | null {
+  for (const key of Object.keys(settings)) {
+    const lowerKey = key.toLowerCase();
+    if (!lowerKey.includes('font')) continue;
+    if (!keywords.some(k => lowerKey.includes(k))) continue;
+    const value = settings[key];
+    if (typeof value === 'string' && SHOPIFY_FONT_PICKER_PATTERN.test(value.trim())) {
+      return value.trim();
+    }
+  }
+  return null;
 }
 
 function extractFontFamily(shopifyFontString: string): string {

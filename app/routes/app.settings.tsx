@@ -1173,7 +1173,7 @@ const PreviewDisplay = memo(({
         fontStyle: formStyles?.fontStyle === 'italic' ? 'italic' : 'normal',
         color: formStyles?.labelColor || formStyles?.textColor || '#374151',
         marginBottom: '2px',
-        fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        fontFamily: formStyles?.fontFamily ? `"${formStyles.fontFamily}", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif` : '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
         textAlign: (formStyles?.labelAlignment || 'left') as any
     });
 
@@ -1196,7 +1196,7 @@ const PreviewDisplay = memo(({
             fontSize: (formStyles?.textSize ?? 14) + 'px',
             fontWeight: 400,
             fontStyle: 'normal' as const,
-            fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            fontFamily: formStyles?.fontFamily ? `"${formStyles.fontFamily}", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif` : '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
             color: formStyles?.textColor || '#111827',
             boxSizing: 'border-box' as const,
             // backgroundColor removed - set explicitly in preview divs to avoid React reconciliation conflicts
