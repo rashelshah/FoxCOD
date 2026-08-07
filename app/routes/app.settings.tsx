@@ -3026,7 +3026,7 @@ export default function SettingsPage() {
                             });
                         }
                         setThemeApplied(true);
-                        shopify.toast.show(`✓ ${profile.themeClassification || 'Website'} theme matched — click Save to publish the form & button`);
+                        shopify.toast.show(`✓ ${profile.themeClassification || 'Website'} Designed with AI — click Save to publish the form & button`);
                         const bundleOffersUpdated = (actionData as any).bundleOffersUpdated;
                         const paymentModeCardsApplied = (actionData as any).paymentModeCardsApplied;
                         const appliedExtras: string[] = [];
@@ -3338,6 +3338,97 @@ export default function SettingsPage() {
                 }
                 .presets-scroll-container::-webkit-scrollbar-thumb:hover {
                     background: #94a3b8;
+                }
+
+                /* AI Design Button */
+                @keyframes ai-rotate-border {
+                    0% { transform: translate(-50%, -50%) rotate(0deg); }
+                    100% { transform: translate(-50%, -50%) rotate(360deg); }
+                }
+
+                .ai-design-btn {
+                    position: relative;
+                    padding: 10px 24px;
+                    border-radius: 9999px;
+                    background: transparent;
+                    color: white;
+                    font-weight: 600;
+                    font-size: 15px;
+                    border: none;
+                    cursor: pointer;
+                    overflow: hidden;
+                    z-index: 1;
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+                    transition: all 0.3s ease;
+                }
+                
+                .ai-design-btn:hover {
+                    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+                    transform: translateY(-1px);
+                }
+
+                .ai-design-btn::before {
+                    content: '';
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    width: 300px;
+                    height: 300px;
+                    background: conic-gradient(
+                        #4285f4 0%,
+                        #ea4335 25%,
+                        #fbbc05 50%,
+                        #34a853 75%,
+                        #4285f4 100%
+                    );
+                    animation: ai-rotate-border 3s linear infinite;
+                    z-index: -2;
+                }
+
+                .ai-design-btn::after {
+                    content: '';
+                    position: absolute;
+                    inset: 3px;
+                    background: #1f2937;
+                    border-radius: 9999px;
+                    z-index: -1;
+                }
+
+                @keyframes ai-loading-bounce {
+                    0%, 80%, 100% { transform: translateY(0); }
+                    40% { transform: translateY(-4px); }
+                }
+                .ai-loading-dots {
+                    display: inline-flex;
+                    gap: 2px;
+                    align-items: center;
+                    justify-content: center;
+                    min-width: 40px;
+                }
+                .ai-loading-dots span {
+                    display: inline-block;
+                    animation: ai-loading-bounce 1.4s infinite ease-in-out both;
+                    font-size: 18px;
+                    line-height: 1;
+                }
+                .ai-loading-dots span:nth-child(1) { animation-delay: -0.32s; }
+                .ai-loading-dots span:nth-child(2) { animation-delay: -0.16s; }
+                
+                .ai-design-btn:disabled {
+                    opacity: 0.7;
+                    cursor: not-allowed;
+                }
+                
+                .ai-design-btn.small {
+                    padding: 6px 14px;
+                    font-size: 12px;
+                }
+                
+                .ai-design-btn.small::after {
+                    inset: 2px;
                 }
 
                 /* Prevent horizontal scrolling globally */
@@ -4554,6 +4645,19 @@ export default function SettingsPage() {
                                     {saveError}
                                 </div>
                             )}
+                            <button
+                                className={`ai-design-btn ${themeApplied ? 'applied' : ''}`}
+                                onClick={handleExtractTheme}
+                                disabled={isExtractingTheme}
+                            >
+                                {isExtractingTheme ? (
+                                    <span className="ai-loading-dots">
+                                        <span>.</span><span>.</span><span>.</span>
+                                    </span>
+                                ) : (
+                                    <span>{themeApplied ? "✓ Designed with AI" : "✨ Design with AI"}</span>
+                                )}
+                            </button>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#f9fafb', padding: '6px 12px', borderRadius: '10px', border: '1px solid #e5e7eb' }}>
                                 <span style={{ fontSize: '13px', fontWeight: 600, color: '#374151' }}>COD Form Status</span>
                                 <div
@@ -5242,15 +5346,19 @@ export default function SettingsPage() {
                                                 <div className="input-group">
                                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                                                         <label className="input-label" style={{ margin: 0 }}>Style Preset</label>
-                                                        <Button
-                                                            size="micro"
-                                                            variant="primary"
+                                                        <button
+                                                            className={`ai-design-btn small ${themeApplied ? 'applied' : ''}`}
                                                             onClick={handleExtractTheme}
-                                                            loading={isExtractingTheme}
-                                                            tone={themeApplied ? "success" : undefined}
+                                                            disabled={isExtractingTheme}
                                                         >
-                                                            {themeApplied ? "✓ Store Theme Applied" : "✨ Match Store Theme"}
-                                                        </Button>
+                                                            {isExtractingTheme ? (
+                                                                <span className="ai-loading-dots">
+                                                                    <span>.</span><span>.</span><span>.</span>
+                                                                </span>
+                                                            ) : (
+                                                                <span>{themeApplied ? "✓ Designed with AI" : "✨ Design with AI"}</span>
+                                                            )}
+                                                        </button>
                                                     </div>
                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                                                         {/* Category tabs */}
