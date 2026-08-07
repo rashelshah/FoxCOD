@@ -267,9 +267,13 @@ export async function extractThemeSettings(admin: AdminApiContext, session: Sess
             // Also set primary to the button color since that's the brand accent
             if (schemeBtnBg) profile.colors.primary = schemeBtnBg;
 
-            // Font from inter_n4 style string → "Inter"
-            if (current.type_body_font) profile.fonts.body = extractFontFamily(current.type_body_font);
-            if (current.type_heading_font) profile.fonts.heading = extractFontFamily(current.type_heading_font);
+            // Font from inter_n4 style string → "Inter". Body font key name
+            // varies by theme — Dawn/Horizon use type_body_font, others
+            // (e.g. Minimog) use type_base_font.
+            const bodyFontRaw = current.type_body_font || current.type_base_font;
+            const headingFontRaw = current.type_heading_font || current.type_header_font;
+            if (bodyFontRaw) profile.fonts.body = extractFontFamily(bodyFontRaw);
+            if (headingFontRaw) profile.fonts.heading = extractFontFamily(headingFontRaw);
 
             // Border radius from scheme settings
             if (current.button_border_radius_primary !== undefined) {
@@ -283,8 +287,10 @@ export async function extractThemeSettings(admin: AdminApiContext, session: Sess
           profile.styles.borderRadius = `${current.buttons_radius}px`;
         }
 
-        if (current.type_body_font) profile.fonts.body = extractFontFamily(current.type_body_font);
-        if (current.type_header_font) profile.fonts.heading = extractFontFamily(current.type_header_font);
+        const fallbackBodyFontRaw = current.type_body_font || current.type_base_font;
+        const fallbackHeadingFontRaw = current.type_header_font || current.type_heading_font;
+        if (fallbackBodyFontRaw) profile.fonts.body = extractFontFamily(fallbackBodyFontRaw);
+        if (fallbackHeadingFontRaw) profile.fonts.heading = extractFontFamily(fallbackHeadingFontRaw);
 
         if (current.buttons_radius !== undefined) {
           profile.styles.borderRadius = `${current.buttons_radius}px`;
@@ -506,7 +512,19 @@ export async function extractThemeSettings(admin: AdminApiContext, session: Sess
 
 function extractFontFamily(shopifyFontString: string): string {
   if (typeof shopifyFontString !== 'string') return '';
-  const slug = shopifyFontString.split('_')[0].replace(/-/g, ' ');
+  // Shopify's font-picker values are underscore-joined: a font slug — itself
+  // possibly multiple words, e.g. "josefin_slab", "playfair_display",
+  // "ibm_plex_mono" — followed by a trailing style+weight suffix like "_n7"
+  // (normal 700) or "_i4" (italic 400). Only strip that trailing suffix;
+  // taking just the first segment (the old approach) drops words from any
+  // multi-word family — "josefin_slab_n7" became "Josefin" instead of the
+  // correct "Josefin Slab", and "Josefin" isn't even a real Google Font
+  // (only "Josefin Sans"/"Josefin Slab" are), so the font failed to load.
+  const parts = shopifyFontString.split('_');
+  const lastPart = parts[parts.length - 1];
+  const hasStyleWeightSuffix = parts.length > 1 && /^[ni]\d$/.test(lastPart);
+  const slugParts = hasStyleWeightSuffix ? parts.slice(0, -1) : parts;
+  const slug = slugParts.join(' ').replace(/-/g, ' ');
   // Title-case each word so it matches Google Fonts' naming convention
   // (e.g. "assistant" -> "Assistant", "work sans" -> "Work Sans").
   return slug
