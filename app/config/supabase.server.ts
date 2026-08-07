@@ -748,17 +748,30 @@ export async function getOrderStats(shopDomain: string) {
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
     const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
+    // Partial COD / Full Prepaid / Native COD checkouts are logged the moment
+    // the checkout is CREATED (via logOrder(), before the customer pays) so
+    // in-progress retries/2-phase-sync work — that row has no shopify_order_id
+    // until a real Shopify order actually exists (set by logOrderWithShopifyIds,
+    // either synchronously for regular COD or via the orders/create webhook
+    // once payment completes). If the customer abandons checkout, that row
+    // never gets one — it's a draft the customer never finished, not an
+    // order, and must be excluded from every count/revenue figure below so
+    // stats match what actually shows up in Shopify's Orders list.
+    const REAL_ORDER_FILTER = 'shopify_order_id' as const;
+
     // Get total orders
     const { count: totalOrders } = await supabase
         .from('order_logs')
         .select('*', { count: 'exact', head: true })
-        .eq('shop_domain', shopDomain);
+        .eq('shop_domain', shopDomain)
+        .not(REAL_ORDER_FILTER, 'is', null);
 
     // Get pending orders
     const { count: pendingOrders } = await supabase
         .from('order_logs')
         .select('*', { count: 'exact', head: true })
         .eq('shop_domain', shopDomain)
+        .not(REAL_ORDER_FILTER, 'is', null)
         .eq('status', 'pending');
 
     // Get today's orders
@@ -766,6 +779,7 @@ export async function getOrderStats(shopDomain: string) {
         .from('order_logs')
         .select('*', { count: 'exact', head: true })
         .eq('shop_domain', shopDomain)
+        .not(REAL_ORDER_FILTER, 'is', null)
         .gte('created_at', todayStart);
 
     // Get this week's orders
@@ -773,6 +787,7 @@ export async function getOrderStats(shopDomain: string) {
         .from('order_logs')
         .select('*', { count: 'exact', head: true })
         .eq('shop_domain', shopDomain)
+        .not(REAL_ORDER_FILTER, 'is', null)
         .gte('created_at', weekStart);
 
     // Get total revenue (from confirmed/delivered orders)
@@ -780,6 +795,7 @@ export async function getOrderStats(shopDomain: string) {
         .from('order_logs')
         .select('total_price')
         .eq('shop_domain', shopDomain)
+        .not(REAL_ORDER_FILTER, 'is', null)
         .not('status', 'in', '(cancelled,returned)');
 
     const totalRevenue = revenueData?.reduce((sum, order) => sum + (order.total_price || 0), 0) || 0;
@@ -789,6 +805,7 @@ export async function getOrderStats(shopDomain: string) {
         .from('order_logs')
         .select('total_price')
         .eq('shop_domain', shopDomain)
+        .not(REAL_ORDER_FILTER, 'is', null)
         .gte('created_at', todayStart)
         .not('status', 'in', '(cancelled,returned)');
 
@@ -799,6 +816,7 @@ export async function getOrderStats(shopDomain: string) {
         .from('order_logs')
         .select('*')
         .eq('shop_domain', shopDomain)
+        .not(REAL_ORDER_FILTER, 'is', null)
         .order('created_at', { ascending: false })
         .limit(10);
 
@@ -806,7 +824,8 @@ export async function getOrderStats(shopDomain: string) {
     const { data: statusData } = await supabase
         .from('order_logs')
         .select('status')
-        .eq('shop_domain', shopDomain);
+        .eq('shop_domain', shopDomain)
+        .not(REAL_ORDER_FILTER, 'is', null);
 
     const ordersByStatus: Record<string, number> = {};
     statusData?.forEach(order => {
@@ -939,10 +958,17 @@ export async function disconnectIntegration(
  * Get comprehensive analytics stats directly from Supabase
  */
 export async function getAnalyticsStats(shopDomain: string, createdAtMin?: string) {
+    // Exclude rows still awaiting checkout completion (see getOrderStats
+    // above for why: logOrder() logs Partial COD / Full Prepaid / Native COD
+    // checkouts the moment they're created, before the customer pays, and
+    // that row only gets a shopify_order_id once a real Shopify order
+    // actually exists. Without this filter, abandoned checkouts count as
+    // orders here even though they never appear in Shopify's Orders list.
     let query = supabase
         .from('order_logs')
         .select('*')
-        .eq('shop_domain', shopDomain);
+        .eq('shop_domain', shopDomain)
+        .not('shopify_order_id', 'is', null);
 
     if (createdAtMin) {
         query = query.gte('created_at', createdAtMin);
