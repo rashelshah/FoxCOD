@@ -865,6 +865,52 @@
   }
 
   /**
+   * Loads a Google Fonts stylesheet for the given family, idempotently (one
+   * <link> per family, reused across every form on the page). Many Shopify
+   * curated theme fonts share their exact name with a real Google Font, so
+   * this covers "Match Store Theme" as well as the manual font picker.
+   */
+  var foxcodLoadedFontFamilies = {};
+  function ensureThemeFontLoaded(fontFamily) {
+    // Defensive: this must never throw and interrupt initFoxCod — worst case
+    // the font just doesn't load and the form falls back to the default stack.
+    try {
+      if (!fontFamily || typeof fontFamily !== 'string') return;
+      if (foxcodLoadedFontFamilies[fontFamily]) return;
+      foxcodLoadedFontFamilies[fontFamily] = true;
+      var linkId = 'foxcod-theme-font-' + fontFamily.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+      if (document.getElementById(linkId)) return;
+      var href = 'https://fonts.googleapis.com/css2?family=' + encodeURIComponent(fontFamily).replace(/%20/g, '+') + ':wght@400;500;600;700&display=swap';
+      var link = document.createElement('link');
+      link.id = linkId;
+      link.rel = 'stylesheet';
+      link.href = href;
+      document.head.appendChild(link);
+    } catch (e) {
+      console.warn('[COD Form] ensureThemeFontLoaded failed (non-fatal):', e);
+    }
+  }
+
+  /**
+   * Sets the --foxcod-font-family CSS variable on the form's container so the
+   * theme font cascades to every descendant (payment-mode cards, order
+   * summary, labels, product name/price) via .cod-form-container's base rule
+   * in cod-form-core.liquid — no per-element changes needed elsewhere.
+   */
+  function applyThemeFont(rootElement, fontFamily) {
+    try {
+      if (!rootElement || !fontFamily) return;
+      var containerEl = (rootElement.classList && rootElement.classList.contains('cod-form-container'))
+        ? rootElement
+        : (rootElement.querySelector('.cod-form-container') || rootElement);
+      ensureThemeFontLoaded(fontFamily);
+      containerEl.style.setProperty('--foxcod-font-family', '"' + fontFamily + '", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif');
+    } catch (e) {
+      console.warn('[COD Form] applyThemeFont failed (non-fatal):', e);
+    }
+  }
+
+  /**
    * Normalize config blobs that may arrive as an object, JSON string, or HTML-escaped JSON string.
    */
   function normalizeConfigObject(value, fallback) {
@@ -1897,6 +1943,12 @@
       // originalTrigger.click() and re-open the product form instead of the cart form.
       rootElement._foxcodConfig = config;
 
+      // Apply the theme/custom font across the whole form via a CSS variable
+      // on the container — see applyThemeFont() for how it cascades.
+      if (config.styles && config.styles.fontFamily) {
+        applyThemeFont(rootElement, config.styles.fontFamily);
+      }
+
       // Initialize form after fetching IP geolocation
       if (window.FoxCod.CountryRestrictionEngine && window.FoxCod.CountryRestrictionEngine.initAsync) {
           window.FoxCod.CountryRestrictionEngine.initAsync().then(function() {
@@ -2169,6 +2221,9 @@
     var radius = src.borderRadius != null
       ? Number(src.borderRadius)
       : fallbackRadius;
+    // Exact padding extracted via "Match Store Theme" — overrides the
+    // small/medium/large bucket below when present.
+    var customPadding = src.customPadding || (!useCustom && productBtnStyles.customPadding) || null;
 
     function setImportant(prop, value) {
       if (value == null || value === '') return;
@@ -2183,8 +2238,8 @@
     setImportant('font-family', 'inherit');
     setImportant('display', 'block');
 
-    // Size
-    setImportant('padding', btnSize === 'small' ? '10px 16px' : btnSize === 'large' ? '16px' : '13px 16px');
+    // Size — theme-extracted exact padding wins over the bucketed size guess
+    setImportant('padding', customPadding || (btnSize === 'small' ? '10px 16px' : btnSize === 'large' ? '16px' : '13px 16px'));
 
     // Typography
     setImportant('color', textColor);
@@ -3641,7 +3696,7 @@
             couponLabel.style.fontSize = Math.max((styles.labelFontSize || textSize), 15) + 'px';
             couponLabel.style.color = styles.labelColor || textColor;
             couponLabel.style.textAlign = labelAlignment;
-            couponLabel.style.fontFamily = '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+            couponLabel.style.fontFamily = 'inherit';
             couponLabel.textContent = field.label || 'Coupon Code';
             couponTitleWrap.appendChild(couponLabel);
 
@@ -3694,7 +3749,7 @@
             couponInput.style.fontSize = Math.max(textSize, minCouponFontSize) + 'px';
             couponInput.style.fontWeight = '700';
             couponInput.style.letterSpacing = '0.02em';
-            couponInput.style.fontFamily = '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+            couponInput.style.fontFamily = 'inherit';
             couponInput.style.color = textColor;
             couponInput.style.background = 'rgba(255,255,255,0.94)';
             couponInput.style.boxSizing = 'border-box';
@@ -3739,7 +3794,7 @@
             couponButton.style.fontSize = '12px';
             couponButton.style.fontWeight = '800';
             couponButton.style.letterSpacing = '0.02em';
-            couponButton.style.fontFamily = '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+            couponButton.style.fontFamily = 'inherit';
             couponButton.style.transition = 'all 0.18s ease';
             couponButton.style.position = 'relative';
             couponButton.style.overflow = 'hidden';
@@ -3815,7 +3870,7 @@
         label.style.fontSize = (styles.labelFontSize || textSize) + 'px';
         label.style.color = styles.labelColor || textColor;
         label.style.textAlign = labelAlignment;
-        label.style.fontFamily = '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        label.style.fontFamily = 'inherit';
         label.innerHTML = field.label + (field.required ? ' <span style="color:#e53935">*</span>' : '');
         wrapper.appendChild(label);
 
@@ -3975,7 +4030,7 @@
         input.style.fontSize = Math.max(textSize, 16) + 'px'; // minimum 16px to prevent iOS auto-zoom
         input.style.fontWeight = '400';
         input.style.fontStyle = 'normal';
-        input.style.fontFamily = '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        input.style.fontFamily = 'inherit';
         input.style.color = textColor; // Input text color
         if (styles.fieldBackgroundColor) {
             input.style.setProperty('background-color', styles.fieldBackgroundColor, 'important');

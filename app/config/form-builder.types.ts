@@ -75,7 +75,14 @@ export interface FormStyles {
     labelColor: string;            // Separate from textColor
     labelFontSize: number;         // Separate control for labels
     priceColor: string;            // Price display color (product price, total price, offer prices)
-    fontFamily: 'Inter' | 'Poppins' | 'DM Sans' | 'Outfit' | 'Playfair Display' | 'Cormorant Garamond' | 'Abril Fatface' | 'Syne' | 'Space Grotesk';  // Font family for form title and description
+    /**
+     * Font family applied across the whole form (title, description, labels,
+     * placeholders, payment-mode cards, order summary, button). Free-form
+     * string rather than a closed set — the Style tab's picker offers 9
+     * curated options, but "Match Store Theme" can populate this with any
+     * font name extracted from the merchant's theme.
+     */
+    fontFamily: string;
     fullPrepaidEnabled?: boolean; // Added for static full prepaid button
 }
 
@@ -91,6 +98,12 @@ export interface ButtonStyles {
     borderColor: string;
     borderWidth: number;
     borderRadius: number;
+    /**
+     * Exact padding extracted from the merchant's theme via "Match Store
+     * Theme" (e.g. "14px 24px"). When set, overrides the small/medium/large
+     * buttonSize bucket so the button's size matches the theme precisely.
+     */
+    customPadding?: string;
     shadow: boolean;
     animation: 'none' | 'fade' | 'slide' | 'pulse';
 

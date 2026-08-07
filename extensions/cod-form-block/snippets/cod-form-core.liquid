@@ -171,7 +171,7 @@
         box-sizing:border-box !important;
         font-family:inherit !important;
         transition:all 0.2s ease !important;
-        padding:{% if resolved_button_size == 'small' %}10px 16px{% elsif resolved_button_size == 'large' %}16px{% else %}13px 16px{% endif %} !important;
+        padding:{% if btn_styles.customPadding %}{{ btn_styles.customPadding }}{% elsif resolved_button_size == 'small' %}10px 16px{% elsif resolved_button_size == 'large' %}16px{% else %}13px 16px{% endif %} !important;
         font-size:{{ btn_styles.textSize | default: 15 }}px !important;
         font-weight:{% if btn_styles.fontStyle == 'bold' %}700{% else %}400{% endif %} !important;
         font-style:{% if btn_styles.fontStyle == 'italic' %}italic{% else %}normal{% endif %} !important;
@@ -696,7 +696,16 @@
     border: 1px solid #e5e5e5;
     border-radius: 8px;
     background: #fff;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: var(--foxcod-font-family, 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+  }
+
+  /* input/button/select/textarea don't inherit font-family by default per the
+     CSS spec, so they need this explicitly to pick up the theme font above. */
+  .cod-form-container input,
+  .cod-form-container button,
+  .cod-form-container select,
+  .cod-form-container textarea {
+    font-family: inherit;
   }
 
   .cod-product-info {
@@ -1236,7 +1245,7 @@
       --cod-accent: {{ accent_color }};
       --cod-form-bg: {{ form_background }};
       --cod-radius: {{ cod_border_radius }}px;
-      --cod-btn-size: {% if resolved_button_size == 'small' %}10px 20px{% elsif resolved_button_size == 'large' %}16px 32px{% else %}14px 28px{% endif %};
+      --cod-btn-size: {% if btn_styles.customPadding %}{{ btn_styles.customPadding }}{% elsif resolved_button_size == 'small' %}10px 20px{% elsif resolved_button_size == 'large' %}16px 32px{% else %}14px 28px{% endif %};
       --cod-btn-font: {% if resolved_button_size == 'small' %}14px{% elsif resolved_button_size == 'large' %}18px{% else %}16px{% endif %};
       --cod-btn-text: {{ btn_styles.textColor | default: '#ffffff' }};
       --cod-btn-border-color: {{ btn_styles.borderColor | default: cod_primary_color }};

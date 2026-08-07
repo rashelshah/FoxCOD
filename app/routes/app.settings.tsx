@@ -38,7 +38,8 @@ import {
     importShippingRatesFromShopify,
     type ShippingRate,
 } from "../services/shipping-rates.server";
-import { extractThemeSettings } from "../utils/themeExtraction";
+import { extractThemeSettings, derivePaymentModeCardStyle } from "../utils/themeExtraction";
+import { applyThemeToOfferGroups } from "../services/quantity-offers-sync.server";
 import {
     type FormField,
     type ContentBlocks,
@@ -432,6 +433,53 @@ async function resolveCollectionProductIds(admin: any, collectionIds: string[]):
     return [...new Set(productIds)]; // Deduplicate
 }
 
+/**
+ * "Match Store Theme" cross-feature effect: persist the theme-derived
+ * Payment Mode card colors immediately — same immediacy as
+ * applyThemeToOfferGroups for Bundle Offers — instead of leaving it staged
+ * behind the page's Save button, since the merchant expects clicking Match
+ * Store Theme alone to be enough for these two secondary surfaces.
+ */
+async function applyThemeToPaymentModeCards(admin: any, shopDomain: string, profile: any): Promise<boolean> {
+    const cardStyle = derivePaymentModeCardStyle(profile);
+    if (!cardStyle) return false;
+
+    const existing = await getFormSettings(shopDomain);
+    if (!existing) return false;
+
+    const paymentModeCardStyles = {
+        full_prepaid: cardStyle,
+        partial_payment: cardStyle,
+        pure_cod: cardStyle,
+    };
+
+    await saveFormSettings({ ...existing, payment_mode_card_styles: paymentModeCardStyles as any });
+
+    const shopResponse = await admin.graphql(`{ shop { id } }`);
+    const shopData = await shopResponse.json();
+    const shopGid = shopData.data.shop.id;
+    const metafieldRes = await admin.graphql(`
+        mutation SetMetafield($metafields: [MetafieldsSetInput!]!) {
+            metafieldsSet(metafields: $metafields) {
+                metafields { key }
+                userErrors { field message }
+            }
+        }
+    `, {
+        variables: {
+            metafields: [
+                { ownerId: shopGid, namespace: "fox_cod", key: "payment_mode_card_styles_json", value: JSON.stringify(paymentModeCardStyles), type: "json" },
+            ]
+        }
+    });
+    const metafieldJson = await metafieldRes.json();
+    if (metafieldJson.data?.metafieldsSet?.userErrors?.length > 0) {
+        console.error('[Settings] payment_mode_card_styles_json metafield sync errors:', metafieldJson.data.metafieldsSet.userErrors);
+    }
+
+    return true;
+}
+
 export const action = async ({ request }: ActionFunctionArgs) => {
     const { session, admin } = await authenticate.admin(request);
     const shopDomain = session.shop;
@@ -443,7 +491,27 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     if (actionType === "extract_theme") {
         try {
             const profile = await extractThemeSettings(admin, session);
-            return { success: true, actionType: "extract_theme", profile };
+
+            // Cross-feature effect: overwrite every existing Bundle Offer
+            // group's design colors to match the newly extracted theme too.
+            // Best-effort — a failure here shouldn't fail theme extraction.
+            let bundleOffersUpdated = 0;
+            try {
+                bundleOffersUpdated = await applyThemeToOfferGroups(admin, shopDomain, profile);
+            } catch (offersError) {
+                console.error("[Settings] Failed to apply theme to bundle offers:", offersError);
+            }
+
+            // Cross-feature effect: persist Payment Mode card colors right
+            // away too, same as Bundle Offers above — best-effort.
+            let paymentModeCardsApplied = false;
+            try {
+                paymentModeCardsApplied = await applyThemeToPaymentModeCards(admin, shopDomain, profile);
+            } catch (cardsError) {
+                console.error("[Settings] Failed to apply theme to payment mode cards:", cardsError);
+            }
+
+            return { success: true, actionType: "extract_theme", profile, bundleOffersUpdated, paymentModeCardsApplied };
         } catch (error: any) {
             console.error("Theme extraction failed:", error);
             return { success: false, actionType: "extract_theme", error: error.message };
@@ -767,6 +835,102 @@ const darkenColor = (hex: string, percent: number) => {
     return `#${(r << 16 | g << 8 | b).toString(16).padStart(6, '0')}`;
 };
 
+// Helper to lighten a hex color — used to "lift" input fields off a dark
+// theme background (standard dark-mode convention: surfaces sit a shade
+// lighter than the page behind them).
+const lightenColor = (hex: string, percent: number) => {
+    const num = parseInt(hex.replace('#', ''), 16);
+    const r = Math.min(255, (num >> 16) + Math.round(255 * percent / 100));
+    const g = Math.min(255, ((num >> 8) & 0x00FF) + Math.round(255 * percent / 100));
+    const b = Math.min(255, (num & 0x0000FF) + Math.round(255 * percent / 100));
+    return `#${(r << 16 | g << 8 | b).toString(16).padStart(6, '0')}`;
+};
+
+// Local copy of the perceived-brightness check (kept separate from
+// themeExtraction.ts, which is a server-only module importing "fs"/"path" —
+// importing it here would pull those into the client bundle).
+const isColorDark = (hex: string): boolean => {
+    const clean = (hex || '').replace('#', '');
+    if (clean.length !== 3 && clean.length !== 6) return false;
+    const full = clean.length === 3 ? clean.split('').map(c => c + c).join('') : clean;
+    const r = parseInt(full.slice(0, 2), 16);
+    const g = parseInt(full.slice(2, 4), 16);
+    const b = parseInt(full.slice(4, 6), 16);
+    if ([r, g, b].some(Number.isNaN)) return false;
+    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+    return brightness < 128;
+};
+
+const isValidHexColor = (hex: any): hex is string =>
+    typeof hex === 'string' && /^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6})$/.test(hex);
+
+const hexToRgbLocal = (hex: string) => {
+    const clean = hex.replace('#', '');
+    const full = clean.length === 3 ? clean.split('').map(c => c + c).join('') : clean;
+    return {
+        r: parseInt(full.slice(0, 2), 16),
+        g: parseInt(full.slice(2, 4), 16),
+        b: parseInt(full.slice(4, 6), 16),
+    };
+};
+
+// Mix `weight` (0..1) of hexB into hexA — used to derive theme-tinted
+// surfaces (field backgrounds, payment-mode cards) instead of picking
+// arbitrary fixed colors.
+const mixHex = (hexA: string, hexB: string, weight: number): string => {
+    const a = hexToRgbLocal(hexA);
+    const b = hexToRgbLocal(hexB);
+    const w = Math.max(0, Math.min(1, weight));
+    const mix = (x: number, y: number) => Math.round(x + (y - x) * w);
+    return `#${[mix(a.r, b.r), mix(a.g, b.g), mix(a.b, b.b)].map(v => v.toString(16).padStart(2, '0')).join('')}`;
+};
+
+// Readable text color for text sitting on top of `bgHex`.
+const pickTextOn = (bgHex: string): string =>
+    isColorDark(bgHex) ? '#ffffff' : darkenColor(bgHex, 55);
+
+// Field background that reads as a distinct surface on top of the page
+// background regardless of theme, without defaulting to a stark,
+// theme-agnostic white on light pages — a whisper of the page background
+// and the brand accent color is blended in so fields feel like part of the
+// site's palette. Dark pages still get lifted a shade lighter, unchanged.
+const computeFieldBackground = (pageBg: string, accentColor?: string): string => {
+    if (isColorDark(pageBg)) return lightenColor(pageBg, 12);
+    let base = isValidHexColor(pageBg) ? mixHex('#FFFFFF', pageBg, 0.08) : '#FFFFFF';
+    if (accentColor && isValidHexColor(accentColor)) {
+        base = mixHex(base, accentColor, 0.035);
+    }
+    return base;
+};
+
+// Derives a single color set (from the extracted theme's accent/text
+// colors) applied uniformly across all three Payment Mode cards when
+// "Match Store Theme" runs, so they visually match the rest of the theme
+// instead of keeping their built-in green/blue/orange palette.
+const deriveThemeCardStyle = (profile: any): PaymentModeCardStyle | null => {
+    const accent = profile?.colors?.button || profile?.colors?.primary;
+    if (!accent || !isValidHexColor(accent)) return null;
+    const themeText = profile?.colors?.text;
+    const textColor = (themeText && isValidHexColor(themeText) && isColorDark(themeText))
+        ? themeText
+        : darkenColor(accent, 45);
+    const iconBg = mixHex('#FFFFFF', accent, 0.16);
+    return {
+        mode: 'custom',
+        cardBackgroundColor: mixHex('#FFFFFF', accent, 0.10),
+        borderColor: accent,
+        descriptionColor: textColor,
+        descriptionBackgroundColor: iconBg,
+        textColor,
+        iconColor: accent,
+        iconBackgroundColor: iconBg,
+        tagBackgroundColor: accent,
+        tagTextColor: (profile?.colors?.buttonText && isValidHexColor(profile.colors.buttonText))
+            ? profile.colors.buttonText
+            : pickTextOn(accent),
+    };
+};
+
 export const ButtonIconSvg = ({ iconType, color = 'currentColor', size = 18 }: { iconType: string, color?: string, size?: number }) => {
     const s: React.CSSProperties = { width: size, height: size, color };
     if (iconType === 'cart') return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" /><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" /></svg>;
@@ -810,11 +974,12 @@ const PreviewDisplay = memo(({
         const hasTransformAnim = btn.animationPreset && btn.animationPreset !== 'none' && btn.animationPreset !== 'glow' && btn.animationPreset !== 'gradient-flow';
         const base: any = {
             width: '100%',
-            padding: buttonSize === 'small' ? '10px' : buttonSize === 'large' ? '16px' : '13px',
+            padding: btn.customPadding || (buttonSize === 'small' ? '10px' : buttonSize === 'large' ? '16px' : '13px'),
             borderRadius: (btn.borderRadius ?? borderRadius) + 'px',
             fontWeight: btn.fontStyle === 'bold' ? 700 : 400,
             fontStyle: btn.fontStyle === 'italic' ? 'italic' : 'normal',
             fontSize: (btn.textSize ?? 15) + 'px',
+            fontFamily: formStyles?.fontFamily || 'Inter',
             border: borderW ? `${borderW}px solid ${borderCol}` : 'none',
             cursor: 'pointer',
             transition: hasTransformAnim ? 'opacity 0.2s ease, background-color 0.2s ease' : 'all 0.2s ease',
@@ -863,6 +1028,7 @@ const PreviewDisplay = memo(({
             fontWeight: fsb.fontStyle === 'bold' ? 700 : 400,
             fontStyle: fsb.fontStyle === 'italic' ? 'italic' : 'normal',
             fontSize: (fsb.textSize ?? 15) + 'px',
+            fontFamily: formStyles?.fontFamily || 'Inter',
             border: borderW ? `${borderW}px solid ${borderCol}` : 'none',
             cursor: 'pointer',
             transition: 'all 0.2s ease',
@@ -1278,7 +1444,7 @@ const PreviewDisplay = memo(({
                                 )}
                                 {/* Only show form when NOT on button tab */}
                                 {activeTab !== 'button' && (
-                                    <div className="preview-modal" style={{ ...getModalStyle(), marginTop: '0', background: 'transparent', boxShadow: 'none', border: 'none', backdropFilter: 'none', padding: '0 0 16px 0' }}>
+                                    <div className="preview-modal" style={{ ...getModalStyle(), marginTop: '0', background: 'transparent', boxShadow: 'none', border: 'none', backdropFilter: 'none', padding: '0 0 16px 0', fontFamily: formStyles?.fontFamily || 'Inter' }}>
                                         {blocks?.show_form_title !== false && (
                                             <div className="preview-modal-title" style={{
                                                 fontWeight: 700,
@@ -1286,7 +1452,6 @@ const PreviewDisplay = memo(({
                                                 marginBottom: '6px',
                                                 color: formStyles?.textColor || '#111',
                                                 textAlign: 'center',
-                                                fontFamily: formStyles?.fontFamily || 'Inter'
                                             }}>
                                                 {formTitle || 'Cash on Delivery'}
                                             </div>
@@ -1298,7 +1463,6 @@ const PreviewDisplay = memo(({
                                                 marginBottom: '16px',
                                                 textAlign: 'center',
                                                 lineHeight: '1.4',
-                                                fontFamily: formStyles?.fontFamily || 'Inter'
                                             }}>
                                                 {formSubtitle || 'Fill in your details to place a COD order'}
                                             </div>
@@ -1314,7 +1478,6 @@ const PreviewDisplay = memo(({
                                             padding: '6px 8px',
                                             margin: '12px 0 16px 0',
                                             gap: 'clamp(3px, 1.2vw, 8px)',
-                                            fontFamily: formStyles?.fontFamily || 'Inter',
                                             fontSize: 'clamp(6.8px, 1.8vw, 8.8px)',
                                             fontWeight: 600,
                                             color: '#000000',
@@ -2681,6 +2844,26 @@ export default function SettingsPage() {
         setSelectedPreset(getSelectedPresetFromStyles(formStyles));
     }, [formStyles?.themeKey]);
 
+    // Dynamically load whatever font is currently selected — covers both the
+    // curated Style-tab options (several of which aren't in root.tsx's static
+    // font link) and any arbitrary font name "Match Store Theme" extracts.
+    useEffect(() => {
+        const family = formStyles?.fontFamily;
+        if (!family) return;
+        const linkId = 'fox-dynamic-theme-font';
+        const href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(family).replace(/%20/g, '+')}:wght@400;500;600;700&display=swap`;
+        let link = document.getElementById(linkId) as HTMLLinkElement | null;
+        if (!link) {
+            link = document.createElement('link');
+            link.id = linkId;
+            link.rel = 'stylesheet';
+            document.head.appendChild(link);
+        }
+        if (link.href !== href) {
+            link.href = href;
+        }
+    }, [formStyles?.fontFamily]);
+
     // Compute current settings state for comparison
     const hasUnsavedChanges = useMemo(() => {
         const current = {
@@ -2782,22 +2965,40 @@ export default function SettingsPage() {
                     console.log('[FoxCOD] Full actionData:', JSON.stringify(actionData));
                     setThemeDebugInfo(profile);
                     if (profile && Object.keys(profile.colors || {}).length > 0) {
-                        // Start from DEFAULT_STYLES to avoid inheriting old preset colors
-                        setFormStyles({
-                            ...DEFAULT_STYLES,
-                            themeKey: 'custom',
-                            background: profile.colors.background || DEFAULT_STYLES.background,
-                            backgroundColor: profile.colors.background || DEFAULT_STYLES.backgroundColor,
-                            fieldBackgroundColor: profile.colors.background || DEFAULT_STYLES.fieldBackgroundColor,
-                            textColor: profile.colors.text || DEFAULT_STYLES.textColor,
-                            primaryColor: profile.colors.button || profile.colors.primary || DEFAULT_STYLES.borderColor,
-                            buttonColor: profile.colors.button || profile.colors.primary || DEFAULT_STYLES.buttonColor || '#000000',
-                            buttonTextColor: profile.colors.buttonText || DEFAULT_STYLES.textColor,
-                            borderColor: profile.colors.border || profile.colors.button || profile.colors.primary || DEFAULT_STYLES.borderColor,
-                            labelColor: profile.colors.text || DEFAULT_STYLES.labelColor,
-                            iconColor: profile.colors.button || profile.colors.primary || DEFAULT_STYLES.iconColor,
-                            priceColor: profile.colors.button || profile.colors.primary || DEFAULT_STYLES.priceColor,
-                            borderRadius: profile.styles?.borderRadius ? parseInt(profile.styles.borderRadius) : DEFAULT_STYLES.borderRadius,
+                        // Start from the CURRENT styles (not DEFAULT_STYLES) so anything
+                        // "Match Store Theme" doesn't determine — border width, shadow,
+                        // label alignment/size, etc. — is preserved rather than silently
+                        // reset. Only the fields the extraction actually produces are
+                        // overwritten below.
+                        const extractedAccent = profile.colors.button || profile.colors.primary;
+                        setFormStyles(prev => {
+                            const pageBg = profile.colors.background || prev.background || DEFAULT_STYLES.background;
+                            return {
+                                ...prev,
+                                themeKey: 'custom',
+                                background: pageBg,
+                                backgroundColor: pageBg,
+                                // Never the same as the page background — fields need to
+                                // read as a distinct surface on both light and dark themes —
+                                // but on light themes it's tinted with the page bg + brand
+                                // accent instead of a stark, theme-agnostic white.
+                                fieldBackgroundColor: computeFieldBackground(pageBg, extractedAccent),
+                                textColor: profile.colors.text || prev.textColor,
+                                borderColor: profile.colors.border || profile.colors.button || profile.colors.primary || prev.borderColor,
+                                borderWidth: profile.styles?.borderWidth ? parseInt(profile.styles.borderWidth) : prev.borderWidth,
+                                labelColor: profile.colors.text || prev.labelColor,
+                                iconColor: profile.colors.button || profile.colors.primary || prev.iconColor,
+                                priceColor: profile.colors.button || profile.colors.primary || prev.priceColor,
+                                borderRadius: profile.styles?.borderRadius ? parseInt(profile.styles.borderRadius) : prev.borderRadius,
+                                fontFamily: profile.fonts?.body || profile.fonts?.heading || prev.fontFamily,
+                                // Pre-existing fields not part of FormStyles — left as-is (same
+                                // right-hand values as before) so this doesn't drop them.
+                                ...({
+                                    primaryColor: profile.colors.button || profile.colors.primary || prev.borderColor,
+                                    buttonColor: profile.colors.button || profile.colors.primary || (prev as any).buttonColor || '#000000',
+                                    buttonTextColor: profile.colors.buttonText || prev.textColor,
+                                } as any),
+                            };
                         });
                         // Also update the COD button color (uses primaryColor state)
                         const extractedBtnColor = profile.colors.button || profile.colors.primary;
@@ -2809,9 +3010,33 @@ export default function SettingsPage() {
                             backgroundColor: profile.colors.button || profile.colors.primary || prev.backgroundColor,
                             textColor: profile.colors.buttonText || '#ffffff',
                             borderRadius: profile.styles?.borderRadius ? parseInt(profile.styles.borderRadius) : prev.borderRadius,
+                            borderWidth: profile.styles?.borderWidth ? parseInt(profile.styles.borderWidth) : prev.borderWidth,
+                            customPadding: profile.styles?.buttonPadding || undefined,
                         }));
+                        // Payment Mode cards (Full Prepaid / Partial Payment / Cash on
+                        // Delivery) — apply the same theme-derived color set to all three
+                        // so they match the rest of the theme instead of keeping their
+                        // built-in green/blue/orange palette.
+                        const themeCardStyle = deriveThemeCardStyle(profile);
+                        if (themeCardStyle) {
+                            setPaymentModeCardStyles({
+                                full_prepaid: themeCardStyle,
+                                partial_payment: themeCardStyle,
+                                pure_cod: themeCardStyle,
+                            });
+                        }
                         setThemeApplied(true);
-                        shopify.toast.show(`✓ ${profile.themeClassification || 'Website'} Theme Applied!`);
+                        shopify.toast.show(`✓ ${profile.themeClassification || 'Website'} theme matched — click Save to publish the form & button`);
+                        const bundleOffersUpdated = (actionData as any).bundleOffersUpdated;
+                        const paymentModeCardsApplied = (actionData as any).paymentModeCardsApplied;
+                        const appliedExtras: string[] = [];
+                        if (paymentModeCardsApplied) appliedExtras.push('payment mode cards');
+                        if (bundleOffersUpdated > 0) appliedExtras.push(`${bundleOffersUpdated} bundle offer${bundleOffersUpdated === 1 ? '' : 's'}`);
+                        if (appliedExtras.length > 0) {
+                            setTimeout(() => {
+                                shopify.toast.show(`✓ Already live: ${appliedExtras.join(' + ')} matched to theme`);
+                            }, 300);
+                        }
                     } else {
                         shopify.toast.show(`Theme extracted but colors empty. Check debug panel.`, { duration: 4000, isError: true });
                     }
@@ -3446,9 +3671,10 @@ export default function SettingsPage() {
                 .preview-product { padding: 16px; }
                 .preview-product-img { width: 80px; height: 80px; border-radius: 6px; flex-shrink: 0; object-fit: cover; }
                 .preview-modal { padding: 16px; margin-top: 12px; border-radius: 12px; background: #f9fafb; }
+                .preview-modal input, .preview-modal button, .preview-modal select, .preview-modal textarea { font-family: inherit; }
                 .preview-input { width: 100%; padding: 10px 12px; margin-bottom: 8px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 12px; box-sizing: border-box; }
                 .preview-submit { width: 100%; padding: 12px; border: none; color: white; border-radius: 8px; font-weight: 600; font-size: 13px; margin-top: 4px; }
-                
+
                 /* Sortable Fields Styles */
                 .sortable-fields-container { margin-top: 16px; }
                 .sortable-field-item {

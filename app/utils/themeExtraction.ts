@@ -18,6 +18,8 @@ export interface ThemeProfile {
   };
   styles: {
     borderRadius?: string;
+    borderWidth?: string;
+    buttonPadding?: string;
     shadow?: string;
     cardStyle?: 'flat' | 'shadow' | 'bordered' | 'glass';
   };
@@ -275,7 +277,7 @@ export async function extractThemeSettings(admin: AdminApiContext, session: Sess
             }
           }
         }
-        
+
         // Ride theme radius property
         if (current.buttons_radius !== undefined) {
           profile.styles.borderRadius = `${current.buttons_radius}px`;
@@ -286,6 +288,15 @@ export async function extractThemeSettings(admin: AdminApiContext, session: Sess
 
         if (current.buttons_radius !== undefined) {
           profile.styles.borderRadius = `${current.buttons_radius}px`;
+        }
+
+        // Button border width — try known theme setting keys (Dawn/Horizon/Ride conventions)
+        const borderWidthKeys = ['buttons_border_thickness', 'buttons_border_width', 'button_border_width'];
+        for (const key of borderWidthKeys) {
+          if (current[key] !== undefined) {
+            profile.styles.borderWidth = `${current[key]}px`;
+            break;
+          }
         }
       }
     }
@@ -460,7 +471,17 @@ export async function extractThemeSettings(admin: AdminApiContext, session: Sess
         if (radiusVar && !profile.styles.borderRadius) {
           profile.styles.borderRadius = radiusVar.trim();
         }
-        
+
+        const borderWidthVar = allRootVars['--buttons-border-thickness'] || allRootVars['--buttons-border-width'] || allRootVars['--border-width-button'] || allRootVars['--button-border-width'];
+        if (borderWidthVar && !profile.styles.borderWidth) {
+          profile.styles.borderWidth = borderWidthVar.trim();
+        }
+
+        const paddingVar = allRootVars['--buttons-padding-block'] || allRootVars['--buttons-block-padding'] || allRootVars['--button-padding'];
+        if (paddingVar && !profile.styles.buttonPadding) {
+          profile.styles.buttonPadding = paddingVar.trim();
+        }
+
         console.log('[ThemeExtraction] Final colors after CSS:', profile.colors);
       }
     }
@@ -485,7 +506,14 @@ export async function extractThemeSettings(admin: AdminApiContext, session: Sess
 
 function extractFontFamily(shopifyFontString: string): string {
   if (typeof shopifyFontString !== 'string') return '';
-  return shopifyFontString.split('_')[0].replace(/-/g, ' ');
+  const slug = shopifyFontString.split('_')[0].replace(/-/g, ' ');
+  // Title-case each word so it matches Google Fonts' naming convention
+  // (e.g. "assistant" -> "Assistant", "work sans" -> "Work Sans").
+  return slug
+    .split(' ')
+    .filter(Boolean)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
 }
 
 /**
@@ -594,4 +622,135 @@ function isDarkColor(color: string): boolean {
     return brightness < 128;
   }
   return false;
+}
+
+/**
+ * Color-math helpers shared by every server-side consumer of a ThemeProfile
+ * that needs to derive *new* colors from it (payment mode cards, bundle
+ * offer cards) rather than just copy extracted values 1:1. Kept here next
+ * to the extraction logic so every derived surface uses the same formulas;
+ * app.settings.tsx keeps its own client-side copies (that file can't import
+ * this module — it pulls in "fs"/"path" for the debug dump above).
+ */
+function isValidHexColor(hex: any): hex is string {
+  return typeof hex === 'string' && /^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6})$/.test(hex);
+}
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const clean = hex.replace('#', '');
+  const full = clean.length === 3 ? clean.split('').map(c => c + c).join('') : clean;
+  return {
+    r: parseInt(full.slice(0, 2), 16),
+    g: parseInt(full.slice(2, 4), 16),
+    b: parseInt(full.slice(4, 6), 16),
+  };
+}
+
+function rgbToHex(r: number, g: number, b: number): string {
+  return '#' + [r, g, b].map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
+}
+
+/** Mix `weight` (0..1) of hexB into hexA. weight=0 -> hexA, weight=1 -> hexB. */
+export function mixHex(hexA: string, hexB: string, weight: number): string {
+  const a = hexToRgb(hexA);
+  const b = hexToRgb(hexB);
+  const w = Math.max(0, Math.min(1, weight));
+  return rgbToHex(a.r + (b.r - a.r) * w, a.g + (b.g - a.g) * w, a.b + (b.b - a.b) * w);
+}
+
+function darkenHex(hex: string, percent: number): string {
+  const { r, g, b } = hexToRgb(hex);
+  const amt = Math.round(255 * percent / 100);
+  return rgbToHex(r - amt, g - amt, b - amt);
+}
+
+/** Readable text color for text sitting on top of `bgHex`. */
+function pickTextOn(bgHex: string): string {
+  return isDarkColor(bgHex) ? '#ffffff' : darkenHex(bgHex, 55);
+}
+
+/**
+ * Field/input surface that reads as a distinct layer on top of `pageBg`
+ * without being a stark, theme-agnostic white — mirrors
+ * computeFieldBackground() in app.settings.tsx exactly.
+ */
+export function computeFieldBackgroundColor(pageBg?: string, accentColor?: string): string {
+  if (pageBg && isValidHexColor(pageBg) && isDarkColor(pageBg)) {
+    const { r, g, b } = hexToRgb(pageBg);
+    const amt = Math.round(255 * 12 / 100);
+    return rgbToHex(r + amt, g + amt, b + amt);
+  }
+  let base = pageBg && isValidHexColor(pageBg) ? mixHex('#FFFFFF', pageBg, 0.08) : '#FFFFFF';
+  if (accentColor && isValidHexColor(accentColor)) {
+    base = mixHex(base, accentColor, 0.035);
+  }
+  return base;
+}
+
+/**
+ * Color/radius fields to merge into every bundle-offer group's `design`
+ * object so "Match Store Theme" carries through to the Bundle Offers page —
+ * same accent-tint formula as the payment-mode-card and field-background
+ * derivations, just targeting the offer-card design keys.
+ */
+export function deriveOfferDesignColors(profile: ThemeProfile): Record<string, any> | null {
+  const accent = profile.colors.button || profile.colors.primary;
+  if (!accent || !isValidHexColor(accent)) return null;
+
+  const pageBg = profile.colors.background;
+  const text = profile.colors.text;
+  const selectedTextColor = (text && isValidHexColor(text) && isDarkColor(text)) ? text : darkenHex(accent, 45);
+
+  const colors: Record<string, any> = {
+    selectedBgColor: mixHex('#FFFFFF', accent, 0.10),
+    selectedBorderColor: accent,
+    selectedTagBgColor: accent,
+    selectedTagTextColor: profile.colors.buttonText && isValidHexColor(profile.colors.buttonText)
+      ? profile.colors.buttonText
+      : pickTextOn(accent),
+    selectedTextColor,
+    unselectedBgColor: computeFieldBackgroundColor(pageBg, accent),
+    unselectedBorderColor: profile.colors.border && isValidHexColor(profile.colors.border) ? profile.colors.border : mixHex('#FFFFFF', accent, 0.25),
+  };
+
+  if (profile.styles.borderRadius) {
+    const radius = parseInt(profile.styles.borderRadius, 10);
+    if (!isNaN(radius)) colors.selectedBorderRadius = radius;
+  }
+
+  return colors;
+}
+
+/**
+ * Single color set applied uniformly across all three Payment Mode cards
+ * (Full Prepaid / Partial Payment / Cash on Delivery) — server-side mirror
+ * of deriveThemeCardStyle() in app.settings.tsx, used so "Match Store
+ * Theme" can persist the match immediately (same immediacy as
+ * deriveOfferDesignColors/applyThemeToOfferGroups) instead of requiring a
+ * separate Save click.
+ */
+export function derivePaymentModeCardStyle(profile: ThemeProfile): Record<string, any> | null {
+  const accent = profile.colors.button || profile.colors.primary;
+  if (!accent || !isValidHexColor(accent)) return null;
+
+  const themeText = profile.colors.text;
+  const textColor = (themeText && isValidHexColor(themeText) && isDarkColor(themeText))
+    ? themeText
+    : darkenHex(accent, 45);
+  const iconBg = mixHex('#FFFFFF', accent, 0.16);
+
+  return {
+    mode: 'custom',
+    cardBackgroundColor: mixHex('#FFFFFF', accent, 0.10),
+    borderColor: accent,
+    descriptionColor: textColor,
+    descriptionBackgroundColor: iconBg,
+    textColor,
+    iconColor: accent,
+    iconBackgroundColor: iconBg,
+    tagBackgroundColor: accent,
+    tagTextColor: (profile.colors.buttonText && isValidHexColor(profile.colors.buttonText))
+      ? profile.colors.buttonText
+      : pickTextOn(accent),
+  };
 }
