@@ -82,6 +82,13 @@ export async function extractThemeSettings(admin: AdminApiContext, session: Sess
     styles: {},
     debug: {},
   };
+  // settings_data.json's "current" section — populated in the LEVEL 1 block
+  // below, but also read later in the LEVEL 2/3 CSS-vars block (monochrome
+  // theme fallback), which is a separate scope. Declared here so it's still
+  // in scope there instead of throwing "current is not defined" — which
+  // crashed theme extraction entirely any time a theme's button color came
+  // out black/white/same-as-background (a very common case).
+  let current: Record<string, any> = {};
 
   try {
     // 1. Fetch the main theme ID - CORRECT GraphQL query format
@@ -129,7 +136,7 @@ export async function extractThemeSettings(admin: AdminApiContext, session: Sess
       
       if (settingsContent) {
         const parsedSettings = JSON.parse(settingsContent);
-        const current = parsedSettings.current || {};
+        current = parsedSettings.current || {};
         
         const colorKeys = Object.keys(current).filter(k => 
           k.includes('color') || k.includes('colour') || k.includes('accent') || 
