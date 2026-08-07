@@ -8304,12 +8304,14 @@ function darkenColor(hex, percent) {
       var existing = document.getElementById('foxcod-partial-loader');
       if (existing) existing.remove();
 
-      var overlay = document.createElement('div');
-      overlay.id = 'foxcod-partial-loader';
-      overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:rgba(255,255,255,0.96);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;animation:foxcodPartialFadeIn 0.2s ease;';
-
       // ── Read branding config ──────────────────────────────────────────────
       var branding = (window.FoxCod && window.FoxCod.branding && window.FoxCod.branding.checkout_redirect) || null;
+      var overlayBg = (branding && branding.page_background) || 'rgba(255,255,255,0.96)';
+
+      var overlay = document.createElement('div');
+      overlay.id = 'foxcod-partial-loader';
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:' + overlayBg + ';backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;animation:foxcodPartialFadeIn 0.2s ease;';
+
       var useCustomLogo = branding && branding.display_mode === 'custom_logo' && branding.logo_url;
       var logoSize = (branding && branding.logo_size) ? parseInt(branding.logo_size) : 72;
 
@@ -8404,11 +8406,13 @@ function darkenColor(hex, percent) {
       var existing = document.getElementById('foxcod-order-loader');
       if (existing) existing.remove();
 
+      var branding = (window.FoxCod && window.FoxCod.branding && window.FoxCod.branding.checkout_redirect) || null;
+      var overlayBg = (branding && branding.page_background) || 'rgba(255,255,255,0.96)';
+
       var overlay = document.createElement('div');
       overlay.id = 'foxcod-order-loader';
-      overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:rgba(255,255,255,0.96);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;animation:foxcodPartialFadeIn 0.2s ease;';
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:' + overlayBg + ';backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;animation:foxcodPartialFadeIn 0.2s ease;';
 
-      var branding = (window.FoxCod && window.FoxCod.branding && window.FoxCod.branding.checkout_redirect) || null;
       var useCustomLogo = branding && branding.display_mode === 'custom_logo' && branding.logo_url;
       var logoSize = (branding && branding.logo_size) ? parseInt(branding.logo_size) : 72;
 

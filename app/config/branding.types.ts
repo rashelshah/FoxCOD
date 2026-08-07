@@ -14,6 +14,8 @@ export interface BrandingCheckoutRedirect {
     /** Which icon to show on the redirect screen */
     display_mode: 'lock_icon' | 'custom_logo';
     /** Whether the logo should smoothly animate up and down */
+    /** Custom background for the entire redirect screen (can be hex or gradient) */
+    page_background?: string;
     animate_logo?: boolean;
 }
 

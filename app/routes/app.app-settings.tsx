@@ -2,7 +2,8 @@
  * App Settings Page — Tabbed: Pixels | Fraud Protection | Branding
  * Route: /app/app-settings
  */
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { useLoaderData, useSubmit, useActionData, useNavigation, Link, useSearchParams } from 'react-router';
 import type { LoaderFunctionArgs, ActionFunctionArgs } from 'react-router';
 import { useAppBridge } from '@shopify/app-bridge-react';
@@ -27,6 +28,8 @@ import { DEFAULT_FRAUD_SETTINGS } from '../config/fraud-protection.types';
 import { getBrandingSettings, saveBrandingSettings } from '../config/supabase.server';
 import type { Branding, BrandingCheckoutRedirect } from '../config/branding.types';
 import { DEFAULT_BRANDING } from '../config/branding.types';
+import ColorPicker from 'react-best-gradient-color-picker';
+import { ColorSelector, colorSelectorStyles } from "./ColorSelector";
 
 // ── LOADER ──
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -272,6 +275,188 @@ const TABS = [
 
 type TabId = 'pixels' | 'fraud' | 'branding';
 
+// ── CUSTOM GRADIENT SELECTOR ──
+function GradientColorSelector({ value, onChange }: { value: string; onChange: (color: string) => void }) {
+    const [open, setOpen] = useState(false);
+    // top/left are document coordinates (include scroll offset) so the
+    // popover — portaled to <body> and positioned `absolute` — scrolls
+    // naturally with the page instead of staying pinned to a `fixed`
+    // viewport that can drift out of sync inside the embedded admin iframe.
+    const [pos, setPos] = useState<{ top: number; left: number; openUpward: boolean }>({ top: 0, left: 0, openUpward: false });
+    const wrapperRef = useRef<HTMLDivElement>(null);
+    const popoverRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        function handleClickOutside(e: MouseEvent) {
+            const target = e.target as Node;
+            if (
+                wrapperRef.current && !wrapperRef.current.contains(target) &&
+                (!popoverRef.current || !popoverRef.current.contains(target))
+            ) {
+                setOpen(false);
+            }
+        }
+        if (open) document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [open]);
+
+    const pickerWidth = 280;
+    const estimatedPickerHeight = 450;
+
+    const computePosition = useCallback(() => {
+        if (!wrapperRef.current) return;
+        const rect = wrapperRef.current.getBoundingClientRect();
+        const spaceBelow = window.innerHeight - rect.bottom;
+        const spaceAbove = rect.top;
+        const openUpward = spaceBelow < estimatedPickerHeight && spaceAbove > spaceBelow;
+
+        let top = openUpward
+            ? rect.top + window.scrollY - estimatedPickerHeight - 8
+            : rect.bottom + window.scrollY + 8;
+        // Clamp fully inside the viewport (in document coordinates) so the
+        // popover is never partially cut off top/bottom regardless of which
+        // way it opened or how tall it actually renders.
+        const minTop = window.scrollY + 8;
+        const maxTop = window.scrollY + window.innerHeight - 8;
+        top = Math.max(minTop, Math.min(top, maxTop));
+
+        let left = rect.left + window.scrollX;
+        const minLeft = window.scrollX + 8;
+        const maxLeft = window.scrollX + window.innerWidth - pickerWidth - 8;
+        left = Math.max(minLeft, Math.min(left, maxLeft));
+
+        setPos({ top, left, openUpward });
+    }, [estimatedPickerHeight]);
+
+    const handleOpen = () => {
+        if (!open) computePosition();
+        setOpen(!open);
+    };
+
+    // Re-measure once the popover has actually rendered — the initial
+    // computePosition() call estimates height before layout, so if the real
+    // rendered popover is taller/shorter than the estimate (or the window
+    // was resized/scrolled while open), snap it back fully on-screen.
+    useEffect(() => {
+        if (!open) return;
+        const reposition = () => {
+            if (!popoverRef.current || !wrapperRef.current) return;
+            const wrapperRect = wrapperRef.current.getBoundingClientRect();
+            const popoverHeight = popoverRef.current.offsetHeight;
+            const spaceBelow = window.innerHeight - wrapperRect.bottom;
+            const spaceAbove = wrapperRect.top;
+            const openUpward = spaceBelow < popoverHeight && spaceAbove > spaceBelow;
+            let top = openUpward
+                ? wrapperRect.top + window.scrollY - popoverHeight - 8
+                : wrapperRect.bottom + window.scrollY + 8;
+            const minTop = window.scrollY + 8;
+            const maxTop = window.scrollY + window.innerHeight - Math.min(popoverHeight, window.innerHeight - 16) - 8;
+            top = Math.max(minTop, Math.min(top, Math.max(minTop, maxTop)));
+            setPos(prev => (prev.top === top && prev.openUpward === openUpward) ? prev : { ...prev, top, openUpward });
+        };
+        reposition();
+        window.addEventListener('resize', reposition);
+        window.addEventListener('scroll', reposition, true);
+        return () => {
+            window.removeEventListener('resize', reposition);
+            window.removeEventListener('scroll', reposition, true);
+        };
+    }, [open]);
+
+    return (
+        <div className="polaris-color-selector" ref={wrapperRef}>
+            <div className="polaris-color-row">
+                <div
+                    className="polaris-color-swatch"
+                    style={{ background: value || '#ffffff' }}
+                    onClick={handleOpen}
+                    title="Click to pick a color or gradient"
+                />
+                <input
+                    type="text"
+                    className="polaris-hex-input"
+                    value={value}
+                    onChange={(e) => onChange(e.target.value)}
+                    placeholder="linear-gradient(...)"
+                />
+            </div>
+            {open && typeof document !== 'undefined' && createPortal(
+                <div
+                    ref={popoverRef}
+                    style={{
+                        position: 'absolute', top: pos.top, left: pos.left, zIndex: 999999,
+                        background: 'white', padding: '12px', borderRadius: '12px',
+                        boxShadow: '0 8px 30px rgba(0,0,0,0.2)', border: '1px solid #e5e7eb',
+                        maxHeight: 'calc(100vh - 16px)', overflowY: 'auto',
+                    }}
+                >
+                    <ColorPicker width={260} height={200} value={value} onChange={onChange} />
+                </div>,
+                document.body
+            )}
+        </div>
+    );
+}
+
+/**
+ * Manually scroll-tracked "sticky" column — reproduces position:sticky via
+ * getBoundingClientRect() instead of relying on the CSS property itself,
+ * which wasn't reliably engaging for this column inside the embedded admin
+ * iframe (some containing-block quirk specific to this Grid + Polaris +
+ * App Bridge combination that CSS-only fixes didn't resolve). The slot
+ * always stays in normal flow (so the grid column keeps its width/position
+ * and the left column never jumps); once its top would scroll above
+ * STICK_TOP, the content switches to position:fixed at that same left/width,
+ * pinned to the viewport, and never un-sticks again while scrolling further
+ * — matching "always visible, even at the bottom of the page".
+ */
+const STICK_TOP = 24;
+function StickyPreviewColumn({ children }: { children: ReactNode }) {
+    const slotRef = useRef<HTMLDivElement>(null);
+    const contentRef = useRef<HTMLDivElement>(null);
+    const [state, setState] = useState<{ fixed: boolean; left: number; width: number; height: number }>({ fixed: false, left: 0, width: 0, height: 0 });
+
+    useEffect(() => {
+        function update() {
+            if (!slotRef.current) return;
+            const slotRect = slotRef.current.getBoundingClientRect();
+            const contentHeight = contentRef.current ? contentRef.current.offsetHeight : 0;
+            setState({ fixed: slotRect.top <= STICK_TOP, left: slotRect.left, width: slotRect.width, height: contentHeight });
+        }
+        update();
+        window.addEventListener('scroll', update, true);
+        window.addEventListener('resize', update);
+        // Content height can change independently of scroll/resize (e.g.
+        // toggling the mobile/desktop preview) — keep the slot's reserved
+        // height (and left/width, in case of reflow) in sync so the left
+        // column never jumps and the fixed content doesn't drift.
+        let resizeObserver: ResizeObserver | undefined;
+        if (contentRef.current && typeof ResizeObserver !== 'undefined') {
+            resizeObserver = new ResizeObserver(update);
+            resizeObserver.observe(contentRef.current);
+        }
+        return () => {
+            window.removeEventListener('scroll', update, true);
+            window.removeEventListener('resize', update);
+            resizeObserver?.disconnect();
+        };
+    }, []);
+
+    return (
+        <div ref={slotRef} style={{ minHeight: state.fixed ? state.height : undefined }}>
+            <div
+                ref={contentRef}
+                style={state.fixed
+                    ? { position: 'fixed', top: STICK_TOP, left: state.left, width: state.width, display: 'flex', flexDirection: 'column', gap: '16px', zIndex: 100 }
+                    : { display: 'flex', flexDirection: 'column', gap: '16px' }
+                }
+            >
+                {children}
+            </div>
+        </div>
+    );
+}
+
 // ── COMPONENT ──
 export default function AppSettingsPage() {
     const { pixels: initialPixels, fraudSettings: initialFraud, branding: initialBranding, shopDomain } = useLoaderData<any>();
@@ -380,6 +565,7 @@ export default function AppSettingsPage() {
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string>(mergedBranding.checkout_redirect.logo_url || '');
     const [dragOver, setDragOver] = useState(false);
+    const [brandingPreviewDevice, setBrandingPreviewDevice] = useState<'mobile' | 'desktop'>('mobile');
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -818,6 +1004,21 @@ export default function AppSettingsPage() {
                                                         </BlockStack>
                                                     </Card>
 
+
+                                                    {/* Page Background */}
+                                                    <Card>
+                                                        <BlockStack gap="400">
+                                                            <BlockStack gap="200">
+                                                                <Text variant="headingMd" as="h2">Page Background</Text>
+                                                                <Text variant="bodySm" tone="subdued" as="p">Customize the background color of the redirect screen.</Text>
+                                                            </BlockStack>
+                                                            <GradientColorSelector 
+                                                                value={cr.page_background || 'rgba(255, 255, 255, 1)'} 
+                                                                onChange={(c) => updateCheckoutRedirect({ page_background: c })} 
+                                                            />
+                                                        </BlockStack>
+                                                    </Card>
+
                                                     {/* Logo Background */}
                                                     <Card>
                                                         <InlineStack align="space-between" blockAlign="center">
@@ -858,16 +1059,55 @@ export default function AppSettingsPage() {
                                         </BlockStack>
                                     </div>
 
-                                    {/* RIGHT COLUMN — Live Preview */}
-                                    <div>
-                                        <div style={{ position: 'sticky', top: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                            <BlockStack gap="200">
-                                                <Text variant="headingSm" as="h3">Live Preview</Text>
-                                                <Text variant="bodySm" tone="subdued" as="p">Updates instantly as you change settings</Text>
-                                            </BlockStack>
+                                    {/* RIGHT COLUMN — Live Preview.
+                                        Manually scroll-tracked instead of CSS position:sticky — sticky
+                                        wasn't reliably engaging in the embedded admin iframe here (root
+                                        cause unconfirmed; likely a containing-block quirk specific to
+                                        this Grid + Polaris + App Bridge combination), so this reproduces
+                                        the same pinned-while-scrolling behavior in JS via
+                                        getBoundingClientRect(), which isn't subject to CSS sticky's
+                                        containing-block rules at all. */}
+                                    <StickyPreviewColumn>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <BlockStack gap="200">
+                                                    <Text variant="headingSm" as="h3">Live Preview</Text>
+                                                    <Text variant="bodySm" tone="subdued" as="p">Updates instantly as you change settings</Text>
+                                                </BlockStack>
+                                                <div style={{ display: 'flex', background: '#f3f4f6', padding: '4px', borderRadius: '8px', gap: '4px' }}>
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => { e.preventDefault(); setBrandingPreviewDevice('desktop'); }}
+                                                        style={{
+                                                            background: brandingPreviewDevice === 'desktop' ? '#ffffff' : 'transparent',
+                                                            border: 'none', borderRadius: '6px', padding: '6px 10px',
+                                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                            color: brandingPreviewDevice === 'desktop' ? '#111827' : '#6b7280',
+                                                            boxShadow: brandingPreviewDevice === 'desktop' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                                                            cursor: 'pointer', transition: 'all 0.2s ease'
+                                                        }}
+                                                    >
+                                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => { e.preventDefault(); setBrandingPreviewDevice('mobile'); }}
+                                                        style={{
+                                                            background: brandingPreviewDevice === 'mobile' ? '#ffffff' : 'transparent',
+                                                            border: 'none', borderRadius: '6px', padding: '6px 10px',
+                                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                            color: brandingPreviewDevice === 'mobile' ? '#111827' : '#6b7280',
+                                                            boxShadow: brandingPreviewDevice === 'mobile' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                                                            cursor: 'pointer', transition: 'all 0.2s ease'
+                                                        }}
+                                                    >
+                                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+                                                    </button>
+                                                </div>
+                                            </div>
 
-                                            <div className="preview-phone">
-                                                <div className="preview-phone-screen preview-compact" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px 16px', background: 'white', minHeight: '380px' }}>
+                                            <div style={brandingPreviewDevice === 'desktop' ? { display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#f3f4f6', padding: '32px 16px', borderRadius: '12px' } : {}}>
+                                            <div className={brandingPreviewDevice === 'mobile' ? "preview-phone" : "preview-desktop"} style={brandingPreviewDevice === 'desktop' ? { width: '100%', maxWidth: '520px', margin: '0 auto' } : {}}>
+                                                <div className="preview-phone-screen preview-compact" style={brandingPreviewDevice === 'desktop' ? { display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 16px', background: cr.page_background || 'white', minHeight: '420px', borderRadius: '16px', transition: 'background 0.3s ease' } : { display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px 16px', background: cr.page_background || 'white', minHeight: '380px', transition: 'background 0.3s ease' }}>
                                                     <div className="brd-preview-bg" style={{ width: '100%' }}>
                                                         {/* Center icon */}
                                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -928,6 +1168,7 @@ export default function AppSettingsPage() {
                                                     </div>
                                                 </div>
                                             </div>
+                                            </div>
 
                                             {/* Preview legend */}
                                             <div className="brd-preview-legend" style={{ display: 'flex', justifyContent: 'center', marginTop: '8px', gap: '12px' }}>
@@ -940,8 +1181,7 @@ export default function AppSettingsPage() {
                                                     <span style={{ fontSize: '12px', color: '#6b7280' }}>Custom logo</span>
                                                 </div>
                                             </div>
-                                        </div>
-                                    </div>
+                                        </StickyPreviewColumn>
                                 </div>
                             )}
                         </div>
@@ -954,6 +1194,7 @@ export default function AppSettingsPage() {
 
 // ── STYLES ──
 const styles = `
+    ${colorSelectorStyles}
     .preview-phone { background: #1f2937; border-radius: 32px; padding: 6px; max-width: 350px; margin: 0 auto; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
     .preview-phone-screen { background: white; border-radius: 24px; overflow-y: auto; height: 550px; }
     .preview-phone-screen.preview-compact { min-height: auto; max-height: none; padding: 20px 16px; }
@@ -1080,7 +1321,7 @@ const styles = `
     .brd-preview-col { position: relative; }
     .brd-preview-sticky { position: sticky; top: 24px; display: flex; flex-direction: column; gap: 12px; }
     .brd-preview-frame { border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.06); }
-    .brd-preview-bg { background: rgba(255,255,255,0.96); backdrop-filter: blur(8px); padding: 32px 24px; display: flex; flex-direction: column; align-items: center; gap: 18px; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    .brd-preview-bg { padding: 32px 24px; display: flex; flex-direction: column; align-items: center; gap: 18px; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
     .brd-preview-legend { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #6b7280; }
     .brd-legend-dot { width: 8px; height: 8px; border-radius: 50%; background: #d1d5db; display: inline-block; flex-shrink: 0; }
     .brd-legend-dot.active { background: #6366f1; }

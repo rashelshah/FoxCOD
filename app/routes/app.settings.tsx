@@ -5551,11 +5551,45 @@ export default function SettingsPage() {
                                                 />
                                             </div>
                                             <div className="input-group" style={{ marginTop: 0, minWidth: 0 }}>
-                                                <ColorSelector
-                                                    label="Background Color"
-                                                    value={formStyles?.backgroundColor || '#ffffff'}
-                                                    onChange={(c) => setFormStyles(s => ({ ...s, backgroundColor: c, background: undefined, backgroundImage: undefined }))}
-                                                />
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                                    <label className="input-label" style={{ margin: 0 }}>Background Style</label>
+                                                    <div className="style-options" style={{ margin: 0 }}>
+                                                        <button
+                                                            type="button"
+                                                            className={`style-option ${!formStyles?.backgroundImage && !formStyles?.background?.includes('gradient') ? 'active' : ''}`}
+                                                            onClick={() => setFormStyles(s => ({ ...s, background: undefined, backgroundImage: undefined }))}
+                                                            style={{ padding: '2px 8px', fontSize: '11px' }}
+                                                        >Solid</button>
+                                                        <button
+                                                            type="button"
+                                                            className={`style-option ${formStyles?.backgroundImage || formStyles?.background?.includes('gradient') ? 'active' : ''}`}
+                                                            onClick={() => setFormStyles(s => ({ ...s, background: 'linear-gradient(135deg, #f6d365 0%, #fda085 100%)', backgroundImage: 'linear-gradient(135deg, #f6d365 0%, #fda085 100%)' }))}
+                                                            style={{ padding: '2px 8px', fontSize: '11px' }}
+                                                        >Gradient</button>
+                                                    </div>
+                                                </div>
+
+                                                {(!formStyles?.backgroundImage && !formStyles?.background?.includes('gradient')) ? (
+                                                    <ColorSelector
+                                                        label=""
+                                                        value={formStyles?.backgroundColor || '#ffffff'}
+                                                        onChange={(c) => setFormStyles(s => ({ ...s, backgroundColor: c, background: undefined, backgroundImage: undefined }))}
+                                                    />
+                                                ) : (
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                        <input
+                                                            type="text"
+                                                            className="input-field"
+                                                            style={{ fontFamily: 'monospace', fontSize: '12px', padding: '10px' }}
+                                                            value={formStyles?.backgroundImage || formStyles?.background || ''}
+                                                            onChange={(e) => setFormStyles(s => ({ ...s, background: e.target.value, backgroundImage: e.target.value }))}
+                                                            placeholder="linear-gradient(...)"
+                                                        />
+                                                        <div style={{ fontSize: '11px', color: '#6b7280' }}>
+                                                            Try: <code style={{ cursor: 'pointer', color: '#6366f1' }} onClick={() => setFormStyles(s => ({ ...s, background: 'linear-gradient(135deg, #f6d365 0%, #fda085 100%)', backgroundImage: 'linear-gradient(135deg, #f6d365 0%, #fda085 100%)' }))}>linear-gradient(135deg, #f6d365, #fda085)</code>
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '12px', marginTop: '12px' }}>
