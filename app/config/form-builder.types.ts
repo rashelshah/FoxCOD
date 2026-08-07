@@ -17,6 +17,10 @@ export interface FormField {
     options?: string[]; // For dropdown type
     isCustom?: boolean; // True for seller-created custom fields
     iconType?: string; // Icon identifier for custom fields
+    /** Whether the field's label is displayed above it. Undefined means true. */
+    showLabel?: boolean;
+    /** Whether the placeholder text is displayed inside the field. Undefined means true. */
+    showPlaceholder?: boolean;
 }
 
 export interface CouponConfig {

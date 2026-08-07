@@ -83,10 +83,6 @@ const defaultSettings: Omit<FormSettings, "shop_domain"> = {
     show_email_field: false,
     show_notes_field: false,
     email_required: false,
-    name_placeholder: "Enter your full name",
-    phone_placeholder: "Enter your phone number",
-    address_placeholder: "Enter your delivery address",
-    notes_placeholder: "Any special instructions?",
     modal_style: "glassmorphism",
     animation_style: "fade",
     border_radius: 12,
@@ -611,10 +607,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         show_email_field: formData.get("show_email_field") === "true",
         show_notes_field: formData.get("show_notes_field") === "true",
         email_required: formData.get("email_required") === "true",
-        name_placeholder: formData.get("name_placeholder") as string || defaultSettings.name_placeholder,
-        phone_placeholder: formData.get("phone_placeholder") as string || defaultSettings.phone_placeholder,
-        address_placeholder: formData.get("address_placeholder") as string || defaultSettings.address_placeholder,
-        notes_placeholder: formData.get("notes_placeholder") as string || defaultSettings.notes_placeholder,
         modal_style: formData.get("modal_style") as any || defaultSettings.modal_style,
         animation_style: formData.get("animation_style") as any || defaultSettings.animation_style,
         border_radius: parseInt(formData.get("border_radius") as string) || defaultSettings.border_radius,
@@ -955,8 +947,7 @@ export const ButtonIconSvg = ({ iconType, color = 'currentColor', size = 18 }: {
 const PreviewDisplay = memo(({
     enabled,
     showProductImage, showPrice, buttonText, formTitle, formSubtitle,
-    namePlaceholder, phonePlaceholder, addressPlaceholder,
-    notesPlaceholder, submitButtonText,
+    submitButtonText,
     primaryColor, buttonStyle, buttonSize, borderRadius, modalStyle, animationStyle,
     fields, formStyles, buttonStylesState, blocks, shippingOpts, shippingRates, shippingRatesEnabled, activeTab,
     fmtCurrency, currencySymbol, formSubmitButtonState, partialCodEnabled, partialCodAdvanceAmount, partialPaymentSettings, formType,
@@ -1931,7 +1922,9 @@ const PreviewDisplay = memo(({
                                                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5A2.5 2.5 0 0 1 5.5 7H9l1.2-1.9a1 1 0 0 1 .84-.46H18.5A2.5 2.5 0 0 1 21 7v3a2 2 0 0 0 0 4v3a2.5 2.5 0 0 1-2.5 2.5H11a1 1 0 0 1-.84-.46L9 17H5.5A2.5 2.5 0 0 1 3 14.5v-5Z" /><path d="M14 7v10" /><path d="M14 10h.01" /><path d="M14 14h.01" /></svg>
                                                                 </div>
                                                                 <div>
-                                                                    <label style={{ ...getLabelStyle(), marginBottom: 2, fontSize: `${Math.max((formStyles?.labelFontSize || formStyles?.textSize || 14), 15)}px` } as any}>Coupon Code</label>
+                                                                    {field.showLabel !== false && (
+                                                                        <label style={{ ...getLabelStyle(), marginBottom: 2, fontSize: `${Math.max((formStyles?.labelFontSize || formStyles?.textSize || 14), 15)}px` } as any}>{field.label || 'Coupon Code'}</label>
+                                                                    )}
                                                                     <div style={{ fontSize: '12px', lineHeight: 1.4, color: '#6b7280' }}>Apply your exclusive offer before placing the order</div>
                                                                 </div>
                                                             </div>
@@ -1942,7 +1935,7 @@ const PreviewDisplay = memo(({
                                                                 <input
                                                                     disabled
                                                                     value=""
-                                                                    placeholder={field.placeholder || 'Enter Coupon Code'}
+                                                                    placeholder={field.showPlaceholder === false ? '' : (field.placeholder || 'Enter Coupon Code')}
                                                                     style={{
                                                                         ...getInputStyle(),
                                                                         paddingLeft: 40,
@@ -1997,17 +1990,17 @@ const PreviewDisplay = memo(({
                                                     marginRight: isSideBySide && field.id === 'city' ? '12px' : '0px',
                                                     boxSizing: 'border-box'
                                                 }}>
-                                                    <label style={getLabelStyle() as any}>
-                                                        {field.label} {field.required && <span style={{ color: '#ef4444' }}>*</span>}
-                                                    </label>
+                                                    {field.showLabel !== false && field.type !== 'checkbox' && (
+                                                        <label style={getLabelStyle() as any}>
+                                                            {field.label} {field.required && <span style={{ color: '#ef4444' }}>*</span>}
+                                                        </label>
+                                                    )}
                                                     {field.type === 'textarea' ? (
                                                         <div style={{ position: 'relative' }}>
                                                             <FieldIconSvg field={field} isTextarea />
                                                             <textarea
                                                                 disabled
-                                                                placeholder={field.id === 'address' ? (addressPlaceholder || 'Enter address') :
-                                                                    field.id === 'notes' ? (notesPlaceholder || 'Any notes...') :
-                                                                        `Enter ${field.label.toLowerCase()}`}
+                                                                placeholder={field.showPlaceholder === false ? '' : (field.placeholder || `Enter ${field.label.toLowerCase()}`)}
                                                                 style={{
                                                                     ...getInputStyle(),
                                                                     height: '50px',
@@ -2022,7 +2015,9 @@ const PreviewDisplay = memo(({
                                                     ) : field.type === 'checkbox' ? (
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                                                             <input type="checkbox" disabled style={{ width: '16px', height: '16px' }} />
-                                                            <span style={{ fontSize: '11px', color: '#6b7280' }}>{field.label}</span>
+                                                            {field.showLabel !== false && (
+                                                                <span style={{ fontSize: '11px', color: '#6b7280' }}>{field.label}</span>
+                                                            )}
                                                         </div>
                                                     ) : (
                                                         <div style={{ position: 'relative' }}>
@@ -2030,10 +2025,7 @@ const PreviewDisplay = memo(({
                                                             <input
                                                                 type={field.type === 'tel' ? 'tel' : field.type === 'email' ? 'email' : 'text'}
                                                                 disabled
-                                                                placeholder={field.id === 'name' ? (namePlaceholder || 'John Doe') :
-                                                                    field.id === 'phone' ? (phonePlaceholder || '+91 98765 43210') :
-                                                                        field.id === 'email' ? 'email@example.com' :
-                                                                            `Enter ${field.label.toLowerCase()}`}
+                                                                placeholder={field.showPlaceholder === false ? '' : (field.placeholder || `Enter ${field.label.toLowerCase()}`)}
                                                                 style={{
                                                                     ...getInputStyle(),
                                                                     paddingLeft: 40,
@@ -2093,14 +2085,19 @@ interface SortableFieldItemProps {
     onToggleRequired: (id: string) => void;
     isCustom?: boolean;
     onRemove?: (id: string) => void;
+    isEditing?: boolean;
+    onToggleEdit?: (id: string) => void;
+    onUpdateField?: (id: string, updates: Partial<FormField>) => void;
 }
 
 // Section fields that should not have a "required" toggle
 const SECTION_FIELD_IDS = ['shipping', 'order_summary', 'payment_mode'];
 
-const SortableFieldItem = ({ field, onToggleVisibility, onToggleRequired, isCustom, onRemove }: SortableFieldItemProps) => {
+const SortableFieldItem = ({ field, onToggleVisibility, onToggleRequired, isCustom, onRemove, isEditing, onToggleEdit, onUpdateField }: SortableFieldItemProps) => {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: field.id });
     const isSectionField = SECTION_FIELD_IDS.includes(field.id);
+    // Checkboxes render their own inline label — a separate placeholder hint doesn't apply.
+    const supportsPlaceholder = field.type !== 'checkbox';
 
     const style = {
         transform: CSS.Transform.toString(transform),
@@ -2109,36 +2106,78 @@ const SortableFieldItem = ({ field, onToggleVisibility, onToggleRequired, isCust
     };
 
     return (
-        <div ref={setNodeRef} style={style} className="sortable-field-item">
-            <div className="field-drag-handle" {...attributes} {...listeners}>
-                <span>⋮⋮</span>
-            </div>
-            <div className="field-info">
-                <span className="field-label">{field.label}</span>
-                <span className="field-type">{isSectionField ? 'section' : field.type}</span>
-            </div>
-            <div className="field-actions" style={{ minWidth: '72px', justifyContent: 'flex-end' }}>
-                <Button
-                    icon={field.visible ? ViewIcon : HideIcon}
-                    variant="tertiary"
-                    accessibilityLabel={field.visible ? 'Hide field' : 'Show field'}
-                    onClick={() => onToggleVisibility(field.id)}
-                />
-                {!isSectionField ? (
+        <div ref={setNodeRef} style={style} className="sortable-field-item-wrap">
+            <div className="sortable-field-item">
+                <div className="field-drag-handle" {...attributes} {...listeners}>
+                    <span>⋮⋮</span>
+                </div>
+                <div className="field-info">
+                    <span className="field-label">{field.label}</span>
+                    <span className="field-type">{isSectionField ? 'section' : field.type}</span>
+                </div>
+                <div className="field-actions" style={{ minWidth: '72px', justifyContent: 'flex-end' }}>
+                    {!isSectionField && onToggleEdit && (
+                        <Button
+                            icon={EditIcon}
+                            variant="tertiary"
+                            pressed={isEditing}
+                            accessibilityLabel={isEditing ? 'Close editor' : 'Edit label & placeholder'}
+                            onClick={() => onToggleEdit(field.id)}
+                        />
+                    )}
                     <Button
-                        icon={StarFilledIcon}
+                        icon={field.visible ? ViewIcon : HideIcon}
                         variant="tertiary"
-                        tone={field.required ? 'critical' : undefined}
-                        accessibilityLabel={field.required ? 'Make optional' : 'Make required'}
-                        onClick={() => onToggleRequired(field.id)}
+                        accessibilityLabel={field.visible ? 'Hide field' : 'Show field'}
+                        onClick={() => onToggleVisibility(field.id)}
                     />
-                ) : (
-                    <div style={{ width: '32px' }} />
-                )}
-                {isCustom && onRemove && (
-                    <Button icon={DeleteIcon} variant="plain" tone="critical" accessibilityLabel="Remove field" onClick={() => onRemove(field.id)} />
-                )}
+                    {!isSectionField ? (
+                        <Button
+                            icon={StarFilledIcon}
+                            variant="tertiary"
+                            tone={field.required ? 'critical' : undefined}
+                            accessibilityLabel={field.required ? 'Make optional' : 'Make required'}
+                            onClick={() => onToggleRequired(field.id)}
+                        />
+                    ) : (
+                        <div style={{ width: '32px' }} />
+                    )}
+                    {isCustom && onRemove && (
+                        <Button icon={DeleteIcon} variant="plain" tone="critical" accessibilityLabel="Remove field" onClick={() => onRemove(field.id)} />
+                    )}
+                </div>
             </div>
+            {/* Inline editor — appears directly below the row instead of a separate dialog, so
+                the merchant edits label/placeholder in place without losing context. */}
+            {isEditing && onUpdateField && (
+                <div className="field-edit-panel">
+                    <TextField
+                        label="Label"
+                        value={field.label}
+                        onChange={(v) => onUpdateField(field.id, { label: v })}
+                        autoComplete="off"
+                    />
+                    {supportsPlaceholder && (
+                        <TextField
+                            label="Placeholder"
+                            value={field.placeholder || ''}
+                            onChange={(v) => onUpdateField(field.id, { placeholder: v })}
+                            autoComplete="off"
+                            placeholder={`Enter ${field.label.toLowerCase()}`}
+                        />
+                    )}
+                    <div className="toggle-option" onClick={() => onUpdateField(field.id, { showLabel: field.showLabel === false })}>
+                        <span className="toggle-option-label">Show label</span>
+                        <div className={`mini-toggle ${field.showLabel !== false ? 'on' : 'off'}`} />
+                    </div>
+                    {supportsPlaceholder && (
+                        <div className="toggle-option" onClick={() => onUpdateField(field.id, { showPlaceholder: field.showPlaceholder === false })}>
+                            <span className="toggle-option-label">Show placeholder</span>
+                            <div className={`mini-toggle ${field.showPlaceholder !== false ? 'on' : 'off'}`} />
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 };
@@ -2668,10 +2707,6 @@ export default function SettingsPage() {
     const [showEmailField, setShowEmailField] = useState(settings.show_email_field ?? false);
     const [showNotesField, setShowNotesField] = useState(settings.show_notes_field ?? false);
     const [emailRequired, setEmailRequired] = useState(settings.email_required ?? false);
-    const [namePlaceholder, setNamePlaceholder] = useState(settings.name_placeholder || '');
-    const [phonePlaceholder, setPhonePlaceholder] = useState(settings.phone_placeholder || '');
-    const [addressPlaceholder, setAddressPlaceholder] = useState(settings.address_placeholder || '');
-    const [notesPlaceholder, setNotesPlaceholder] = useState(settings.notes_placeholder || '');
     const [modalStyle, setModalStyle] = useState(settings.modal_style === 'modern' ? 'glassmorphism' : (settings.modal_style || 'glassmorphism'));
     const [animationStyle, setAnimationStyle] = useState(settings.animation_style || 'fade');
     const [borderRadius, setBorderRadius] = useState(settings.border_radius || 12);
@@ -2680,7 +2715,7 @@ export default function SettingsPage() {
     const [formType, setFormType] = useState<'popup' | 'embedded' | 'full_screen'>(settings.form_type || 'popup');
     // Merge saved fields with DEFAULT_FIELDS so newly added fields (e.g. shipping, order_summary) are always present
     // Also absorb any legacy custom_fields into the main fields array
-    const mergeFieldsWithDefaults = (savedFields: FormField[] | undefined, legacyCustomFields?: FormField[]): FormField[] => {
+    const mergeFieldsWithDefaults = useCallback((savedFields: FormField[] | undefined, legacyCustomFields?: FormField[]): FormField[] => {
         const base = (!savedFields || savedFields.length === 0) ? [...DEFAULT_FIELDS] : [...savedFields];
         // Add missing default fields
         const existingIds = new Set(base.map(f => f.id));
@@ -2700,9 +2735,24 @@ export default function SettingsPage() {
                 }
             });
         }
+        // One-time backfill: name/phone/address/notes placeholder text used to
+        // live in separate top-level columns (name_placeholder, etc.) that
+        // were saved but never actually read by the storefront — the
+        // storefront has always sourced every field's placeholder from
+        // field.placeholder itself. Pull any existing legacy value in so
+        // merchants who'd typed one don't lose it now that it's wired up.
+        const legacyPlaceholders: Record<string, string | undefined> = {
+            name: settings.name_placeholder,
+            phone: settings.phone_placeholder,
+            address: settings.address_placeholder,
+            notes: settings.notes_placeholder,
+        };
+        const withLegacyPlaceholders = result.map(f =>
+            (!f.placeholder && legacyPlaceholders[f.id]) ? { ...f, placeholder: legacyPlaceholders[f.id] } : f
+        );
         // Remove 'country' field as it shouldn't be visible to users
-        return result.filter(f => f.id !== 'country');
-    };
+        return withLegacyPlaceholders.filter(f => f.id !== 'country');
+    }, [settings]);
     const [fields, setFields] = useState<FormField[]>(mergeFieldsWithDefaults(settings.fields, settings.custom_fields));
     const [blocks, setBlocks] = useState<ContentBlocks>(settings.blocks || DEFAULT_BLOCKS);
     const [formStyles, setFormStyles] = useState<FormStyles>(settings.styles || DEFAULT_STYLES);
@@ -2872,8 +2922,7 @@ export default function SettingsPage() {
             form_title: formTitle, form_subtitle: formSubtitle, success_message: successMessage, submit_button_text: submitButtonText,
             show_product_image: showProductImage, show_price: showPrice, show_quantity_selector: showQuantitySelector,
             show_email_field: showEmailField, show_notes_field: showNotesField, email_required: emailRequired,
-            name_placeholder: namePlaceholder, phone_placeholder: phonePlaceholder, address_placeholder: addressPlaceholder,
-            notes_placeholder: notesPlaceholder, modal_style: modalStyle, animation_style: animationStyle, border_radius: borderRadius,
+            modal_style: modalStyle, animation_style: animationStyle, border_radius: borderRadius,
             form_type: formType, fields, blocks, custom_fields: [], styles: formStyles, button_styles: { ...buttonStylesState, backgroundColor: primaryColor, buttonStyle, buttonSize },
             shipping_options: shippingOpts, partial_cod_enabled: partialCodEnabled, partial_cod_advance_amount: partialCodAdvanceAmount,
             partial_cod_commission: partialCodCommission, shipping_rates_enabled: shippingRatesEnabled,
@@ -2900,8 +2949,8 @@ export default function SettingsPage() {
     }, [
         enabled, buttonText, primaryColor, requiredFields, maxQuantity, buttonStyle, buttonSize, buttonPosition,
         formTitle, formSubtitle, successMessage, submitButtonText, showProductImage, showPrice, showQuantitySelector,
-        showEmailField, showNotesField, emailRequired, namePlaceholder, phonePlaceholder, addressPlaceholder,
-        notesPlaceholder, modalStyle, animationStyle, borderRadius, formType, fields, blocks,
+        showEmailField, showNotesField, emailRequired,
+        modalStyle, animationStyle, borderRadius, formType, fields, blocks,
         formStyles, buttonStylesState, shippingOpts, partialCodEnabled, partialCodAdvanceAmount, partialCodCommission,
         shippingRatesEnabled, couponFieldEnabled, couponFieldPosition, savedSettingsString, pendingShippingOps, formSubmitButtonState,
         paymentModeCardStyles
@@ -2928,10 +2977,6 @@ export default function SettingsPage() {
         setShowEmailField(orig.show_email_field ?? false);
         setShowNotesField(orig.show_notes_field ?? false);
         setEmailRequired(orig.email_required ?? false);
-        setNamePlaceholder(orig.name_placeholder || '');
-        setPhonePlaceholder(orig.phone_placeholder || '');
-        setAddressPlaceholder(orig.address_placeholder || '');
-        setNotesPlaceholder(orig.notes_placeholder || '');
         setModalStyle(orig.modal_style === 'modern' ? 'glassmorphism' : (orig.modal_style || 'glassmorphism'));
         setAnimationStyle(orig.animation_style || 'fade');
         setBorderRadius(orig.border_radius || 12);
@@ -2952,7 +2997,7 @@ export default function SettingsPage() {
         setShippingRates(initialShippingRates || []);
         // Explicitly hide save bar immediately
         try { shopify.saveBar.hide('form-builder-save-bar')?.catch(() => {}); } catch (e) { }
-    }, [savedSettingsString, initialShippingRates, shopify]);
+    }, [savedSettingsString, initialShippingRates, shopify, mergeFieldsWithDefaults]);
 
     // Handle successful save - only process each actionData once
     useEffect(() => {
@@ -3050,8 +3095,7 @@ export default function SettingsPage() {
                     form_title: formTitle, form_subtitle: formSubtitle, success_message: successMessage, submit_button_text: submitButtonText,
                     show_product_image: showProductImage, show_price: showPrice, show_quantity_selector: showQuantitySelector,
                     show_email_field: showEmailField, show_notes_field: showNotesField, email_required: emailRequired,
-                    name_placeholder: namePlaceholder, phone_placeholder: phonePlaceholder, address_placeholder: addressPlaceholder,
-                    notes_placeholder: notesPlaceholder, modal_style: modalStyle, animation_style: animationStyle, border_radius: borderRadius,
+                    modal_style: modalStyle, animation_style: animationStyle, border_radius: borderRadius,
                     form_type: formType, fields, blocks, custom_fields: [], styles: formStyles, button_styles: { ...buttonStylesState, backgroundColor: primaryColor, buttonStyle, buttonSize },
                     shipping_options: shippingOpts, partial_cod_enabled: partialCodEnabled, partial_cod_advance_amount: partialCodAdvanceAmount,
                     partial_cod_commission: partialCodCommission, shipping_rates_enabled: shippingRatesEnabled,
@@ -3072,8 +3116,8 @@ export default function SettingsPage() {
         }
     }, [actionData, enabled, buttonText, primaryColor, requiredFields, maxQuantity, buttonStyle, buttonSize, buttonPosition,
         formTitle, formSubtitle, successMessage, submitButtonText, showProductImage, showPrice, showQuantitySelector,
-        showEmailField, showNotesField, emailRequired, namePlaceholder, phonePlaceholder, addressPlaceholder,
-        notesPlaceholder, modalStyle, animationStyle, borderRadius, formType, fields, blocks,
+        showEmailField, showNotesField, emailRequired,
+        modalStyle, animationStyle, borderRadius, formType, fields, blocks,
         formStyles, buttonStylesState, shippingOpts, partialCodEnabled, partialCodAdvanceAmount, partialCodCommission, shippingRatesEnabled, couponFieldEnabled, couponFieldPosition, formSubmitButtonState, paymentModeCardStyles, shopify]);
 
     // Hex validation helpers
@@ -3132,6 +3176,18 @@ export default function SettingsPage() {
     const toggleFieldRequired = useCallback((fieldId: string) => {
         setFields((prev) => prev.map((f) =>
             f.id === fieldId ? { ...f, required: !f.required } : f
+        ));
+    }, []);
+
+    // Inline field label/placeholder editor (pencil icon in Field Management) —
+    // only one field's editor is open at a time, expanding directly below its row.
+    const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
+    const toggleFieldEditor = useCallback((fieldId: string) => {
+        setEditingFieldId((prev) => (prev === fieldId ? null : fieldId));
+    }, []);
+    const updateField = useCallback((fieldId: string, updates: Partial<FormField>) => {
+        setFields((prev) => prev.map((f) =>
+            f.id === fieldId ? { ...f, ...updates } : f
         ));
     }, []);
 
@@ -3204,10 +3260,6 @@ export default function SettingsPage() {
         formData.append("show_email_field", showEmailField.toString());
         formData.append("show_notes_field", showNotesField.toString());
         formData.append("email_required", emailRequired.toString());
-        formData.append("name_placeholder", namePlaceholder);
-        formData.append("phone_placeholder", phonePlaceholder);
-        formData.append("address_placeholder", addressPlaceholder);
-        formData.append("notes_placeholder", notesPlaceholder);
         formData.append("modal_style", modalStyle);
         formData.append("animation_style", animationStyle);
         formData.append("border_radius", borderRadius.toString());
@@ -3258,7 +3310,6 @@ export default function SettingsPage() {
         buttonStyle, buttonSize, buttonPosition, formTitle, formSubtitle,
         successMessage, submitButtonText, showProductImage, showPrice,
         showQuantitySelector, showEmailField, showNotesField, emailRequired,
-        namePlaceholder, phonePlaceholder, addressPlaceholder, notesPlaceholder,
         modalStyle, animationStyle, borderRadius, formType, fields, blocks,
         formStyles, buttonStylesState, shippingOpts,
         partialCodEnabled, partialCodAdvanceAmount, partialCodCommission,
@@ -3768,6 +3819,7 @@ export default function SettingsPage() {
 
                 /* Sortable Fields Styles */
                 .sortable-fields-container { margin-top: 16px; }
+                .sortable-field-item-wrap { margin-bottom: 6px; }
                 .sortable-field-item {
                     display: flex;
                     align-items: center;
@@ -3776,10 +3828,19 @@ export default function SettingsPage() {
                     background: white;
                     border: 1px solid #e5e7eb;
                     border-radius: 10px;
-                    margin-bottom: 6px;
                     transition: all 0.2s ease;
                 }
                 .sortable-field-item:hover { border-color: #202223; box-shadow: 0 2px 8px rgba(21, 21, 28, 0.1); }
+                .field-edit-panel {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 14px;
+                    padding: 16px 14px;
+                    margin-top: 6px;
+                    background: white;
+                    border: 1px solid #e5e7eb;
+                    border-radius: 10px;
+                }
                 .field-drag-handle {
                     cursor: grab;
                     color: #9ca3af;
@@ -5194,7 +5255,7 @@ export default function SettingsPage() {
                                             </Banner>
                                         </div>
                                         <p style={{ color: '#6b7280', fontSize: '13px', marginBottom: '16px' }}>
-                                            Drag to reorder • 👁️ visibility • ★ required
+                                            Drag to reorder • ✏️ edit label/placeholder • 👁️ visibility • ★ required
                                         </p>
                                         <div className="sortable-fields-container">
                                             <DndContext
@@ -5214,6 +5275,9 @@ export default function SettingsPage() {
                                                             onToggleRequired={toggleFieldRequired}
                                                             isCustom={field.isCustom}
                                                             onRemove={field.isCustom ? removeCustomField : undefined}
+                                                            isEditing={editingFieldId === field.id}
+                                                            onToggleEdit={toggleFieldEditor}
+                                                            onUpdateField={updateField}
                                                         />
                                                     ))}
                                                 </SortableContext>
@@ -6476,10 +6540,6 @@ export default function SettingsPage() {
                                 buttonText={buttonText}
                                 formTitle={formTitle}
                                 formSubtitle={formSubtitle}
-                                namePlaceholder={namePlaceholder}
-                                phonePlaceholder={phonePlaceholder}
-                                addressPlaceholder={addressPlaceholder}
-                                notesPlaceholder={notesPlaceholder}
                                 submitButtonText={submitButtonText}
                                 primaryColor={primaryColor}
                                 buttonStyle={buttonStyle}

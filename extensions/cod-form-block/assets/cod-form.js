@@ -3688,17 +3688,19 @@
 
             var couponTitleWrap = document.createElement('div');
 
-            var couponLabel = document.createElement('label');
-            couponLabel.style.display = 'block';
-            couponLabel.style.fontWeight = fontStyle === 'bold' ? '700' : '500';
-            couponLabel.style.fontStyle = fontStyle === 'italic' ? 'italic' : 'normal';
-            couponLabel.style.setProperty('margin-bottom', '2px', 'important');
-            couponLabel.style.fontSize = Math.max((styles.labelFontSize || textSize), 15) + 'px';
-            couponLabel.style.color = styles.labelColor || textColor;
-            couponLabel.style.textAlign = labelAlignment;
-            couponLabel.style.fontFamily = 'inherit';
-            couponLabel.textContent = field.label || 'Coupon Code';
-            couponTitleWrap.appendChild(couponLabel);
+            if (field.showLabel !== false) {
+                var couponLabel = document.createElement('label');
+                couponLabel.style.display = 'block';
+                couponLabel.style.fontWeight = fontStyle === 'bold' ? '700' : '500';
+                couponLabel.style.fontStyle = fontStyle === 'italic' ? 'italic' : 'normal';
+                couponLabel.style.setProperty('margin-bottom', '2px', 'important');
+                couponLabel.style.fontSize = Math.max((styles.labelFontSize || textSize), 15) + 'px';
+                couponLabel.style.color = styles.labelColor || textColor;
+                couponLabel.style.textAlign = labelAlignment;
+                couponLabel.style.fontFamily = 'inherit';
+                couponLabel.textContent = field.label || 'Coupon Code';
+                couponTitleWrap.appendChild(couponLabel);
+            }
 
             var couponHint = document.createElement('div');
             couponHint.textContent = 'Apply your exclusive offer before placing the order';
@@ -3739,7 +3741,7 @@
             couponInput.type = 'text';
             couponInput.name = 'coupon';
             couponInput.id = 'cod-coupon';
-            couponInput.placeholder = field.placeholder || 'Enter Coupon Code';
+            couponInput.placeholder = field.showPlaceholder === false ? '' : (field.placeholder || 'Enter Coupon Code');
             couponInput.setAttribute('autocomplete', 'off');
             couponInput.style.width = '100%';
             couponInput.style.padding = '10px 12px 10px 40px';
@@ -3862,17 +3864,19 @@
             wrapper.style.width = '100%';
         }
 
-        var label = document.createElement('label');
-        label.style.display = 'block';
-        label.style.fontWeight = fontStyle === 'bold' ? '700' : '500';
-        label.style.fontStyle = fontStyle === 'italic' ? 'italic' : 'normal';
-        label.style.setProperty('margin-bottom', '2px', 'important');
-        label.style.fontSize = (styles.labelFontSize || textSize) + 'px';
-        label.style.color = styles.labelColor || textColor;
-        label.style.textAlign = labelAlignment;
-        label.style.fontFamily = 'inherit';
-        label.innerHTML = field.label + (field.required ? ' <span style="color:#e53935">*</span>' : '');
-        wrapper.appendChild(label);
+        if (field.showLabel !== false) {
+            var label = document.createElement('label');
+            label.style.display = 'block';
+            label.style.fontWeight = fontStyle === 'bold' ? '700' : '500';
+            label.style.fontStyle = fontStyle === 'italic' ? 'italic' : 'normal';
+            label.style.setProperty('margin-bottom', '2px', 'important');
+            label.style.fontSize = (styles.labelFontSize || textSize) + 'px';
+            label.style.color = styles.labelColor || textColor;
+            label.style.textAlign = labelAlignment;
+            label.style.fontFamily = 'inherit';
+            label.innerHTML = field.label + (field.required ? ' <span style="color:#e53935">*</span>' : '');
+            wrapper.appendChild(label);
+        }
 
         // Input container with icon
         var inputContainer = document.createElement('div');
@@ -3949,7 +3953,7 @@
             // Add placeholder option
             var placeholderOpt = document.createElement('option');
             placeholderOpt.value = '';
-            placeholderOpt.textContent = field.placeholder || ('Select ' + field.label);
+            placeholderOpt.textContent = field.showPlaceholder === false ? '' : (field.placeholder || ('Select ' + field.label));
             placeholderOpt.disabled = true;
             placeholderOpt.selected = true;
             input.appendChild(placeholderOpt);
@@ -3982,16 +3986,17 @@
                 cb.setAttribute('data-required', 'true');
             }
 
-            var cbLabel = document.createElement('span');
-            cbLabel.style.fontSize = (styles.labelFontSize || textSize) + 'px';
-            cbLabel.style.color = styles.labelColor || textColor;
-            cbLabel.textContent = field.label;
-            if (field.required) {
-                cbLabel.innerHTML = field.label + ' <span style="color:#e53935">*</span>';
-            }
-
             checkboxWrapper.appendChild(cb);
-            checkboxWrapper.appendChild(cbLabel);
+            if (field.showLabel !== false) {
+                var cbLabel = document.createElement('span');
+                cbLabel.style.fontSize = (styles.labelFontSize || textSize) + 'px';
+                cbLabel.style.color = styles.labelColor || textColor;
+                cbLabel.textContent = field.label;
+                if (field.required) {
+                    cbLabel.innerHTML = field.label + ' <span style="color:#e53935">*</span>';
+                }
+                checkboxWrapper.appendChild(cbLabel);
+            }
             wrapper.innerHTML = ''; // remove the label we already added
             wrapper.appendChild(checkboxWrapper);
             container.appendChild(wrapper);
@@ -4006,7 +4011,7 @@
         input.name = field.id; // e.g. 'name', 'phone', 'address'
         input.id = 'cod-' + field.id;
         input.setAttribute('data-field-label', field.label || '');
-        input.placeholder = field.placeholder || 'Enter ' + field.label.toLowerCase();
+        input.placeholder = field.showPlaceholder === false ? '' : (field.placeholder || 'Enter ' + field.label.toLowerCase());
         if (field.required) {
           input.required = true;
           input.setAttribute('data-required', 'true');
