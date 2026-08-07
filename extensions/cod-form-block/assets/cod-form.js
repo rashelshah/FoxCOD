@@ -5460,15 +5460,22 @@ function darkenColor(hex, percent) {
       }
 
       if (showPartial) {
-          var finalPartialTotal = orderTotal - partialDiscountAmount;
           var depositAmount = partialAdvance;
           var codFeeAmount = 0;
           if (ppSettings && ppSettings.payment_options && ppSettings.payment_options.length > 0) {
               var opt = ppSettings.payment_options[0];
+              // Deposit % is always a share of the order total, not the total
+              // minus the partial-payment incentive discount — that discount
+              // reduces what's due on delivery instead (see finalPartialTotal
+              // usage further below), matching how the on-select update path
+              // (further down in this file) already computes it. Using the
+              // discounted total here was the bug: with a fixed discount +
+              // percentage deposit, the card showed the wrong amount until
+              // the shopper selected the option and the other path recomputed it.
               if (opt.type === 'percentage' || opt.type === 'remaining_percentage') {
-                  depositAmount = (finalPartialTotal * opt.value) / 100;
+                  depositAmount = (orderTotal * opt.value) / 100;
               } else {
-                  depositAmount = Math.min(opt.value, finalPartialTotal);
+                  depositAmount = Math.min(opt.value, orderTotal);
               }
               
               if (ppSettings.cod_fee_enabled && ppSettings.cod_fee_amount) {
@@ -6260,13 +6267,16 @@ function darkenColor(hex, percent) {
       }
 
       var depositAmount = config.partialCodAdvance || 0;
+      // finalPartialTotal (discounted) is only for dueOnDelivery below — the
+      // deposit % itself is a share of the order total, same fix as the
+      // payment-mode card render above.
       var finalPartialTotal = state.total - partialDiscountAmount;
       if (isPartialSelected && ppSettings && ppSettings.payment_options && ppSettings.payment_options.length > 0) {
           var opt = ppSettings.payment_options[0];
           if (opt.type === 'percentage' || opt.type === 'remaining_percentage') {
-              depositAmount = (finalPartialTotal * opt.value) / 100;
+              depositAmount = (state.total * opt.value) / 100;
           } else {
-              depositAmount = Math.min(opt.value, finalPartialTotal);
+              depositAmount = Math.min(opt.value, state.total);
           }
       }
 
@@ -8250,12 +8260,18 @@ function darkenColor(hex, percent) {
 
       var discountedTotal = finalTotal - partialDiscountAmount;
 
+      // Deposit % is a share of the order total, not the total minus the
+      // partial-payment incentive discount — that discount instead reduces
+      // remainingAmount below (paid on delivery). Using discountedTotal here
+      // was the bug: with a fixed discount + percentage deposit, the amount
+      // actually charged at checkout didn't match what the payment-mode card
+      // displayed to the shopper (which already used finalTotal).
       function calcDeposit(opt) {
           var d = 0;
           if (opt.type === 'percentage' || opt.type === 'remaining_percentage') {
-              d = (discountedTotal * opt.value) / 100;
+              d = (finalTotal * opt.value) / 100;
           } else {
-              d = Math.min(opt.value, discountedTotal);
+              d = Math.min(opt.value, finalTotal);
           }
           return Math.round(d * 100) / 100;
       }
