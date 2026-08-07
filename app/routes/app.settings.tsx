@@ -2419,7 +2419,7 @@ export default function SettingsPage() {
 
     const isSubmitting = navigation.state === "submitting";
     const isExtractingTheme = navigation.state === "submitting" && navigation.formData?.get("action_type") === "extract_theme";
-    const [activeTab, setActiveTab] = useState<'button' | 'form' | 'style' | 'shipping'>('button');
+    const [activeTab, setActiveTab] = useState<'button' | 'form' | 'field-styling' | 'style' | 'shipping'>('button');
     const [themeApplied, setThemeApplied] = useState(false);
     const [themeDebugInfo, setThemeDebugInfo] = useState<any>(null);
 
@@ -4310,6 +4310,12 @@ export default function SettingsPage() {
                             Form Fields
                         </button>
                         <button
+                            className={`tab ${activeTab === 'field-styling' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('field-styling')}
+                        >
+                            Field Styling
+                        </button>
+                        <button
                             className={`tab ${activeTab === 'style' ? 'active' : ''}`}
                             onClick={() => setActiveTab('style')}
                         >
@@ -4863,9 +4869,14 @@ export default function SettingsPage() {
                                             </div>
                                         </div>
                                     </AccordionSection>
+                                </>
+                            )}
 
+                            {/* Field Styling Tab */}
+                            {activeTab === 'field-styling' && (
+                                <>
                                     {/* Field Styling */}
-                                    <AccordionSection id="field-styling" tab="form" title="Field Styling" helperText="Changes the styling of the form fields" expandedSection={expandedSection} toggleSection={toggleSection}>
+                                    <AccordionSection id="field-styling" tab="field-styling" title="Field Styling" helperText="Changes the styling of the form fields" expandedSection={expandedSection} toggleSection={toggleSection}>
                                         
                                         {/* Auto Theme Matching removed as per user request — button moved to Style Preset header */}
 
@@ -5298,7 +5309,12 @@ export default function SettingsPage() {
                                             </Button>
                                         </div>
                                     </AccordionSection>
+                                </>
+                            )}
 
+                            {/* Form Tab (Continued) */}
+                            {activeTab === 'form' && (
+                                <>
                                     <AccordionSection id="coupon-settings" tab="form" title="Coupon Codes" helperText="Enable the coupon field and use Shopify Discounts as the source of truth" expandedSection={expandedSection} toggleSection={toggleSection}>
                                         <div className="settings-card" style={{ display: 'grid', gap: '14px' }}>
                                             <div className="toggle-option" onClick={() => setCouponFieldEnabled(!couponFieldEnabled)}>
