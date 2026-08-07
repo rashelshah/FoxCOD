@@ -228,6 +228,12 @@ const S = `
 .tab.active { background: #f3f4f6; color: #111827; box-shadow: none; font-weight: 600; }
 
 /* ── Toggle ── */
+.mini-toggle { width: 44px; height: 24px; border-radius: 12px; position: relative; transition: background 0.2s cubic-bezier(0.25, 0.1, 0.25, 1); cursor: pointer; flex-shrink: 0; }
+.mini-toggle::after { content: ''; position: absolute; width: 20px; height: 20px; background: white; border-radius: 50%; top: 2px; transition: left 0.2s cubic-bezier(0.25, 0.1, 0.25, 1); box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06); }
+.mini-toggle.on { background: var(--p-color-bg-fill-inverse, #1a1a1a); }
+.mini-toggle.on::after { left: 22px; }
+.mini-toggle.off { background: var(--p-color-bg-surface-secondary-active, #dfe3e8); }
+.mini-toggle.off::after { left: 2px; }
 .pp-toggle-track { width: 44px; height: 24px; border-radius: 12px; background: #dfe3e8; cursor: pointer; position: relative; transition: .2s cubic-bezier(.25,.1,.25,1); flex-shrink: 0; }
 .pp-toggle-track.on { background: #1a1a1a; }
 .pp-toggle-thumb { width: 20px; height: 20px; border-radius: 50%; background: #fff; position: absolute; top: 2px; left: 2px; transition: .2s cubic-bezier(.25,.1,.25,1); box-shadow: 0 1px 3px rgba(0,0,0,.15); }
@@ -1632,9 +1638,24 @@ export default function PartialPaymentsPage() {
               <p>Configure partial payments and prepaid options for your customers.</p>
             </div>
           </div>
-          <Badge tone={(selectedTab === 0 ? settings.enabled : selectedTab === 1 ? settings.full_prepaid_enabled : settings.pure_cod_enabled) ? 'success' : 'critical'}>
-            {(selectedTab === 0 ? settings.enabled : selectedTab === 1 ? settings.full_prepaid_enabled : settings.pure_cod_enabled) ? 'Active' : 'Inactive'}
-          </Badge>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#f9fafb', padding: '6px 12px', borderRadius: '10px', border: '1px solid #e5e7eb' }}>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: '#374151' }}>
+                {selectedTab === 0 ? 'Partial Payment Status' : selectedTab === 1 ? 'Full Prepaid Status' : 'COD Status'}
+              </span>
+              <div
+                  className={`mini-toggle ${(selectedTab === 0 ? settings.enabled : selectedTab === 1 ? settings.full_prepaid_enabled : settings.pure_cod_enabled) ? 'on' : 'off'}`}
+                  onClick={() => {
+                     if (selectedTab === 0) upd('enabled', !settings.enabled);
+                     else if (selectedTab === 1) upd('full_prepaid_enabled', !settings.full_prepaid_enabled);
+                     else upd('pure_cod_enabled', !settings.pure_cod_enabled);
+                  }}
+              />
+            </div>
+            <Badge tone={(selectedTab === 0 ? settings.enabled : selectedTab === 1 ? settings.full_prepaid_enabled : settings.pure_cod_enabled) ? 'success' : 'critical'}>
+              {(selectedTab === 0 ? settings.enabled : selectedTab === 1 ? settings.full_prepaid_enabled : settings.pure_cod_enabled) ? 'Active' : 'Inactive'}
+            </Badge>
+          </div>
         </div>
 
         <div className="tabs">
@@ -1663,57 +1684,6 @@ export default function PartialPaymentsPage() {
               {/* ════════════════════════════════════════════════
                     PARTIAL PAYMENTS CARDS
                 ════════════════════════════════════════════════ */}
-              {/* ════════════════════════════════════════════════
-                    CARD 1 — GENERAL SETTINGS
-                ════════════════════════════════════════════════ */}
-              <Card>
-                <BlockStack gap="400">
-                  <InlineStack align="space-between" blockAlign="center">
-                    <BlockStack gap="100">
-                      <Text as="h2" variant="headingMd">General Settings</Text>
-                      <Text as="p" variant="bodySm" tone="subdued">
-                        Control whether partial payments appear on your storefront.
-                      </Text>
-                    </BlockStack>
-                  </InlineStack>
-
-                  <ToggleRow
-                    label="Partial Payment Status"
-                    sub={settings.enabled ? 'Customers can choose to pay a deposit now.' : 'Partial payment option is hidden from storefront.'}
-                    checked={settings.enabled}
-                    onChange={(v) => upd('enabled', v)}
-                  />
-
-                  {/*
-              <Divider />
-
-              <Text as="h3" variant="headingSm">Module Compatibility</Text>
-              <Text as="p" variant="bodySm" tone="subdued">
-                Control whether other Foxly COD features apply when a customer uses partial payment.
-              </Text>
-
-              <ToggleRow
-                label="Apply Coupons to Partial Orders"
-                sub="Coupon discounts reduce the deposit and remaining amounts proportionally."
-                checked={settings.module_flags?.apply_coupons_to_partial ?? true}
-                onChange={(v) => updFlag('apply_coupons_to_partial', v)}
-              />
-              <ToggleRow
-                label="Apply Bundle Discounts to Partial Orders"
-                sub="Bundle offer pricing is applied before deposit calculation."
-                checked={settings.module_flags?.apply_bundle_discounts_to_partial ?? true}
-                onChange={(v) => updFlag('apply_bundle_discounts_to_partial', v)}
-              />
-              <ToggleRow
-                label="Apply Upsells to Partial Orders"
-                sub="Upsell items are included in the partial payment checkout."
-                checked={settings.module_flags?.apply_upsells_to_partial ?? true}
-                onChange={(v) => updFlag('apply_upsells_to_partial', v)}
-              />
-              */}
-                </BlockStack>
-              </Card>
-
               {/* ════════════════════════════════════════════════
               CARD 2 — PAYMENT OPTIONS
           ════════════════════════════════════════════════ */}
@@ -2121,26 +2091,6 @@ export default function PartialPaymentsPage() {
           ════════════════════════════════════════════════ */}
               <Card>
                 <BlockStack gap="400">
-                  <InlineStack align="space-between" blockAlign="center">
-                    <BlockStack gap="100">
-                      <Text as="h2" variant="headingMd">Full Prepaid Settings</Text>
-                      <Text as="p" variant="bodySm" tone="subdued">
-                        Offer customers an option to pay the full amount upfront.
-                      </Text>
-                    </BlockStack>
-                  </InlineStack>
-
-                  <ToggleRow
-                    label="Full Prepaid Status"
-                    sub={settings.full_prepaid_enabled ? 'Customers can choose to pay the full amount upfront.' : 'Full prepaid option is hidden.'}
-                    checked={settings.full_prepaid_enabled}
-                    onChange={(v) => upd('full_prepaid_enabled', v)}
-                  />
-                </BlockStack>
-              </Card>
-
-              <Card>
-                <BlockStack gap="400">
                   <BlockStack gap="100">
                     <Text as="h2" variant="headingMd">Prepaid Discount</Text>
                     <Text as="p" variant="bodySm" tone="subdued">
@@ -2305,26 +2255,6 @@ export default function PartialPaymentsPage() {
 
           ) : selectedTab === 2 ? (
             <BlockStack gap="500">
-              <Card>
-                <BlockStack gap="400">
-                  <InlineStack align="space-between" blockAlign="center">
-                    <BlockStack gap="100">
-                      <Text as="h2" variant="headingMd">Cash on Delivery Settings</Text>
-                      <Text as="p" variant="bodySm" tone="subdued">
-                        Enable standard Cash on Delivery orders.
-                      </Text>
-                    </BlockStack>
-                  </InlineStack>
-
-                  <ToggleRow
-                    label="COD Status"
-                    sub={settings.pure_cod_enabled ? 'Customers can choose Cash on Delivery.' : 'COD option is hidden.'}
-                    checked={settings.pure_cod_enabled}
-                    onChange={(v) => upd('pure_cod_enabled', v)}
-                  />
-                </BlockStack>
-              </Card>
-
               {/* COD Fee UI matched to Partial Payment style */}
               <div className="pp-cod-fee-box">
                 <div className={`pp-cod-fee-card ${settings.pure_cod_fee_enabled ? 'expanded' : ''}`}>
