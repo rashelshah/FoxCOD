@@ -347,7 +347,15 @@
     }
     window.FoxCod.formSubmitButton = (fsbRaw && typeof fsbRaw === 'object') ? fsbRaw : {};
     console.log('[FoxCod] formSubmitButton injected:', window.FoxCod.formSubmitButton);
-    
+
+    // Payment Mode card color overrides
+    var pmcsRaw = {{ shop.metafields.fox_cod.payment_mode_card_styles_json.value | json | default: 'null' }};
+    if (typeof pmcsRaw === 'string') {
+      try { pmcsRaw = JSON.parse(pmcsRaw); } catch (e) {}
+    }
+    window.FoxCod.paymentModeCardStyles = (pmcsRaw && typeof pmcsRaw === 'object') ? pmcsRaw : null;
+    console.log('[FoxCod] paymentModeCardStyles injected:', window.FoxCod.paymentModeCardStyles);
+
     // Product button styles (used as base for submit button when useProductButtonStyle is true)
     var btnStylesRaw = {{ shop.metafields.fox_cod.button_styles_json.value | json | default: 'null' }};
     if (typeof btnStylesRaw === 'string') {

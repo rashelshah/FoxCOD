@@ -13,7 +13,7 @@ import type { LoaderFunctionArgs, ActionFunctionArgs } from 'react-router';
 import { useLoaderData, useSubmit, useNavigation, useActionData, Link } from 'react-router';
 import { useAppBridge } from '@shopify/app-bridge-react';
 import { authenticate } from '../shopify.server';
-import { getCachedShopCurrency } from '../config/supabase.server';
+import { getCachedShopCurrency, getFormSettings, DEFAULT_PAYMENT_MODE_CARD_STYLES, type PaymentModeCardStyles, type PaymentModeCardStyle } from '../config/supabase.server';
 import {
   getPartialPaymentSettings,
   savePartialPaymentSettings,
@@ -54,11 +54,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session, admin } = await authenticate.admin(request);
   const shopDomain = session.shop;
 
-  const [settingsResult, shopCurrency] = await Promise.all([
+  const [settingsResult, shopCurrency, formSettings] = await Promise.all([
     getPartialPaymentSettings(shopDomain),
     getCachedShopCurrency(shopDomain, admin, 'INR'),
+    getFormSettings(shopDomain),
   ]);
   let settings = settingsResult;
+  // Custom colors set in Form Builder → Field Styling → Payment Mode Card
+  // Styling, so this page's own storefront preview matches what merchants
+  // actually see on the storefront.
+  const paymentModeCardStyles: PaymentModeCardStyles = formSettings?.payment_mode_card_styles || DEFAULT_PAYMENT_MODE_CARD_STYLES;
 
   // First-visit defaults
   if (!settings) {
@@ -143,7 +148,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }
   }
 
-  return { settings, shopDomain, shopCurrency };
+  return { settings, shopDomain, shopCurrency, paymentModeCardStyles };
 };
 
 // ── Action ─────────────────────────────────────────────────────────────────
@@ -1248,7 +1253,7 @@ const SubtitleEditor = ({
 };
 
 export default function PartialPaymentsPage() {
-  const { settings: initialSettings, shopDomain, shopCurrency } = useLoaderData<typeof loader>();
+  const { settings: initialSettings, shopDomain, shopCurrency, paymentModeCardStyles } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const submit = useSubmit();
   const navigation = useNavigation();
@@ -1268,6 +1273,15 @@ export default function PartialPaymentsPage() {
     () => JSON.stringify(settings) !== savedStr,
     [settings, savedStr]
   );
+
+  // Storefront-preview colors: mirrors the Form Builder → Field Styling → Payment
+  // Mode Card Styling resolver, so this page's own preview matches what merchants
+  // actually see on the storefront when they've set custom colors there.
+  const pmColorFor = (method: PaymentModeCardStyle | undefined, key: keyof Omit<PaymentModeCardStyle, 'mode'>, fallback: string) =>
+    (method?.mode === 'custom' && method[key]) ? (method[key] as string) : fallback;
+  const prepaidPmColor = (key: keyof Omit<PaymentModeCardStyle, 'mode'>, fallback: string) => pmColorFor(paymentModeCardStyles?.full_prepaid, key, fallback);
+  const partialPmColor = (key: keyof Omit<PaymentModeCardStyle, 'mode'>, fallback: string) => pmColorFor(paymentModeCardStyles?.partial_payment, key, fallback);
+  const codPmColor = (key: keyof Omit<PaymentModeCardStyle, 'mode'>, fallback: string) => pmColorFor(paymentModeCardStyles?.pure_cod, key, fallback);
 
   // Show / hide save bar
   useEffect(() => {
@@ -1940,13 +1954,13 @@ export default function PartialPaymentsPage() {
                       <Text as="h3" variant="headingSm">Storefront Preview</Text>
                       <Text as="p" variant="bodySm" tone="subdued">Preview uses {fmt(previewOrderTotal)} as example cart total</Text>
                       <div style={{
-                        display: 'flex', flexDirection: 'column', background: '#eff6ff', borderRadius: '12px',
-                        border: '2px solid #2563eb', position: 'relative', overflow: 'visible',
+                        display: 'flex', flexDirection: 'column', background: partialPmColor('cardBackgroundColor', '#eff6ff'), borderRadius: '12px',
+                        border: `2px solid ${partialPmColor('borderColor', '#2563eb')}`, position: 'relative', overflow: 'visible',
                         maxWidth: '400px', marginTop: '16px'
                       }}>
                         {settings.payment_method_tags?.partial_payment?.enabled && (
                           <div style={{
-                            position: 'absolute', top: '-10px', left: '16px', background: '#2563eb', color: 'white',
+                            position: 'absolute', top: '-10px', left: '16px', background: partialPmColor('tagBackgroundColor', '#2563eb'), color: partialPmColor('tagTextColor', 'white'),
                             fontSize: '9px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', letterSpacing: '0.05em',
                             display: 'flex', alignItems: 'center', gap: '4px', textTransform: 'uppercase'
                           }}>
@@ -1955,34 +1969,34 @@ export default function PartialPaymentsPage() {
                         )}
 
                         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '16px 12px 12px 12px', boxSizing: 'border-box', width: '100%', margin: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '32px', height: '32px', borderRadius: '8px', color: '#2563eb', backgroundColor: '#dbeafe' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '32px', height: '32px', borderRadius: '8px', color: partialPmColor('iconColor', '#2563eb'), backgroundColor: partialPmColor('iconBackgroundColor', '#dbeafe') }}>
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>
                           </div>
 
                           <div style={{ flex: 1, minWidth: 0, paddingTop: '2px' }}>
-                            <div style={{ fontWeight: 700, fontSize: '14px', color: '#1e3a8a', lineHeight: 1.2, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              Partial Payment <svg width="14" height="14" viewBox="0 0 24 24" fill="#2563eb" stroke="#eff6ff" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M9 12l2 2 4-4" /></svg>
+                            <div style={{ fontWeight: 700, fontSize: '14px', color: partialPmColor('textColor', '#1e3a8a'), lineHeight: 1.2, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              Partial Payment <svg width="14" height="14" viewBox="0 0 24 24" fill={partialPmColor('iconColor', '#2563eb')} stroke={partialPmColor('cardBackgroundColor', '#eff6ff')} strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M9 12l2 2 4-4" /></svg>
                             </div>
                             {settings.show_partial_payment_subtitle !== false && settings.partial_payment_subtitle ? (
-                              <div style={{ color: '#2563eb', fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>{settings.partial_payment_subtitle}</div>
+                              <div style={{ color: partialPmColor('descriptionColor', '#2563eb'), fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>{settings.partial_payment_subtitle}</div>
                             ) : (
-                              <div style={{ color: '#2563eb', fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>Pay {fmt(previewDeposit)} now • Rest on delivery</div>
+                              <div style={{ color: partialPmColor('descriptionColor', '#2563eb'), fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>Pay {fmt(previewDeposit)} now • Rest on delivery</div>
                             )}
                           </div>
 
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
                               {settings.cod_fee_enabled && previewCodFee > 0 && (
-                                <div style={{ background: '#dbeafe', color: '#1e3a8a', fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '99px', lineHeight: 1, whiteSpace: 'nowrap' }}>
+                                <div style={{ background: partialPmColor('descriptionBackgroundColor', '#dbeafe'), color: partialPmColor('textColor', '#1e3a8a'), fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '99px', lineHeight: 1, whiteSpace: 'nowrap' }}>
                                   {fmt(previewCodFee)} {settings.cod_fee_name || 'COD Fee'}
                                 </div>
                               )}
                               {settings.partial_payment_discount_enabled && settings.partial_payment_discount_value > 0 && (
-                                <div style={{ background: '#dbeafe', color: '#1e3a8a', fontSize: '11px', fontWeight: 700, padding: '3px 8px', borderRadius: '99px', lineHeight: 1 }}>
+                                <div style={{ background: partialPmColor('descriptionBackgroundColor', '#dbeafe'), color: partialPmColor('textColor', '#1e3a8a'), fontSize: '11px', fontWeight: 700, padding: '3px 8px', borderRadius: '99px', lineHeight: 1 }}>
                                   Save {settings.partial_payment_discount_type === 'percentage' ? fmt(previewOrderTotal * (settings.partial_payment_discount_value / 100)) : fmt(settings.partial_payment_discount_value)}
                                 </div>
                               )}
-                              <span style={{ fontWeight: 800, fontSize: '15px', color: '#1e3a8a' }}>
+                              <span style={{ fontWeight: 800, fontSize: '15px', color: partialPmColor('textColor', '#1e3a8a') }}>
                                 {settings.partial_payment_discount_enabled && settings.partial_payment_discount_value > 0 ? (
                                   settings.partial_payment_discount_type === 'percentage' ? fmt(previewDeposit - (previewOrderTotal * (settings.partial_payment_discount_value / 100))) : fmt(previewDeposit - settings.partial_payment_discount_value)
                                 ) : (
@@ -1990,11 +2004,11 @@ export default function PartialPaymentsPage() {
                                 )}
                               </span>
                             </div>
-                            <input type="radio" checked readOnly style={{ width: '18px', height: '18px', accentColor: '#2563eb', margin: 0, pointerEvents: 'none' }} />
+                            <input type="radio" checked readOnly style={{ width: '18px', height: '18px', accentColor: partialPmColor('borderColor', '#2563eb'), margin: 0, pointerEvents: 'none' }} />
                           </div>
                         </div>
                         {settings.payment_method_descriptions?.partial_payment?.enabled && (
-                          <div style={{ background: '#dbeafe', padding: '10px 12px', fontSize: '10px', color: '#1e40af', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500, width: '100%', boxSizing: 'border-box', margin: 0, borderBottomLeftRadius: '10px', borderBottomRightRadius: '10px' }}>
+                          <div style={{ background: partialPmColor('descriptionBackgroundColor', '#dbeafe'), padding: '10px 12px', fontSize: '10px', color: partialPmColor('textColor', '#1e40af'), display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500, width: '100%', boxSizing: 'border-box', margin: 0, borderBottomLeftRadius: '10px', borderBottomRightRadius: '10px' }}>
                             {settings.payment_method_descriptions?.partial_payment?.text}
                           </div>
                         )}
@@ -2180,13 +2194,13 @@ export default function PartialPaymentsPage() {
                     <Text as="h3" variant="headingSm">Storefront Preview</Text>
                     <Text as="p" variant="bodySm" tone="subdued">Preview uses 500 as example cart total</Text>
                     <div style={{
-                      display: 'flex', flexDirection: 'column', background: '#f0fdf4', borderRadius: '12px',
-                      border: '2px solid #22c55e', position: 'relative', overflow: 'visible',
+                      display: 'flex', flexDirection: 'column', background: prepaidPmColor('cardBackgroundColor', '#f0fdf4'), borderRadius: '12px',
+                      border: `2px solid ${prepaidPmColor('borderColor', '#22c55e')}`, position: 'relative', overflow: 'visible',
                       maxWidth: '400px', marginTop: '16px'
                     }}>
                       {(settings.payment_method_tags?.full_prepaid?.enabled || (!settings.payment_method_tags?.full_prepaid && true)) && (
                         <div style={{
-                          position: 'absolute', top: '-10px', left: '16px', background: '#22c55e', color: 'white',
+                          position: 'absolute', top: '-10px', left: '16px', background: prepaidPmColor('tagBackgroundColor', '#22c55e'), color: prepaidPmColor('tagTextColor', 'white'),
                           fontSize: '9px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', letterSpacing: '0.05em',
                           display: 'flex', alignItems: 'center', gap: '4px', textTransform: 'uppercase'
                         }}>
@@ -2195,25 +2209,25 @@ export default function PartialPaymentsPage() {
                       )}
 
                       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '16px 12px 12px 12px', boxSizing: 'border-box', width: '100%', margin: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '32px', height: '32px', borderRadius: '8px', color: '#16a34a', backgroundColor: '#dcfce7' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '32px', height: '32px', borderRadius: '8px', color: prepaidPmColor('iconColor', '#16a34a'), backgroundColor: prepaidPmColor('iconBackgroundColor', '#dcfce7') }}>
                           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4" /><path d="M4 6v12c0 1.1.9 2 2 2h14v-4" /><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z" /></svg>
                         </div>
 
                         <div style={{ flex: 1, minWidth: 0, paddingTop: '2px' }}>
-                          <div style={{ fontWeight: 700, fontSize: '14px', color: '#166534', lineHeight: 1.2 }}>Full Prepaid</div>
+                          <div style={{ fontWeight: 700, fontSize: '14px', color: prepaidPmColor('textColor', '#166534'), lineHeight: 1.2 }}>Full Prepaid</div>
                           {settings.show_full_prepaid_subtitle !== false && settings.full_prepaid_subtitle && (
-                            <div style={{ color: '#16a34a', fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>{settings.full_prepaid_subtitle}</div>
+                            <div style={{ color: prepaidPmColor('descriptionColor', '#16a34a'), fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>{settings.full_prepaid_subtitle}</div>
                           )}
                         </div>
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
                             {settings.prepaid_discount_enabled && settings.prepaid_discount_value > 0 && (
-                              <div style={{ background: '#dcfce7', color: '#166534', fontSize: '11px', fontWeight: 700, padding: '3px 8px', borderRadius: '99px', lineHeight: 1 }}>
+                              <div style={{ background: prepaidPmColor('descriptionBackgroundColor', '#dcfce7'), color: prepaidPmColor('textColor', '#166534'), fontSize: '11px', fontWeight: 700, padding: '3px 8px', borderRadius: '99px', lineHeight: 1 }}>
                                 Save {settings.prepaid_discount_type === 'percentage' ? fmt(500 * (settings.prepaid_discount_value / 100)) : fmt(settings.prepaid_discount_value)}
                               </div>
                             )}
-                            <span style={{ fontWeight: 800, fontSize: '15px', color: '#166534' }}>
+                            <span style={{ fontWeight: 800, fontSize: '15px', color: prepaidPmColor('textColor', '#166534') }}>
                               {settings.prepaid_discount_enabled && settings.prepaid_discount_value > 0 ? (
                                 settings.prepaid_discount_type === 'percentage' ? fmt(500 - (500 * (settings.prepaid_discount_value / 100))) : fmt(500 - settings.prepaid_discount_value)
                               ) : (
@@ -2221,11 +2235,11 @@ export default function PartialPaymentsPage() {
                               )}
                             </span>
                           </div>
-                          <input type="radio" checked readOnly style={{ width: '18px', height: '18px', accentColor: '#22c55e', margin: 0, pointerEvents: 'none' }} />
+                          <input type="radio" checked readOnly style={{ width: '18px', height: '18px', accentColor: prepaidPmColor('borderColor', '#22c55e'), margin: 0, pointerEvents: 'none' }} />
                         </div>
                       </div>
                       {settings.payment_method_descriptions?.full_prepaid?.enabled && (
-                        <div style={{ background: '#dcfce7', padding: '10px 12px', fontSize: '10px', color: '#166534', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500, width: '100%', boxSizing: 'border-box', margin: 0, borderBottomLeftRadius: '10px', borderBottomRightRadius: '10px' }}>
+                        <div style={{ background: prepaidPmColor('descriptionBackgroundColor', '#dcfce7'), padding: '10px 12px', fontSize: '10px', color: prepaidPmColor('textColor', '#166534'), display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500, width: '100%', boxSizing: 'border-box', margin: 0, borderBottomLeftRadius: '10px', borderBottomRightRadius: '10px' }}>
                           {settings.payment_method_descriptions?.full_prepaid?.text}
                         </div>
                       )}
@@ -2390,13 +2404,13 @@ export default function PartialPaymentsPage() {
                   <Text as="h3" variant="headingSm">Storefront Preview</Text>
                   <Text as="p" variant="bodySm" tone="subdued">Preview uses 500 as example cart total</Text>
                   <div style={{
-                    display: 'flex', flexDirection: 'column', background: '#fff7ed', borderRadius: '12px',
-                    border: '2px solid #ea580c', position: 'relative', overflow: 'visible',
+                    display: 'flex', flexDirection: 'column', background: codPmColor('cardBackgroundColor', '#fff7ed'), borderRadius: '12px',
+                    border: `2px solid ${codPmColor('borderColor', '#ea580c')}`, position: 'relative', overflow: 'visible',
                     maxWidth: '400px', marginTop: '16px'
                   }}>
                     {settings.payment_method_tags?.pure_cod?.enabled && (
                       <div style={{
-                        position: 'absolute', top: '-10px', left: '16px', background: '#ea580c', color: 'white',
+                        position: 'absolute', top: '-10px', left: '16px', background: codPmColor('tagBackgroundColor', '#ea580c'), color: codPmColor('tagTextColor', 'white'),
                         fontSize: '9px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', letterSpacing: '0.05em',
                         display: 'flex', alignItems: 'center', gap: '4px', textTransform: 'uppercase'
                       }}>
@@ -2405,14 +2419,14 @@ export default function PartialPaymentsPage() {
                     )}
 
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '16px 12px 12px 12px', boxSizing: 'border-box', width: '100%', margin: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '32px', height: '32px', borderRadius: '8px', color: '#ea580c', backgroundColor: '#ffedd5' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '32px', height: '32px', borderRadius: '8px', color: codPmColor('iconColor', '#ea580c'), backgroundColor: codPmColor('iconBackgroundColor', '#ffedd5') }}>
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1" ry="1" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
                       </div>
 
                       <div style={{ flex: 1, minWidth: 0, paddingTop: '2px' }}>
-                        <div style={{ fontWeight: 700, fontSize: '14px', color: '#9a3412', lineHeight: 1.2 }}>Cash on Delivery</div>
+                        <div style={{ fontWeight: 700, fontSize: '14px', color: codPmColor('textColor', '#9a3412'), lineHeight: 1.2 }}>Cash on Delivery</div>
                           {settings.show_pure_cod_subtitle !== false && settings.pure_cod_subtitle && (
-                            <div style={{ color: '#ea580c', fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>{settings.pure_cod_subtitle}</div>
+                            <div style={{ color: codPmColor('descriptionColor', '#ea580c'), fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>{settings.pure_cod_subtitle}</div>
                           )}
 
                       </div>
@@ -2420,11 +2434,11 @@ export default function PartialPaymentsPage() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
                           {settings.pure_cod_fee_enabled && settings.pure_cod_fee_amount > 0 && (
-                            <div style={{ background: '#ffedd5', color: '#9a3412', fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '99px', lineHeight: 1, whiteSpace: 'nowrap' }}>
+                            <div style={{ background: codPmColor('descriptionBackgroundColor', '#ffedd5'), color: codPmColor('textColor', '#9a3412'), fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '99px', lineHeight: 1, whiteSpace: 'nowrap' }}>
                               {settings.pure_cod_fee_type === 'percentage' ? fmt(500 * (settings.pure_cod_fee_amount / 100)) : fmt(settings.pure_cod_fee_amount)} {settings.pure_cod_fee_name || 'COD Fee'}
                             </div>
                           )}
-                          <span style={{ fontWeight: 800, fontSize: '15px', color: '#9a3412' }}>
+                          <span style={{ fontWeight: 800, fontSize: '15px', color: codPmColor('textColor', '#9a3412') }}>
                             {settings.pure_cod_fee_enabled && settings.pure_cod_fee_amount > 0 ? (
                               settings.pure_cod_fee_type === 'percentage' ? fmt(500 + (500 * (settings.pure_cod_fee_amount / 100))) : fmt(500 + settings.pure_cod_fee_amount)
                             ) : (
@@ -2432,11 +2446,11 @@ export default function PartialPaymentsPage() {
                             )}
                           </span>
                         </div>
-                        <input type="radio" checked readOnly style={{ width: '18px', height: '18px', accentColor: '#ea580c', margin: 0, pointerEvents: 'none' }} />
+                        <input type="radio" checked readOnly style={{ width: '18px', height: '18px', accentColor: codPmColor('borderColor', '#ea580c'), margin: 0, pointerEvents: 'none' }} />
                       </div>
                     </div>
                     {settings.payment_method_descriptions?.pure_cod?.enabled && (
-                      <div style={{ background: '#ffedd5', padding: '10px 12px', fontSize: '10px', color: '#9a3412', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500, width: '100%', boxSizing: 'border-box', margin: 0, borderBottomLeftRadius: '10px', borderBottomRightRadius: '10px' }}>
+                      <div style={{ background: codPmColor('descriptionBackgroundColor', '#ffedd5'), padding: '10px 12px', fontSize: '10px', color: codPmColor('textColor', '#9a3412'), display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500, width: '100%', boxSizing: 'border-box', margin: 0, borderBottomLeftRadius: '10px', borderBottomRightRadius: '10px' }}>
                         {settings.payment_method_descriptions?.pure_cod?.text}
                       </div>
                     )}

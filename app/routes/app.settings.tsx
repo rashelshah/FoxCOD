@@ -46,6 +46,8 @@ import {
     type ButtonStyles,
     type ShippingOptions,
     type FormSubmitButtonStyles,
+    type PaymentModeCardStyle,
+    type PaymentModeCardStyles,
     DEFAULT_FIELDS,
 
     DEFAULT_BLOCKS,
@@ -53,6 +55,10 @@ import {
     DEFAULT_BUTTON_STYLES,
     DEFAULT_SHIPPING_OPTIONS,
     DEFAULT_FORM_SUBMIT_BUTTON,
+    DEFAULT_PAYMENT_MODE_CARD_STYLES,
+    DEFAULT_PAYMENT_MODE_CARD_STYLE_FULL_PREPAID,
+    DEFAULT_PAYMENT_MODE_CARD_STYLE_PARTIAL_PAYMENT,
+    DEFAULT_PAYMENT_MODE_CARD_STYLE_PURE_COD,
 } from "../config/form-builder.types";
 import { ColorSelector, colorSelectorStyles } from "./ColorSelector";
 
@@ -117,6 +123,8 @@ const defaultSettings: Omit<FormSettings, "shop_domain"> = {
     coupon_field_position: 13,
     // Form submit button
     form_submit_button: DEFAULT_FORM_SUBMIT_BUTTON,
+    // Payment Mode card colors
+    payment_mode_card_styles: DEFAULT_PAYMENT_MODE_CARD_STYLES,
 };
 
 const PRESET_KEYS = new Set([
@@ -560,6 +568,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         coupon_field_position: parseInt(formData.get("coupon_field_position") as string) || defaultSettings.coupon_field_position,
         // Form submit button style overrides
         form_submit_button: JSON.parse(formData.get("form_submit_button") as string || JSON.stringify(defaultSettings.form_submit_button)),
+        // Payment Mode card color overrides
+        payment_mode_card_styles: JSON.parse(formData.get("payment_mode_card_styles") as string || JSON.stringify(defaultSettings.payment_mode_card_styles)),
     };
 
     // Save to Supabase
@@ -573,6 +583,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
         if (dbError.message?.includes('enable_coupon_field') || dbError.message?.includes('coupon_field_position') || dbError.message?.includes('coupons')) {
             return { success: false, error: 'Database migration needed: Run migration_v16_coupons.sql in Supabase' };
+        }
+        if (dbError.message?.includes('payment_mode_card_styles')) {
+            return { success: false, error: 'Database migration needed: Run add_payment_mode_card_styles.sql in Supabase' };
         }
         return { success: false, error: dbError.message || 'Failed to save to database' };
     }
@@ -706,6 +719,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     { ownerId: shopGid, namespace: "fox_cod", key: "shipping_rates_json", value: JSON.stringify(shippingRatesForMetafield || []), type: "json" },
                     // Form submit button style overrides
                     { ownerId: shopGid, namespace: "fox_cod", key: "form_submit_button_json", value: JSON.stringify(settings.form_submit_button || DEFAULT_FORM_SUBMIT_BUTTON), type: "json" },
+                    // Payment Mode card color overrides
+                    { ownerId: shopGid, namespace: "fox_cod", key: "payment_mode_card_styles_json", value: JSON.stringify(settings.payment_mode_card_styles || DEFAULT_PAYMENT_MODE_CARD_STYLES), type: "json" },
                 ]
             }
         });
@@ -780,7 +795,8 @@ const PreviewDisplay = memo(({
     notesPlaceholder, submitButtonText,
     primaryColor, buttonStyle, buttonSize, borderRadius, modalStyle, animationStyle,
     fields, formStyles, buttonStylesState, blocks, shippingOpts, shippingRates, shippingRatesEnabled, activeTab,
-    fmtCurrency, currencySymbol, formSubmitButtonState, partialCodEnabled, partialCodAdvanceAmount, partialPaymentSettings, formType
+    fmtCurrency, currencySymbol, formSubmitButtonState, partialCodEnabled, partialCodAdvanceAmount, partialPaymentSettings, formType,
+    paymentModeCardStyles
 }: any) => {
     const [previewDevice, setPreviewDevice] = useState<'mobile' | 'desktop'>('mobile');
 
@@ -1536,6 +1552,15 @@ const PreviewDisplay = memo(({
                                                 const codFeeBg = onlyCod ? '#dcfce7' : '#ffedd5';
                                                 const codFeeColor = onlyCod ? '#166534' : '#9a3412';
 
+                                                // Custom Payment Mode Card colors — applied uniformly across all three
+                                                // cards when mode === 'custom'; each call keeps the original per-card
+                                                // hardcoded literal as its fallback so "Default" mode is unchanged.
+                                                const pmColorFor = (method: PaymentModeCardStyle | undefined, key: keyof Omit<PaymentModeCardStyle, 'mode'>, fallback: string) =>
+                                                    (method?.mode === 'custom' && method[key]) ? (method[key] as string) : fallback;
+                                                const prepaidColor = (key: keyof Omit<PaymentModeCardStyle, 'mode'>, fallback: string) => pmColorFor(paymentModeCardStyles?.full_prepaid, key, fallback);
+                                                const partialColor = (key: keyof Omit<PaymentModeCardStyle, 'mode'>, fallback: string) => pmColorFor(paymentModeCardStyles?.partial_payment, key, fallback);
+                                                const codColor = (key: keyof Omit<PaymentModeCardStyle, 'mode'>, fallback: string) => pmColorFor(paymentModeCardStyles?.pure_cod, key, fallback);
+
                                                 return (
                                                     <div key={field.id} style={{ marginBottom: '16px', marginTop: '16px' }}>
                                                         {/* Header */}
@@ -1552,14 +1577,14 @@ const PreviewDisplay = memo(({
                                                             {/* 1. Full Prepaid (Visual Only) */}
                                                             {showFullPrepaid && (
                                                                 <label style={{
-                                                                    display: 'flex', flexDirection: 'column', background: '#f0fdf4', borderRadius: '10px',
-                                                                    border: '2px solid #22c55e', cursor: 'pointer', position: 'relative', overflow: 'visible',
+                                                                    display: 'flex', flexDirection: 'column', background: prepaidColor('cardBackgroundColor', '#f0fdf4'), borderRadius: '10px',
+                                                                    border: `2px solid ${prepaidColor('borderColor', '#22c55e')}`, cursor: 'pointer', position: 'relative', overflow: 'visible',
                                                                     padding: 0, opacity: 1
                                                                 }}>
                                                                     {/* Custom Tag Badge */}
                                                                     {(partialPaymentSettings?.payment_method_tags?.full_prepaid?.enabled || (!partialPaymentSettings?.payment_method_tags?.full_prepaid && true)) && (
                                                                         <div style={{
-                                                                            position: 'absolute', top: '-10px', left: '16px', background: '#22c55e', color: 'white',
+                                                                            position: 'absolute', top: '-10px', left: '16px', background: prepaidColor('tagBackgroundColor', '#22c55e'), color: prepaidColor('tagTextColor', 'white'),
                                                                             fontSize: '9px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', letterSpacing: '0.05em',
                                                                             display: 'flex', alignItems: 'center', gap: '4px', textTransform: 'uppercase'
                                                                         }}>
@@ -1569,30 +1594,30 @@ const PreviewDisplay = memo(({
 
                                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: (partialPaymentSettings?.payment_method_tags?.full_prepaid?.enabled || (!partialPaymentSettings?.payment_method_tags?.full_prepaid && true)) ? '18px 10px 8px 10px' : '8px 10px' }}>
                                                                         {/* Icon */}
-                                                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '24px', height: '24px', borderRadius: '6px', color: '#16a34a', backgroundColor: '#dcfce7' }}>
+                                                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '24px', height: '24px', borderRadius: '6px', color: prepaidColor('iconColor', '#16a34a'), backgroundColor: prepaidColor('iconBackgroundColor', '#dcfce7') }}>
                                                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4" /><path d="M4 6v12c0 1.1.9 2 2 2h14v-4" /><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z" /></svg>
                                                                         </div>
 
                                                                         {/* Center text */}
                                                                         <div style={{ flex: 1, minWidth: 0 }}>
-                                                                            <div style={{ fontWeight: 700, fontSize: '11px', color: '#166534', lineHeight: 1.1 }}>Full Prepaid</div>
+                                                                            <div style={{ fontWeight: 700, fontSize: '11px', color: prepaidColor('textColor', '#166534'), lineHeight: 1.1 }}>Full Prepaid</div>
                                                                             {partialPaymentSettings?.show_full_prepaid_subtitle !== false && partialPaymentSettings?.full_prepaid_subtitle && (
-                                                                                <div style={{ color: '#16a34a', fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>{partialPaymentSettings.full_prepaid_subtitle}</div>
+                                                                                <div style={{ color: prepaidColor('descriptionColor', '#16a34a'), fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>{partialPaymentSettings.full_prepaid_subtitle}</div>
                                                                             )}
                                                                         </div>
 
                                                                         {/* Right side pricing */}
                                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                                                                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                                                                                <div style={{ background: '#dcfce7', color: '#166534', fontSize: '11px', fontWeight: 700, padding: '3px 8px', borderRadius: '99px', lineHeight: 1 }}>Save $20</div>
-                                                                                <span style={{ fontWeight: 800, fontSize: '12px', color: '#166534' }}>{fmtCurrency(total - 20)}</span>
+                                                                                <div style={{ background: prepaidColor('descriptionBackgroundColor', '#dcfce7'), color: prepaidColor('textColor', '#166534'), fontSize: '11px', fontWeight: 700, padding: '3px 8px', borderRadius: '99px', lineHeight: 1 }}>Save $20</div>
+                                                                                <span style={{ fontWeight: 800, fontSize: '12px', color: prepaidColor('textColor', '#166534') }}>{fmtCurrency(total - 20)}</span>
                                                                             </div>
-                                                                            <input type="radio" name="preview-payment" checked readOnly style={{ width: '14px', height: '14px', accentColor: '#22c55e', margin: 0, cursor: 'pointer' }} />
+                                                                            <input type="radio" name="preview-payment" checked readOnly style={{ width: '14px', height: '14px', accentColor: prepaidColor('borderColor', '#22c55e'), margin: 0, cursor: 'pointer' }} />
                                                                         </div>
                                                                     </div>
                                                                     {/* Info Bar */}
                                                                     {partialPaymentSettings?.payment_method_descriptions?.full_prepaid?.enabled && (
-                                                                        <div style={{ background: '#dcfce7', padding: '5px 8px', borderBottomLeftRadius: '8px', borderBottomRightRadius: '8px', fontSize: '8.5px', color: '#166534', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500 }}>
+                                                                        <div style={{ background: prepaidColor('descriptionBackgroundColor', '#dcfce7'), padding: '5px 8px', borderBottomLeftRadius: '8px', borderBottomRightRadius: '8px', fontSize: '8.5px', color: prepaidColor('textColor', '#166534'), display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500 }}>
                                                                             {partialPaymentSettings?.payment_method_descriptions?.full_prepaid?.text}
                                                                         </div>
                                                                     )}
@@ -1602,12 +1627,12 @@ const PreviewDisplay = memo(({
                                                             {/* 2. Partial Payment */}
                                                             {showPartial && (
                                                                 <label style={{
-                                                                    display: 'flex', flexDirection: 'column', background: '#eff6ff', borderRadius: '10px',
-                                                                    border: '2px solid #bfdbfe', cursor: 'default', position: 'relative', overflow: 'visible'
+                                                                    display: 'flex', flexDirection: 'column', background: partialColor('cardBackgroundColor', '#eff6ff'), borderRadius: '10px',
+                                                                    border: `2px solid ${partialColor('borderColor', '#bfdbfe')}`, cursor: 'default', position: 'relative', overflow: 'visible'
                                                                 }}>
                                                                     {partialPaymentSettings?.payment_method_tags?.partial_payment?.enabled && (
                                                                         <div style={{
-                                                                            position: 'absolute', top: '-10px', left: '16px', background: '#2563eb', color: 'white',
+                                                                            position: 'absolute', top: '-10px', left: '16px', background: partialColor('tagBackgroundColor', '#2563eb'), color: partialColor('tagTextColor', 'white'),
                                                                             fontSize: '9px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', letterSpacing: '0.05em',
                                                                             display: 'flex', alignItems: 'center', gap: '4px', textTransform: 'uppercase'
                                                                         }}>
@@ -1616,32 +1641,32 @@ const PreviewDisplay = memo(({
                                                                     )}
                                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: partialPaymentSettings?.payment_method_tags?.partial_payment?.enabled ? '18px 10px 8px 10px' : '8px 10px' }}>
                                                                         {/* Icon */}
-                                                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '24px', height: '24px', borderRadius: '6px', color: '#2563eb', backgroundColor: '#dbeafe' }}>
+                                                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '24px', height: '24px', borderRadius: '6px', color: partialColor('iconColor', '#2563eb'), backgroundColor: partialColor('iconBackgroundColor', '#dbeafe') }}>
                                                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>
                                                                         </div>
 
                                                                         {/* Center text */}
                                                                         <div style={{ flex: 1, minWidth: 0 }}>
-                                                                            <div style={{ fontWeight: 700, fontSize: '11px', color: '#1e3a8a', lineHeight: 1.1, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                                                            <div style={{ fontWeight: 700, fontSize: '11px', color: partialColor('textColor', '#1e3a8a'), lineHeight: 1.1, display: 'flex', alignItems: 'center', gap: '3px' }}>
                                                                                 Partial Payment
-                                                                                <svg width="10" height="10" viewBox="0 0 24 24" fill="#2563eb" stroke="#eff6ff" strokeWidth="2.5"><circle cx="12" cy="12" r="10" /><path d="M9 12l2 2 4-4" /></svg>
+                                                                                <svg width="10" height="10" viewBox="0 0 24 24" fill={partialColor('iconColor', '#2563eb')} stroke={partialColor('cardBackgroundColor', '#eff6ff')} strokeWidth="2.5"><circle cx="12" cy="12" r="10" /><path d="M9 12l2 2 4-4" /></svg>
                                                                             </div>
                                                                             {partialPaymentSettings?.show_partial_payment_subtitle !== false && partialPaymentSettings?.partial_payment_subtitle ? (
-                                                                                <div style={{ color: '#2563eb', fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>{partialPaymentSettings.partial_payment_subtitle}</div>
+                                                                                <div style={{ color: partialColor('descriptionColor', '#2563eb'), fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>{partialPaymentSettings.partial_payment_subtitle}</div>
                                                                             ) : (
-                                                                                <div style={{ color: '#2563eb', fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>Pay {fmtCurrency(partialCodAdvanceAmount || 0)} now • Rest on delivery</div>
+                                                                                <div style={{ color: partialColor('descriptionColor', '#2563eb'), fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>Pay {fmtCurrency(partialCodAdvanceAmount || 0)} now • Rest on delivery</div>
                                                                             )}
                                                                         </div>
 
                                                                         {/* Right side pricing */}
                                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-                                                                            <span style={{ fontWeight: 800, fontSize: '12px', color: '#1e3a8a' }}>{fmtCurrency(partialCodAdvanceAmount || 0)}</span>
+                                                                            <span style={{ fontWeight: 800, fontSize: '12px', color: partialColor('textColor', '#1e3a8a') }}>{fmtCurrency(partialCodAdvanceAmount || 0)}</span>
                                                                             <input type="radio" name="preview-payment" disabled style={{ width: '14px', height: '14px', margin: 0 }} />
                                                                         </div>
                                                                     </div>
                                                                     {/* Info Bar */}
                                                                     {partialPaymentSettings?.payment_method_descriptions?.partial_payment?.enabled && (
-                                                                        <div style={{ background: '#dbeafe', padding: '5px 8px', borderBottomLeftRadius: '8px', borderBottomRightRadius: '8px', fontSize: '8.5px', color: '#1e40af', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500 }}>
+                                                                        <div style={{ background: partialColor('descriptionBackgroundColor', '#dbeafe'), padding: '5px 8px', borderBottomLeftRadius: '8px', borderBottomRightRadius: '8px', fontSize: '8.5px', color: partialColor('textColor', '#1e40af'), display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500 }}>
                                                                             {partialPaymentSettings?.payment_method_descriptions?.partial_payment?.text}
                                                                         </div>
                                                                     )}
@@ -1651,12 +1676,12 @@ const PreviewDisplay = memo(({
                                                             {/* 3. Cash on Delivery */}
                                                             {showPureCod && (
                                                             <label style={{
-                                                                display: 'flex', flexDirection: 'column', background: codBg, borderRadius: '10px',
-                                                                border: `2px solid ${codBorder}`, cursor: 'default', position: 'relative', overflow: 'visible'
+                                                                display: 'flex', flexDirection: 'column', background: codColor('cardBackgroundColor', codBg), borderRadius: '10px',
+                                                                border: `2px solid ${codColor('borderColor', codBorder)}`, cursor: 'default', position: 'relative', overflow: 'visible'
                                                             }}>
                                                                 {partialPaymentSettings?.payment_method_tags?.pure_cod?.enabled && (
                                                                     <div style={{
-                                                                        position: 'absolute', top: '-10px', left: '16px', background: codTagBg, color: 'white',
+                                                                        position: 'absolute', top: '-10px', left: '16px', background: codColor('tagBackgroundColor', codTagBg), color: codColor('tagTextColor', 'white'),
                                                                         fontSize: '9px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', letterSpacing: '0.05em',
                                                                         display: 'flex', alignItems: 'center', gap: '4px', textTransform: 'uppercase'
                                                                     }}>
@@ -1665,30 +1690,30 @@ const PreviewDisplay = memo(({
                                                                 )}
                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: partialPaymentSettings?.payment_method_tags?.pure_cod?.enabled ? '18px 10px 8px 10px' : '8px 10px' }}>
                                                                     {/* Icon */}
-                                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '24px', height: '24px', borderRadius: '6px', color: codIconColor, backgroundColor: codIconBg }}>
+                                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, width: '24px', height: '24px', borderRadius: '6px', color: codColor('iconColor', codIconColor), backgroundColor: codColor('iconBackgroundColor', codIconBg) }}>
                                                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="1" ry="1" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg>
                                                                     </div>
 
                                                                     {/* Center text */}
                                                                     <div style={{ flex: 1, minWidth: 0 }}>
-                                                                        <div style={{ fontWeight: 700, fontSize: '11px', color: codTitleColor, lineHeight: 1.1 }}>Cash on Delivery</div>
+                                                                        <div style={{ fontWeight: 700, fontSize: '11px', color: codColor('textColor', codTitleColor), lineHeight: 1.1 }}>Cash on Delivery</div>
                                                                         {partialPaymentSettings?.show_pure_cod_subtitle !== false && partialPaymentSettings?.pure_cod_subtitle && (
-                                                                            <div style={{ color: codSubtitleColor, fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>{partialPaymentSettings.pure_cod_subtitle}</div>
+                                                                            <div style={{ color: codColor('descriptionColor', codSubtitleColor), fontSize: '9px', marginTop: '2px', lineHeight: 1.2 }}>{partialPaymentSettings.pure_cod_subtitle}</div>
                                                                         )}
                                                                     </div>
 
                                                                     {/* Right side pricing */}
                                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                                                                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-                                                                            <div style={{ background: codFeeBg, color: codFeeColor, fontSize: '9px', fontWeight: 600, padding: '2px 6px', borderRadius: '99px', lineHeight: 1 }}>+ {fmtCurrency(20)} COD fee</div>
-                                                                            <span style={{ fontWeight: 800, fontSize: '12px', color: codTitleColor }}>{fmtCurrency(total)}</span>
+                                                                            <div style={{ background: codColor('descriptionBackgroundColor', codFeeBg), color: codColor('textColor', codFeeColor), fontSize: '9px', fontWeight: 600, padding: '2px 6px', borderRadius: '99px', lineHeight: 1 }}>+ {fmtCurrency(20)} COD fee</div>
+                                                                            <span style={{ fontWeight: 800, fontSize: '12px', color: codColor('textColor', codTitleColor) }}>{fmtCurrency(total)}</span>
                                                                         </div>
                                                                         <input type="radio" name="preview-payment" disabled style={{ width: '14px', height: '14px', margin: 0 }} />
                                                                     </div>
                                                                 </div>
                                                                 {/* Info Bar */}
                                                                 {partialPaymentSettings?.payment_method_descriptions?.pure_cod?.enabled && (
-                                                                    <div style={{ background: codFeeBg, padding: '5px 8px', borderBottomLeftRadius: '8px', borderBottomRightRadius: '8px', fontSize: '8.5px', color: codFeeColor, display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500 }}>
+                                                                    <div style={{ background: codColor('descriptionBackgroundColor', codFeeBg), padding: '5px 8px', borderBottomLeftRadius: '8px', borderBottomRightRadius: '8px', fontSize: '8.5px', color: codColor('textColor', codFeeColor), display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500 }}>
                                                                         {partialPaymentSettings?.payment_method_descriptions?.pure_cod?.text}
                                                                     </div>
                                                                 )}
@@ -2522,6 +2547,7 @@ export default function SettingsPage() {
     const [buttonStylesState, setButtonStylesState] = useState<ButtonStyles>(settings.button_styles || DEFAULT_BUTTON_STYLES);
     const [shippingOpts, setShippingOpts] = useState<ShippingOptions>(settings.shipping_options || DEFAULT_SHIPPING_OPTIONS);
     const [formSubmitButtonState, setFormSubmitButtonState] = useState<FormSubmitButtonStyles>(settings.form_submit_button || DEFAULT_FORM_SUBMIT_BUTTON);
+    const [paymentModeCardStyles, setPaymentModeCardStyles] = useState<PaymentModeCardStyles>(settings.payment_mode_card_styles || DEFAULT_PAYMENT_MODE_CARD_STYLES);
     const [showAddFieldModal, setShowAddFieldModal] = useState(false);
     const [newFieldType, setNewFieldType] = useState<'text' | 'number' | 'dropdown' | 'checkbox'>('text');
     const [newFieldLabel, setNewFieldLabel] = useState('');
@@ -2669,7 +2695,7 @@ export default function SettingsPage() {
             shipping_options: shippingOpts, partial_cod_enabled: partialCodEnabled, partial_cod_advance_amount: partialCodAdvanceAmount,
             partial_cod_commission: partialCodCommission, shipping_rates_enabled: shippingRatesEnabled,
             enable_coupon_field: couponFieldEnabled, coupon_field_position: couponFieldPosition,
-            form_submit_button: formSubmitButtonState
+            form_submit_button: formSubmitButtonState, payment_mode_card_styles: paymentModeCardStyles
         };
 
         // Robust deep equality check instead of JSON.stringify which is vulnerable to key ordering
@@ -2694,7 +2720,8 @@ export default function SettingsPage() {
         showEmailField, showNotesField, emailRequired, namePlaceholder, phonePlaceholder, addressPlaceholder,
         notesPlaceholder, modalStyle, animationStyle, borderRadius, formType, fields, blocks,
         formStyles, buttonStylesState, shippingOpts, partialCodEnabled, partialCodAdvanceAmount, partialCodCommission,
-        shippingRatesEnabled, couponFieldEnabled, couponFieldPosition, savedSettingsString, pendingShippingOps, formSubmitButtonState
+        shippingRatesEnabled, couponFieldEnabled, couponFieldPosition, savedSettingsString, pendingShippingOps, formSubmitButtonState,
+        paymentModeCardStyles
     ]);
 
     // Discard handler - reset all fields to saved values
@@ -2736,6 +2763,7 @@ export default function SettingsPage() {
         setPartialCodCommission(orig.partial_cod_commission ?? 0);
         setShippingRatesEnabled(orig.shipping_rates_enabled ?? false);
         setFormSubmitButtonState(orig.form_submit_button || DEFAULT_FORM_SUBMIT_BUTTON);
+        setPaymentModeCardStyles(orig.payment_mode_card_styles || DEFAULT_PAYMENT_MODE_CARD_STYLES);
         // Reset pending shipping operations and restore original rates
         setPendingShippingOps([]);
         setShippingRates(initialShippingRates || []);
@@ -2803,7 +2831,7 @@ export default function SettingsPage() {
                     shipping_options: shippingOpts, partial_cod_enabled: partialCodEnabled, partial_cod_advance_amount: partialCodAdvanceAmount,
                     partial_cod_commission: partialCodCommission, shipping_rates_enabled: shippingRatesEnabled,
                     enable_coupon_field: couponFieldEnabled, coupon_field_position: couponFieldPosition,
-                    form_submit_button: formSubmitButtonState
+                    form_submit_button: formSubmitButtonState, payment_mode_card_styles: paymentModeCardStyles
                 };
                 setSavedSettingsString(JSON.stringify(currentSettings));
                 shopify.toast.show("Settings saved successfully!");
@@ -2821,7 +2849,7 @@ export default function SettingsPage() {
         formTitle, formSubtitle, successMessage, submitButtonText, showProductImage, showPrice, showQuantitySelector,
         showEmailField, showNotesField, emailRequired, namePlaceholder, phonePlaceholder, addressPlaceholder,
         notesPlaceholder, modalStyle, animationStyle, borderRadius, formType, fields, blocks,
-        formStyles, buttonStylesState, shippingOpts, partialCodEnabled, partialCodAdvanceAmount, partialCodCommission, shippingRatesEnabled, couponFieldEnabled, couponFieldPosition, formSubmitButtonState, shopify]);
+        formStyles, buttonStylesState, shippingOpts, partialCodEnabled, partialCodAdvanceAmount, partialCodCommission, shippingRatesEnabled, couponFieldEnabled, couponFieldPosition, formSubmitButtonState, paymentModeCardStyles, shopify]);
 
     // Hex validation helpers
     const isValidHex = (hex: string): boolean => {
@@ -2976,6 +3004,7 @@ export default function SettingsPage() {
         formData.append("coupon_field_position", couponFieldPosition.toString());
         // Form submit button style overrides
         formData.append("form_submit_button", JSON.stringify(formSubmitButtonState));
+        formData.append("payment_mode_card_styles", JSON.stringify(paymentModeCardStyles));
 
         submit(formData, { method: "post" });
 
@@ -3009,7 +3038,7 @@ export default function SettingsPage() {
         formStyles, buttonStylesState, shippingOpts,
         partialCodEnabled, partialCodAdvanceAmount, partialCodCommission,
         shippingRatesEnabled, submit, shopify, pendingShippingOps,
-        formSubmitButtonState
+        formSubmitButtonState, paymentModeCardStyles
     ]);
 
     // Show/hide native Shopify save bar based on unsaved changes
@@ -5327,6 +5356,141 @@ export default function SettingsPage() {
                                             </Button>
                                         </div>
                                     </AccordionSection>
+
+                                    <AccordionSection id="payment-mode-card-styling" tab="field-styling" title="Payment Mode Card Styling" helperText="Colors for the Full Prepaid / Partial Payment / Cash on Delivery cards" expandedSection={expandedSection} toggleSection={toggleSection}>
+                                        {([
+                                            { key: 'full_prepaid' as const, label: 'Full Prepaid', defaults: DEFAULT_PAYMENT_MODE_CARD_STYLE_FULL_PREPAID, enabled: partialPaymentSettings?.full_prepaid_enabled ?? false },
+                                            { key: 'partial_payment' as const, label: 'Partial Payment', defaults: DEFAULT_PAYMENT_MODE_CARD_STYLE_PARTIAL_PAYMENT, enabled: partialPaymentSettings?.enabled ?? false },
+                                            { key: 'pure_cod' as const, label: 'Cash on Delivery', defaults: DEFAULT_PAYMENT_MODE_CARD_STYLE_PURE_COD, enabled: partialPaymentSettings?.pure_cod_enabled ?? true },
+                                        ]).map(({ key: methodKey, label, defaults, enabled: methodEnabled }, idx) => {
+                                            const methodStyle: PaymentModeCardStyle = paymentModeCardStyles?.[methodKey] || defaults;
+                                            const updateMethod = (patch: Partial<PaymentModeCardStyle>) => {
+                                                setPaymentModeCardStyles(s => ({
+                                                    ...s,
+                                                    [methodKey]: { ...(s?.[methodKey] || defaults), ...patch },
+                                                }));
+                                            };
+                                            return (
+                                                <div key={methodKey} style={idx > 0 ? { marginTop: 24, paddingTop: 20, borderTop: '1px solid #e5e7eb' } : undefined}>
+                                                    <Text as="h3" variant="headingSm">{label}</Text>
+
+                                                    {!methodEnabled && (
+                                                        <div style={{ marginTop: 8 }}>
+                                                            <Banner tone="warning">
+                                                                <p>Enable {label} in <Link to="/app/partial-payments">Payment Methods</Link> to customize its colors.</p>
+                                                            </Banner>
+                                                        </div>
+                                                    )}
+
+                                                    {methodEnabled && (
+                                                        <>
+                                                    <div className="style-options" style={{ marginTop: 8 }}>
+                                                        {(['default', 'custom'] as const).map((m) => (
+                                                            <button
+                                                                key={m}
+                                                                type="button"
+                                                                className={`style-option ${(methodStyle.mode || 'default') === m ? 'active' : ''}`}
+                                                                onClick={() => updateMethod({ mode: m })}
+                                                            >
+                                                                {m === 'default' ? 'Default' : 'Custom'}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+
+                                                    {methodStyle.mode === 'custom' && (
+                                                        <>
+                                                            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '12px', marginTop: '16px' }}>
+                                                                <div className="input-group" style={{ marginTop: 0, minWidth: 0 }}>
+                                                                    <ColorSelector
+                                                                        label="Card Background Color"
+                                                                        value={methodStyle.cardBackgroundColor || defaults.cardBackgroundColor}
+                                                                        onChange={(c) => updateMethod({ cardBackgroundColor: c })}
+                                                                    />
+                                                                </div>
+                                                                <div className="input-group" style={{ marginTop: 0, minWidth: 0 }}>
+                                                                    <ColorSelector
+                                                                        label="Border Color"
+                                                                        value={methodStyle.borderColor || defaults.borderColor}
+                                                                        onChange={(c) => updateMethod({ borderColor: c })}
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '12px', marginTop: '12px' }}>
+                                                                <div className="input-group" style={{ marginTop: 0, minWidth: 0 }}>
+                                                                    <ColorSelector
+                                                                        label="Text Color"
+                                                                        value={methodStyle.textColor || defaults.textColor}
+                                                                        onChange={(c) => updateMethod({ textColor: c })}
+                                                                    />
+                                                                </div>
+                                                                <div className="input-group" style={{ marginTop: 0, minWidth: 0 }}>
+                                                                    <ColorSelector
+                                                                        label="Description Color"
+                                                                        value={methodStyle.descriptionColor || defaults.descriptionColor}
+                                                                        onChange={(c) => updateMethod({ descriptionColor: c })}
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '12px', marginTop: '12px' }}>
+                                                                <div className="input-group" style={{ marginTop: 0, minWidth: 0 }}>
+                                                                    <ColorSelector
+                                                                        label="Description Background Color"
+                                                                        value={methodStyle.descriptionBackgroundColor || defaults.descriptionBackgroundColor}
+                                                                        onChange={(c) => updateMethod({ descriptionBackgroundColor: c })}
+                                                                    />
+                                                                </div>
+                                                                <p className="setting-helper" style={{ alignSelf: 'center', marginTop: 0 }}>Also used for the &quot;Save&quot; / fee pill background.</p>
+                                                            </div>
+                                                            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '12px', marginTop: '12px' }}>
+                                                                <div className="input-group" style={{ marginTop: 0, minWidth: 0 }}>
+                                                                    <ColorSelector
+                                                                        label="Icon Color"
+                                                                        value={methodStyle.iconColor || defaults.iconColor}
+                                                                        onChange={(c) => updateMethod({ iconColor: c })}
+                                                                    />
+                                                                </div>
+                                                                <div className="input-group" style={{ marginTop: 0, minWidth: 0 }}>
+                                                                    <ColorSelector
+                                                                        label="Icon Background"
+                                                                        value={methodStyle.iconBackgroundColor || defaults.iconBackgroundColor}
+                                                                        onChange={(c) => updateMethod({ iconBackgroundColor: c })}
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '12px', marginTop: '12px' }}>
+                                                                <div className="input-group" style={{ marginTop: 0, minWidth: 0 }}>
+                                                                    <ColorSelector
+                                                                        label="Tag Background Color"
+                                                                        value={methodStyle.tagBackgroundColor || defaults.tagBackgroundColor}
+                                                                        onChange={(c) => updateMethod({ tagBackgroundColor: c })}
+                                                                    />
+                                                                </div>
+                                                                <div className="input-group" style={{ marginTop: 0, minWidth: 0 }}>
+                                                                    <ColorSelector
+                                                                        label="Tag Text Color"
+                                                                        value={methodStyle.tagTextColor || defaults.tagTextColor}
+                                                                        onChange={(c) => updateMethod({ tagTextColor: c })}
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        </>
+                                                    )}
+
+                                                    <div style={{ marginTop: 16 }}>
+                                                        <Button
+                                                            tone="critical"
+                                                            icon={ResetIcon}
+                                                            onClick={() => updateMethod({ ...defaults })}
+                                                        >
+                                                            Restore to Default
+                                                        </Button>
+                                                    </div>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </AccordionSection>
                                 </>
                             )}
 
@@ -5969,6 +6133,7 @@ export default function SettingsPage() {
                                 partialCodEnabled={partialCodEnabled}
                                 partialCodAdvanceAmount={partialCodAdvanceAmount}
                                 partialPaymentSettings={partialPaymentSettings}
+                                paymentModeCardStyles={paymentModeCardStyles}
                             />
                         </div>
 

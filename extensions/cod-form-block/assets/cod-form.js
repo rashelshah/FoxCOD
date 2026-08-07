@@ -782,6 +782,7 @@
                                     buttonText: dataContainer.dataset.buttonText || 'Buy Now - Cash on Delivery',
                                     primaryColor: dataContainer.dataset.primaryColor || '#000000',
                                     partialPaymentSettings: (window.FoxCod && window.FoxCod.partialPaymentSettings) || null,
+                                    paymentModeCardStyles: (window.FoxCod && window.FoxCod.paymentModeCardStyles) || null,
                                     buttonStyles: safeJSONParse(dataContainer.dataset.buttonStyles, {}),
                                     formSubmitButton: safeJSONParse(dataContainer.dataset.formSubmitButton, {}),
                                     fields: safeJSONParse(dataContainer.dataset.fields, {}),
@@ -1838,7 +1839,9 @@
         })(),
         partialCodAdvance: parseInt(dataContainer.dataset.partialCodAdvance) || 100,
         partialPaymentSettings: (window.FoxCod && window.FoxCod.partialPaymentSettings) || null,
-        
+        // Payment Mode card color overrides
+        paymentModeCardStyles: (window.FoxCod && window.FoxCod.paymentModeCardStyles) || null,
+
         // Button Animation Configuration
         animationPreset: dataContainer.dataset.animationPreset || 'none',
         animationSpeed: dataContainer.dataset.animationSpeed || 'normal',
@@ -5316,15 +5319,28 @@ function darkenColor(hex, percent) {
           html += '</div>';
       }
 
-      var renderTag = function(method, defaultColor) {
+      // ── Payment Mode card color overrides ────────────────────────────────
+      // Applied uniformly across all three cards when mode === 'custom'; each
+      // theme below keeps this card's original hardcoded literal as fallback
+      // so "Default" mode renders exactly as before.
+      var pmStyles = config.paymentModeCardStyles || {};
+      var pmColorFor = function(methodStyles, key, fallback) {
+          return (methodStyles && methodStyles.mode === 'custom' && methodStyles[key]) ? methodStyles[key] : fallback;
+      };
+      var prepaidColor = function(key, fallback) { return pmColorFor(pmStyles.full_prepaid, key, fallback); };
+      var partialColor = function(key, fallback) { return pmColorFor(pmStyles.partial_payment, key, fallback); };
+      var codColor = function(key, fallback) { return pmColorFor(pmStyles.pure_cod, key, fallback); };
+
+      var renderTag = function(method, defaultColor, defaultTextColor) {
+          var tagTextColor = defaultTextColor || 'white';
           var tagsConfig = ppSettings && ppSettings.payment_method_tags;
           // Support backward compatibility where full prepaid tag was always shown by default
           if (!tagsConfig && method === 'full_prepaid') {
-              return '<div style="position: absolute; top: -10px; left: 16px; background: ' + defaultColor + '; color: white; font-size: 9px; font-weight: 700; padding: 3px 8px; border-radius: 6px; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px; text-transform: uppercase;">★ MOST POPULAR</div>';
+              return '<div style="position: absolute; top: -10px; left: 16px; background: ' + defaultColor + '; color: ' + tagTextColor + '; font-size: 9px; font-weight: 700; padding: 3px 8px; border-radius: 6px; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px; text-transform: uppercase;">★ MOST POPULAR</div>';
           }
           var tagSettings = tagsConfig && tagsConfig[method];
           if (tagSettings && tagSettings.enabled && tagSettings.text) {
-              return '<div style="position: absolute; top: -10px; left: 16px; background: ' + defaultColor + '; color: white; font-size: 9px; font-weight: 700; padding: 3px 8px; border-radius: 6px; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px; text-transform: uppercase;">' + tagSettings.text + '</div>';
+              return '<div style="position: absolute; top: -10px; left: 16px; background: ' + defaultColor + '; color: ' + tagTextColor + '; font-size: 9px; font-weight: 700; padding: 3px 8px; border-radius: 6px; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px; text-transform: uppercase;">' + tagSettings.text + '</div>';
           }
           return '';
       };
@@ -5337,37 +5353,48 @@ function darkenColor(hex, percent) {
       };
 
       if (showFullPrepaid) {
+          var prepaidTheme = {
+              bg: prepaidColor('cardBackgroundColor', '#f0fdf4'),
+              border: prepaidColor('borderColor', '#22c55e'),
+              iconColor: prepaidColor('iconColor', '#16a34a'),
+              iconBg: prepaidColor('iconBackgroundColor', '#dcfce7'),
+              titleColor: prepaidColor('textColor', '#166534'),
+              descColor: prepaidColor('descriptionColor', '#16a34a'),
+              descBg: prepaidColor('descriptionBackgroundColor', '#dcfce7'),
+              tagBg: prepaidColor('tagBackgroundColor', '#22c55e'),
+              tagText: prepaidColor('tagTextColor', 'white')
+          };
           var marginStyle = hasTag('full_prepaid') ? 'margin: 12px 0 0 0 !important;' : 'margin: 0 !important;';
-          html += '<label class="pm-row pm-prepaid" style="display: flex; flex-direction: column; background: #f0fdf4; border-radius: 12px; border: 1.5px solid #22c55e; cursor: pointer; position: relative; overflow: visible; padding: 0 !important; ' + marginStyle + ' box-sizing: border-box; opacity: 1;">';
+          html += '<label class="pm-row pm-prepaid" style="display: flex; flex-direction: column; background: ' + prepaidTheme.bg + '; border-radius: 12px; border: 1.5px solid ' + prepaidTheme.border + '; cursor: pointer; position: relative; overflow: visible; padding: 0 !important; ' + marginStyle + ' box-sizing: border-box; opacity: 1;">';
           var isPrepaidChecked = (defaultMethod === 'full_prepaid') ? 'checked' : '';
           html += '<input type="radio" name="payment_method" value="full_prepaid" ' + isPrepaidChecked + ' style="position:absolute; opacity:0; pointer-events:none; margin:0; padding:0;">';
-          html += renderTag('full_prepaid', '#22c55e');
+          html += renderTag('full_prepaid', prepaidTheme.tagBg, prepaidTheme.tagText);
           html += '<div style="display: flex; align-items: flex-start; gap: 12px; padding: 16px 12px 12px 12px; box-sizing: border-box; width: 100%; margin: 0;">';
-          html += '<div style="display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px; color: #16a34a; background-color: #dcfce7;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4" /><path d="M4 6v12c0 1.1.9 2 2 2h14v-4" /><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z" /></svg></div>';
+          html += '<div style="display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px; color: ' + prepaidTheme.iconColor + '; background-color: ' + prepaidTheme.iconBg + ';"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4" /><path d="M4 6v12c0 1.1.9 2 2 2h14v-4" /><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z" /></svg></div>';
           html += '<div style="flex: 1; min-width: 0; padding-top: 2px;">';
-          html += '<div style="font-weight: 700; font-size: 14px; color: #166534; line-height: 1.2;">Full Prepaid</div>';
+          html += '<div style="font-weight: 700; font-size: 14px; color: ' + prepaidTheme.titleColor + '; line-height: 1.2;">Full Prepaid</div>';
           var showFpSub = !ppSettings || ppSettings.show_full_prepaid_subtitle !== false;
           var fpSub = (ppSettings && ppSettings.full_prepaid_subtitle) || 'Pay now & get fastest delivery';
           if (showFpSub && fpSub) {
-              html += '<div style="color: #16a34a; font-size: 11px; margin-top: 4px; line-height: 1.3;">' + fpSub + '</div>';
+              html += '<div style="color: ' + prepaidTheme.descColor + '; font-size: 11px; margin-top: 4px; line-height: 1.3;">' + fpSub + '</div>';
           }
           html += '</div>';
           html += '<div style="display: flex; align-items: center; gap: 12px; flex-shrink: 0;">';
           html += '<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">';
           if (prepaidDiscountAmount > 0) {
-              html += '<div class="pm-prepaid-save-pill" style="background: #dcfce7; color: #166534; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 99px; line-height: 1; white-space: nowrap;">' + prepaidDiscountText + '</div>';
+              html += '<div class="pm-prepaid-save-pill" style="background: ' + prepaidTheme.descBg + '; color: ' + prepaidTheme.titleColor + '; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 99px; line-height: 1; white-space: nowrap;">' + prepaidDiscountText + '</div>';
           } else {
-              html += '<div class="pm-prepaid-save-pill" style="background: #dcfce7; color: #166534; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 99px; line-height: 1; display: none; white-space: nowrap;"></div>';
+              html += '<div class="pm-prepaid-save-pill" style="background: ' + prepaidTheme.descBg + '; color: ' + prepaidTheme.titleColor + '; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 99px; line-height: 1; display: none; white-space: nowrap;"></div>';
           }
           html += '<div style="display: flex; align-items: baseline; gap: 6px;">';
-          html += '<span class="pm-amt-prepaid" style="font-weight: 800; font-size: 15px; color: #166534;">' + formatMoney(finalPrepaidTotal) + '</span>';
+          html += '<span class="pm-amt-prepaid" style="font-weight: 800; font-size: 15px; color: ' + prepaidTheme.titleColor + ';">' + formatMoney(finalPrepaidTotal) + '</span>';
           html += '</div></div>';
           var isPrepaidChecked = (defaultMethod === 'full_prepaid') ? 'checked' : '';
-          html += '<input type="radio" name="payment_method_visual" class="pm-pill" ' + isPrepaidChecked + ' style="width: 18px; height: 18px; accent-color: #22c55e; margin: 0; pointer-events: none;">';
+          html += '<input type="radio" name="payment_method_visual" class="pm-pill" ' + isPrepaidChecked + ' style="width: 18px; height: 18px; accent-color: ' + prepaidTheme.border + '; margin: 0; pointer-events: none;">';
           html += '</div></div>';
           var prepaidDesc = ppSettings && ppSettings.payment_method_descriptions && ppSettings.payment_method_descriptions.full_prepaid ? ppSettings.payment_method_descriptions.full_prepaid : { enabled: true, text: 'Pay now, save more, receive sooner' };
           if (prepaidDesc.enabled) {
-              html += '<div style="background: #dcfce7; padding: 4px 12px; font-size: 11px; color: #166534; text-align: center; font-weight: 500; width: 100%; box-sizing: border-box; margin: 0; border-radius: 0 0 10.5px 10.5px;">' + prepaidDesc.text + '</div>';
+              html += '<div style="background: ' + prepaidTheme.descBg + '; padding: 4px 12px; font-size: 11px; color: ' + prepaidTheme.titleColor + '; text-align: center; font-weight: 500; width: 100%; box-sizing: border-box; margin: 0; border-radius: 0 0 10.5px 10.5px;">' + prepaidDesc.text + '</div>';
           }
           html += '</label>';
       }
@@ -5394,22 +5421,33 @@ function darkenColor(hex, percent) {
           }
           var depositText = formatMoney(depositAmount);
 
+          var partialTheme = {
+              bg: partialColor('cardBackgroundColor', '#eff6ff'),
+              border: partialColor('borderColor', '#2563eb'),
+              iconColor: partialColor('iconColor', '#2563eb'),
+              iconBg: partialColor('iconBackgroundColor', '#dbeafe'),
+              titleColor: partialColor('textColor', '#1e3a8a'),
+              descColor: partialColor('descriptionColor', '#2563eb'),
+              descBg: partialColor('descriptionBackgroundColor', '#dbeafe'),
+              tagBg: partialColor('tagBackgroundColor', '#2563eb'),
+              tagText: partialColor('tagTextColor', 'white')
+          };
           var marginStylePartial = hasTag('partial_payment') ? 'margin: 12px 0 0 0 !important;' : 'margin: 0 !important;';
-          html += '<label class="pm-row pm-partial" style="display: flex; flex-direction: column; background: #eff6ff; border-radius: 12px; border: 1.5px solid #2563eb; cursor: pointer; position: relative; overflow: visible; padding: 0 !important; ' + marginStylePartial + ' box-sizing: border-box;">';
+          html += '<label class="pm-row pm-partial" style="display: flex; flex-direction: column; background: ' + partialTheme.bg + '; border-radius: 12px; border: 1.5px solid ' + partialTheme.border + '; cursor: pointer; position: relative; overflow: visible; padding: 0 !important; ' + marginStylePartial + ' box-sizing: border-box;">';
           var isPartialChecked = (defaultMethod === 'partial_cod') ? 'checked' : '';
           html += '<input type="radio" name="payment_method" value="partial_cod" ' + isPartialChecked + ' style="position:absolute; opacity:0; pointer-events:none; margin:0; padding:0;">';
-          html += renderTag('partial_payment', '#2563eb');
+          html += renderTag('partial_payment', partialTheme.tagBg, partialTheme.tagText);
           html += '<div style="display: flex; align-items: flex-start; gap: 12px; padding: 16px 12px 12px 12px; box-sizing: border-box; width: 100%; margin: 0;">';
-          html += '<div style="display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px; color: #2563eb; background-color: #dbeafe;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg></div>';
+          html += '<div style="display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px; color: ' + partialTheme.iconColor + '; background-color: ' + partialTheme.iconBg + ';"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg></div>';
           html += '<div style="flex: 1; min-width: 0; padding-top: 2px;">';
-          html += '<div style="font-weight: 700; font-size: 14px; color: #1e3a8a; line-height: 1.2; display: flex; align-items: center; gap: 4px;">Partial Payment <svg width="14" height="14" viewBox="0 0 24 24" fill="#2563eb" stroke="#eff6ff" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/></svg></div>';
+          html += '<div style="font-weight: 700; font-size: 14px; color: ' + partialTheme.titleColor + '; line-height: 1.2; display: flex; align-items: center; gap: 4px;">Partial Payment <svg width="14" height="14" viewBox="0 0 24 24" fill="' + partialTheme.iconColor + '" stroke="' + partialTheme.bg + '" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9 12l2 2 4-4"/></svg></div>';
           var showPpSub = !ppSettings || ppSettings.show_partial_payment_subtitle !== false;
           var ppSub = ppSettings && ppSettings.partial_payment_subtitle;
           if (showPpSub) {
               if (ppSub) {
-                  html += '<div class="pm-desc-partial" style="color: #2563eb; font-size: 11px; margin-top: 4px; line-height: 1.3;">' + ppSub + '</div>';
+                  html += '<div class="pm-desc-partial" style="color: ' + partialTheme.descColor + '; font-size: 11px; margin-top: 4px; line-height: 1.3;">' + ppSub + '</div>';
               } else {
-                  html += '<div class="pm-desc-partial" style="color: #2563eb; font-size: 11px; margin-top: 4px; line-height: 1.3;">Pay ' + depositText + ' now • Rest on delivery</div>';
+                  html += '<div class="pm-desc-partial" style="color: ' + partialTheme.descColor + '; font-size: 11px; margin-top: 4px; line-height: 1.3;">Pay ' + depositText + ' now • Rest on delivery</div>';
               }
           }
           html += '</div>';
@@ -5417,22 +5455,22 @@ function darkenColor(hex, percent) {
           html += '<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">';
           if (ppSettings && ppSettings.cod_fee_enabled && ppSettings.cod_fee_amount) {
               var displayStyle = codFeeAmount > 0 ? 'block' : 'none';
-              html += '<div class="pm-cod-fee-pill" style="display: ' + displayStyle + '; background: #dbeafe; color: #1e3a8a; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 99px; line-height: 1; white-space: nowrap;">' + formatMoney(codFeeAmount) + ' ' + (ppSettings.cod_fee_name || 'COD fee') + '</div>';
+              html += '<div class="pm-cod-fee-pill" style="display: ' + displayStyle + '; background: ' + partialTheme.descBg + '; color: ' + partialTheme.titleColor + '; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 99px; line-height: 1; white-space: nowrap;">' + formatMoney(codFeeAmount) + ' ' + (ppSettings.cod_fee_name || 'COD fee') + '</div>';
           }
           if (partialDiscountAmount > 0) {
-              html += '<div class="pm-partial-save-pill" style="background: #dbeafe; color: #1e3a8a; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 99px; line-height: 1; white-space: nowrap;">' + partialDiscountText + '</div>';
+              html += '<div class="pm-partial-save-pill" style="background: ' + partialTheme.descBg + '; color: ' + partialTheme.titleColor + '; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 99px; line-height: 1; white-space: nowrap;">' + partialDiscountText + '</div>';
           } else {
-              html += '<div class="pm-partial-save-pill" style="background: #dbeafe; color: #1e3a8a; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 99px; line-height: 1; display: none; white-space: nowrap;"></div>';
+              html += '<div class="pm-partial-save-pill" style="background: ' + partialTheme.descBg + '; color: ' + partialTheme.titleColor + '; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 99px; line-height: 1; display: none; white-space: nowrap;"></div>';
           }
-          var amtColor = '#1e3a8a';
+          var amtColor = partialTheme.titleColor;
           html += '<span class="pm-amt-partial" style="font-weight: 800; font-size: 15px; color: ' + amtColor + ';">' + depositText + '</span>';
           html += '</div>';
           var isPartialChecked = (defaultMethod === 'partial_cod') ? 'checked' : '';
-          html += '<input type="radio" name="payment_method_visual" class="pm-pill" ' + isPartialChecked + ' style="width: 18px; height: 18px; accent-color: #2563eb; margin: 0; pointer-events: none;">';
+          html += '<input type="radio" name="payment_method_visual" class="pm-pill" ' + isPartialChecked + ' style="width: 18px; height: 18px; accent-color: ' + partialTheme.border + '; margin: 0; pointer-events: none;">';
           html += '</div></div>';
           var partialDesc = ppSettings && ppSettings.payment_method_descriptions && ppSettings.payment_method_descriptions.partial_payment ? ppSettings.payment_method_descriptions.partial_payment : { enabled: true, text: 'Secure your order • Avoid fake cancellations' };
           if (partialDesc.enabled) {
-              html += '<div style="background: #dbeafe; padding: 4px 12px; font-size: 11px; color: #1e40af; text-align: center; font-weight: 500; width: 100%; box-sizing: border-box; margin: 0; border-radius: 0 0 10.5px 10.5px;">' + partialDesc.text + '</div>';
+              html += '<div style="background: ' + partialTheme.descBg + '; padding: 4px 12px; font-size: 11px; color: ' + partialTheme.titleColor + '; text-align: center; font-weight: 500; width: 100%; box-sizing: border-box; margin: 0; border-radius: 0 0 10.5px 10.5px;">' + partialDesc.text + '</div>';
           }
           html += '</label>';
       }
@@ -5451,22 +5489,24 @@ function darkenColor(hex, percent) {
           var marginStyleCod = hasTag('pure_cod') ? 'margin: 12px 0 0 0 !important;' : 'margin: 0 !important;';
           var isOnlyCodEnabled = !showFullPrepaid && !showPartial && showFullCod;
           var theme = {
-              bg: isOnlyCodEnabled ? '#f0fdf4' : '#fff7ed',
-              border: isOnlyCodEnabled ? '#22c55e' : '#ea580c',
-              iconColor: isOnlyCodEnabled ? '#16a34a' : '#ea580c',
-              iconBg: isOnlyCodEnabled ? '#dcfce7' : '#ffedd5',
-              titleColor: isOnlyCodEnabled ? '#166534' : '#9a3412',
-              pillBg: isOnlyCodEnabled ? '#dcfce7' : '#ffedd5',
-              pillColor: isOnlyCodEnabled ? '#166534' : '#9a3412',
-              accent: isOnlyCodEnabled ? '#22c55e' : '#ea580c',
-              footerBg: isOnlyCodEnabled ? '#dcfce7' : '#ffedd5',
-              footerColor: isOnlyCodEnabled ? '#166534' : '#9a3412'
+              bg: codColor('cardBackgroundColor', isOnlyCodEnabled ? '#f0fdf4' : '#fff7ed'),
+              border: codColor('borderColor', isOnlyCodEnabled ? '#22c55e' : '#ea580c'),
+              iconColor: codColor('iconColor', isOnlyCodEnabled ? '#16a34a' : '#ea580c'),
+              iconBg: codColor('iconBackgroundColor', isOnlyCodEnabled ? '#dcfce7' : '#ffedd5'),
+              titleColor: codColor('textColor', isOnlyCodEnabled ? '#166534' : '#9a3412'),
+              pillBg: codColor('descriptionBackgroundColor', isOnlyCodEnabled ? '#dcfce7' : '#ffedd5'),
+              pillColor: codColor('textColor', isOnlyCodEnabled ? '#166534' : '#9a3412'),
+              accent: codColor('borderColor', isOnlyCodEnabled ? '#22c55e' : '#ea580c'),
+              footerBg: codColor('descriptionBackgroundColor', isOnlyCodEnabled ? '#dcfce7' : '#ffedd5'),
+              footerColor: codColor('textColor', isOnlyCodEnabled ? '#166534' : '#9a3412')
           };
+          theme.tagBg = codColor('tagBackgroundColor', theme.border);
+          theme.tagText = codColor('tagTextColor', 'white');
 
           html += '<label class="pm-row pm-cod" style="display: flex; flex-direction: column; background: ' + theme.bg + '; border-radius: 12px; border: 1.5px solid ' + theme.border + '; cursor: pointer; position: relative; overflow: visible; padding: 0 !important; ' + marginStyleCod + ' box-sizing: border-box;">';
           var isCodChecked = (defaultMethod === 'full_cod') ? 'checked' : '';
           html += '<input type="radio" name="payment_method" value="full_cod" ' + isCodChecked + ' style="position:absolute; opacity:0; pointer-events:none; margin:0; padding:0;">';
-          html += renderTag('pure_cod', theme.border);
+          html += renderTag('pure_cod', theme.tagBg, theme.tagText);
           html += '<div style="display: flex; align-items: flex-start; gap: 12px; padding: 16px 12px 12px 12px; box-sizing: border-box; width: 100%; margin: 0;">';
           html += '<div style="display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px; color: ' + theme.iconColor + '; background-color: ' + theme.iconBg + ';"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="1" ry="1" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg></div>';
           html += '<div style="flex: 1; min-width: 0; padding-top: 2px;">';
@@ -5528,13 +5568,19 @@ function darkenColor(hex, percent) {
                   var isChecked = rInput && rInput.checked;
                   if (rPill) rPill.checked = isChecked;
 
-                  // Update borders based on selection
+                  // Update borders based on selection — each card's own custom mode (if
+                  // set) uses one constant border color regardless of selection state.
                   if (row.classList.contains('pm-prepaid')) {
-                      row.style.borderColor = isChecked ? '#22c55e' : '#bbf7d0';
+                      var fpStyles = pmStyles.full_prepaid;
+                      row.style.borderColor = (fpStyles && fpStyles.mode === 'custom') ? fpStyles.borderColor : (isChecked ? '#22c55e' : '#bbf7d0');
                   } else if (row.classList.contains('pm-partial')) {
-                      row.style.borderColor = isChecked ? '#2563eb' : '#bfdbfe';
+                      var partialStyles = pmStyles.partial_payment;
+                      row.style.borderColor = (partialStyles && partialStyles.mode === 'custom') ? partialStyles.borderColor : (isChecked ? '#2563eb' : '#bfdbfe');
                   } else if (row.classList.contains('pm-cod')) {
-                      if (typeof isOnlyCodEnabled !== 'undefined' && isOnlyCodEnabled) {
+                      var codStyles = pmStyles.pure_cod;
+                      if (codStyles && codStyles.mode === 'custom') {
+                          row.style.borderColor = codStyles.borderColor;
+                      } else if (typeof isOnlyCodEnabled !== 'undefined' && isOnlyCodEnabled) {
                           row.style.borderColor = isChecked ? '#22c55e' : '#bbf7d0';
                       } else {
                           row.style.borderColor = isChecked ? '#ea580c' : '#fed7aa';

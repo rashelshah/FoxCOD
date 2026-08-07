@@ -307,3 +307,83 @@ export const DEFAULT_FORM_SUBMIT_BUTTON: FormSubmitButtonStyles = {
     shadow: true,
     shadowIntensity: 35,
 };
+
+/**
+ * Payment Mode card style overrides for a single card (Full Prepaid, Partial
+ * Payment, or Cash on Delivery). When mode is 'default', this card keeps its
+ * own built-in color theme; when 'custom', these colors override it.
+ * descriptionBackgroundColor is intentionally separate from
+ * iconBackgroundColor — it colors the bottom description/info bar and the
+ * "Save $X" / fee pill, not the icon circle.
+ */
+export interface PaymentModeCardStyle {
+    mode: 'default' | 'custom';
+    cardBackgroundColor: string;
+    borderColor: string;
+    descriptionColor: string;
+    descriptionBackgroundColor: string;
+    textColor: string;
+    iconColor: string;
+    iconBackgroundColor: string;
+    tagBackgroundColor: string;
+    tagTextColor: string;
+}
+
+/**
+ * Payment Mode card style overrides, one independent config per card, so
+ * each of the three payment method cards can be styled separately.
+ */
+export interface PaymentModeCardStyles {
+    full_prepaid: PaymentModeCardStyle;
+    partial_payment: PaymentModeCardStyle;
+    pure_cod: PaymentModeCardStyle;
+}
+
+/**
+ * Default per-card styles — each pre-filled with that card's existing
+ * built-in palette so switching to "Custom" starts from a sensible baseline.
+ */
+export const DEFAULT_PAYMENT_MODE_CARD_STYLE_FULL_PREPAID: PaymentModeCardStyle = {
+    mode: 'default',
+    cardBackgroundColor: '#F0FDF4',
+    borderColor: '#22C55E',
+    descriptionColor: '#16A34A',
+    descriptionBackgroundColor: '#DCFCE7',
+    textColor: '#166534',
+    iconColor: '#16A34A',
+    iconBackgroundColor: '#DCFCE7',
+    tagBackgroundColor: '#22C55E',
+    tagTextColor: '#FFFFFF',
+};
+
+export const DEFAULT_PAYMENT_MODE_CARD_STYLE_PARTIAL_PAYMENT: PaymentModeCardStyle = {
+    mode: 'default',
+    cardBackgroundColor: '#EFF6FF',
+    borderColor: '#2563EB',
+    descriptionColor: '#2563EB',
+    descriptionBackgroundColor: '#DBEAFE',
+    textColor: '#1E3A8A',
+    iconColor: '#2563EB',
+    iconBackgroundColor: '#DBEAFE',
+    tagBackgroundColor: '#2563EB',
+    tagTextColor: '#FFFFFF',
+};
+
+export const DEFAULT_PAYMENT_MODE_CARD_STYLE_PURE_COD: PaymentModeCardStyle = {
+    mode: 'default',
+    cardBackgroundColor: '#F0FDF4',
+    borderColor: '#22C55E',
+    descriptionColor: '#16A34A',
+    descriptionBackgroundColor: '#DCFCE7',
+    textColor: '#166534',
+    iconColor: '#16A34A',
+    iconBackgroundColor: '#DCFCE7',
+    tagBackgroundColor: '#22C55E',
+    tagTextColor: '#FFFFFF',
+};
+
+export const DEFAULT_PAYMENT_MODE_CARD_STYLES: PaymentModeCardStyles = {
+    full_prepaid: DEFAULT_PAYMENT_MODE_CARD_STYLE_FULL_PREPAID,
+    partial_payment: DEFAULT_PAYMENT_MODE_CARD_STYLE_PARTIAL_PAYMENT,
+    pure_cod: DEFAULT_PAYMENT_MODE_CARD_STYLE_PURE_COD,
+};

@@ -136,17 +136,20 @@ import {
     ShippingOption,
     ShippingOptions,
     FormSubmitButtonStyles,
+    PaymentModeCardStyle,
+    PaymentModeCardStyles,
     DEFAULT_FIELDS,
     DEFAULT_BLOCKS,
     DEFAULT_STYLES,
     DEFAULT_BUTTON_STYLES,
     DEFAULT_SHIPPING_OPTIONS,
     DEFAULT_FORM_SUBMIT_BUTTON,
+    DEFAULT_PAYMENT_MODE_CARD_STYLES,
 } from './form-builder.types';
 
 // Re-export for other modules
-export type { FormField, CouponConfig, ContentBlocks, FormStyles, ButtonStyles, ShippingOption, ShippingOptions, FormSubmitButtonStyles };
-export { DEFAULT_FIELDS, DEFAULT_BLOCKS, DEFAULT_STYLES, DEFAULT_BUTTON_STYLES, DEFAULT_SHIPPING_OPTIONS, DEFAULT_FORM_SUBMIT_BUTTON };
+export type { FormField, CouponConfig, ContentBlocks, FormStyles, ButtonStyles, ShippingOption, ShippingOptions, FormSubmitButtonStyles, PaymentModeCardStyle, PaymentModeCardStyles };
+export { DEFAULT_FIELDS, DEFAULT_BLOCKS, DEFAULT_STYLES, DEFAULT_BUTTON_STYLES, DEFAULT_SHIPPING_OPTIONS, DEFAULT_FORM_SUBMIT_BUTTON, DEFAULT_PAYMENT_MODE_CARD_STYLES };
 
 // =============================================
 // BRANDING TYPES
@@ -204,6 +207,8 @@ export interface FormSettings {
     coupons?: CouponConfig[];
     // Form submit button style overrides
     form_submit_button?: FormSubmitButtonStyles;
+    // Payment Mode selector card color overrides
+    payment_mode_card_styles?: PaymentModeCardStyles;
     // Merchant branding (JSONB column)
     branding?: Branding;
 }
@@ -282,6 +287,8 @@ export async function saveFormSettings(settings: FormSettings) {
                 coupons: settings.coupons || [],
                 // Form submit button style overrides
                 form_submit_button: settings.form_submit_button || DEFAULT_FORM_SUBMIT_BUTTON,
+                // Payment Mode selector card color overrides
+                payment_mode_card_styles: settings.payment_mode_card_styles || DEFAULT_PAYMENT_MODE_CARD_STYLES,
                 // Merchant branding
                 ...(settings.branding !== undefined ? { branding: settings.branding } : {}),
             },
