@@ -9,7 +9,7 @@ import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
 import { useLoaderData, useSubmit, useNavigation, Link, useActionData, Await } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
-import { RangeSlider, Button, InlineStack, Modal, Text, Icon, Select, TextField, ColorPicker, Banner, Popover, ActionList, Badge, Spinner } from "@shopify/polaris";
+import { RangeSlider, Button, InlineStack, BlockStack, Modal, Text, Icon, Select, TextField, ColorPicker, Banner, Popover, ActionList, Badge, Spinner, DropZone, ChoiceList } from "@shopify/polaris";
 import { EditIcon, DeleteIcon, ViewIcon, HideIcon, StarFilledIcon, ResetIcon, PlusIcon } from "@shopify/polaris-icons";
 import {
     DndContext,
@@ -50,6 +50,7 @@ import {
     type PaymentModeCardStyle,
     type PaymentModeCardStyles,
     type AnnouncementBannerSettings,
+    type FormLogoSettings,
     DEFAULT_FIELDS,
 
     DEFAULT_BLOCKS,
@@ -62,9 +63,12 @@ import {
     DEFAULT_PAYMENT_MODE_CARD_STYLE_PARTIAL_PAYMENT,
     DEFAULT_PAYMENT_MODE_CARD_STYLE_PURE_COD,
     DEFAULT_ANNOUNCEMENT_BANNER,
+    DEFAULT_FORM_LOGO,
 } from "../config/form-builder.types";
 import { ColorSelector, colorSelectorStyles } from "./ColorSelector";
 import { AnnouncementBannerPreview } from "./AnnouncementBannerPreview";
+import { FormLogoPreview } from "./FormLogoPreview";
+import { uploadImageToShopify } from "../services/shopify-file-upload.server";
 
 // Default settings for new shops
 const defaultSettings: Omit<FormSettings, "shop_domain"> = {
@@ -127,6 +131,7 @@ const defaultSettings: Omit<FormSettings, "shop_domain"> = {
     payment_mode_card_styles: DEFAULT_PAYMENT_MODE_CARD_STYLES,
     // Sliding announcement banner shown above the form title
     announcement_banner: DEFAULT_ANNOUNCEMENT_BANNER,
+    form_logo: DEFAULT_FORM_LOGO,
 };
 
 const PRESET_KEYS = new Set([
@@ -149,6 +154,13 @@ const PRESET_KEYS = new Set([
 function getSelectedPresetFromStyles(styles?: Partial<FormStyles> | null) {
     const themeKey = styles?.themeKey || 'custom';
     return PRESET_KEYS.has(themeKey) ? themeKey : 'custom';
+}
+
+// This is a compact popup form, not a page header — cap the logo so it can
+// never dominate the layout, even for settings saved before this cap existed.
+const MAX_FORM_LOGO_SIZE = 88;
+function clampFormLogo(logo: FormLogoSettings): FormLogoSettings {
+    return { ...logo, size: Math.min(Math.max(logo.size || DEFAULT_FORM_LOGO.size, 32), MAX_FORM_LOGO_SIZE) };
 }
 
 /**
@@ -206,6 +218,8 @@ async function ensureMetafieldDefinitions(admin: any) {
         { key: "branding_json", type: "json" },
         // Sliding announcement banner shown above the form title
         { key: "announcement_banner_json", type: "json" },
+        // Custom logo shown above the product image/title at the top of the form
+        { key: "form_logo_json", type: "json" },
     ];
 
     console.log('[Settings] Ensuring metafield definitions (parallel)...');
@@ -397,6 +411,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             styles: { ...DEFAULT_STYLES, ...(settings.styles || {}) },
             button_styles: { ...DEFAULT_BUTTON_STYLES, ...(settings.button_styles || {}) },
             announcement_banner: { ...DEFAULT_ANNOUNCEMENT_BANNER, ...(settings.announcement_banner || {}) },
+            form_logo: { ...DEFAULT_FORM_LOGO, ...(settings.form_logo || {}) },
         }
         : { ...defaultSettings, shop_domain: shopDomain };
     return { shop: shopDomain, settings: merged, shippingRates, appUrl, products, collections, shopCurrency, partialPaymentSettings };
@@ -594,6 +609,28 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
     }
 
+    // Custom form logo — parse settings and, if a new file was uploaded, push it to Shopify Files.
+    // Clamp size server-side too (not just in the slider) so a stale/tampered value can never
+    // reach the DB, the metafield, or the storefront render.
+    let formLogo: FormLogoSettings = clampFormLogo(JSON.parse(formData.get("form_logo") as string || JSON.stringify(defaultSettings.form_logo)));
+    const logoFile = formData.get("logo_file") as File | null;
+    if (logoFile && logoFile.size > 0) {
+        const ALLOWED_LOGO_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml', 'image/webp'];
+        if (!ALLOWED_LOGO_TYPES.includes(logoFile.type)) {
+            return { success: false, error: `Invalid logo file type: ${logoFile.type}. Allowed: PNG, JPG, JPEG, SVG, WEBP.` };
+        }
+        if (logoFile.size > 5 * 1024 * 1024) {
+            return { success: false, error: 'Logo file is too large. Maximum size is 5 MB.' };
+        }
+        try {
+            const logoUrl = await uploadImageToShopify(admin, logoFile);
+            formLogo = { ...formLogo, logo_url: logoUrl };
+        } catch (uploadError: any) {
+            console.error('[Settings] Error uploading form logo:', uploadError);
+            return { success: false, error: uploadError.message || 'Failed to upload logo' };
+        }
+    }
+
     // Parse all form data including new JSONB fields
     const settings: FormSettings = {
         shop_domain: shopDomain,
@@ -640,6 +677,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         payment_mode_card_styles: JSON.parse(formData.get("payment_mode_card_styles") as string || JSON.stringify(defaultSettings.payment_mode_card_styles)),
         // Sliding announcement banner shown above the form title
         announcement_banner: JSON.parse(formData.get("announcement_banner") as string || JSON.stringify(defaultSettings.announcement_banner)),
+        // Custom logo shown above the product image/title at the top of the form
+        form_logo: formLogo,
     };
 
     // Save to Supabase
@@ -659,6 +698,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
         if (dbError.message?.includes('announcement_banner')) {
             return { success: false, error: 'Database migration needed: Run add_announcement_banner.sql in Supabase' };
+        }
+        if (dbError.message?.includes('form_logo')) {
+            return { success: false, error: 'Database migration needed: Run add_form_logo.sql in Supabase' };
         }
         return { success: false, error: dbError.message || 'Failed to save to database' };
     }
@@ -796,6 +838,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     { ownerId: shopGid, namespace: "fox_cod", key: "payment_mode_card_styles_json", value: JSON.stringify(settings.payment_mode_card_styles || DEFAULT_PAYMENT_MODE_CARD_STYLES), type: "json" },
                     // Sliding announcement banner shown above the form title
                     { ownerId: shopGid, namespace: "fox_cod", key: "announcement_banner_json", value: JSON.stringify(settings.announcement_banner || DEFAULT_ANNOUNCEMENT_BANNER), type: "json" },
+                    // Custom logo shown above the product image/title at the top of the form
+                    { ownerId: shopGid, namespace: "fox_cod", key: "form_logo_json", value: JSON.stringify(settings.form_logo || DEFAULT_FORM_LOGO), type: "json" },
                 ]
             }
         });
@@ -830,7 +874,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         console.error("Error saving metafields:", error);
     }
 
-    return { success: true };
+    // Echo back the resolved form_logo (has the real Shopify CDN URL if a file
+    // was uploaded this request) so the frontend can sync its local state.
+    return { success: true, form_logo: formLogo };
 };
 
 // Helper to darken a hex color for gradient
@@ -980,7 +1026,7 @@ const PreviewDisplay = memo(({
     primaryColor, buttonStyle, buttonSize, borderRadius, modalStyle, animationStyle,
     fields, formStyles, buttonStylesState, blocks, shippingOpts, shippingRates, shippingRatesEnabled, activeTab,
     fmtCurrency, currencySymbol, formSubmitButtonState, partialCodEnabled, partialCodAdvanceAmount, partialPaymentSettings, formType,
-    paymentModeCardStyles, announcementBanner
+    paymentModeCardStyles, announcementBanner, formLogo, logoPreviewUrl
 }: any) => {
     const [previewDevice, setPreviewDevice] = useState<'mobile' | 'desktop'>('mobile');
 
@@ -1392,6 +1438,12 @@ const PreviewDisplay = memo(({
                                 {previewDevice === 'desktop' && activeTab !== 'button' && (
                                     <div style={{ position: 'absolute', top: '12px', right: '12px', width: '28px', height: '28px', borderRadius: '50%', background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 10 }}>
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                    </div>
+                                )}
+                                {/* Custom Branding — logo above the product image/title */}
+                                {activeTab !== 'button' && (
+                                    <div style={ (formLogo?.enabled && (logoPreviewUrl || formLogo?.logo_url)) ? { marginTop: previewDevice === 'desktop' ? '-20px' : '-12px', marginBottom: '-4px' } : {} }>
+                                        <FormLogoPreview logo={{ ...formLogo, logo_url: logoPreviewUrl || formLogo.logo_url }} />
                                     </div>
                                 )}
                                 {/* Product Info - horizontal layout matching storefront mobile */}
@@ -2792,6 +2844,23 @@ export default function SettingsPage() {
     const [formSubmitButtonState, setFormSubmitButtonState] = useState<FormSubmitButtonStyles>(settings.form_submit_button || DEFAULT_FORM_SUBMIT_BUTTON);
     const [paymentModeCardStyles, setPaymentModeCardStyles] = useState<PaymentModeCardStyles>(settings.payment_mode_card_styles || DEFAULT_PAYMENT_MODE_CARD_STYLES);
     const [announcementBanner, setAnnouncementBanner] = useState<AnnouncementBannerSettings>(settings.announcement_banner || DEFAULT_ANNOUNCEMENT_BANNER);
+    const [formLogo, setFormLogo] = useState<FormLogoSettings>(clampFormLogo(settings.form_logo || DEFAULT_FORM_LOGO));
+    const [logoFile, setLogoFile] = useState<File | null>(null);
+    const [logoPreviewUrl, setLogoPreviewUrl] = useState<string>(settings.form_logo?.logo_url || '');
+
+    const handleLogoDrop = useCallback((_dropFiles: File[], acceptedFiles: File[]) => {
+        const file = acceptedFiles[0];
+        if (!file) return;
+        setLogoFile(file);
+        setLogoPreviewUrl(URL.createObjectURL(file));
+        setFormLogo(prev => ({ ...prev, enabled: true }));
+    }, []);
+
+    const handleRemoveFormLogo = useCallback(() => {
+        setLogoFile(null);
+        setLogoPreviewUrl('');
+        setFormLogo(prev => ({ ...prev, logo_url: '', enabled: false }));
+    }, []);
     const [showAddFieldModal, setShowAddFieldModal] = useState(false);
     const [newFieldType, setNewFieldType] = useState<'text' | 'number' | 'dropdown' | 'checkbox'>('text');
     const [newFieldLabel, setNewFieldLabel] = useState('');
@@ -2959,7 +3028,8 @@ export default function SettingsPage() {
             partial_cod_commission: partialCodCommission, shipping_rates_enabled: shippingRatesEnabled,
             enable_coupon_field: couponFieldEnabled, coupon_field_position: couponFieldPosition,
             form_submit_button: formSubmitButtonState, payment_mode_card_styles: paymentModeCardStyles,
-            announcement_banner: announcementBanner
+            announcement_banner: announcementBanner,
+            form_logo: formLogo
         };
 
         // Robust deep equality check instead of JSON.stringify which is vulnerable to key ordering
@@ -2977,7 +3047,7 @@ export default function SettingsPage() {
             settingsChanged = true;
         }
 
-        return settingsChanged || pendingShippingOps.length > 0;
+        return settingsChanged || pendingShippingOps.length > 0 || !!logoFile;
     }, [
         enabled, buttonText, primaryColor, requiredFields, maxQuantity, buttonStyle, buttonSize, buttonPosition,
         formTitle, formSubtitle, successMessage, submitButtonText, showProductImage, showPrice, showQuantitySelector,
@@ -2985,7 +3055,7 @@ export default function SettingsPage() {
         modalStyle, animationStyle, borderRadius, formType, fields, blocks,
         formStyles, buttonStylesState, shippingOpts, partialCodEnabled, partialCodAdvanceAmount, partialCodCommission,
         shippingRatesEnabled, couponFieldEnabled, couponFieldPosition, savedSettingsString, pendingShippingOps, formSubmitButtonState,
-        paymentModeCardStyles, announcementBanner
+        paymentModeCardStyles, announcementBanner, formLogo, logoFile
     ]);
 
     // Discard handler - reset all fields to saved values
@@ -3025,6 +3095,9 @@ export default function SettingsPage() {
         setFormSubmitButtonState(orig.form_submit_button || DEFAULT_FORM_SUBMIT_BUTTON);
         setPaymentModeCardStyles(orig.payment_mode_card_styles || DEFAULT_PAYMENT_MODE_CARD_STYLES);
         setAnnouncementBanner(orig.announcement_banner || DEFAULT_ANNOUNCEMENT_BANNER);
+        setFormLogo(clampFormLogo(orig.form_logo || DEFAULT_FORM_LOGO));
+        setLogoFile(null);
+        setLogoPreviewUrl((orig.form_logo || DEFAULT_FORM_LOGO).logo_url || '');
         // Reset pending shipping operations and restore original rates
         setPendingShippingOps([]);
         setShippingRates(initialShippingRates || []);
@@ -3140,8 +3213,16 @@ export default function SettingsPage() {
                     partial_cod_commission: partialCodCommission, shipping_rates_enabled: shippingRatesEnabled,
                     enable_coupon_field: couponFieldEnabled, coupon_field_position: couponFieldPosition,
                     form_submit_button: formSubmitButtonState, payment_mode_card_styles: paymentModeCardStyles,
-                    announcement_banner: announcementBanner
+                    announcement_banner: announcementBanner,
+                    form_logo: (actionData as any).form_logo || formLogo
                 };
+                // Sync the resolved logo (real Shopify CDN URL) back into state and
+                // clear the pending File now that it's been persisted.
+                if ((actionData as any).form_logo) {
+                    setFormLogo((actionData as any).form_logo);
+                    setLogoPreviewUrl((actionData as any).form_logo.logo_url || '');
+                }
+                setLogoFile(null);
                 setSavedSettingsString(JSON.stringify(currentSettings));
                 shopify.toast.show("Settings saved successfully!");
                 setSaveError(null);
@@ -3158,7 +3239,7 @@ export default function SettingsPage() {
         formTitle, formSubtitle, successMessage, submitButtonText, showProductImage, showPrice, showQuantitySelector,
         showEmailField, showNotesField, emailRequired,
         modalStyle, animationStyle, borderRadius, formType, fields, blocks,
-        formStyles, buttonStylesState, shippingOpts, partialCodEnabled, partialCodAdvanceAmount, partialCodCommission, shippingRatesEnabled, couponFieldEnabled, couponFieldPosition, formSubmitButtonState, paymentModeCardStyles, announcementBanner, shopify]);
+        formStyles, buttonStylesState, shippingOpts, partialCodEnabled, partialCodAdvanceAmount, partialCodCommission, shippingRatesEnabled, couponFieldEnabled, couponFieldPosition, formSubmitButtonState, paymentModeCardStyles, announcementBanner, formLogo, shopify]);
 
     // Hex validation helpers
     const isValidHex = (hex: string): boolean => {
@@ -3323,8 +3404,10 @@ export default function SettingsPage() {
         formData.append("form_submit_button", JSON.stringify(formSubmitButtonState));
         formData.append("payment_mode_card_styles", JSON.stringify(paymentModeCardStyles));
         formData.append("announcement_banner", JSON.stringify(announcementBanner));
+        formData.append("form_logo", JSON.stringify(formLogo));
+        if (logoFile) formData.append("logo_file", logoFile);
 
-        submit(formData, { method: "post" });
+        submit(formData, { method: "post", encType: "multipart/form-data" });
 
         // Process pending shipping rate operations
         if (pendingShippingOps.length > 0) {
@@ -3355,7 +3438,7 @@ export default function SettingsPage() {
         formStyles, buttonStylesState, shippingOpts,
         partialCodEnabled, partialCodAdvanceAmount, partialCodCommission,
         shippingRatesEnabled, submit, shopify, pendingShippingOps,
-        formSubmitButtonState, paymentModeCardStyles, announcementBanner
+        formSubmitButtonState, paymentModeCardStyles, announcementBanner, formLogo, logoFile
     ]);
 
     // Show/hide native Shopify save bar based on unsaved changes
@@ -6387,6 +6470,139 @@ export default function SettingsPage() {
                                         )}
                                     </AccordionSection>
 
+                                    {/* Custom Branding — logo shown above the product image/title */}
+                                    <AccordionSection id="form-logo" tab="form" title="Custom Branding (Logo)" helperText="Show your store logo at the very top of the form, above the product image and name." expandedSection={expandedSection} toggleSection={toggleSection}>
+                                        <div className="toggle-option" style={{ marginBottom: '16px' }} onClick={() => setFormLogo(prev => ({ ...prev, enabled: !prev.enabled }))}>
+                                            <span className="toggle-option-label">Show Custom Logo</span>
+                                            <div className={`mini-toggle ${formLogo.enabled ? 'on' : 'off'}`} />
+                                        </div>
+
+                                        {formLogo.enabled && (
+                                            <>
+                                                <div className="input-group" style={{ marginBottom: '16px' }}>
+                                                    <label className="input-label" style={{ marginBottom: '6px' }}>Logo Image</label>
+                                                    <Text variant="bodySm" tone="subdued" as="p">PNG, JPG, SVG, WEBP · Max 5 MB</Text>
+                                                    <div style={{ marginTop: '8px' }}>
+                                                        {logoPreviewUrl ? (
+                                                            <InlineStack gap="400" align="start" blockAlign="center">
+                                                                <div style={{ width: 64, height: 64, border: '1px solid #e5e7eb', borderRadius: 8, padding: 4, background: 'white', flexShrink: 0 }}>
+                                                                    <img src={logoPreviewUrl} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                                                                </div>
+                                                                <BlockStack gap="200">
+                                                                    <div style={{ width: 180 }}>
+                                                                        <DropZone allowMultiple={false} onDrop={handleLogoDrop} accept="image/png, image/jpeg, image/svg+xml, image/webp">
+                                                                            <DropZone.FileUpload actionTitle="Replace Logo" />
+                                                                        </DropZone>
+                                                                    </div>
+                                                                    <Button tone="critical" variant="plain" onClick={handleRemoveFormLogo}>Remove</Button>
+                                                                </BlockStack>
+                                                            </InlineStack>
+                                                        ) : (
+                                                            <DropZone allowMultiple={false} onDrop={handleLogoDrop} accept="image/png, image/jpeg, image/svg+xml, image/webp">
+                                                                <DropZone.FileUpload />
+                                                            </DropZone>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {logoPreviewUrl && (
+                                                    <>
+                                                        {/* Alignment */}
+                                                        <div className="input-group" style={{ marginTop: 12 }}>
+                                                            <label className="input-label">Logo Alignment</label>
+                                                            <div className="style-options">
+                                                                {([
+                                                                    { value: 'left', label: 'Left' },
+                                                                    { value: 'center', label: 'Center' },
+                                                                    { value: 'right', label: 'Right' },
+                                                                ] as const).map((opt) => (
+                                                                    <button
+                                                                        key={opt.value}
+                                                                        type="button"
+                                                                        className={`style-option ${formLogo.align === opt.value ? 'active' : ''}`}
+                                                                        onClick={() => setFormLogo(prev => ({ ...prev, align: opt.value }))}
+                                                                    >
+                                                                        {opt.label}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Logo Size */}
+                                                        <div className="input-group" style={{ marginTop: 12 }}>
+                                                            <label className="input-label">Logo Height: {formLogo.size}px</label>
+                                                            <p className="setting-helper" style={{ margin: '0 0 6px' }}>Sets the logo's height — width follows its natural proportions automatically. Keep it modest, this is a compact popup form: 40–64px reads best.</p>
+                                                            <div style={{ padding: '0 8px', width: '100%' }}>
+                                                                <RangeSlider
+                                                                    labelHidden
+                                                                    label="Logo Size"
+                                                                    min={32}
+                                                                    max={88}
+                                                                    step={4}
+                                                                    value={Math.min(formLogo.size, 88)}
+                                                                    onChange={(v) => setFormLogo(prev => ({ ...prev, size: Number(v) }))}
+                                                                    output
+                                                                />
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Image Zoom */}
+                                                        <div className="input-group" style={{ marginTop: 12 }}>
+                                                            <label className="input-label">Image Zoom: {formLogo.zoom}%</label>
+                                                            <p className="setting-helper" style={{ margin: '0 0 6px' }}>Scale the image up or down to fit perfectly inside the logo container.</p>
+                                                            <div style={{ padding: '0 8px', width: '100%' }}>
+                                                                <RangeSlider
+                                                                    labelHidden
+                                                                    label="Image Zoom"
+                                                                    min={50}
+                                                                    max={200}
+                                                                    step={5}
+                                                                    value={formLogo.zoom}
+                                                                    onChange={(v) => setFormLogo(prev => ({ ...prev, zoom: Number(v) }))}
+                                                                    output
+                                                                />
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Logo Shape */}
+                                                        <div className="input-group" style={{ marginTop: 12 }}>
+                                                            <label className="input-label" style={{ marginBottom: '6px' }}>Logo Shape</label>
+                                                            <ChoiceList
+                                                                title="Logo Shape"
+                                                                titleHidden
+                                                                choices={[
+                                                                    { label: 'Original', value: 'original' },
+                                                                    { label: 'Rounded', value: 'rounded' },
+                                                                    { label: 'Circle', value: 'circle' },
+                                                                ]}
+                                                                selected={[formLogo.shape]}
+                                                                onChange={(selected) => setFormLogo(prev => ({ ...prev, shape: selected[0] as 'original' | 'rounded' | 'circle' }))}
+                                                            />
+                                                        </div>
+
+                                                        {/* Logo Background — soft backdrop so the logo reads as an intentional badge */}
+                                                        <div className="toggle-option" style={{ marginTop: 16 }} onClick={() => setFormLogo(prev => ({ ...prev, background: !prev.background }))}>
+                                                            <span className="toggle-option-label">Logo Background</span>
+                                                            <div className={`mini-toggle ${formLogo.background ? 'on' : 'off'}`} />
+                                                        </div>
+                                                        <p className="setting-helper" style={{ margin: '4px 0 0' }}>
+                                                            Adds a soft padded card with a subtle shadow behind the logo. Recommended for square or transparent-background logos — turn off if your logo image already looks like a finished wordmark (e.g. text on transparent background).
+                                                        </p>
+                                                        {formLogo.background && (
+                                                            <div className="input-group" style={{ marginTop: 12, maxWidth: 220 }}>
+                                                                <ColorSelector
+                                                                    label="Background Color"
+                                                                    value={formLogo.backgroundColor || '#f3f4f6'}
+                                                                    onChange={(c: string) => setFormLogo(prev => ({ ...prev, backgroundColor: c }))}
+                                                                />
+                                                            </div>
+                                                        )}
+                                                    </>
+                                                )}
+                                            </>
+                                        )}
+                                    </AccordionSection>
+
                                     {/* Add Field Modal — Polaris UI */}
                                     <Modal
                                         open={showAddFieldModal}
@@ -6673,6 +6889,8 @@ export default function SettingsPage() {
                                 partialPaymentSettings={partialPaymentSettings}
                                 paymentModeCardStyles={paymentModeCardStyles}
                                 announcementBanner={announcementBanner}
+                                formLogo={formLogo}
+                                logoPreviewUrl={logoPreviewUrl}
                             />
                         </div>
 

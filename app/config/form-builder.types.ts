@@ -429,3 +429,33 @@ export const DEFAULT_ANNOUNCEMENT_BANNER: AnnouncementBannerSettings = {
     backgroundColor: '#111827',
     textColor: '#ffffff',
 };
+
+/**
+ * Custom store logo shown above the product image/title at the top of the
+ * COD form. Toggleable, with the same size/zoom/shape controls as the
+ * checkout-redirect Branding logo (see BrandingCheckoutRedirect), plus
+ * horizontal alignment which that one doesn't need since it's always centered.
+ */
+export interface FormLogoSettings {
+    enabled: boolean;
+    logo_url: string;
+    align: 'left' | 'center' | 'right';
+    size: number;
+    zoom: number;
+    shape: 'original' | 'rounded' | 'circle';
+    // Soft backdrop card behind the logo (padding + shadow) so it reads as an
+    // intentional badge instead of a raw image floating on the form background.
+    background: boolean;
+    backgroundColor: string;
+}
+
+export const DEFAULT_FORM_LOGO: FormLogoSettings = {
+    enabled: false,
+    logo_url: '',
+    align: 'center',
+    size: 48,
+    zoom: 100,
+    shape: 'rounded',
+    background: true,
+    backgroundColor: '#f3f4f6',
+};

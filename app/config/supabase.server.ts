@@ -139,6 +139,7 @@ import {
     PaymentModeCardStyle,
     PaymentModeCardStyles,
     AnnouncementBannerSettings,
+    FormLogoSettings,
     DEFAULT_FIELDS,
     DEFAULT_BLOCKS,
     DEFAULT_STYLES,
@@ -147,11 +148,12 @@ import {
     DEFAULT_FORM_SUBMIT_BUTTON,
     DEFAULT_PAYMENT_MODE_CARD_STYLES,
     DEFAULT_ANNOUNCEMENT_BANNER,
+    DEFAULT_FORM_LOGO,
 } from './form-builder.types';
 
 // Re-export for other modules
-export type { FormField, CouponConfig, ContentBlocks, FormStyles, ButtonStyles, ShippingOption, ShippingOptions, FormSubmitButtonStyles, PaymentModeCardStyle, PaymentModeCardStyles, AnnouncementBannerSettings };
-export { DEFAULT_FIELDS, DEFAULT_BLOCKS, DEFAULT_STYLES, DEFAULT_BUTTON_STYLES, DEFAULT_SHIPPING_OPTIONS, DEFAULT_FORM_SUBMIT_BUTTON, DEFAULT_PAYMENT_MODE_CARD_STYLES, DEFAULT_ANNOUNCEMENT_BANNER };
+export type { FormField, CouponConfig, ContentBlocks, FormStyles, ButtonStyles, ShippingOption, ShippingOptions, FormSubmitButtonStyles, PaymentModeCardStyle, PaymentModeCardStyles, AnnouncementBannerSettings, FormLogoSettings };
+export { DEFAULT_FIELDS, DEFAULT_BLOCKS, DEFAULT_STYLES, DEFAULT_BUTTON_STYLES, DEFAULT_SHIPPING_OPTIONS, DEFAULT_FORM_SUBMIT_BUTTON, DEFAULT_PAYMENT_MODE_CARD_STYLES, DEFAULT_ANNOUNCEMENT_BANNER, DEFAULT_FORM_LOGO };
 
 // =============================================
 // BRANDING TYPES
@@ -213,6 +215,8 @@ export interface FormSettings {
     payment_mode_card_styles?: PaymentModeCardStyles;
     // Sliding announcement banner shown above the form title
     announcement_banner?: AnnouncementBannerSettings;
+    // Custom logo shown above the product image/title at the top of the form
+    form_logo?: FormLogoSettings;
     // Merchant branding (JSONB column)
     branding?: Branding;
 }
@@ -295,6 +299,8 @@ export async function saveFormSettings(settings: FormSettings) {
                 payment_mode_card_styles: settings.payment_mode_card_styles || DEFAULT_PAYMENT_MODE_CARD_STYLES,
                 // Sliding announcement banner shown above the form title
                 announcement_banner: settings.announcement_banner || DEFAULT_ANNOUNCEMENT_BANNER,
+                // Custom logo shown above the product image/title at the top of the form
+                form_logo: settings.form_logo || DEFAULT_FORM_LOGO,
                 // Merchant branding
                 ...(settings.branding !== undefined ? { branding: settings.branding } : {}),
             },

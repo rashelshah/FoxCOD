@@ -108,6 +108,9 @@
 {% assign cod_banner = shop.metafields.fox_cod.announcement_banner_json.value %}
 {% assign cod_banner_statements = cod_banner.statements %}
 
+{% comment %} Custom logo shown above the product image/title at the top of the form {% endcomment %}
+{% assign cod_form_logo = shop.metafields.fox_cod.form_logo_json.value %}
+
 {% comment %} Build product collection IDs for shipping rate collection matching {% endcomment %}
 {% assign product_collection_ids = '' %}
 {% if product %}
@@ -438,6 +441,73 @@
   
   {% comment %} Close Button {% endcomment %}
   <button type="button" class="cod-close-btn" data-cod-close="{{ instance_id }}">&times;</button>
+
+  {% comment %}
+    Custom Branding — store logo above the product image/title, shown inside a soft "badge"
+    backdrop (unless disabled) so it reads as an intentional element rather than a raw image
+    floating on the form background.
+    The badge is height-driven, not a forced square: most logos (wordmarks, logo+text lockups)
+    are wider than tall, so cramming them into a 1:1 box either crops them or leaves them tiny
+    with dead space on both sides. Circle is the one shape where a square footprint is actually
+    correct (it's an avatar treatment), so it keeps a square window; Original/Rounded get a wide
+    rectangular window sized to the logo's own proportions instead.
+    Size vs. Zoom are deliberately independent: Size fixes the badge's own footprint (the only
+    thing that should push the rest of the form down when changed). Zoom only scales the <img>
+    *inside* that fixed-height window, so it never changes the badge's footprint or shifts layout.
+  {% endcomment %}
+  {% if cod_form_logo.enabled and cod_form_logo.logo_url != blank %}
+    {% assign cod_logo_is_circle = false %}
+    {% if cod_form_logo.shape == 'circle' %}{% assign cod_logo_is_circle = true %}{% endif %}
+    {% comment %} Cap defensively — this is a compact popup form, not a page header, and stale saved values from before this cap existed must never render huge {% endcomment %}
+    {% assign cod_logo_height = cod_form_logo.size | default: 48 | at_most: 88 %}
+    {% assign cod_logo_zoom = cod_form_logo.zoom | default: 100 %}
+    {% assign cod_logo_zoomed_height = cod_logo_height | times: cod_logo_zoom | divided_by: 100 %}
+    {% assign cod_logo_justify = 'center' %}
+    {% if cod_form_logo.align == 'left' %}
+      {% assign cod_logo_justify = 'flex-start' %}
+    {% elsif cod_form_logo.align == 'right' %}
+      {% assign cod_logo_justify = 'flex-end' %}
+    {% endif %}
+    {% assign cod_logo_radius = '0px' %}
+    {% if cod_logo_is_circle %}
+      {% assign cod_logo_radius = '50%' %}
+    {% elsif cod_form_logo.shape == 'rounded' %}
+      {% assign cod_logo_radius = '10px' %}
+    {% endif %}
+    {% assign cod_logo_bg_enabled = cod_form_logo.background %}
+    {% if cod_logo_bg_enabled == nil %}{% assign cod_logo_bg_enabled = true %}{% endif %}
+    {% assign cod_logo_container_radius = '16px' %}
+    {% if cod_logo_is_circle %}{% assign cod_logo_container_radius = '50%' %}{% endif %}
+    {% assign cod_logo_padding = 0 %}
+    {% assign cod_logo_bg_style = 'background:transparent;' %}
+    {% if cod_logo_bg_enabled %}
+      {% assign cod_logo_padding = cod_logo_height | times: 0.14 | round | at_least: 8 | at_most: 14 %}
+      {% assign cod_logo_bg_color = cod_form_logo.backgroundColor | default: '#f3f4f6' %}
+      {% assign cod_logo_bg_style = 'background:' | append: cod_logo_bg_color | append: '; box-shadow:0 4px 14px rgba(0,0,0,0.08); border:1px solid rgba(0,0,0,0.04);' %}
+    {% endif %}
+    {% assign cod_logo_window_width = cod_logo_height | times: 2.6 | round %}
+    {% if cod_logo_is_circle %}{% assign cod_logo_window_width = cod_logo_height %}{% endif %}
+    {% assign cod_logo_container_width = cod_logo_window_width | plus: cod_logo_padding | plus: cod_logo_padding %}
+    {% assign cod_logo_container_height = cod_logo_height | plus: cod_logo_padding | plus: cod_logo_padding %}
+    <div class="cod-form-logo" style="display:flex; justify-content:{{ cod_logo_justify }}; margin-top:-16px; margin-bottom:-4px;">
+      <div style="width:{{ cod_logo_container_width }}px; height:{{ cod_logo_container_height }}px; padding:{{ cod_logo_padding }}px; box-sizing:border-box; border-radius:{{ cod_logo_container_radius }}; {{ cod_logo_bg_style }} display:flex; align-items:center; justify-content:center;">
+        {% comment %} Fixed-height clipped window — this is the "logo container" the Zoom slider scales inside of {% endcomment %}
+        <div style="width:{{ cod_logo_window_width }}px; height:{{ cod_logo_height }}px; overflow:hidden; border-radius:{{ cod_logo_radius }}; flex-shrink:0; display:flex; align-items:center; justify-content:center;">
+          {% if cod_logo_is_circle %}
+            <img src="{{ cod_form_logo.logo_url }}"
+                 alt="{{ shop.name }}"
+                 style="display:block; width:{{ cod_logo_zoomed_height }}px; height:{{ cod_logo_zoomed_height }}px; flex-shrink:0; object-fit:cover;"
+                 loading="lazy">
+          {% else %}
+            <img src="{{ cod_form_logo.logo_url }}"
+                 alt="{{ shop.name }}"
+                 style="display:block; height:{{ cod_logo_zoomed_height }}px; width:auto; max-width:none; object-fit:contain;"
+                 loading="lazy">
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  {% endif %}
 
   {% comment %} Product Info {% endcomment %}
   {% if cod_show_product_image == 'true' or cod_show_price == 'true' %}

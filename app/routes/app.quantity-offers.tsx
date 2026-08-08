@@ -46,6 +46,7 @@ import { supabase } from "../config/supabase.server";
 import { getFormSettings, getCachedShopCurrency } from "../config/supabase.server";
 import { DEFAULT_FIELDS } from "../config/form-builder.types";
 import { getPartialPaymentSettings } from "../services/partial-payment-settings.server";
+import { FormLogoPreview } from "./FormLogoPreview";
 import { syncOffersToMetafield, applyThemeToOfferGroups } from "../services/quantity-offers-sync.server";
 import { extractThemeSettings, deriveOfferDesignColors } from "../utils/themeExtraction";
 
@@ -1275,6 +1276,10 @@ export default function QuantityOffersPage() {
                                                     }
                                                     return base;
                                                 })()}>
+                                                    {/* Custom Branding — logo above the form title */}
+                                                    <div style={ (formSettings?.form_logo?.enabled && formSettings?.form_logo?.logo_url) ? { marginTop: previewDevice === 'desktop' ? '-20px' : '-12px', marginBottom: '-4px' } : {} }>
+                                                        <FormLogoPreview logo={formSettings?.form_logo} />
+                                                    </div>
                                                     <AnnouncementBannerPreview banner={formSettings?.announcement_banner} />
                                                     {/* Form Title */}
                                                     {formSettings?.blocks?.show_form_title !== false && (
@@ -1451,7 +1456,6 @@ export default function QuantityOffersPage() {
                                                             })}
                                                         </div>
                                                     )}
-
                                                     {/* Dynamic Form Fields - from Form Builder (including shipping/order summary in drag-drop order) */}
                                                     {(mergedFields as any[])
                                                         .filter((f: any) => f.visible)

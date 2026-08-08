@@ -11,6 +11,7 @@ import { getUpsellCampaigns, saveCampaign, deleteCampaign, toggleCampaignActive,
 import { type UpsellCampaign, type UpsellType, type CampaignOffer, type CampaignDesign, type ButtonDesign, createDefaultCampaign, createDefaultOffer, DEFAULT_CAMPAIGN_DESIGN } from "../config/upsell-offers.types";
 import { ColorSelector, colorSelectorStyles } from "./ColorSelector";
 import { AnnouncementBannerPreview } from "./AnnouncementBannerPreview";
+import { FormLogoPreview } from "./FormLogoPreview";
 import { Page, Layout, Tabs, Card, Button, Badge, EmptyState, Text, InlineStack, BlockStack, Box, Divider, TextField, Select, ButtonGroup, Banner, LegacyCard, RangeSlider, Modal } from "@shopify/polaris";
 import { EditIcon, DeleteIcon } from "@shopify/polaris-icons";
 import { getFormSettings, getCachedShopCurrency } from "../config/supabase.server";
@@ -829,7 +830,11 @@ export default function UpsellDownsellPage() {
                                                         }
                                                         return base;
                                                     })()}>
-                                                        <AnnouncementBannerPreview banner={formSettings?.announcement_banner} />
+
+                                                        {/* Custom Branding — logo above the product info */}
+                                                        <div style={ (formSettings?.form_logo?.enabled && formSettings?.form_logo?.logo_url) ? { marginTop: previewDevice === 'desktop' ? '-20px' : '-12px', marginBottom: '-4px' } : {} }>
+                                                            <FormLogoPreview logo={formSettings?.form_logo} />
+                                                        </div>
                                                         {/* Product Section - horizontal layout matching storefront mobile */}
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingBottom: '12px', borderBottom: '1px solid rgba(0,0,0,0.08)', marginBottom: '8px', position: 'relative' }}>
                                                             <div style={{ position: 'relative', flexShrink: 0 }}>
@@ -867,6 +872,8 @@ export default function UpsellDownsellPage() {
                                                                 <div style={{ width: '28px', height: '28px', background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 500, color: '#6b7280', cursor: 'default' }}>+</div>
                                                             </div>
                                                         </div>
+
+                                                        <AnnouncementBannerPreview banner={formSettings?.announcement_banner} />
 
                                                         {/* Form Title */}
                                                         {formSettings?.blocks?.show_form_title !== false && (
