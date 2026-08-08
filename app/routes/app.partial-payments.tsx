@@ -139,12 +139,23 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     if (settings.show_partial_payment_subtitle === undefined) settings.show_partial_payment_subtitle = true;
     if (settings.show_pure_cod_subtitle === undefined) settings.show_pure_cod_subtitle = true;
 
-    if (!settings.payment_method_descriptions) {
-      settings.payment_method_descriptions = {
-        partial_payment: { enabled: true, text: 'Secure your order • Avoid fake cancellations' },
-        full_prepaid: { enabled: true, text: 'Pay now, save more, receive sooner' },
-        pure_cod: { enabled: true, text: 'Higher return risk • Slightly slower processing' }
-      };
+    // savePartialPaymentSettings() always writes a truthy shell object here
+    // (it bundles subtitles/partial_discounts into this same JSONB column),
+    // so a whole-object presence check never catches a row where the shell
+    // exists but an individual method's {enabled, text} is still missing —
+    // which is exactly what every fresh install looks like. Backfill per key
+    // instead, matching the defaults cod-form.js already falls back to on
+    // the real storefront, so the admin preview can't under-report them.
+    const descDefaults = {
+      partial_payment: { enabled: true, text: 'Secure your order • Avoid fake cancellations' },
+      full_prepaid: { enabled: true, text: 'Pay now, save more, receive sooner' },
+      pure_cod: { enabled: true, text: 'Higher return risk • Slightly slower processing' }
+    } as const;
+    settings.payment_method_descriptions = { ...(settings.payment_method_descriptions || {}) };
+    for (const method of Object.keys(descDefaults) as Array<keyof typeof descDefaults>) {
+      if (!settings.payment_method_descriptions[method]) {
+        settings.payment_method_descriptions[method] = descDefaults[method];
+      }
     }
   }
 
@@ -2019,9 +2030,9 @@ export default function PartialPaymentsPage() {
                             <input type="radio" checked readOnly style={{ width: '18px', height: '18px', accentColor: partialPmColor('borderColor', '#2563eb'), margin: 0, pointerEvents: 'none' }} />
                           </div>
                         </div>
-                        {settings.payment_method_descriptions?.partial_payment?.enabled && (
+                        {(settings.payment_method_descriptions?.partial_payment?.enabled ?? true) && (
                           <div style={{ background: partialPmColor('descriptionBackgroundColor', '#dbeafe'), padding: '10px 12px', fontSize: '10px', color: partialPmColor('textColor', '#1e40af'), display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500, width: '100%', boxSizing: 'border-box', margin: 0, borderBottomLeftRadius: '10px', borderBottomRightRadius: '10px' }}>
-                            {interpolatePrice(settings.payment_method_descriptions?.partial_payment?.text, fmt(previewDeposit), fmt(previewPartialDiscountAmount))}
+                            {interpolatePrice(settings.payment_method_descriptions?.partial_payment?.text ?? 'Secure your order • Avoid fake cancellations', fmt(previewDeposit), fmt(previewPartialDiscountAmount))}
                           </div>
                         )}
                       </div>
@@ -2230,9 +2241,9 @@ export default function PartialPaymentsPage() {
                           <input type="radio" checked readOnly style={{ width: '18px', height: '18px', accentColor: prepaidPmColor('borderColor', '#22c55e'), margin: 0, pointerEvents: 'none' }} />
                         </div>
                       </div>
-                      {settings.payment_method_descriptions?.full_prepaid?.enabled && (
+                      {(settings.payment_method_descriptions?.full_prepaid?.enabled ?? true) && (
                         <div style={{ background: prepaidPmColor('descriptionBackgroundColor', '#dcfce7'), padding: '10px 12px', fontSize: '10px', color: prepaidPmColor('textColor', '#166534'), display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500, width: '100%', boxSizing: 'border-box', margin: 0, borderBottomLeftRadius: '10px', borderBottomRightRadius: '10px' }}>
-                          {interpolatePrice(settings.payment_method_descriptions?.full_prepaid?.text, fmt(previewFullPrepaidTotal), fmt(previewFullPrepaidDiscountAmount))}
+                          {interpolatePrice(settings.payment_method_descriptions?.full_prepaid?.text ?? 'Pay now, save more, receive sooner', fmt(previewFullPrepaidTotal), fmt(previewFullPrepaidDiscountAmount))}
                         </div>
                       )}
                     </div>
@@ -2421,9 +2432,9 @@ export default function PartialPaymentsPage() {
                         <input type="radio" checked readOnly style={{ width: '18px', height: '18px', accentColor: codPmColor('borderColor', '#ea580c'), margin: 0, pointerEvents: 'none' }} />
                       </div>
                     </div>
-                    {settings.payment_method_descriptions?.pure_cod?.enabled && (
+                    {(settings.payment_method_descriptions?.pure_cod?.enabled ?? true) && (
                       <div style={{ background: codPmColor('descriptionBackgroundColor', '#ffedd5'), padding: '10px 12px', fontSize: '10px', color: codPmColor('textColor', '#9a3412'), display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500, width: '100%', boxSizing: 'border-box', margin: 0, borderBottomLeftRadius: '10px', borderBottomRightRadius: '10px' }}>
-                        {interpolatePrice(settings.payment_method_descriptions?.pure_cod?.text, fmt(previewPureCodTotal))}
+                        {interpolatePrice(settings.payment_method_descriptions?.pure_cod?.text ?? 'Higher return risk • Slightly slower processing', fmt(previewPureCodTotal))}
                       </div>
                     )}
                   </div>

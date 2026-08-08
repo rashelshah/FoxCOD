@@ -13,7 +13,7 @@
 {% comment %} Read COD settings from metafields (synced from app dashboard) {% endcomment %}
 {% assign cod_enabled = shop.metafields.fox_cod.enabled | default: 'true' %}
 {% assign cod_button_text = shop.metafields.fox_cod.button_text.value | default: shop.metafields.fox_cod.button_text | default: 'Buy Now - Cash on Delivery' %}
-{% assign cod_primary_color = shop.metafields.fox_cod.primary_color.value | default: shop.metafields.fox_cod.primary_color | default: '#667eea' %}
+{% assign cod_primary_color = shop.metafields.fox_cod.primary_color.value | default: shop.metafields.fox_cod.primary_color | default: '#000000' %}
 {% assign cod_app_url = shop.metafields.fox_cod.app_url | default: '' %}
 {% assign cod_max_quantity = shop.metafields.fox_cod.max_quantity | default: 10 %}
 {% assign cod_form_title = shop.metafields.fox_cod.form_title.value | default: shop.metafields.fox_cod.form_title | default: 'Enter your Details' %}
@@ -29,7 +29,7 @@
 {% assign cod_border_radius = shop.metafields.fox_cod.border_radius | default: 12 %}
 {% assign cod_show_product_image = shop.metafields.fox_cod.show_product_image | default: 'true' %}
 {% assign cod_show_price = shop.metafields.fox_cod.show_price | default: 'true' %}
-{% assign cod_modal_style = shop.metafields.fox_cod.modal_style | default: 'modern' %}
+{% assign cod_modal_style = shop.metafields.fox_cod.modal_style | default: 'glassmorphism' %}
 {% assign cod_anim_style = shop.metafields.fox_cod.animation_style | default: 'fade' %}
 
 {% comment %} Advanced JSON Settings {% endcomment %}
@@ -40,7 +40,8 @@
 {% assign cod_custom_fields = shop.metafields.fox_cod.custom_fields | default: '[]' %}
 {% assign cod_styles_raw = shop.metafields.fox_cod.styles %}
 {% assign cod_styles_parsed = cod_styles_raw.value %}
-{% assign theme_key = cod_styles_parsed.themeKey | default: 'custom' %}
+{% comment %} 'default' matches DEFAULT_STYLES.themeKey in form-builder.types.ts — a never-configured store must render the app's real default theme (black accent), not the unthemed 'custom' fallback. {% endcomment %}
+{% assign theme_key = cod_styles_parsed.themeKey | default: 'default' %}
 
 {% assign form_theme_color = cod_primary_color %}
 {% if theme_key == 'modern_slate' %}{% assign form_theme_color = '#ea580c' %}

@@ -83,7 +83,11 @@ const shopify = shopifyApp({
         if (!existingPartialSettings) {
           await savePartialPaymentSettings({
             shop_domain: session.shop,
-            enabled: true,
+            // COD-only by default — matches the fallback the storefront/admin
+            // preview already use elsewhere (app.partial-payments.tsx's
+            // first-visit fallback, partial-payment-settings.server.ts's
+            // "no settings" branch). Merchants opt in to Prepaid/Partial.
+            enabled: false,
             payment_options: DEFAULT_PAYMENT_OPTIONS,
             cod_fee_enabled: false,
             cod_fee_name: 'COD Fee',
@@ -106,7 +110,7 @@ const shopify = shopifyApp({
             pure_cod_maximum_order_total: 0,
             pure_cod_allowed_product_ids: [],
             pure_cod_allowed_collection_ids: [],
-            full_prepaid_enabled: true,
+            full_prepaid_enabled: false,
             full_prepaid_minimum_order_total: 0,
             full_prepaid_maximum_order_total: 0,
             full_prepaid_allowed_product_ids: [],
@@ -114,6 +118,16 @@ const shopify = shopifyApp({
             prepaid_discount_enabled: false,
             prepaid_discount_type: 'percentage',
             prepaid_discount_value: 0,
+            payment_method_tags: {
+              partial_payment: { enabled: false, text: 'SAVE MORE!' },
+              full_prepaid: { enabled: true, text: '★ MOST POPULAR' },
+              pure_cod: { enabled: false, text: 'BUY NOW' },
+            },
+            payment_method_descriptions: {
+              partial_payment: { enabled: true, text: 'Secure your order • Avoid fake cancellations' },
+              full_prepaid: { enabled: true, text: 'Pay now, save more, receive sooner' },
+              pure_cod: { enabled: true, text: 'Higher return risk • Slightly slower processing' },
+            },
           });
           console.log(`[Install] Initialized default partial payment settings for ${session.shop}`);
         }
