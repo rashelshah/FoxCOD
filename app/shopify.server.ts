@@ -25,6 +25,19 @@ const shopify = shopifyApp({
     afterAuth: async ({ session }) => {
       const webhookResponses = await shopify.registerWebhooks({ session });
       console.log("[WEBHOOK REGISTERED]", webhookResponses);
+
+      // Seed the billing row so the shop starts on Free with a usage window
+      // anchored to install time, and reconcile against Shopify in case this is
+      // a reinstall that still has an active subscription.
+      try {
+        const { ensureSubscription, syncFromShopify } = await import("./services/billing/subscription.server");
+        await ensureSubscription(session.shop);
+        await syncFromShopify(session.shop);
+        console.log(`[Install] Billing initialized for ${session.shop}`);
+      } catch (error) {
+        console.error(`[Install] Error initializing billing for ${session.shop}:`, error);
+      }
+
       try {
         const { getFormSettings, saveFormSettings, DEFAULT_BLOCKS, DEFAULT_STYLES, DEFAULT_BUTTON_STYLES } = await import("./config/supabase.server");
         const { getPartialPaymentSettings, savePartialPaymentSettings } = await import("./services/partial-payment-settings.server");

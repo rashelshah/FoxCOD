@@ -217,7 +217,11 @@ export function getSkeletonForPath(pathname: string) {
         return <TwoColumnEditorSkeleton />;
     }
 
-    if (pathname.startsWith('/app/partial-payments') || pathname.startsWith('/app/app-settings')) {
+    if (
+        pathname.startsWith('/app/partial-payments') ||
+        pathname.startsWith('/app/app-settings') ||
+        pathname.startsWith('/app/billing')
+    ) {
         return <StackedCardsSkeleton />;
     }
 

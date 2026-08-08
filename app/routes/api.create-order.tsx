@@ -22,6 +22,7 @@ import {
 import { calculateOrderPricing, normalizeCouponCode, validateCouponForShop } from "../services/coupons.server";
 import { getPartialPaymentSettings } from "../services/partial-payment-settings.server";
 import { createPendingOrder } from "../services/shopify-graphql-orders.server";
+import { validatePlanBeforeOrder, planLimitResponseBody } from "../services/billing/plan-enforcement.server";
 import {
     resolveCountryForOrder,
     getContextualPricesForVariants,
@@ -287,13 +288,26 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             shop: body.shop,
         });
 
-        const [fraudSettings, formSettings, partialPaymentSettings, orderCountry] = await Promise.all([
+        const [fraudSettings, formSettings, partialPaymentSettings, orderCountry, planCheck] = await Promise.all([
             getFraudProtectionSettings(body.shop),
             getFormSettings(body.shop),
             getPartialPaymentSettings(body.shop),
             orderCountryPromise,
+            validatePlanBeforeOrder(body.shop),
         ]);
         console.log("⏱ [COD Order] Parallel fetch done:", Date.now() - start, "ms");
+
+        // ── PLAN ENFORCEMENT ──
+        // Server-side and keyed off the shop domain, so nothing the storefront
+        // sends can raise the allowance. Checked before any Shopify work so a
+        // blocked shop never creates a draft order it can't be billed for.
+        if (!planCheck.allowed) {
+            console.warn(`[COD Order] Blocked by plan limit for ${body.shop}`);
+            return Response.json(
+                planLimitResponseBody(planCheck),
+                { status: 403, headers: corsHeaders }
+            );
+        }
 
         // ── Contextual Pricing ──────────────────────────────────────────────
         const allVariantIds: any[] = [];

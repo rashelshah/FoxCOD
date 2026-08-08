@@ -26,5 +26,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     console.error(`Error marking shop uninstalled in Supabase:`, error);
   }
 
+  // Clear billing state. Shopify cancels the app subscription itself on
+  // uninstall, so there's nothing to cancel through the API — this resets the
+  // local plan to Free so a reinstall starts clean. Usage events and charge
+  // history are intentionally preserved for reporting and billing disputes.
+  try {
+    const { disableBillingForShop } = await import("../services/billing/subscription.server");
+    await disableBillingForShop(shop);
+  } catch (error) {
+    console.error(`Error disabling billing for ${shop}:`, error);
+  }
+
   return new Response(null, { status: 200 });
 };

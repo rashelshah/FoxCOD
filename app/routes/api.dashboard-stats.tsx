@@ -9,6 +9,7 @@
 import type { LoaderFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import { getFormSettings, getOrderStats, getCachedShopCurrency } from "../config/supabase.server";
+import { getCurrentUsage } from "../services/billing/order-counter.server";
 
 export const defaultStats = {
   totalOrders: 0,
@@ -25,11 +26,17 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
   const shopDomain = session.shop;
 
-  const [shopCurrency, settings, supabaseStats] = await Promise.all([
+  const [shopCurrency, settings, supabaseStats, billing] = await Promise.all([
     getCachedShopCurrency(shopDomain, admin),
     getFormSettings(shopDomain),
     getOrderStats(shopDomain).catch((error) => {
       console.log("Error fetching Supabase order stats:", error);
+      return null;
+    }),
+    // Read-only snapshot for the dashboard's subscription widget. A billing
+    // failure must not take the whole dashboard down with it.
+    getCurrentUsage(shopDomain).catch((error) => {
+      console.log("Error fetching billing usage:", error);
       return null;
     }),
   ]);
@@ -38,5 +45,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     enabled: settings?.enabled || false,
     stats: supabaseStats ? { ...defaultStats, ...supabaseStats } : defaultStats,
     shopCurrency,
+    billing,
   };
 };

@@ -30,6 +30,7 @@ import {
     getContextualPricesForVariants,
     assertPricingConsistency,
 } from "../services/contextual-pricing.server";
+import { validatePlanBeforeOrder, planLimitResponseBody } from "../services/billing/plan-enforcement.server";
 
 // ── In-process caches to avoid repeated DB/session round-trips ──
 // REST clients and fraud settings are stable per shop for minutes at a time.
@@ -245,6 +246,24 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
                 currencyCode: result.currencyCode,
                 prices: pricesData
             }), { headers: corsHeaders });
+        }
+
+        // ── PLAN ENFORCEMENT ──────────────────────────────────────────────────
+        // Single choke point for all four order flows below (native COD, full
+        // prepaid, partial COD, regular COD). Placed after the read-only
+        // coupon/pricing branches, which don't create anything, and before any
+        // handler runs so a blocked shop never reaches Shopify.
+        //
+        // Keyed on data.shop — the same value that decides which store the order
+        // is created against — so spoofing it can't buy a bypass, it just points
+        // the whole request at a different store.
+        const planCheck = await validatePlanBeforeOrder(data.shop);
+        if (!planCheck.allowed) {
+            console.warn(`[Proxy] Order blocked by plan limit for ${data.shop}`);
+            return new Response(JSON.stringify(planLimitResponseBody(planCheck)), {
+                status: 200, // 200 so the Shopify proxy passes the JSON through
+                headers: corsHeaders,
+            });
         }
 
         // Route: Checkout Creation (Partial COD + Full Prepaid share one endpoint)

@@ -138,6 +138,50 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     await logOrderWithShopifyIds(orderLogEntry, payload.id.toString(), payload.name);
     console.log("[Webhook] Special COD order logged successfully:", payload.name);
 
+    // ── Billing: count this order against the shop's plan allowance ──
+    //
+    // This is the ONLY place orders are counted. It runs off orders/create, so
+    // by definition the order is a real, successfully created Shopify order —
+    // draft orders, abandoned checkouts and failed form submissions never get
+    // here, no matter which of the four order flows produced them.
+    //
+    // Excluded: test orders (payload.test) and orders that arrive already
+    // cancelled. Non-FoxlyCOD orders were filtered out further up; an order
+    // that only carried inventory metadata is not ours to bill for.
+    if (isPartialCod || isFullPrepaid || isRegularCod) {
+      if (payload.test) {
+        console.log("[Billing] Skipping test order", payload.id);
+      } else if (payload.cancelled_at) {
+        console.log("[Billing] Skipping already-cancelled order", payload.id);
+      } else {
+        try {
+          const { incrementOrderCount } = await import("../services/billing/order-counter.server");
+          const orderType = isFullPrepaid
+            ? "full_prepaid"
+            : isPartialCod
+              ? "partial_cod"
+              : "cod";
+
+          // The Shopify order id is the dedupe key, so a redelivered webhook
+          // counts once no matter how many times it fires.
+          const counted = await incrementOrderCount(shop, {
+            eventKey: payload.id.toString(),
+            orderType,
+            shopifyOrderId: payload.id.toString(),
+            shopifyOrderName: payload.name,
+          });
+
+          console.log(
+            `[Billing] Order ${payload.name} ${counted.counted ? "counted" : "already counted"}` +
+            ` (${counted.usage.orderCount}/${counted.usage.isUnlimited ? "∞" : counted.usage.includedOrders})`,
+          );
+        } catch (billingError: any) {
+          // Metering must never break order processing.
+          console.error("[Billing] Failed to count order:", billingError?.message);
+        }
+      }
+    }
+
     // Sync to Google Sheets
     syncOrderToGoogleSheets(shop, {
       orderId: payload.id?.toString(),

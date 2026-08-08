@@ -7,11 +7,12 @@
 import { useEffect } from "react";
 import type { LoaderFunctionArgs } from "react-router";
 import { useLoaderData, useFetcher, Link, useNavigate } from "react-router";
-import { Button, InlineStack, Card, BlockStack, ProgressBar, Text } from "@shopify/polaris";
+import { Badge, Banner, Button, InlineStack, Card, BlockStack, ProgressBar, Text } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import { saveShop } from "../config/supabase.server";
 import { DashboardSkeleton } from "./PageSkeletons";
 import { defaultStats, type loader as dashboardStatsLoader } from "./api.dashboard-stats";
+import type { UsageSnapshot } from "../services/billing/order-counter.server";
 
 const FOX_COD_EXTENSION_UID = "87e0c6dc-4f49-e6ce-990c-7f93eadc93f862473f7f";
 const FOX_COD_EMBED_HANDLE = "cod-form-embed";
@@ -103,6 +104,7 @@ export default function Index() {
       enabled={statsFetcher.data.enabled}
       stats={statsFetcher.data.stats}
       shopCurrency={statsFetcher.data.shopCurrency}
+      billing={statsFetcher.data.billing}
     />
   );
 }
@@ -112,11 +114,14 @@ function DashboardContent({
   enabled,
   stats,
   shopCurrency,
+  billing,
 }: {
   themeEditorUrl: string;
   enabled: boolean;
   stats: typeof defaultStats;
   shopCurrency: string;
+  /** Null when the billing lookup failed — the widget is simply hidden. */
+  billing: UsageSnapshot | null;
 }) {
   const navigate = useNavigate();
 
@@ -795,6 +800,91 @@ function DashboardContent({
               <div className="stat-subtext">Orders in last 7 days</div>
             </div>
           </div>
+
+          {/* Subscription Analytics */}
+          {billing && (
+            <div style={{ marginBottom: "28px" }}>
+              <Card>
+                <BlockStack gap="400">
+                  <InlineStack align="space-between" blockAlign="center">
+                    <Text variant="headingMd" as="h3">Subscription</Text>
+                    <InlineStack gap="200" blockAlign="center">
+                      <Badge tone={billing.limitReached ? "critical" : "success"}>
+                        {`${billing.planName} · ${billing.cycle === "yearly" ? "Yearly" : "Monthly"}`}
+                      </Badge>
+                      <Button variant="plain" onClick={() => navigate('/app/billing')}>Manage</Button>
+                    </InlineStack>
+                  </InlineStack>
+
+                  {billing.limitReached && (
+                    <Banner tone="critical" title="Order limit reached">
+                      <p>
+                        New orders are being blocked. Upgrade your plan to continue receiving orders.
+                      </p>
+                    </Banner>
+                  )}
+
+                  {!billing.isUnlimited && (
+                    <BlockStack gap="200">
+                      <InlineStack align="space-between">
+                        <Text variant="bodySm" as="span" tone="subdued">
+                          {`${billing.orderCount.toLocaleString()} of ${billing.includedOrders.toLocaleString()} orders used`}
+                        </Text>
+                        <Text variant="bodySm" as="span" tone="subdued">
+                          {`${billing.usagePercent}%`}
+                        </Text>
+                      </InlineStack>
+                      <ProgressBar
+                        progress={billing.usagePercent}
+                        size="small"
+                        tone={billing.usagePercent >= 100 ? "critical" : billing.usagePercent >= 80 ? "highlight" : "primary"}
+                      />
+                    </BlockStack>
+                  )}
+
+                  <div className="stats-grid">
+                    <div className="stat-card">
+                      <div className="stat-header"><span className="stat-label">Monthly Orders</span></div>
+                      <p className="stat-value">{billing.orderCount.toLocaleString()}</p>
+                      <div className="stat-subtext">This billing cycle</div>
+                    </div>
+                    <div className="stat-card">
+                      <div className="stat-header"><span className="stat-label">Included</span></div>
+                      <p className="stat-value">
+                        {billing.isUnlimited ? "∞" : billing.includedOrders.toLocaleString()}
+                      </p>
+                      <div className="stat-subtext">
+                        {billing.isUnlimited
+                          ? "Unlimited orders"
+                          : `${(billing.remainingOrders ?? 0).toLocaleString()} remaining`}
+                      </div>
+                    </div>
+                    <div className="stat-card">
+                      <div className="stat-header"><span className="stat-label">Overage Orders</span></div>
+                      <p className="stat-value">{billing.overageOrders.toLocaleString()}</p>
+                      <div className="stat-subtext">
+                        {billing.overagePrice > 0
+                          ? `$${billing.overagePrice.toFixed(2)} per extra order`
+                          : "No overage charges"}
+                      </div>
+                    </div>
+                    <div className="stat-card">
+                      <div className="stat-header"><span className="stat-label">Estimated Charges</span></div>
+                      <p className="stat-value">
+                        {new Intl.NumberFormat("en-US", { style: "currency", currency: billing.currency })
+                          .format(billing.estimatedOverageAmount)}
+                      </p>
+                      <div className="stat-subtext">
+                        {billing.renewsOn
+                          ? `Renews ${new Date(billing.renewsOn).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+                          : "Free plan — no renewal"}
+                      </div>
+                    </div>
+                  </div>
+                </BlockStack>
+              </Card>
+            </div>
+          )}
 
           {/* Quick Actions - Polaris Buttons */}
           <div className="section-header">

@@ -53,6 +53,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       console.log(`[Webhook] No matching row for shopify_order_id=${numericId}`);
     }
 
+    // ── Billing: give back the order slot ──
+    //
+    // Cancelled orders don't count toward the plan allowance. The reversal is
+    // idempotent (the usage event is marked voided, not deleted) and can never
+    // drop overage below what has already been charged — Shopify usage records
+    // are not reversible, so anything already billed stays billed.
+    try {
+      const { decrementOrderCount } = await import("../services/billing/order-counter.server");
+      await decrementOrderCount(shop, numericId);
+    } catch (billingError: any) {
+      console.error("[Billing] Failed to uncount cancelled order:", billingError?.message);
+    }
+
     return new Response(null, { status: 200 });
   } catch (error) {
     console.error("[Webhook] Error processing orders/cancelled:", error);
