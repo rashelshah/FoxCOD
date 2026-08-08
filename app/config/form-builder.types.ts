@@ -404,3 +404,28 @@ export const DEFAULT_PAYMENT_MODE_CARD_STYLES: PaymentModeCardStyles = {
     partial_payment: DEFAULT_PAYMENT_MODE_CARD_STYLE_PARTIAL_PAYMENT,
     pure_cod: DEFAULT_PAYMENT_MODE_CARD_STYLE_PURE_COD,
 };
+
+/**
+ * Sliding announcement banner shown above the COD form title — rotates
+ * through `statements` one at a time. Toggleable, with its own color
+ * overrides; "Design with AI" (Form Builder's theme extraction) also writes
+ * backgroundColor/textColor here so the banner matches the extracted store
+ * theme, same as it already does for Payment Mode cards and Bundle Offers.
+ */
+export interface AnnouncementBannerSettings {
+    enabled: boolean;
+    statements: string[];
+    backgroundColor: string;
+    textColor: string;
+}
+
+export const DEFAULT_ANNOUNCEMENT_BANNER: AnnouncementBannerSettings = {
+    enabled: false,
+    statements: [
+        'Cash on Delivery available on this order',
+        'Free & fast delivery',
+        'Easy returns within 7 days',
+    ],
+    backgroundColor: '#111827',
+    textColor: '#ffffff',
+};

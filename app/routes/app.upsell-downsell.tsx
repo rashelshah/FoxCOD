@@ -10,6 +10,7 @@ import { authenticate } from "../shopify.server";
 import { getUpsellCampaigns, saveCampaign, deleteCampaign, toggleCampaignActive, syncUpsellsToMetafield } from "../services/upsell-offers.server";
 import { type UpsellCampaign, type UpsellType, type CampaignOffer, type CampaignDesign, type ButtonDesign, createDefaultCampaign, createDefaultOffer, DEFAULT_CAMPAIGN_DESIGN } from "../config/upsell-offers.types";
 import { ColorSelector, colorSelectorStyles } from "./ColorSelector";
+import { AnnouncementBannerPreview } from "./AnnouncementBannerPreview";
 import { Page, Layout, Tabs, Card, Button, Badge, EmptyState, Text, InlineStack, BlockStack, Box, Divider, TextField, Select, ButtonGroup, Banner, LegacyCard, RangeSlider, Modal } from "@shopify/polaris";
 import { EditIcon, DeleteIcon } from "@shopify/polaris-icons";
 import { getFormSettings, getCachedShopCurrency } from "../config/supabase.server";
@@ -828,6 +829,7 @@ export default function UpsellDownsellPage() {
                                                         }
                                                         return base;
                                                     })()}>
+                                                        <AnnouncementBannerPreview banner={formSettings?.announcement_banner} />
                                                         {/* Product Section - horizontal layout matching storefront mobile */}
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingBottom: '12px', borderBottom: '1px solid rgba(0,0,0,0.08)', marginBottom: '8px', position: 'relative' }}>
                                                             <div style={{ position: 'relative', flexShrink: 0 }}>

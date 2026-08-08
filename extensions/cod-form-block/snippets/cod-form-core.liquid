@@ -104,6 +104,10 @@
 {% comment %} For Shopify `json` type metafields, `.value` already returns parsed object — use directly {% endcomment %}
 {% assign cod_form_submit_btn = shop.metafields.fox_cod.form_submit_button_json.value %}
 
+{% comment %} Sliding announcement banner shown above the form title {% endcomment %}
+{% assign cod_banner = shop.metafields.fox_cod.announcement_banner_json.value %}
+{% assign cod_banner_statements = cod_banner.statements %}
+
 {% comment %} Build product collection IDs for shipping rate collection matching {% endcomment %}
 {% assign product_collection_ids = '' %}
 {% if product %}
@@ -473,7 +477,67 @@
     {% endif %}
   </div>
   {% endif %}
-  
+
+  {% comment %} Announcement Banner — sliding statements above the form title {% endcomment %}
+  {% if cod_banner.enabled and cod_banner_statements.size > 0 %}
+  <div class="cod-announcement-banner" id="cod-announcement-banner-{{ instance_id }}" style="background-color: {{ cod_banner.backgroundColor | default: '#111827' }}; color: {{ cod_banner.textColor | default: '#ffffff' }}; font-family: '{{ cod_styles_parsed.fontFamily | default: 'Inter' }}', sans-serif;">
+    {% if cod_banner_statements.size > 1 %}
+      <button type="button" class="cod-announcement-nav cod-announcement-prev" aria-label="Previous">&#8249;</button>
+    {% endif %}
+    <div class="cod-announcement-track">
+      {% for statement in cod_banner_statements %}
+        <span class="cod-announcement-statement{% if forloop.first %} is-active{% endif %}">{{ statement }}</span>
+      {% endfor %}
+    </div>
+    {% if cod_banner_statements.size > 1 %}
+      <button type="button" class="cod-announcement-nav cod-announcement-next" aria-label="Next">&#8250;</button>
+    {% endif %}
+  </div>
+  <style>
+    #cod-announcement-banner-{{ instance_id }} {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 7px 12px; border-radius: 8px; margin-bottom: 12px;
+      font-size: 12.5px; font-weight: 600; text-align: center; overflow: hidden; box-sizing: border-box;
+    }
+    #cod-announcement-banner-{{ instance_id }} .cod-announcement-track { position: relative; flex: 1; min-width: 0; height: 1.4em; overflow: hidden; }
+    #cod-announcement-banner-{{ instance_id }} .cod-announcement-statement {
+      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      opacity: 0; transform: translateX(10px); transition: opacity 0.35s ease, transform 0.35s ease;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%;
+    }
+    #cod-announcement-banner-{{ instance_id }} .cod-announcement-statement.is-active { opacity: 1; transform: translateX(0); }
+    #cod-announcement-banner-{{ instance_id }} .cod-announcement-nav {
+      background: transparent; border: none; color: inherit; cursor: pointer;
+      font-size: 15px; line-height: 1; padding: 2px 4px; opacity: 0.8; flex-shrink: 0;
+    }
+    #cod-announcement-banner-{{ instance_id }} .cod-announcement-nav:hover { opacity: 1; }
+  </style>
+  <script>
+    (function() {
+      var banner = document.getElementById('cod-announcement-banner-{{ instance_id }}');
+      if (!banner) return;
+      var statements = banner.querySelectorAll('.cod-announcement-statement');
+      if (statements.length <= 1) return;
+      var idx = 0;
+      var timer = null;
+      function show(next) {
+        statements[idx].classList.remove('is-active');
+        idx = (next + statements.length) % statements.length;
+        statements[idx].classList.add('is-active');
+      }
+      function startAutoRotate() {
+        if (timer) clearInterval(timer);
+        timer = setInterval(function() { show(idx + 1); }, 3500);
+      }
+      var prevBtn = banner.querySelector('.cod-announcement-prev');
+      var nextBtn = banner.querySelector('.cod-announcement-next');
+      if (prevBtn) prevBtn.addEventListener('click', function() { show(idx - 1); startAutoRotate(); });
+      if (nextBtn) nextBtn.addEventListener('click', function() { show(idx + 1); startAutoRotate(); });
+      startAutoRotate();
+    })();
+  </script>
+  {% endif %}
+
   <div class="cod-form-headers" style="text-align: center; margin-bottom: 16px; font-family: '{{ cod_styles_parsed.fontFamily | default: 'Inter' }}', sans-serif;">
       {% if cod_blocks_parsed.show_form_title != false %}
         {% if cod_form_title != blank %}<h2 style="margin: 0; font-size: 20px; font-weight: 600; color: {{ cod_styles_parsed.textColor | default: '#111' }}; font-family: inherit;">{{ cod_form_title }}</h2>{% endif %}

@@ -16,6 +16,7 @@ import {
 } from "@shopify/polaris";
 import { EditIcon, DeleteIcon } from "@shopify/polaris-icons";
 import { ColorSelector, colorSelectorStyles } from "./ColorSelector";
+import { AnnouncementBannerPreview } from "./AnnouncementBannerPreview";
 import {
     DndContext,
     closestCenter,
@@ -1274,6 +1275,7 @@ export default function QuantityOffersPage() {
                                                     }
                                                     return base;
                                                 })()}>
+                                                    <AnnouncementBannerPreview banner={formSettings?.announcement_banner} />
                                                     {/* Form Title */}
                                                     {formSettings?.blocks?.show_form_title !== false && (
                                                         <div style={{

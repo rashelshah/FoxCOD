@@ -138,6 +138,7 @@ import {
     FormSubmitButtonStyles,
     PaymentModeCardStyle,
     PaymentModeCardStyles,
+    AnnouncementBannerSettings,
     DEFAULT_FIELDS,
     DEFAULT_BLOCKS,
     DEFAULT_STYLES,
@@ -145,11 +146,12 @@ import {
     DEFAULT_SHIPPING_OPTIONS,
     DEFAULT_FORM_SUBMIT_BUTTON,
     DEFAULT_PAYMENT_MODE_CARD_STYLES,
+    DEFAULT_ANNOUNCEMENT_BANNER,
 } from './form-builder.types';
 
 // Re-export for other modules
-export type { FormField, CouponConfig, ContentBlocks, FormStyles, ButtonStyles, ShippingOption, ShippingOptions, FormSubmitButtonStyles, PaymentModeCardStyle, PaymentModeCardStyles };
-export { DEFAULT_FIELDS, DEFAULT_BLOCKS, DEFAULT_STYLES, DEFAULT_BUTTON_STYLES, DEFAULT_SHIPPING_OPTIONS, DEFAULT_FORM_SUBMIT_BUTTON, DEFAULT_PAYMENT_MODE_CARD_STYLES };
+export type { FormField, CouponConfig, ContentBlocks, FormStyles, ButtonStyles, ShippingOption, ShippingOptions, FormSubmitButtonStyles, PaymentModeCardStyle, PaymentModeCardStyles, AnnouncementBannerSettings };
+export { DEFAULT_FIELDS, DEFAULT_BLOCKS, DEFAULT_STYLES, DEFAULT_BUTTON_STYLES, DEFAULT_SHIPPING_OPTIONS, DEFAULT_FORM_SUBMIT_BUTTON, DEFAULT_PAYMENT_MODE_CARD_STYLES, DEFAULT_ANNOUNCEMENT_BANNER };
 
 // =============================================
 // BRANDING TYPES
@@ -209,6 +211,8 @@ export interface FormSettings {
     form_submit_button?: FormSubmitButtonStyles;
     // Payment Mode selector card color overrides
     payment_mode_card_styles?: PaymentModeCardStyles;
+    // Sliding announcement banner shown above the form title
+    announcement_banner?: AnnouncementBannerSettings;
     // Merchant branding (JSONB column)
     branding?: Branding;
 }
@@ -289,6 +293,8 @@ export async function saveFormSettings(settings: FormSettings) {
                 form_submit_button: settings.form_submit_button || DEFAULT_FORM_SUBMIT_BUTTON,
                 // Payment Mode selector card color overrides
                 payment_mode_card_styles: settings.payment_mode_card_styles || DEFAULT_PAYMENT_MODE_CARD_STYLES,
+                // Sliding announcement banner shown above the form title
+                announcement_banner: settings.announcement_banner || DEFAULT_ANNOUNCEMENT_BANNER,
                 // Merchant branding
                 ...(settings.branding !== undefined ? { branding: settings.branding } : {}),
             },

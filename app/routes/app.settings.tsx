@@ -49,6 +49,7 @@ import {
     type FormSubmitButtonStyles,
     type PaymentModeCardStyle,
     type PaymentModeCardStyles,
+    type AnnouncementBannerSettings,
     DEFAULT_FIELDS,
 
     DEFAULT_BLOCKS,
@@ -60,8 +61,10 @@ import {
     DEFAULT_PAYMENT_MODE_CARD_STYLE_FULL_PREPAID,
     DEFAULT_PAYMENT_MODE_CARD_STYLE_PARTIAL_PAYMENT,
     DEFAULT_PAYMENT_MODE_CARD_STYLE_PURE_COD,
+    DEFAULT_ANNOUNCEMENT_BANNER,
 } from "../config/form-builder.types";
 import { ColorSelector, colorSelectorStyles } from "./ColorSelector";
+import { AnnouncementBannerPreview } from "./AnnouncementBannerPreview";
 
 // Default settings for new shops
 const defaultSettings: Omit<FormSettings, "shop_domain"> = {
@@ -122,6 +125,8 @@ const defaultSettings: Omit<FormSettings, "shop_domain"> = {
     form_submit_button: DEFAULT_FORM_SUBMIT_BUTTON,
     // Payment Mode card colors
     payment_mode_card_styles: DEFAULT_PAYMENT_MODE_CARD_STYLES,
+    // Sliding announcement banner shown above the form title
+    announcement_banner: DEFAULT_ANNOUNCEMENT_BANNER,
 };
 
 const PRESET_KEYS = new Set([
@@ -199,6 +204,8 @@ async function ensureMetafieldDefinitions(admin: any) {
         { key: "form_submit_button_json", type: "json" },
         // Merchant Branding (checkout redirect + future sections)
         { key: "branding_json", type: "json" },
+        // Sliding announcement banner shown above the form title
+        { key: "announcement_banner_json", type: "json" },
     ];
 
     console.log('[Settings] Ensuring metafield definitions (parallel)...');
@@ -389,6 +396,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             ...settings,
             styles: { ...DEFAULT_STYLES, ...(settings.styles || {}) },
             button_styles: { ...DEFAULT_BUTTON_STYLES, ...(settings.button_styles || {}) },
+            announcement_banner: { ...DEFAULT_ANNOUNCEMENT_BANNER, ...(settings.announcement_banner || {}) },
         }
         : { ...defaultSettings, shop_domain: shopDomain };
     return { shop: shopDomain, settings: merged, shippingRates, appUrl, products, collections, shopCurrency, partialPaymentSettings };
@@ -630,6 +638,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         form_submit_button: JSON.parse(formData.get("form_submit_button") as string || JSON.stringify(defaultSettings.form_submit_button)),
         // Payment Mode card color overrides
         payment_mode_card_styles: JSON.parse(formData.get("payment_mode_card_styles") as string || JSON.stringify(defaultSettings.payment_mode_card_styles)),
+        // Sliding announcement banner shown above the form title
+        announcement_banner: JSON.parse(formData.get("announcement_banner") as string || JSON.stringify(defaultSettings.announcement_banner)),
     };
 
     // Save to Supabase
@@ -646,6 +656,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
         if (dbError.message?.includes('payment_mode_card_styles')) {
             return { success: false, error: 'Database migration needed: Run add_payment_mode_card_styles.sql in Supabase' };
+        }
+        if (dbError.message?.includes('announcement_banner')) {
+            return { success: false, error: 'Database migration needed: Run add_announcement_banner.sql in Supabase' };
         }
         return { success: false, error: dbError.message || 'Failed to save to database' };
     }
@@ -781,6 +794,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
                     { ownerId: shopGid, namespace: "fox_cod", key: "form_submit_button_json", value: JSON.stringify(settings.form_submit_button || DEFAULT_FORM_SUBMIT_BUTTON), type: "json" },
                     // Payment Mode card color overrides
                     { ownerId: shopGid, namespace: "fox_cod", key: "payment_mode_card_styles_json", value: JSON.stringify(settings.payment_mode_card_styles || DEFAULT_PAYMENT_MODE_CARD_STYLES), type: "json" },
+                    // Sliding announcement banner shown above the form title
+                    { ownerId: shopGid, namespace: "fox_cod", key: "announcement_banner_json", value: JSON.stringify(settings.announcement_banner || DEFAULT_ANNOUNCEMENT_BANNER), type: "json" },
                 ]
             }
         });
@@ -923,6 +938,20 @@ const deriveThemeCardStyle = (profile: any): PaymentModeCardStyle | null => {
     };
 };
 
+// Derives background/text colors for the announcement banner from the
+// extracted theme's accent color — same "Match Store Theme" treatment as
+// deriveThemeCardStyle above, just for the banner instead of payment cards.
+const deriveThemeBannerStyle = (profile: any): { backgroundColor: string; textColor: string } | null => {
+    const accent = profile?.colors?.button || profile?.colors?.primary;
+    if (!accent || !isValidHexColor(accent)) return null;
+    return {
+        backgroundColor: accent,
+        textColor: (profile?.colors?.buttonText && isValidHexColor(profile.colors.buttonText))
+            ? profile.colors.buttonText
+            : pickTextOn(accent),
+    };
+};
+
 export const ButtonIconSvg = ({ iconType, color = 'currentColor', size = 18 }: { iconType: string, color?: string, size?: number }) => {
     const s: React.CSSProperties = { width: size, height: size, color };
     if (iconType === 'cart') return <svg style={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" /><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" /></svg>;
@@ -951,7 +980,7 @@ const PreviewDisplay = memo(({
     primaryColor, buttonStyle, buttonSize, borderRadius, modalStyle, animationStyle,
     fields, formStyles, buttonStylesState, blocks, shippingOpts, shippingRates, shippingRatesEnabled, activeTab,
     fmtCurrency, currencySymbol, formSubmitButtonState, partialCodEnabled, partialCodAdvanceAmount, partialPaymentSettings, formType,
-    paymentModeCardStyles
+    paymentModeCardStyles, announcementBanner
 }: any) => {
     const [previewDevice, setPreviewDevice] = useState<'mobile' | 'desktop'>('mobile');
 
@@ -1436,6 +1465,7 @@ const PreviewDisplay = memo(({
                                 {/* Only show form when NOT on button tab */}
                                 {activeTab !== 'button' && (
                                     <div className="preview-modal" style={{ ...getModalStyle(), marginTop: '0', background: 'transparent', boxShadow: 'none', border: 'none', backdropFilter: 'none', padding: '0 0 16px 0', fontFamily: formStyles?.fontFamily || 'Inter' }}>
+                                        <AnnouncementBannerPreview banner={announcementBanner} />
                                         {blocks?.show_form_title !== false && (
                                             <div className="preview-modal-title" style={{
                                                 fontWeight: 700,
@@ -2761,6 +2791,7 @@ export default function SettingsPage() {
     const [shippingOpts, setShippingOpts] = useState<ShippingOptions>(settings.shipping_options || DEFAULT_SHIPPING_OPTIONS);
     const [formSubmitButtonState, setFormSubmitButtonState] = useState<FormSubmitButtonStyles>(settings.form_submit_button || DEFAULT_FORM_SUBMIT_BUTTON);
     const [paymentModeCardStyles, setPaymentModeCardStyles] = useState<PaymentModeCardStyles>(settings.payment_mode_card_styles || DEFAULT_PAYMENT_MODE_CARD_STYLES);
+    const [announcementBanner, setAnnouncementBanner] = useState<AnnouncementBannerSettings>(settings.announcement_banner || DEFAULT_ANNOUNCEMENT_BANNER);
     const [showAddFieldModal, setShowAddFieldModal] = useState(false);
     const [newFieldType, setNewFieldType] = useState<'text' | 'number' | 'dropdown' | 'checkbox'>('text');
     const [newFieldLabel, setNewFieldLabel] = useState('');
@@ -2927,7 +2958,8 @@ export default function SettingsPage() {
             shipping_options: shippingOpts, partial_cod_enabled: partialCodEnabled, partial_cod_advance_amount: partialCodAdvanceAmount,
             partial_cod_commission: partialCodCommission, shipping_rates_enabled: shippingRatesEnabled,
             enable_coupon_field: couponFieldEnabled, coupon_field_position: couponFieldPosition,
-            form_submit_button: formSubmitButtonState, payment_mode_card_styles: paymentModeCardStyles
+            form_submit_button: formSubmitButtonState, payment_mode_card_styles: paymentModeCardStyles,
+            announcement_banner: announcementBanner
         };
 
         // Robust deep equality check instead of JSON.stringify which is vulnerable to key ordering
@@ -2953,7 +2985,7 @@ export default function SettingsPage() {
         modalStyle, animationStyle, borderRadius, formType, fields, blocks,
         formStyles, buttonStylesState, shippingOpts, partialCodEnabled, partialCodAdvanceAmount, partialCodCommission,
         shippingRatesEnabled, couponFieldEnabled, couponFieldPosition, savedSettingsString, pendingShippingOps, formSubmitButtonState,
-        paymentModeCardStyles
+        paymentModeCardStyles, announcementBanner
     ]);
 
     // Discard handler - reset all fields to saved values
@@ -2992,6 +3024,7 @@ export default function SettingsPage() {
         setShippingRatesEnabled(orig.shipping_rates_enabled ?? false);
         setFormSubmitButtonState(orig.form_submit_button || DEFAULT_FORM_SUBMIT_BUTTON);
         setPaymentModeCardStyles(orig.payment_mode_card_styles || DEFAULT_PAYMENT_MODE_CARD_STYLES);
+        setAnnouncementBanner(orig.announcement_banner || DEFAULT_ANNOUNCEMENT_BANNER);
         // Reset pending shipping operations and restore original rates
         setPendingShippingOps([]);
         setShippingRates(initialShippingRates || []);
@@ -3070,6 +3103,12 @@ export default function SettingsPage() {
                                 pure_cod: themeCardStyle,
                             });
                         }
+                        // Announcement banner — only its colors change; enabled/statements
+                        // are left exactly as the merchant set them.
+                        const themeBannerStyle = deriveThemeBannerStyle(profile);
+                        if (themeBannerStyle) {
+                            setAnnouncementBanner(prev => ({ ...prev, ...themeBannerStyle }));
+                        }
                         setThemeApplied(true);
                         shopify.toast.show(`✓ ${profile.themeClassification || 'Website'} Designed with AI — click Save to publish the form & button`);
                         const bundleOffersUpdated = (actionData as any).bundleOffersUpdated;
@@ -3100,7 +3139,8 @@ export default function SettingsPage() {
                     shipping_options: shippingOpts, partial_cod_enabled: partialCodEnabled, partial_cod_advance_amount: partialCodAdvanceAmount,
                     partial_cod_commission: partialCodCommission, shipping_rates_enabled: shippingRatesEnabled,
                     enable_coupon_field: couponFieldEnabled, coupon_field_position: couponFieldPosition,
-                    form_submit_button: formSubmitButtonState, payment_mode_card_styles: paymentModeCardStyles
+                    form_submit_button: formSubmitButtonState, payment_mode_card_styles: paymentModeCardStyles,
+                    announcement_banner: announcementBanner
                 };
                 setSavedSettingsString(JSON.stringify(currentSettings));
                 shopify.toast.show("Settings saved successfully!");
@@ -3118,7 +3158,7 @@ export default function SettingsPage() {
         formTitle, formSubtitle, successMessage, submitButtonText, showProductImage, showPrice, showQuantitySelector,
         showEmailField, showNotesField, emailRequired,
         modalStyle, animationStyle, borderRadius, formType, fields, blocks,
-        formStyles, buttonStylesState, shippingOpts, partialCodEnabled, partialCodAdvanceAmount, partialCodCommission, shippingRatesEnabled, couponFieldEnabled, couponFieldPosition, formSubmitButtonState, paymentModeCardStyles, shopify]);
+        formStyles, buttonStylesState, shippingOpts, partialCodEnabled, partialCodAdvanceAmount, partialCodCommission, shippingRatesEnabled, couponFieldEnabled, couponFieldPosition, formSubmitButtonState, paymentModeCardStyles, announcementBanner, shopify]);
 
     // Hex validation helpers
     const isValidHex = (hex: string): boolean => {
@@ -3282,6 +3322,7 @@ export default function SettingsPage() {
         // Form submit button style overrides
         formData.append("form_submit_button", JSON.stringify(formSubmitButtonState));
         formData.append("payment_mode_card_styles", JSON.stringify(paymentModeCardStyles));
+        formData.append("announcement_banner", JSON.stringify(announcementBanner));
 
         submit(formData, { method: "post" });
 
@@ -3314,7 +3355,7 @@ export default function SettingsPage() {
         formStyles, buttonStylesState, shippingOpts,
         partialCodEnabled, partialCodAdvanceAmount, partialCodCommission,
         shippingRatesEnabled, submit, shopify, pendingShippingOps,
-        formSubmitButtonState, paymentModeCardStyles
+        formSubmitButtonState, paymentModeCardStyles, announcementBanner
     ]);
 
     // Show/hide native Shopify save bar based on unsaved changes
@@ -6274,6 +6315,78 @@ export default function SettingsPage() {
                                         </div>
                                     </AccordionSection>
 
+                                    {/* Announcement Banner — sliding statements above the form title */}
+                                    <AccordionSection id="announcement-banner" tab="form" title="Announcement Banner" helperText="A slim, sliding banner above the form title that rotates through your own statements — e.g. shipping info, support contact, or a promo." expandedSection={expandedSection} toggleSection={toggleSection}>
+                                        <div className="toggle-option" style={{ marginBottom: '16px' }} onClick={() => setAnnouncementBanner(prev => ({ ...prev, enabled: !prev.enabled }))}>
+                                            <span className="toggle-option-label">Show Announcement Banner</span>
+                                            <div className={`mini-toggle ${announcementBanner.enabled ? 'on' : 'off'}`} />
+                                        </div>
+
+                                        {announcementBanner.enabled && (
+                                            <>
+                                                <div className="input-group" style={{ marginBottom: '16px' }}>
+                                                    <label className="input-label" style={{ marginBottom: '6px' }}>Statements</label>
+                                                    <div style={{ display: 'grid', gap: '8px' }}>
+                                                        {announcementBanner.statements.map((statement, i) => (
+                                                            <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                                <input
+                                                                    type="text"
+                                                                    className="input-field"
+                                                                    style={{ flex: 1 }}
+                                                                    value={statement}
+                                                                    placeholder={`Statement ${i + 1}`}
+                                                                    onChange={(e) => setAnnouncementBanner(prev => ({
+                                                                        ...prev,
+                                                                        statements: prev.statements.map((s, si) => si === i ? e.target.value : s),
+                                                                    }))}
+                                                                />
+                                                                <Button
+                                                                    icon={DeleteIcon}
+                                                                    variant="tertiary"
+                                                                    tone="critical"
+                                                                    accessibilityLabel="Remove statement"
+                                                                    disabled={announcementBanner.statements.length <= 1}
+                                                                    onClick={() => setAnnouncementBanner(prev => ({
+                                                                        ...prev,
+                                                                        statements: prev.statements.filter((_, si) => si !== i),
+                                                                    }))}
+                                                                />
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                    <div style={{ marginTop: '10px' }}>
+                                                        <Button
+                                                            icon={PlusIcon}
+                                                            onClick={() => setAnnouncementBanner(prev => ({ ...prev, statements: [...prev.statements, ''] }))}
+                                                        >
+                                                            Add statement
+                                                        </Button>
+                                                    </div>
+                                                </div>
+
+                                                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '12px' }}>
+                                                    <div className="input-group" style={{ marginTop: 0, minWidth: 0 }}>
+                                                        <ColorSelector
+                                                            label="Background Color"
+                                                            value={announcementBanner.backgroundColor}
+                                                            onChange={(c: string) => setAnnouncementBanner(prev => ({ ...prev, backgroundColor: c }))}
+                                                        />
+                                                    </div>
+                                                    <div className="input-group" style={{ marginTop: 0, minWidth: 0 }}>
+                                                        <ColorSelector
+                                                            label="Text Color"
+                                                            value={announcementBanner.textColor}
+                                                            onChange={(c: string) => setAnnouncementBanner(prev => ({ ...prev, textColor: c }))}
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <p className="setting-helper" style={{ margin: '10px 0 0' }}>
+                                                    &ldquo;Design with AI&rdquo; above also updates these colors to match your store&rsquo;s theme.
+                                                </p>
+                                            </>
+                                        )}
+                                    </AccordionSection>
+
                                     {/* Add Field Modal — Polaris UI */}
                                     <Modal
                                         open={showAddFieldModal}
@@ -6559,6 +6672,7 @@ export default function SettingsPage() {
                                 partialCodAdvanceAmount={partialCodAdvanceAmount}
                                 partialPaymentSettings={partialPaymentSettings}
                                 paymentModeCardStyles={paymentModeCardStyles}
+                                announcementBanner={announcementBanner}
                             />
                         </div>
 
