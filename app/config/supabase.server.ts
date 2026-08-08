@@ -759,73 +759,86 @@ export async function getOrderStats(shopDomain: string) {
     // stats match what actually shows up in Shopify's Orders list.
     const REAL_ORDER_FILTER = 'shopify_order_id' as const;
 
-    // Get total orders
-    const { count: totalOrders } = await supabase
-        .from('order_logs')
-        .select('*', { count: 'exact', head: true })
-        .eq('shop_domain', shopDomain)
-        .not(REAL_ORDER_FILTER, 'is', null);
+    // All 8 queries below are independent of one another — run them concurrently
+    // instead of one-by-one so this loader takes as long as the slowest single
+    // round-trip to Supabase, not the sum of all eight.
+    const [
+        { count: totalOrders },
+        { count: pendingOrders },
+        { count: todayOrders },
+        { count: weekOrders },
+        { data: revenueData },
+        { data: todayRevenueData },
+        { data: recentOrders },
+        { data: statusData },
+    ] = await Promise.all([
+        // Get total orders
+        supabase
+            .from('order_logs')
+            .select('*', { count: 'exact', head: true })
+            .eq('shop_domain', shopDomain)
+            .not(REAL_ORDER_FILTER, 'is', null),
 
-    // Get pending orders
-    const { count: pendingOrders } = await supabase
-        .from('order_logs')
-        .select('*', { count: 'exact', head: true })
-        .eq('shop_domain', shopDomain)
-        .not(REAL_ORDER_FILTER, 'is', null)
-        .eq('status', 'pending');
+        // Get pending orders
+        supabase
+            .from('order_logs')
+            .select('*', { count: 'exact', head: true })
+            .eq('shop_domain', shopDomain)
+            .not(REAL_ORDER_FILTER, 'is', null)
+            .eq('status', 'pending'),
 
-    // Get today's orders
-    const { count: todayOrders } = await supabase
-        .from('order_logs')
-        .select('*', { count: 'exact', head: true })
-        .eq('shop_domain', shopDomain)
-        .not(REAL_ORDER_FILTER, 'is', null)
-        .gte('created_at', todayStart);
+        // Get today's orders
+        supabase
+            .from('order_logs')
+            .select('*', { count: 'exact', head: true })
+            .eq('shop_domain', shopDomain)
+            .not(REAL_ORDER_FILTER, 'is', null)
+            .gte('created_at', todayStart),
 
-    // Get this week's orders
-    const { count: weekOrders } = await supabase
-        .from('order_logs')
-        .select('*', { count: 'exact', head: true })
-        .eq('shop_domain', shopDomain)
-        .not(REAL_ORDER_FILTER, 'is', null)
-        .gte('created_at', weekStart);
+        // Get this week's orders
+        supabase
+            .from('order_logs')
+            .select('*', { count: 'exact', head: true })
+            .eq('shop_domain', shopDomain)
+            .not(REAL_ORDER_FILTER, 'is', null)
+            .gte('created_at', weekStart),
 
-    // Get total revenue (from confirmed/delivered orders)
-    const { data: revenueData } = await supabase
-        .from('order_logs')
-        .select('total_price')
-        .eq('shop_domain', shopDomain)
-        .not(REAL_ORDER_FILTER, 'is', null)
-        .not('status', 'in', '(cancelled,returned)');
+        // Get total revenue (from confirmed/delivered orders)
+        supabase
+            .from('order_logs')
+            .select('total_price')
+            .eq('shop_domain', shopDomain)
+            .not(REAL_ORDER_FILTER, 'is', null)
+            .not('status', 'in', '(cancelled,returned)'),
+
+        // Get today's revenue
+        supabase
+            .from('order_logs')
+            .select('total_price')
+            .eq('shop_domain', shopDomain)
+            .not(REAL_ORDER_FILTER, 'is', null)
+            .gte('created_at', todayStart)
+            .not('status', 'in', '(cancelled,returned)'),
+
+        // Get recent orders
+        supabase
+            .from('order_logs')
+            .select('*')
+            .eq('shop_domain', shopDomain)
+            .not(REAL_ORDER_FILTER, 'is', null)
+            .order('created_at', { ascending: false })
+            .limit(10),
+
+        // Get orders by status for analytics
+        supabase
+            .from('order_logs')
+            .select('status')
+            .eq('shop_domain', shopDomain)
+            .not(REAL_ORDER_FILTER, 'is', null),
+    ]);
 
     const totalRevenue = revenueData?.reduce((sum, order) => sum + (order.total_price || 0), 0) || 0;
-
-    // Get today's revenue
-    const { data: todayRevenueData } = await supabase
-        .from('order_logs')
-        .select('total_price')
-        .eq('shop_domain', shopDomain)
-        .not(REAL_ORDER_FILTER, 'is', null)
-        .gte('created_at', todayStart)
-        .not('status', 'in', '(cancelled,returned)');
-
     const todayRevenue = todayRevenueData?.reduce((sum, order) => sum + (order.total_price || 0), 0) || 0;
-
-    // Get recent orders
-    const { data: recentOrders } = await supabase
-        .from('order_logs')
-        .select('*')
-        .eq('shop_domain', shopDomain)
-        .not(REAL_ORDER_FILTER, 'is', null)
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-    // Get orders by status for analytics
-    const { data: statusData } = await supabase
-        .from('order_logs')
-        .select('status')
-        .eq('shop_domain', shopDomain)
-        .not(REAL_ORDER_FILTER, 'is', null);
 
     const ordersByStatus: Record<string, number> = {};
     statusData?.forEach(order => {

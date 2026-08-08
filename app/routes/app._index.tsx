@@ -4,11 +4,14 @@
  * Premium modern design
  */
 
+import { useEffect } from "react";
 import type { LoaderFunctionArgs } from "react-router";
-import { useLoaderData, Link, useNavigate } from "react-router";
+import { useLoaderData, useFetcher, Link, useNavigate } from "react-router";
 import { Button, InlineStack, Card, BlockStack, ProgressBar, Text } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
-import { getFormSettings, saveShop, getOrderStats, getCachedShopCurrency } from "../config/supabase.server";
+import { saveShop } from "../config/supabase.server";
+import { DashboardSkeleton } from "./PageSkeletons";
+import { defaultStats, type loader as dashboardStatsLoader } from "./api.dashboard-stats";
 
 const FOX_COD_EXTENSION_UID = "87e0c6dc-4f49-e6ce-990c-7f93eadc93f862473f7f";
 const FOX_COD_EMBED_HANDLE = "cod-form-embed";
@@ -47,12 +50,19 @@ function getCodThemeEditorUrl(shop: string) {
 
 
 /**
- * Loader: Fetch dashboard data from Supabase
- * authenticate.admin() guarantees a fresh session token —
- * the SDK auto-refreshes expired tokens before returning.
+ * Loader: only the fast, synchronous pieces (auth + a URL built from the shop
+ * domain) — deliberately excludes the Shopify/Supabase calls that feed the
+ * stat cards. Those are slow enough that blocking the initial document on
+ * them defeats the skeleton: the Shopify CLI's local tunnel (and likely
+ * Vercel's serverless functions in production) buffers the whole SSR
+ * response before forwarding it, so React Router's streamed Suspense/Await
+ * shell-then-content never reaches the browser as separate chunks — it just
+ * makes the single response slower. Fetching the stats client-side (see the
+ * default export below) keeps this response tiny and fast through any such
+ * proxy, so the skeleton actually paints immediately every time.
  */
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { admin, session } = await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
   const shopDomain = session.shop;
 
   // Best-effort sync of shop token/scope — doesn't affect what the page renders,
@@ -63,35 +73,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     });
   }
 
-  const defaultStats = {
-    totalOrders: 0,
-    pendingOrders: 0,
-    totalRevenue: 0,
-    todayRevenue: 0,
-    recentOrders: [] as unknown[],
-    todayOrders: 0,
-    weekOrders: 0,
-    ordersByStatus: {} as Record<string, number>,
-  };
-
-  const [shopCurrency, settings, supabaseStats] = await Promise.all([
-    getCachedShopCurrency(shopDomain, admin),
-    getFormSettings(shopDomain),
-    getOrderStats(shopDomain).catch((error) => {
-      console.log("Error fetching Supabase order stats:", error);
-      return null;
-    }),
-  ]);
-
-  const stats = supabaseStats ? { ...defaultStats, ...supabaseStats } : defaultStats;
-
   return {
     shop: shopDomain,
     themeEditorUrl: getCodThemeEditorUrl(shopDomain),
-    enabled: settings?.enabled || false,
-    settings,
-    stats,
-    shopCurrency,
   };
 };
 
@@ -99,7 +83,41 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
  * Dashboard Component - Premium Design
  */
 export default function Index() {
-  const { themeEditorUrl, enabled, stats, shopCurrency } = useLoaderData<typeof loader>();
+  const { themeEditorUrl } = useLoaderData<typeof loader>();
+  const statsFetcher = useFetcher<typeof dashboardStatsLoader>();
+
+  useEffect(() => {
+    if (statsFetcher.state === "idle" && statsFetcher.data == null) {
+      statsFetcher.load("/api/dashboard-stats");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statsFetcher.state, statsFetcher.data]);
+
+  if (!statsFetcher.data) {
+    return <DashboardSkeleton />;
+  }
+
+  return (
+    <DashboardContent
+      themeEditorUrl={themeEditorUrl}
+      enabled={statsFetcher.data.enabled}
+      stats={statsFetcher.data.stats}
+      shopCurrency={statsFetcher.data.shopCurrency}
+    />
+  );
+}
+
+function DashboardContent({
+  themeEditorUrl,
+  enabled,
+  stats,
+  shopCurrency,
+}: {
+  themeEditorUrl: string;
+  enabled: boolean;
+  stats: typeof defaultStats;
+  shopCurrency: string;
+}) {
   const navigate = useNavigate();
 
   // Format currency
