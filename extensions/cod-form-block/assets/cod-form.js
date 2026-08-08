@@ -4668,13 +4668,15 @@ function darkenColor(hex, percent) {
 
 
 
-      // For presets, use a tinted version of the form's background color
+      // For presets, use a tinted version of the form's background color.
+      // Kept subtle (was 0.06/0.08) — on light themes that read as a
+      // noticeably dark grey card instead of a gentle surface tint.
       var presetBg;
       if (themeKey === 'default' || themeKey === 'professional') {
-          presetBg = 'rgb(243, 244, 246)';
+          presetBg = 'rgb(248, 249, 250)';
       } else {
           // Use form background color to create tinted background
-          presetBg = darkenColor(backgroundColor, 0.06) || '#f3f4f6';
+          presetBg = darkenColor(backgroundColor, 0.03) || '#f8f9fa';
       }
 
       if (isPresetTheme) {
@@ -4682,7 +4684,7 @@ function darkenColor(hex, percent) {
           card.style.border = themeKey === 'default' ? customBorder : 'none';
       } else {
           // For custom themes, use a slightly tinted version of form background or fallback
-          var formBgTinted = darkenColor(backgroundColor, 0.08) || customGreyBg;
+          var formBgTinted = darkenColor(backgroundColor, 0.04) || customGreyBg;
           card.style.background = formBgTinted;
           card.style.border = customBorder;
       }
@@ -6404,7 +6406,11 @@ function darkenColor(hex, percent) {
       
       if (config.modalStyle === 'glassmorphism') {
           container.style.setProperty('background', userBgColor, 'important');
-          container.style.backdropFilter = 'blur(10px)';
+          // 6px, not 10px — this element also scrolls its own content on
+          // mobile, and a live backdrop blur recomputed every scroll frame
+          // is the main cause of laggy scrolling; lower radius = cheaper.
+          container.style.backdropFilter = 'blur(6px)';
+          container.style.setProperty('-webkit-backdrop-filter', 'blur(6px)');
           container.style.boxShadow = '0 8px 32px 0 rgba(31, 38, 135, 0.37)';
           container.style.border = '1px solid rgba(255, 255, 255, 0.18)';
       } else if (config.modalStyle === 'minimal') {

@@ -767,6 +767,12 @@
     overflow-y: auto;
     overflow-x: hidden;
     overscroll-behavior-x: contain;
+    overscroll-behavior-y: contain;
+    /* Momentum scrolling + own compositor layer — without these, a fixed,
+       overflow:auto container with a blurred sibling/self scrolls on the
+       main thread on iOS instead of the GPU, which reads as laggy. */
+    -webkit-overflow-scrolling: touch;
+    transform: translateZ(0);
   }
 
   @keyframes fadeIn {
@@ -1194,6 +1200,9 @@
       width: 100%;
       max-height: calc(100svh - env(safe-area-inset-bottom, 0px) - 20px);
       overflow-y: auto;
+      overscroll-behavior-y: contain;
+      -webkit-overflow-scrolling: touch;
+      transform: translateZ(0);
     }
     
     /* Sticky Button on Mobile */
@@ -1457,12 +1466,18 @@
   {% if cod_modal_style == 'glassmorphism' %}
   .cod-form-container {
       background: rgba(255, 255, 255, 0.95) !important;
-      backdrop-filter: blur(10px) !important;
+      /* Lower blur radius than the original 10px — backdrop-filter is applied
+         directly to the element that also scrolls its own content, and blur
+         cost scales with radius; 6px still reads as frosted glass but is
+         noticeably cheaper to recompute every scroll frame on mobile. */
+      backdrop-filter: blur(6px) !important;
+      -webkit-backdrop-filter: blur(6px) !important;
       border: 1px solid rgba(255, 255, 255, 0.2) !important;
   }
   .cod-modal-overlay {
       background: rgba(0, 0, 0, 0.3) !important;
       backdrop-filter: blur(4px) !important;
+      -webkit-backdrop-filter: blur(4px) !important;
   }
   {% endif %}
   

@@ -123,7 +123,7 @@ export default function App() {
           <s-link href="/app/upsell-downsell">Upsells & Downsells</s-link>
           {/* <s-link href="/app/orders">Orders</s-link> */}
           <s-link href="/app/analytics">Analytics & Integrations</s-link>
-          <s-link href="/app/billing">Billing</s-link>
+          <s-link href="/app/billing">Billing Plans</s-link>
           <s-link href="/app/app-settings">Settings</s-link>
         </s-app-nav>
         {isRouteChanging ? getSkeletonForPath(navigation.location.pathname) : <Outlet />}
