@@ -45,7 +45,8 @@ import { supabase } from "../config/supabase.server";
 import { getFormSettings, getCachedShopCurrency } from "../config/supabase.server";
 import { DEFAULT_FIELDS } from "../config/form-builder.types";
 import { getPartialPaymentSettings } from "../services/partial-payment-settings.server";
-import { syncOffersToMetafield } from "../services/quantity-offers-sync.server";
+import { syncOffersToMetafield, applyThemeToOfferGroups } from "../services/quantity-offers-sync.server";
+import { extractThemeSettings, deriveOfferDesignColors } from "../utils/themeExtraction";
 
 // Color Presets for quick selection
 const COLOR_PRESETS = [
@@ -145,6 +146,23 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const shopDomain = session.shop;
     const formData = await request.formData();
     const actionType = formData.get("action") as string;
+
+    // "Design with AI" — mirrors Form Builder's theme extraction, but only
+    // ever touches Bundle Offer groups' `design` colors. It deliberately
+    // does not read or write form_settings (styles, button_styles, fields,
+    // etc.) or the payment-mode-card styles Form Builder's own AI button
+    // also updates — this is scoped to bundles only.
+    if (actionType === "design_with_ai") {
+        try {
+            const profile = await extractThemeSettings(admin, session);
+            const offerGroupsUpdated = await applyThemeToOfferGroups(admin, shopDomain, profile);
+            const themeColors = deriveOfferDesignColors(profile);
+            return { success: true, actionType: "design_with_ai", offerGroupsUpdated, themeColors };
+        } catch (error: any) {
+            console.error('[Bundle Offers] Design with AI failed:', error);
+            return { success: false, actionType: "design_with_ai", error: error.message || 'Failed to design with AI' };
+        }
+    }
 
     if (actionType === "save") {
         const offerGroup = JSON.parse(formData.get("offerGroup") as string);
@@ -357,11 +375,14 @@ export default function QuantityOffersPage() {
     const [activeGroup, setActiveGroup] = useState<QuantityOfferGroup | null>(null);
     const [editingOfferId, setEditingOfferId] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<'offers' | 'design'>('offers');
+    const [themeApplied, setThemeApplied] = useState(false);
     const [groupToDelete, setGroupToDelete] = useState<{ id: string, name: string } | null>(null);
 
     const deletingGroupId = navigation.state === "submitting" && navigation.formData?.get("action") === "delete"
         ? navigation.formData.get("groupId")
         : null;
+
+    const isDesigningWithAi = navigation.state === "submitting" && navigation.formData?.get("action") === "design_with_ai";
 
     const displayGroups = useMemo(() => {
         if (!initialOfferGroups) return [];
@@ -459,6 +480,26 @@ export default function QuantityOffersPage() {
     useEffect(() => {
         if (actionData?.success && actionData !== lastProcessedActionRef.current) {
             lastProcessedActionRef.current = actionData;
+
+            if ((actionData as any).actionType === 'design_with_ai') {
+                const themeColors = (actionData as any).themeColors;
+                // Give the currently-open group's preview the new colors right away —
+                // applyThemeToOfferGroups already persisted every EXISTING group
+                // server-side, but a brand-new, not-yet-saved group isn't in the DB
+                // for it to touch, so this is the only way that one gets updated.
+                if (themeColors) {
+                    setActiveGroup((prev) => prev ? { ...prev, design: { ...prev.design, ...themeColors } } : prev);
+                }
+                setThemeApplied(true);
+                const updatedCount = (actionData as any).offerGroupsUpdated || 0;
+                shopify.toast.show(
+                    updatedCount > 0
+                        ? `✓ Designed with AI — ${updatedCount} bundle offer${updatedCount === 1 ? '' : 's'} matched to your theme`
+                        : '✓ Designed with AI'
+                );
+                return;
+            }
+
             if ((actionData as any)?.savedGroupId) {
                 lastSavedGroupIdRef.current = String((actionData as any).savedGroupId);
                 // If this was a newly created group, attach the id immediately so edits don't stay "id=null"
@@ -480,11 +521,12 @@ export default function QuantityOffersPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [actionData]);
 
-    // Surface save errors to the seller
+    // Surface save / design-with-ai errors to the seller
     useEffect(() => {
         if (actionData && (actionData as any).success === false && (actionData as any).error) {
+            const label = (actionData as any).actionType === 'design_with_ai' ? 'Design with AI failed' : 'Save failed';
             try {
-                shopify.toast.show(`Save failed: ${(actionData as any).error}`, { duration: 5000 });
+                shopify.toast.show(`${label}: ${(actionData as any).error}`, { duration: 5000, isError: true });
             } catch {
                 // no-op
             }
@@ -510,6 +552,15 @@ export default function QuantityOffersPage() {
         setEditingOfferId(null);
         setActiveTab('offers');
     }, [mapDbGroupToUi, stringifySavedGroup]);
+
+    // Bundle-only "Design with AI" — extracts the storefront theme and applies
+    // it to every Bundle Offer group's colors, same as Form Builder's own
+    // button, but scoped so it never touches form_settings.
+    const handleDesignWithAI = useCallback(() => {
+        const formData = new FormData();
+        formData.append("action", "design_with_ai");
+        submit(formData, { method: "post" });
+    }, [submit]);
 
     const updateActiveGroup = useCallback((updates: Partial<QuantityOfferGroup>) => {
         if (!activeGroup) return;
@@ -820,6 +871,32 @@ export default function QuantityOffersPage() {
 
                                         {activeTab === 'design' && (
                                             <BlockStack gap="400">
+                                                {/* Design with AI — bundle-only theme match */}
+                                                <LegacyCard sectioned>
+                                                    <InlineStack align="space-between" blockAlign="center" gap="300" wrap={false}>
+                                                        <BlockStack gap="050">
+                                                            <Text as="h3" variant="headingSm">Match your store's theme</Text>
+                                                            <Text as="p" variant="bodySm" tone="subdued">
+                                                                Pulls colors from your storefront and applies them to this bundle's design only — your COD form is untouched.
+                                                            </Text>
+                                                        </BlockStack>
+                                                        <button
+                                                            type="button"
+                                                            className={`ai-design-btn small ${themeApplied ? 'applied' : ''}`}
+                                                            onClick={handleDesignWithAI}
+                                                            disabled={isDesigningWithAi}
+                                                        >
+                                                            {isDesigningWithAi ? (
+                                                                <span className="ai-loading-dots">
+                                                                    <span>.</span><span>.</span><span>.</span>
+                                                                </span>
+                                                            ) : (
+                                                                <span>{themeApplied ? "✓ Designed with AI" : "✨ Design with AI"}</span>
+                                                            )}
+                                                        </button>
+                                                    </InlineStack>
+                                                </LegacyCard>
+
                                                 {/* Template Selection */}
                                                 <LegacyCard title="Template" sectioned>
                                                     <div className="template-grid">
@@ -2365,4 +2442,47 @@ const styles = `
     
     /* Button */
     .preview-btn { width: calc(100% - 32px); margin: 0 16px 16px; padding: 14px; font-size: 15px; font-weight: 600; border: none; cursor: pointer; }
+
+    /* Design with AI button — same look as Form Builder's, scoped to bundles here */
+    .ai-design-btn {
+        position: relative;
+        padding: 10px 24px;
+        border-radius: 9999px;
+        background: transparent;
+        color: white;
+        font-weight: 600;
+        font-size: 15px;
+        border: none;
+        cursor: pointer;
+        overflow: hidden;
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        transition: all 0.3s ease;
+        flex-shrink: 0;
+    }
+    .ai-design-btn:hover { box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2); transform: translateY(-1px); }
+    .ai-design-btn::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 300px;
+        height: 300px;
+        background: conic-gradient(#4285f4 0%, #ea4335 25%, #fbbc05 50%, #34a853 75%, #4285f4 100%);
+        animation: ai-rotate-border 3s linear infinite;
+        z-index: -2;
+    }
+    .ai-design-btn::after { content: ''; position: absolute; inset: 3px; background: #1f2937; border-radius: 9999px; z-index: -1; }
+    @keyframes ai-rotate-border { from { transform: translate(-50%, -50%) rotate(0deg); } to { transform: translate(-50%, -50%) rotate(360deg); } }
+    @keyframes ai-loading-bounce { 0%, 80%, 100% { transform: translateY(0); } 40% { transform: translateY(-4px); } }
+    .ai-loading-dots { display: inline-flex; gap: 2px; align-items: center; justify-content: center; min-width: 40px; }
+    .ai-loading-dots span { display: inline-block; animation: ai-loading-bounce 1.4s infinite ease-in-out both; font-size: 18px; line-height: 1; }
+    .ai-loading-dots span:nth-child(1) { animation-delay: -0.32s; }
+    .ai-loading-dots span:nth-child(2) { animation-delay: -0.16s; }
+    .ai-design-btn:disabled { opacity: 0.7; cursor: not-allowed; }
+    .ai-design-btn.small { padding: 6px 14px; font-size: 12px; }
+    .ai-design-btn.small::after { inset: 2px; }
 `;
