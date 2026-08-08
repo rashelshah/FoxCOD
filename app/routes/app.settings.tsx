@@ -4754,12 +4754,6 @@ export default function SettingsPage() {
                             Field Styling
                         </button>
                         <button
-                            className={`tab ${activeTab === 'style' ? 'active' : ''}`}
-                            onClick={() => setActiveTab('style')}
-                        >
-                            Styles
-                        </button>
-                        <button
                             className={`tab ${activeTab === 'shipping' ? 'active' : ''}`}
                             onClick={() => setActiveTab('shipping')}
                         >
@@ -5923,6 +5917,98 @@ export default function SettingsPage() {
                                             );
                                         })}
                                     </AccordionSection>
+
+                                    {/* Form Animation (Default Open) */}
+                                    {false && <AccordionSection id="form-animation" tab="field-styling" title="Form Animation" expandedSection={expandedSection} toggleSection={toggleSection}>
+                                        <p className="setting-helper" style={{ marginBottom: 12 }}>Choose the modal style and entry animation for the COD form.</p>
+                                        <div className="input-group">
+                                            <label className="input-label">Modal Style</label>
+                                            <div className="style-options">
+                                                {['modern', 'minimal', 'glassmorphism'].map((style) => (
+                                                    <button
+                                                        key={style}
+                                                        className={`style-option ${modalStyle === style ? 'active' : ''}`}
+                                                        onClick={() => setModalStyle(style as any)}
+                                                    >
+                                                        {style.charAt(0).toUpperCase() + style.slice(1)}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="input-group" style={{ marginTop: 16 }}>
+                                            <label className="input-label">Animation</label>
+                                            <div className="style-options">
+                                                {['fade', 'slide', 'scale'].map((style) => (
+                                                    <button
+                                                        key={style}
+                                                        className={`style-option ${animationStyle === style ? 'active' : ''}`}
+                                                        onClick={() => setAnimationStyle(style as any)}
+                                                    >
+                                                        {style.charAt(0).toUpperCase() + style.slice(1)}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </AccordionSection>}
+
+                                    {/* Form Shape */}
+                                    <AccordionSection id="form-shape" tab="field-styling" title="Form Shape" helperText="Choose how the form appears on mobile devices" expandedSection={expandedSection} toggleSection={toggleSection}>
+                                        <div className="input-group">
+                                            <label className="input-label">Form Type</label>
+                                            <div className="style-options">
+                                                {['popup', 'full_screen'].map((type) => (
+                                                    <button
+                                                        key={type}
+                                                        className={`style-option ${formType === type ? 'active' : ''}`}
+                                                        onClick={() => {
+                                                            setFormType(type as any);
+                                                            if (type === 'full_screen') {
+                                                                setBorderRadius(0);
+                                                            } else {
+                                                                setBorderRadius(16);
+                                                            }
+                                                        }}
+                                                    >
+                                                        {type === 'popup' ? 'Pop up' : 'Full Screen'}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <p className="setting-helper">Choose how the form appears on mobile devices.</p>
+                                        </div>
+                                    </AccordionSection>
+
+                                    {/* Modal Display Options */}
+                                    <AccordionSection id="modal-display" tab="field-styling" title="Modal Display Options" helperText="Choose what information is displayed in the modal" expandedSection={expandedSection} toggleSection={toggleSection}>
+                                        <div className="toggle-options">
+                                            <div className="toggle-option" onClick={() => setShowProductImage(!showProductImage)}>
+                                                <span className="toggle-option-label">Show Product Image in Modal</span>
+                                                <div className={`mini-toggle ${showProductImage ? 'on' : 'off'}`} />
+                                            </div>
+                                            <div className="toggle-option" onClick={() => setShowPrice(!showPrice)}>
+                                                <span className="toggle-option-label">Show Price in Modal</span>
+                                                <div className={`mini-toggle ${showPrice ? 'on' : 'off'}`} />
+                                            </div>
+                                        </div>
+                                    </AccordionSection>
+
+                                    {/* Restore to Default */}
+                                    <div style={{ padding: '12px 16px' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                            <Button
+                                                tone="critical"
+                                                icon={ResetIcon}
+                                                onClick={() => {
+                                                    setModalStyle('modern');
+                                                    setAnimationStyle('fade');
+                                                    setBorderRadius(12);
+                                                    setShowProductImage(true);
+                                                    setShowPrice(true);
+                                                }}
+                                            >
+                                                Restore All to Default
+                                            </Button>
+                                        </div>
+                                    </div>
                                 </>
                             )}
 
@@ -6294,6 +6380,8 @@ export default function SettingsPage() {
                                             </div>
                                         </Modal.Section>
                                     </Modal>
+
+
                                 </>
                             )}
 
@@ -6432,102 +6520,7 @@ export default function SettingsPage() {
                             }
 
 
-                            {/* Style Tab */}
-                            {activeTab === 'style' && (
-                                <>
-                                    {/* Form Animation (Default Open) */}
-                                    {false && <AccordionSection id="form-animation" tab="style" title="Form Animation" expandedSection={expandedSection} toggleSection={toggleSection}>
-                                        <p className="setting-helper" style={{ marginBottom: 12 }}>Choose the modal style and entry animation for the COD form.</p>
-                                        <div className="input-group">
-                                            <label className="input-label">Modal Style</label>
-                                            <div className="style-options">
-                                                {['modern', 'minimal', 'glassmorphism'].map((style) => (
-                                                    <button
-                                                        key={style}
-                                                        className={`style-option ${modalStyle === style ? 'active' : ''}`}
-                                                        onClick={() => setModalStyle(style as any)}
-                                                    >
-                                                        {style.charAt(0).toUpperCase() + style.slice(1)}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                        <div className="input-group" style={{ marginTop: 16 }}>
-                                            <label className="input-label">Animation</label>
-                                            <div className="style-options">
-                                                {['fade', 'slide', 'scale'].map((style) => (
-                                                    <button
-                                                        key={style}
-                                                        className={`style-option ${animationStyle === style ? 'active' : ''}`}
-                                                        onClick={() => setAnimationStyle(style as any)}
-                                                    >
-                                                        {style.charAt(0).toUpperCase() + style.slice(1)}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </AccordionSection>}
 
-                                    {/* Form Shape */}
-                                    <AccordionSection id="form-shape" tab="style" title="Form Shape" expandedSection={expandedSection} toggleSection={toggleSection}>
-                                        <div className="input-group">
-                                            <label className="input-label">Form Type</label>
-                                            <div className="style-options">
-                                                {['popup', 'full_screen'].map((type) => (
-                                                    <button
-                                                        key={type}
-                                                        className={`style-option ${formType === type ? 'active' : ''}`}
-                                                        onClick={() => {
-                                                            setFormType(type as any);
-                                                            if (type === 'full_screen') {
-                                                                setBorderRadius(0);
-                                                            } else {
-                                                                setBorderRadius(16);
-                                                            }
-                                                        }}
-                                                    >
-                                                        {type === 'popup' ? 'Pop up' : 'Full Screen'}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                            <p className="setting-helper">Choose how the form appears on mobile devices.</p>
-                                        </div>
-                                    </AccordionSection>
-
-                                    {/* Modal Display Options */}
-                                    <AccordionSection id="modal-display" tab="style" title="Modal Display Options" expandedSection={expandedSection} toggleSection={toggleSection}>
-                                        <div className="toggle-options">
-                                            <div className="toggle-option" onClick={() => setShowProductImage(!showProductImage)}>
-                                                <span className="toggle-option-label">Show Product Image in Modal</span>
-                                                <div className={`mini-toggle ${showProductImage ? 'on' : 'off'}`} />
-                                            </div>
-                                            <div className="toggle-option" onClick={() => setShowPrice(!showPrice)}>
-                                                <span className="toggle-option-label">Show Price in Modal</span>
-                                                <div className={`mini-toggle ${showPrice ? 'on' : 'off'}`} />
-                                            </div>
-                                        </div>
-                                    </AccordionSection>
-
-                                    {/* Restore to Default */}
-                                    <div style={{ padding: '12px 16px' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'center' }}>
-                                            <Button
-                                                tone="critical"
-                                                icon={ResetIcon}
-                                                onClick={() => {
-                                                    setModalStyle('modern');
-                                                    setAnimationStyle('fade');
-                                                    setBorderRadius(12);
-                                                    setShowProductImage(true);
-                                                    setShowPrice(true);
-                                                }}
-                                            >
-                                                Restore All to Default
-                                            </Button>
-                                        </div>
-                                    </div>
-                                </>
-                            )}
                         </div>
 
                         {/* Preview Panel - Hidden on Shipping tab */}
