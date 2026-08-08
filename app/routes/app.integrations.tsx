@@ -11,6 +11,7 @@ import { authenticate } from "../shopify.server";
 import { getAllIntegrationSettings, disconnectIntegration, supabase } from "../config/supabase.server";
 import { INTEGRATIONS, STATUS_BADGES, type Integration, type IntegrationSettings, type GoogleSheetsConfig } from "../config/integrations.types";
 import { revokeToken } from "../services/google-sheets.server";
+import { AnalyticsIntegrationsTabs } from "./AnalyticsIntegrationsTabs";
 
 /**
  * Loader: Fetch integration settings for all integrations
@@ -523,6 +524,8 @@ export default function IntegrationsPage() {
                             <p>Connect third-party services to enhance your COD workflow</p>
                         </div>
                     </div>
+
+                    <AnalyticsIntegrationsTabs active="integrations" />
 
                     {/* Success/Error Message */}
                     {message && (

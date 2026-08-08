@@ -11,6 +11,7 @@ import type { LoaderFunctionArgs } from "react-router";
 import { useLoaderData, useNavigate, useSearchParams } from "react-router";
 import { authenticate } from "../shopify.server";
 import { supabase, getAnalyticsStats } from "../config/supabase.server";
+import { AnalyticsIntegrationsTabs } from "./AnalyticsIntegrationsTabs";
 import {
     Page,
     Layout,
@@ -224,6 +225,7 @@ export default function AnalyticsPage() {
                 subtitle="Track your COD order performance"
                 backAction={{ content: "Dashboard", onAction: () => navigate("/app") }}
             >
+                <AnalyticsIntegrationsTabs active="analytics" />
                 <Layout>
                     <Layout.Section>
                         <Card>
@@ -253,6 +255,7 @@ export default function AnalyticsPage() {
             subtitle="Track your COD order performance"
             backAction={{ content: "Dashboard", onAction: () => navigate("/app") }}
         >
+            <AnalyticsIntegrationsTabs active="analytics" />
             <BlockStack gap="500">
                 {/* ─── Date Filter ─── */}
                 <InlineStack align="end">

@@ -122,8 +122,7 @@ export default function App() {
           <s-link href="/app/quantity-offers">Bundle Offers</s-link>
           <s-link href="/app/upsell-downsell">Upsells & Downsells</s-link>
           {/* <s-link href="/app/orders">Orders</s-link> */}
-          <s-link href="/app/analytics">Analytics</s-link>
-          <s-link href="/app/integrations">Integrations</s-link>
+          <s-link href="/app/analytics">Analytics & Integrations</s-link>
           <s-link href="/app/billing">Billing</s-link>
           <s-link href="/app/app-settings">Settings</s-link>
         </s-app-nav>
