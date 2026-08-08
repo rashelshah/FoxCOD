@@ -10,6 +10,7 @@ import { authenticate } from "../shopify.server";
 import { getUpsellCampaigns, saveCampaign, deleteCampaign, toggleCampaignActive, syncUpsellsToMetafield } from "../services/upsell-offers.server";
 import { type UpsellCampaign, type UpsellType, type CampaignOffer, type CampaignDesign, type ButtonDesign, createDefaultCampaign, createDefaultOffer, DEFAULT_CAMPAIGN_DESIGN } from "../config/upsell-offers.types";
 import { ColorSelector, colorSelectorStyles } from "./ColorSelector";
+import { handlePreviewAutoHideScroll } from "./previewScrollbar";
 import { AnnouncementBannerPreview } from "./AnnouncementBannerPreview";
 import { FormLogoPreview } from "./FormLogoPreview";
 import { Page, Layout, Tabs, Card, Button, Badge, EmptyState, Text, InlineStack, BlockStack, Box, Divider, TextField, Select, ButtonGroup, Banner, LegacyCard, RangeSlider, Modal } from "@shopify/polaris";
@@ -792,7 +793,7 @@ export default function UpsellDownsellPage() {
                                             </div>
                                             <div style={previewDevice === 'desktop' ? { display: 'flex', justifyContent: 'center', alignItems: 'flex-start', background: '#f3f4f6', padding: '32px 16px', borderRadius: '12px', minHeight: '550px' } : {}}>
                                                 <div className={previewDevice === 'mobile' ? "pv-phone" : "preview-desktop"} style={previewDevice === 'desktop' ? { width: '100%', maxWidth: '520px', margin: '0 auto', position: 'relative' } : {}}>
-                                                    <div className="pv-phone-screen" ref={tickPreviewRef} style={previewDevice === 'desktop' ? { background: '#ffffff', borderRadius: '12px', height: 'auto', maxHeight: 'none', padding: '24px', maskImage: 'none', WebkitMaskImage: 'none', overflow: 'visible', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' } : {
+                                                    <div className="pv-phone-screen" ref={tickPreviewRef} onScroll={handlePreviewAutoHideScroll} style={previewDevice === 'desktop' ? { background: '#ffffff', borderRadius: '12px', height: 'auto', maxHeight: 'none', padding: '24px', maskImage: 'none', WebkitMaskImage: 'none', overflow: 'visible', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' } : {
                                                         ...((formSettings?.form_type || 'popup') === 'popup' ? { background: '#f3f4f6', display: 'flex', flexDirection: 'column', paddingTop: '12px' } : {})
                                                     }}>
 
@@ -1858,7 +1859,7 @@ export default function UpsellDownsellPage() {
                                             </div>
                                             <div style={previewDevice === 'desktop' ? { display: 'flex', justifyContent: 'center', alignItems: 'flex-start', background: '#f3f4f6', padding: '32px 16px', borderRadius: '12px', minHeight: '550px' } : {}}>
                                                 <div className={previewDevice === 'mobile' ? "pv-phone" : "preview-desktop"} style={previewDevice === 'desktop' ? { width: '100%', maxWidth: '520px', margin: '0 auto', position: 'relative' } : {}}>
-                                                    <div className="pv-phone-screen" style={previewDevice === 'desktop' ? { background: '#ffffff', borderRadius: '12px', height: 'auto', maxHeight: 'none', padding: '24px', maskImage: 'none', WebkitMaskImage: 'none', overflow: 'visible', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' } : { height: 'auto', minHeight: 0 }}>
+                                                    <div className="pv-phone-screen" onScroll={handlePreviewAutoHideScroll} style={previewDevice === 'desktop' ? { background: '#ffffff', borderRadius: '12px', height: 'auto', maxHeight: 'none', padding: '24px', maskImage: 'none', WebkitMaskImage: 'none', overflow: 'visible', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' } : { height: 'auto', minHeight: 0 }}>
                                                     {/* Downsell popup preview */}
                                                     {(() => {
                                                         const d = editing.design;
@@ -2340,7 +2341,7 @@ export default function UpsellDownsellPage() {
                                             </div>
                                             <div style={previewDevice === 'desktop' ? { display: 'flex', justifyContent: 'center', alignItems: 'flex-start', background: '#f3f4f6', padding: '32px 16px', borderRadius: '12px', minHeight: '550px' } : {}}>
                                                 <div className={previewDevice === 'mobile' ? "pv-phone" : "preview-desktop"} style={previewDevice === 'desktop' ? { width: '100%', maxWidth: '520px', margin: '0 auto', position: 'relative' } : {}}>
-                                                    <div className="pv-phone-screen" style={previewDevice === 'desktop' ? { background: '#ffffff', borderRadius: '12px', height: 'auto', maxHeight: 'none', padding: '24px', maskImage: 'none', WebkitMaskImage: 'none', overflow: 'visible', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' } : { height: '560px' }}>
+                                                    <div className="pv-phone-screen" onScroll={handlePreviewAutoHideScroll} style={previewDevice === 'desktop' ? { background: '#ffffff', borderRadius: '12px', height: 'auto', maxHeight: 'none', padding: '24px', maskImage: 'none', WebkitMaskImage: 'none', overflow: 'visible', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' } : { height: '560px' }}>
                                                     <div className="pv-modal" style={editing.design.bgImage
                                                         ? { backgroundImage: `url(${editing.design.bgImage})`, backgroundSize: 'cover', backgroundPosition: 'center', borderRadius: previewDevice === 'desktop' ? '24px' : '0px' }
                                                         : { background: editing.design.bgColor, borderRadius: previewDevice === 'desktop' ? '24px' : '0px' }

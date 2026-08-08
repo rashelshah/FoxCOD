@@ -40,6 +40,35 @@ export default function App() {
           button:active, .btn:active, [role='button']:active {
             transform: scale(0.98);
           }
+
+          /* Live-preview phone-mockup scrollbars (Form Builder, Bundle Offers,
+             Upsells & Downsells, Branding): invisible at rest, briefly visible
+             while actively scrolling (via the .is-scrolling class toggled from
+             an onScroll handler), then fades back out — mirrors macOS overlay
+             scrollbars instead of Windows/Chrome's persistent scrollbar track. */
+          .preview-phone-screen, .pv-phone-screen {
+            scrollbar-width: none;
+          }
+          .preview-phone-screen::-webkit-scrollbar,
+          .pv-phone-screen::-webkit-scrollbar {
+            width: 4px;
+            background: transparent;
+          }
+          .preview-phone-screen::-webkit-scrollbar-thumb,
+          .pv-phone-screen::-webkit-scrollbar-thumb {
+            background: transparent;
+            border-radius: 4px;
+            transition: background 0.2s ease;
+          }
+          .preview-phone-screen.is-scrolling,
+          .pv-phone-screen.is-scrolling {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(156, 163, 175, 0.6) transparent;
+          }
+          .preview-phone-screen.is-scrolling::-webkit-scrollbar-thumb,
+          .pv-phone-screen.is-scrolling::-webkit-scrollbar-thumb {
+            background: rgba(156, 163, 175, 0.6);
+          }
         `}} />
       </head>
       <body>

@@ -5246,6 +5246,21 @@ function darkenColor(hex, percent) {
   }
 
   /**
+   * Replace {{price}} and {{discount}} tokens in merchant-authored
+   * Tag/Subtitle/Description text with the actual formatted amounts for
+   * that payment method — same {{token}} convention as the Upsells &
+   * Downsells {{price}}/{{title}} text. discountText defaults to the
+   * formatted zero amount so the token still resolves to something sane
+   * on methods (like Cash on Delivery) that have no discount concept.
+   */
+  function interpolatePriceToken(text, priceText, discountText) {
+      if (!text) return text;
+      var result = String(text).split('{{price}}').join(priceText);
+      result = result.split('{{discount}}').join(typeof discountText !== 'undefined' ? discountText : formatMoney(0));
+      return result;
+  }
+
+  /**
    * Render Payment Method Selection (Full Prepaid, Partial COD, Full COD)
    */
   function renderPaymentMethodOptions(form, config) {
@@ -5393,7 +5408,11 @@ function darkenColor(hex, percent) {
       var partialColor = function(key, fallback) { return pmColorFor(pmStyles.partial_payment, key, fallback); };
       var codColor = function(key, fallback) { return pmColorFor(pmStyles.pure_cod, key, fallback); };
 
-      var renderTag = function(method, defaultColor, defaultTextColor) {
+      var tagClassFor = function(method) {
+          return method === 'full_prepaid' ? 'pm-tag-prepaid' : method === 'partial_payment' ? 'pm-tag-partial' : 'pm-tag-cod';
+      };
+
+      var renderTag = function(method, defaultColor, defaultTextColor, priceText, discountText) {
           var tagTextColor = defaultTextColor || 'white';
           var tagsConfig = ppSettings && ppSettings.payment_method_tags;
           // Support backward compatibility where full prepaid tag was always shown by default
@@ -5402,7 +5421,8 @@ function darkenColor(hex, percent) {
           }
           var tagSettings = tagsConfig && tagsConfig[method];
           if (tagSettings && tagSettings.enabled && tagSettings.text) {
-              return '<div style="position: absolute; top: -10px; left: 16px; background: ' + defaultColor + '; color: ' + tagTextColor + '; font-size: 9px; font-weight: 700; padding: 3px 8px; border-radius: 6px; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px; text-transform: uppercase;">' + tagSettings.text + '</div>';
+              var tagText = interpolatePriceToken(tagSettings.text, priceText, discountText);
+              return '<div class="' + tagClassFor(method) + '" style="position: absolute; top: -10px; left: 16px; background: ' + defaultColor + '; color: ' + tagTextColor + '; font-size: 9px; font-weight: 700; padding: 3px 8px; border-radius: 6px; letter-spacing: 0.05em; display: flex; align-items: center; gap: 4px; text-transform: uppercase;">' + tagText + '</div>';
           }
           return '';
       };
@@ -5430,15 +5450,15 @@ function darkenColor(hex, percent) {
           html += '<label class="pm-row pm-prepaid" style="display: flex; flex-direction: column; background: ' + prepaidTheme.bg + '; border-radius: 12px; border: 1.5px solid ' + prepaidTheme.border + '; cursor: pointer; position: relative; overflow: visible; padding: 0 !important; ' + marginStyle + ' box-sizing: border-box; opacity: 1;">';
           var isPrepaidChecked = (defaultMethod === 'full_prepaid') ? 'checked' : '';
           html += '<input type="radio" name="payment_method" value="full_prepaid" ' + isPrepaidChecked + ' style="position:absolute; opacity:0; pointer-events:none; margin:0; padding:0;">';
-          html += renderTag('full_prepaid', prepaidTheme.tagBg, prepaidTheme.tagText);
+          html += renderTag('full_prepaid', prepaidTheme.tagBg, prepaidTheme.tagText, formatMoney(finalPrepaidTotal), formatMoney(prepaidDiscountAmount));
           html += '<div style="display: flex; align-items: flex-start; gap: 12px; padding: 16px 12px 12px 12px; box-sizing: border-box; width: 100%; margin: 0;">';
           html += '<div style="display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px; color: ' + prepaidTheme.iconColor + '; background-color: ' + prepaidTheme.iconBg + ';"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4" /><path d="M4 6v12c0 1.1.9 2 2 2h14v-4" /><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z" /></svg></div>';
           html += '<div style="flex: 1; min-width: 0; padding-top: 2px;">';
           html += '<div style="font-weight: 700; font-size: 14px; color: ' + prepaidTheme.titleColor + '; line-height: 1.2;">Full Prepaid</div>';
           var showFpSub = !ppSettings || ppSettings.show_full_prepaid_subtitle !== false;
-          var fpSub = (ppSettings && ppSettings.full_prepaid_subtitle) || 'Pay now & get fastest delivery';
+          var fpSub = interpolatePriceToken((ppSettings && ppSettings.full_prepaid_subtitle) || 'Pay now & get fastest delivery', formatMoney(finalPrepaidTotal), formatMoney(prepaidDiscountAmount));
           if (showFpSub && fpSub) {
-              html += '<div style="color: ' + prepaidTheme.descColor + '; font-size: 11px; margin-top: 4px; line-height: 1.3;">' + fpSub + '</div>';
+              html += '<div class="pm-desc-prepaid" style="color: ' + prepaidTheme.descColor + '; font-size: 11px; margin-top: 4px; line-height: 1.3;">' + fpSub + '</div>';
           }
           html += '</div>';
           html += '<div style="display: flex; align-items: center; gap: 12px; flex-shrink: 0;">';
@@ -5456,7 +5476,7 @@ function darkenColor(hex, percent) {
           html += '</div></div>';
           var prepaidDesc = ppSettings && ppSettings.payment_method_descriptions && ppSettings.payment_method_descriptions.full_prepaid ? ppSettings.payment_method_descriptions.full_prepaid : { enabled: true, text: 'Pay now, save more, receive sooner' };
           if (prepaidDesc.enabled) {
-              html += '<div style="background: ' + prepaidTheme.descBg + '; padding: 4px 12px; font-size: 11px; color: ' + prepaidTheme.titleColor + '; text-align: center; font-weight: 500; width: 100%; box-sizing: border-box; margin: 0; border-radius: 0 0 10.5px 10.5px;">' + prepaidDesc.text + '</div>';
+              html += '<div class="pm-footer-prepaid" style="background: ' + prepaidTheme.descBg + '; padding: 4px 12px; font-size: 11px; color: ' + prepaidTheme.titleColor + '; text-align: center; font-weight: 500; width: 100%; box-sizing: border-box; margin: 0; border-radius: 0 0 10.5px 10.5px;">' + interpolatePriceToken(prepaidDesc.text, formatMoney(finalPrepaidTotal), formatMoney(prepaidDiscountAmount)) + '</div>';
           }
           html += '</label>';
       }
@@ -5505,7 +5525,7 @@ function darkenColor(hex, percent) {
           html += '<label class="pm-row pm-partial" style="display: flex; flex-direction: column; background: ' + partialTheme.bg + '; border-radius: 12px; border: 1.5px solid ' + partialTheme.border + '; cursor: pointer; position: relative; overflow: visible; padding: 0 !important; ' + marginStylePartial + ' box-sizing: border-box;">';
           var isPartialChecked = (defaultMethod === 'partial_cod') ? 'checked' : '';
           html += '<input type="radio" name="payment_method" value="partial_cod" ' + isPartialChecked + ' style="position:absolute; opacity:0; pointer-events:none; margin:0; padding:0;">';
-          html += renderTag('partial_payment', partialTheme.tagBg, partialTheme.tagText);
+          html += renderTag('partial_payment', partialTheme.tagBg, partialTheme.tagText, depositText, formatMoney(partialDiscountAmount));
           html += '<div style="display: flex; align-items: flex-start; gap: 12px; padding: 16px 12px 12px 12px; box-sizing: border-box; width: 100%; margin: 0;">';
           html += '<div style="display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px; color: ' + partialTheme.iconColor + '; background-color: ' + partialTheme.iconBg + ';"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg></div>';
           html += '<div style="flex: 1; min-width: 0; padding-top: 2px;">';
@@ -5514,7 +5534,7 @@ function darkenColor(hex, percent) {
           var ppSub = ppSettings && ppSettings.partial_payment_subtitle;
           if (showPpSub) {
               if (ppSub) {
-                  html += '<div class="pm-desc-partial" style="color: ' + partialTheme.descColor + '; font-size: 11px; margin-top: 4px; line-height: 1.3;">' + ppSub + '</div>';
+                  html += '<div class="pm-desc-partial" style="color: ' + partialTheme.descColor + '; font-size: 11px; margin-top: 4px; line-height: 1.3;">' + interpolatePriceToken(ppSub, depositText, formatMoney(partialDiscountAmount)) + '</div>';
               } else {
                   html += '<div class="pm-desc-partial" style="color: ' + partialTheme.descColor + '; font-size: 11px; margin-top: 4px; line-height: 1.3;">Pay ' + depositText + ' now • Rest on delivery</div>';
               }
@@ -5539,7 +5559,7 @@ function darkenColor(hex, percent) {
           html += '</div></div>';
           var partialDesc = ppSettings && ppSettings.payment_method_descriptions && ppSettings.payment_method_descriptions.partial_payment ? ppSettings.payment_method_descriptions.partial_payment : { enabled: true, text: 'Secure your order • Avoid fake cancellations' };
           if (partialDesc.enabled) {
-              html += '<div style="background: ' + partialTheme.descBg + '; padding: 4px 12px; font-size: 11px; color: ' + partialTheme.titleColor + '; text-align: center; font-weight: 500; width: 100%; box-sizing: border-box; margin: 0; border-radius: 0 0 10.5px 10.5px;">' + partialDesc.text + '</div>';
+              html += '<div class="pm-footer-partial" style="background: ' + partialTheme.descBg + '; padding: 4px 12px; font-size: 11px; color: ' + partialTheme.titleColor + '; text-align: center; font-weight: 500; width: 100%; box-sizing: border-box; margin: 0; border-radius: 0 0 10.5px 10.5px;">' + interpolatePriceToken(partialDesc.text, depositText, formatMoney(partialDiscountAmount)) + '</div>';
           }
           html += '</label>';
       }
@@ -5571,11 +5591,12 @@ function darkenColor(hex, percent) {
           };
           theme.tagBg = codColor('tagBackgroundColor', theme.border);
           theme.tagText = codColor('tagTextColor', 'white');
+          var codTotalText = formatMoney(parseFloat(orderTotal || 0) + parseFloat(pureCodFeeAmount || 0));
 
           html += '<label class="pm-row pm-cod" style="display: flex; flex-direction: column; background: ' + theme.bg + '; border-radius: 12px; border: 1.5px solid ' + theme.border + '; cursor: pointer; position: relative; overflow: visible; padding: 0 !important; ' + marginStyleCod + ' box-sizing: border-box;">';
           var isCodChecked = (defaultMethod === 'full_cod') ? 'checked' : '';
           html += '<input type="radio" name="payment_method" value="full_cod" ' + isCodChecked + ' style="position:absolute; opacity:0; pointer-events:none; margin:0; padding:0;">';
-          html += renderTag('pure_cod', theme.tagBg, theme.tagText);
+          html += renderTag('pure_cod', theme.tagBg, theme.tagText, codTotalText);
           html += '<div style="display: flex; align-items: flex-start; gap: 12px; padding: 16px 12px 12px 12px; box-sizing: border-box; width: 100%; margin: 0;">';
           html += '<div style="display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px; color: ' + theme.iconColor + '; background-color: ' + theme.iconBg + ';"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13" rx="1" ry="1" /><polygon points="16 8 20 8 23 11 23 16 16 16 16 8" /><circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" /></svg></div>';
           html += '<div style="flex: 1; min-width: 0; padding-top: 2px;">';
@@ -5583,7 +5604,7 @@ function darkenColor(hex, percent) {
           var showCodSub = !ppSettings || ppSettings.show_pure_cod_subtitle !== false;
           var codSub = ppSettings && ppSettings.pure_cod_subtitle;
           if (showCodSub && codSub) {
-              html += '<div style="color: ' + theme.iconColor + '; font-size: 11px; margin-top: 4px; line-height: 1.3;">' + codSub + '</div>';
+              html += '<div class="pm-desc-cod" style="color: ' + theme.iconColor + '; font-size: 11px; margin-top: 4px; line-height: 1.3;">' + interpolatePriceToken(codSub, codTotalText) + '</div>';
           }
 
           html += '</div>';
@@ -5593,14 +5614,14 @@ function darkenColor(hex, percent) {
               var displayStyle = pureCodFeeAmount > 0 ? 'block' : 'none';
               html += '<div class="pm-cod-fee-pill" style="display: ' + displayStyle + '; background: ' + theme.pillBg + '; color: ' + theme.pillColor + '; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 99px; line-height: 1; white-space: nowrap;">' + formatMoney(pureCodFeeAmount) + ' ' + (ppSettings.pure_cod_fee_name || 'COD fee') + '</div>';
           }
-          html += '<span class="pm-amt-cod" style="font-weight: 800; font-size: 15px; color: ' + theme.titleColor + ';">' + formatMoney(parseFloat(orderTotal || 0) + parseFloat(pureCodFeeAmount || 0)) + '</span>';
+          html += '<span class="pm-amt-cod" style="font-weight: 800; font-size: 15px; color: ' + theme.titleColor + ';">' + codTotalText + '</span>';
           html += '</div>';
           var isCodChecked = (defaultMethod === 'full_cod') ? 'checked' : '';
           html += '<input type="radio" name="payment_method_visual" class="pm-pill" ' + isCodChecked + ' style="width: 18px; height: 18px; accent-color: ' + theme.accent + '; margin: 0; pointer-events: none;">';
           html += '</div></div>';
           var codDesc = ppSettings && ppSettings.payment_method_descriptions && ppSettings.payment_method_descriptions.pure_cod ? ppSettings.payment_method_descriptions.pure_cod : { enabled: true, text: 'Higher return risk • Slightly slower processing' };
           if (codDesc.enabled) {
-              html += '<div style="background: ' + theme.footerBg + '; padding: 4px 12px; font-size: 11px; color: ' + theme.footerColor + '; text-align: center; font-weight: 500; width: 100%; box-sizing: border-box; margin: 0; border-radius: 0 0 10.5px 10.5px;">' + codDesc.text + '</div>';
+              html += '<div class="pm-footer-cod" style="background: ' + theme.footerBg + '; padding: 4px 12px; font-size: 11px; color: ' + theme.footerColor + '; text-align: center; font-weight: 500; width: 100%; box-sizing: border-box; margin: 0; border-radius: 0 0 10.5px 10.5px;">' + interpolatePriceToken(codDesc.text, codTotalText) + '</div>';
           }
           html += '</label>';
       }
@@ -5793,10 +5814,29 @@ function darkenColor(hex, percent) {
               prepaidDiscountAmount = Math.min(prepaidDiscountAmount, orderTotal);
           }
           var finalPrepaidTotal = orderTotal - prepaidDiscountAmount;
+          var prepaidPriceText = formatMoney(finalPrepaidTotal);
+          var prepaidDiscountText = formatMoney(prepaidDiscountAmount);
 
           var amtEl = pmPrepaid.querySelector('.pm-amt-prepaid');
-          if (amtEl) amtEl.textContent = formatMoney(finalPrepaidTotal);
-          
+          if (amtEl) amtEl.textContent = prepaidPriceText;
+
+          // Keep any {{price}}/{{discount}} used in the tag/subtitle/description
+          // in sync with the recalculated total (quantity/variant change, upsell, etc.)
+          var fpSubEl = pmPrepaid.querySelector('.pm-desc-prepaid');
+          if (fpSubEl) {
+              fpSubEl.textContent = interpolatePriceToken((ppSettings && ppSettings.full_prepaid_subtitle) || 'Pay now & get fastest delivery', prepaidPriceText, prepaidDiscountText);
+          }
+          var fpFooterEl = pmPrepaid.querySelector('.pm-footer-prepaid');
+          if (fpFooterEl) {
+              var fpDescText = (ppSettings && ppSettings.payment_method_descriptions && ppSettings.payment_method_descriptions.full_prepaid && ppSettings.payment_method_descriptions.full_prepaid.text) || 'Pay now, save more, receive sooner';
+              fpFooterEl.textContent = interpolatePriceToken(fpDescText, prepaidPriceText, prepaidDiscountText);
+          }
+          var fpTagEl = pmPrepaid.querySelector('.pm-tag-prepaid');
+          if (fpTagEl) {
+              var fpTagText = ppSettings && ppSettings.payment_method_tags && ppSettings.payment_method_tags.full_prepaid && ppSettings.payment_method_tags.full_prepaid.text;
+              if (fpTagText) fpTagEl.textContent = interpolatePriceToken(fpTagText, prepaidPriceText, prepaidDiscountText);
+          }
+
           var savePill = pmPrepaid.querySelector('.pm-prepaid-save-pill');
           if (savePill) {
               if (prepaidDiscountAmount > 0) {
@@ -5833,11 +5873,33 @@ function darkenColor(hex, percent) {
           }
           depositText = formatMoney(depositAmount);
 
+          var partialDiscountAmount = 0;
+          if (ppSettings && ppSettings.partial_payment_discount_enabled && ppSettings.partial_payment_discount_value > 0) {
+              if (ppSettings.partial_payment_discount_type === 'percentage') {
+                  partialDiscountAmount = (orderTotal * ppSettings.partial_payment_discount_value) / 100;
+              } else {
+                  partialDiscountAmount = ppSettings.partial_payment_discount_value;
+              }
+              partialDiscountAmount = Math.min(partialDiscountAmount, orderTotal);
+          }
+          var partialDiscountText = formatMoney(partialDiscountAmount);
+
           var descEl = pmPartial.querySelector('.pm-desc-partial');
           var showPpSub = !ppSettings || ppSettings.show_partial_payment_subtitle !== false;
           var ppSub = ppSettings && ppSettings.partial_payment_subtitle;
-          if (descEl && showPpSub && !ppSub) {
-              descEl.textContent = 'Pay ' + depositText + ' now • Rest on delivery';
+          if (descEl && showPpSub) {
+              descEl.textContent = ppSub ? interpolatePriceToken(ppSub, depositText, partialDiscountText) : ('Pay ' + depositText + ' now • Rest on delivery');
+          }
+
+          var partialFooterEl = pmPartial.querySelector('.pm-footer-partial');
+          if (partialFooterEl) {
+              var partialDescText = (ppSettings && ppSettings.payment_method_descriptions && ppSettings.payment_method_descriptions.partial_payment && ppSettings.payment_method_descriptions.partial_payment.text) || 'Secure your order • Avoid fake cancellations';
+              partialFooterEl.textContent = interpolatePriceToken(partialDescText, depositText, partialDiscountText);
+          }
+          var partialTagEl = pmPartial.querySelector('.pm-tag-partial');
+          if (partialTagEl) {
+              var partialTagText = ppSettings && ppSettings.payment_method_tags && ppSettings.payment_method_tags.partial_payment && ppSettings.payment_method_tags.partial_payment.text;
+              if (partialTagText) partialTagEl.textContent = interpolatePriceToken(partialTagText, depositText, partialDiscountText);
           }
 
           var amtEl = pmPartial.querySelector('.pm-amt-partial');
@@ -5853,15 +5915,6 @@ function darkenColor(hex, percent) {
               }
           }
 
-          var partialDiscountAmount = 0;
-          if (ppSettings && ppSettings.partial_payment_discount_enabled && ppSettings.partial_payment_discount_value > 0) {
-              if (ppSettings.partial_payment_discount_type === 'percentage') {
-                  partialDiscountAmount = (orderTotal * ppSettings.partial_payment_discount_value) / 100;
-              } else {
-                  partialDiscountAmount = ppSettings.partial_payment_discount_value;
-              }
-              partialDiscountAmount = Math.min(partialDiscountAmount, orderTotal);
-          }
           var partialSavePill = pmPartial.querySelector('.pm-partial-save-pill');
           if (partialSavePill) {
               if (partialDiscountAmount > 0) {
@@ -5882,7 +5935,23 @@ function darkenColor(hex, percent) {
           if (ppS && ppS.pure_cod_fee_enabled && ppS.pure_cod_fee_amount) {
               pureCodFeeAmt = ppS.pure_cod_fee_type === "percentage" ? (orderTotal * ppS.pure_cod_fee_amount) / 100 : ppS.pure_cod_fee_amount;
           }
-          if (amtCodEl) amtCodEl.textContent = formatMoney(parseFloat(orderTotal || 0) + parseFloat(pureCodFeeAmt || 0));
+          var codTotalText = formatMoney(parseFloat(orderTotal || 0) + parseFloat(pureCodFeeAmt || 0));
+          if (amtCodEl) amtCodEl.textContent = codTotalText;
+
+          var codSubEl = pmCod.querySelector('.pm-desc-cod');
+          if (codSubEl && ppS && ppS.pure_cod_subtitle) {
+              codSubEl.textContent = interpolatePriceToken(ppS.pure_cod_subtitle, codTotalText);
+          }
+          var codFooterEl = pmCod.querySelector('.pm-footer-cod');
+          if (codFooterEl) {
+              var codDescText = (ppS && ppS.payment_method_descriptions && ppS.payment_method_descriptions.pure_cod && ppS.payment_method_descriptions.pure_cod.text) || 'Higher return risk • Slightly slower processing';
+              codFooterEl.textContent = interpolatePriceToken(codDescText, codTotalText);
+          }
+          var codTagEl = pmCod.querySelector('.pm-tag-cod');
+          if (codTagEl) {
+              var codTagText = ppS && ppS.payment_method_tags && ppS.payment_method_tags.pure_cod && ppS.payment_method_tags.pure_cod.text;
+              if (codTagText) codTagEl.textContent = interpolatePriceToken(codTagText, codTotalText);
+          }
 
           var codFeePill = pmCod.querySelector('.pm-cod-fee-pill');
           if (codFeePill) {

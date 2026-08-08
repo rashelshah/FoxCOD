@@ -1170,7 +1170,7 @@ const TagEditor = ({
               onChange={(v) => updTag(method, { text: v })}
               autoComplete="off"
               placeholder="e.g. ★ MOST POPULAR"
-              helpText="Keep it short (e.g. ★ MOST POPULAR or ⚡ FASTEST)"
+              helpText="Keep it short (e.g. ★ MOST POPULAR or ⚡ FASTEST). Use {{price}} for the dynamic price and {{discount}} for the amount saved."
             />
           </div>
         )}
@@ -1209,7 +1209,7 @@ const DescEditor = ({
               onChange={(v) => updDesc(method, { text: v })}
               autoComplete="off"
               placeholder={defaultDesc}
-              helpText="Short description to appear at the bottom of the payment block"
+              helpText="Short description to appear at the bottom of the payment block. Use {{price}} for the dynamic price and {{discount}} for the amount saved."
             />
           </div>
         )}
@@ -1249,7 +1249,7 @@ const SubtitleEditor = ({
               onChange={(v) => upd(textKey, v)}
               autoComplete="off"
               placeholder={defaultText}
-              helpText="Short subtitle to appear directly below the payment method title"
+              helpText="Short subtitle to appear directly below the payment method title. Use {{price}} for the dynamic price and {{discount}} for the amount saved."
             />
           </div>
         )}
@@ -1470,6 +1470,18 @@ export default function PartialPaymentsPage() {
     [shopCurrency]
   );
 
+  // Replace {{price}} and {{discount}} in merchant-authored Tag/Subtitle/
+  // Description text with the actual formatted amounts — same {{token}}
+  // convention as Upsells & Downsells. discountText defaults to the
+  // formatted zero amount so the token still resolves to something sane on
+  // methods (like Cash on Delivery) that have no discount concept.
+  const interpolatePrice = useCallback((text: string | undefined, priceText: string, discountText?: string) => {
+    if (!text) return text;
+    let result = text.split('{{price}}').join(priceText);
+    result = result.split('{{discount}}').join(discountText ?? fmt(0));
+    return result;
+  }, [fmt]);
+
   // ── Deposit preview (using first option) ─────────────────────────────────
   const firstOpt = settings.payment_options[0];
   const previewOrderTotal = 1000;
@@ -1489,6 +1501,36 @@ export default function PartialPaymentsPage() {
   }, [settings.cod_fee_enabled, settings.cod_fee_amount, settings.cod_fee_type, previewDeposit]);
   const previewPayNow = previewDeposit + previewCodFee;
   const previewRemaining = previewOrderTotal - previewDeposit;
+
+  // Discount preview for the Partial Payment tab's {{discount}} token.
+  const previewPartialDiscountAmount = useMemo(() => {
+    if (!(settings.partial_payment_discount_enabled && (settings.partial_payment_discount_value ?? 0) > 0)) return 0;
+    return settings.partial_payment_discount_type === 'percentage'
+      ? previewOrderTotal * ((settings.partial_payment_discount_value ?? 0) / 100)
+      : (settings.partial_payment_discount_value ?? 0);
+  }, [settings.partial_payment_discount_enabled, settings.partial_payment_discount_value, settings.partial_payment_discount_type]);
+
+  // ── Full Prepaid / Pure COD preview totals (these two tabs preview against
+  // a flat 500, matching their existing "Preview uses 500..." caption) ──────
+  const previewFullPrepaidTotal = useMemo(() => {
+    if (!(settings.prepaid_discount_enabled && settings.prepaid_discount_value > 0)) return 500;
+    return settings.prepaid_discount_type === 'percentage'
+      ? 500 - (500 * (settings.prepaid_discount_value / 100))
+      : 500 - settings.prepaid_discount_value;
+  }, [settings.prepaid_discount_enabled, settings.prepaid_discount_value, settings.prepaid_discount_type]);
+  // Discount preview for the Full Prepaid tab's {{discount}} token.
+  const previewFullPrepaidDiscountAmount = useMemo(() => {
+    if (!(settings.prepaid_discount_enabled && settings.prepaid_discount_value > 0)) return 0;
+    return settings.prepaid_discount_type === 'percentage'
+      ? 500 * (settings.prepaid_discount_value / 100)
+      : settings.prepaid_discount_value;
+  }, [settings.prepaid_discount_enabled, settings.prepaid_discount_value, settings.prepaid_discount_type]);
+  const previewPureCodTotal = useMemo(() => {
+    if (!(settings.pure_cod_fee_enabled && settings.pure_cod_fee_amount > 0)) return 500;
+    return settings.pure_cod_fee_type === 'percentage'
+      ? 500 + (500 * (settings.pure_cod_fee_amount / 100))
+      : 500 + settings.pure_cod_fee_amount;
+  }, [settings.pure_cod_fee_enabled, settings.pure_cod_fee_amount, settings.pure_cod_fee_type]);
 
   // ── Modal ─────────────────────────────────────────────────────────────────
   const ms = settings.modal_settings ?? DEFAULT_MODAL_SETTINGS;
@@ -1934,7 +1976,7 @@ export default function PartialPaymentsPage() {
                             fontSize: '9px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', letterSpacing: '0.05em',
                             display: 'flex', alignItems: 'center', gap: '4px', textTransform: 'uppercase'
                           }}>
-                            {settings.payment_method_tags?.partial_payment?.text}
+                            {interpolatePrice(settings.payment_method_tags?.partial_payment?.text, fmt(previewDeposit), fmt(previewPartialDiscountAmount))}
                           </div>
                         )}
 
@@ -1948,7 +1990,7 @@ export default function PartialPaymentsPage() {
                               Partial Payment <svg width="14" height="14" viewBox="0 0 24 24" fill={partialPmColor('iconColor', '#2563eb')} stroke={partialPmColor('cardBackgroundColor', '#eff6ff')} strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M9 12l2 2 4-4" /></svg>
                             </div>
                             {settings.show_partial_payment_subtitle !== false && settings.partial_payment_subtitle ? (
-                              <div style={{ color: partialPmColor('descriptionColor', '#2563eb'), fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>{settings.partial_payment_subtitle}</div>
+                              <div style={{ color: partialPmColor('descriptionColor', '#2563eb'), fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>{interpolatePrice(settings.partial_payment_subtitle, fmt(previewDeposit), fmt(previewPartialDiscountAmount))}</div>
                             ) : (
                               <div style={{ color: partialPmColor('descriptionColor', '#2563eb'), fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>Pay {fmt(previewDeposit)} now • Rest on delivery</div>
                             )}
@@ -1979,7 +2021,7 @@ export default function PartialPaymentsPage() {
                         </div>
                         {settings.payment_method_descriptions?.partial_payment?.enabled && (
                           <div style={{ background: partialPmColor('descriptionBackgroundColor', '#dbeafe'), padding: '10px 12px', fontSize: '10px', color: partialPmColor('textColor', '#1e40af'), display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500, width: '100%', boxSizing: 'border-box', margin: 0, borderBottomLeftRadius: '10px', borderBottomRightRadius: '10px' }}>
-                            {settings.payment_method_descriptions?.partial_payment?.text}
+                            {interpolatePrice(settings.payment_method_descriptions?.partial_payment?.text, fmt(previewDeposit), fmt(previewPartialDiscountAmount))}
                           </div>
                         )}
                       </div>
@@ -2154,7 +2196,7 @@ export default function PartialPaymentsPage() {
                           fontSize: '9px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', letterSpacing: '0.05em',
                           display: 'flex', alignItems: 'center', gap: '4px', textTransform: 'uppercase'
                         }}>
-                          {settings.payment_method_tags?.full_prepaid?.text || '★ MOST POPULAR'}
+                          {settings.payment_method_tags?.full_prepaid?.text ? interpolatePrice(settings.payment_method_tags.full_prepaid.text, fmt(previewFullPrepaidTotal), fmt(previewFullPrepaidDiscountAmount)) : '★ MOST POPULAR'}
                         </div>
                       )}
 
@@ -2166,7 +2208,7 @@ export default function PartialPaymentsPage() {
                         <div style={{ flex: 1, minWidth: 0, paddingTop: '2px' }}>
                           <div style={{ fontWeight: 700, fontSize: '14px', color: prepaidPmColor('textColor', '#166534'), lineHeight: 1.2 }}>Full Prepaid</div>
                           {settings.show_full_prepaid_subtitle !== false && settings.full_prepaid_subtitle && (
-                            <div style={{ color: prepaidPmColor('descriptionColor', '#16a34a'), fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>{settings.full_prepaid_subtitle}</div>
+                            <div style={{ color: prepaidPmColor('descriptionColor', '#16a34a'), fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>{interpolatePrice(settings.full_prepaid_subtitle, fmt(previewFullPrepaidTotal), fmt(previewFullPrepaidDiscountAmount))}</div>
                           )}
                         </div>
 
@@ -2190,7 +2232,7 @@ export default function PartialPaymentsPage() {
                       </div>
                       {settings.payment_method_descriptions?.full_prepaid?.enabled && (
                         <div style={{ background: prepaidPmColor('descriptionBackgroundColor', '#dcfce7'), padding: '10px 12px', fontSize: '10px', color: prepaidPmColor('textColor', '#166534'), display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500, width: '100%', boxSizing: 'border-box', margin: 0, borderBottomLeftRadius: '10px', borderBottomRightRadius: '10px' }}>
-                          {settings.payment_method_descriptions?.full_prepaid?.text}
+                          {interpolatePrice(settings.payment_method_descriptions?.full_prepaid?.text, fmt(previewFullPrepaidTotal), fmt(previewFullPrepaidDiscountAmount))}
                         </div>
                       )}
                     </div>
@@ -2344,7 +2386,7 @@ export default function PartialPaymentsPage() {
                         fontSize: '9px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px', letterSpacing: '0.05em',
                         display: 'flex', alignItems: 'center', gap: '4px', textTransform: 'uppercase'
                       }}>
-                        {settings.payment_method_tags?.pure_cod?.text}
+                        {interpolatePrice(settings.payment_method_tags?.pure_cod?.text, fmt(previewPureCodTotal))}
                       </div>
                     )}
 
@@ -2356,7 +2398,7 @@ export default function PartialPaymentsPage() {
                       <div style={{ flex: 1, minWidth: 0, paddingTop: '2px' }}>
                         <div style={{ fontWeight: 700, fontSize: '14px', color: codPmColor('textColor', '#9a3412'), lineHeight: 1.2 }}>Cash on Delivery</div>
                           {settings.show_pure_cod_subtitle !== false && settings.pure_cod_subtitle && (
-                            <div style={{ color: codPmColor('descriptionColor', '#ea580c'), fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>{settings.pure_cod_subtitle}</div>
+                            <div style={{ color: codPmColor('descriptionColor', '#ea580c'), fontSize: '11px', marginTop: '4px', lineHeight: 1.3 }}>{interpolatePrice(settings.pure_cod_subtitle, fmt(previewPureCodTotal))}</div>
                           )}
 
                       </div>
@@ -2381,7 +2423,7 @@ export default function PartialPaymentsPage() {
                     </div>
                     {settings.payment_method_descriptions?.pure_cod?.enabled && (
                       <div style={{ background: codPmColor('descriptionBackgroundColor', '#ffedd5'), padding: '10px 12px', fontSize: '10px', color: codPmColor('textColor', '#9a3412'), display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 500, width: '100%', boxSizing: 'border-box', margin: 0, borderBottomLeftRadius: '10px', borderBottomRightRadius: '10px' }}>
-                        {settings.payment_method_descriptions?.pure_cod?.text}
+                        {interpolatePrice(settings.payment_method_descriptions?.pure_cod?.text, fmt(previewPureCodTotal))}
                       </div>
                     )}
                   </div>

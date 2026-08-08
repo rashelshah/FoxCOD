@@ -69,6 +69,7 @@ import { ColorSelector, colorSelectorStyles } from "./ColorSelector";
 import { AnnouncementBannerPreview } from "./AnnouncementBannerPreview";
 import { FormLogoPreview } from "./FormLogoPreview";
 import { uploadImageToShopify } from "../services/shopify-file-upload.server";
+import { handlePreviewAutoHideScroll } from "./previewScrollbar";
 
 // Default settings for new shops
 const defaultSettings: Omit<FormSettings, "shop_domain"> = {
@@ -1401,7 +1402,7 @@ const PreviewDisplay = memo(({
             </div>
             <div className="preview-content" style={previewDevice === 'desktop' ? { display: 'flex', justifyContent: 'center', alignItems: 'flex-start', background: '#f3f4f6', padding: '32px 16px', borderRadius: '12px', minHeight: '550px' } : {}}>
                 <div className={previewDevice === 'mobile' ? "preview-phone" : "preview-desktop"} style={previewDevice === 'desktop' ? { width: '100%', maxWidth: '520px', margin: '0 auto', position: 'relative' } : {}}>
-                    <div className={`preview-phone-screen ${activeTab === 'button' && enabled ? 'preview-compact' : ''}`} style={previewDevice === 'desktop' ? { background: 'transparent', height: 'auto', maxHeight: 'none', padding: '0', maskImage: 'none', WebkitMaskImage: 'none', overflow: 'visible' } : {
+                    <div className={`preview-phone-screen ${activeTab === 'button' && enabled ? 'preview-compact' : ''}`} onScroll={handlePreviewAutoHideScroll} style={previewDevice === 'desktop' ? { background: 'transparent', height: 'auto', maxHeight: 'none', padding: '0', maskImage: 'none', WebkitMaskImage: 'none', overflow: 'visible' } : {
                         ...(formType === 'popup' && activeTab !== 'button' && enabled ? { background: '#f3f4f6', display: 'flex', flexDirection: 'column', paddingTop: '12px' } : {})
                     }}>
                         {!enabled ? (

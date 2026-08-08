@@ -31,6 +31,7 @@ import { DEFAULT_BRANDING } from '../config/branding.types';
 import { uploadImageToShopify } from '../services/shopify-file-upload.server';
 import ColorPicker from 'react-best-gradient-color-picker';
 import { ColorSelector, colorSelectorStyles } from "./ColorSelector";
+import { handlePreviewAutoHideScroll } from "./previewScrollbar";
 
 // ── LOADER ──
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -995,7 +996,7 @@ export default function AppSettingsPage() {
 
                                             <div style={brandingPreviewDevice === 'desktop' ? { display: 'flex', justifyContent: 'center', alignItems: 'center', background: '#f3f4f6', padding: '32px 16px', borderRadius: '12px' } : {}}>
                                             <div className={brandingPreviewDevice === 'mobile' ? "preview-phone" : "preview-desktop"} style={brandingPreviewDevice === 'desktop' ? { width: '100%', maxWidth: '520px', margin: '0 auto' } : {}}>
-                                                <div className="preview-phone-screen preview-compact" style={brandingPreviewDevice === 'desktop' ? { display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 16px', background: cr.page_background || 'white', minHeight: '420px', borderRadius: '16px', transition: 'background 0.3s ease' } : { display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px 16px', background: cr.page_background || 'white', minHeight: '380px', transition: 'background 0.3s ease' }}>
+                                                <div className="preview-phone-screen preview-compact" onScroll={handlePreviewAutoHideScroll} style={brandingPreviewDevice === 'desktop' ? { display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 16px', background: cr.page_background || 'white', minHeight: '420px', borderRadius: '16px', transition: 'background 0.3s ease' } : { display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px 16px', background: cr.page_background || 'white', minHeight: '380px', transition: 'background 0.3s ease' }}>
                                                     <div className="brd-preview-bg" style={{ width: '100%' }}>
                                                         {/* Center icon */}
                                                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
