@@ -5635,22 +5635,29 @@ function darkenColor(hex, percent) {
                   var isChecked = rInput && rInput.checked;
                   if (rPill) rPill.checked = isChecked;
 
-                  // Update borders based on selection — each card's own custom mode (if
-                  // set) uses one constant border color regardless of selection state.
+                  // Update borders based on selection. Custom mode's merchant-set
+                  // borderColor is the SELECTED state — full strength, exactly what
+                  // they configured. Unchecked custom cards use that SAME color at
+                  // reduced opacity (via hexToRgba), not default mode's hardcoded
+                  // green/blue/orange tints and not a blank border — the unselected
+                  // state should still visibly be "their" color, just lighter, the
+                  // same relationship default mode has between its selected and
+                  // unselected shades of one hue.
                   if (row.classList.contains('pm-prepaid')) {
                       var fpStyles = pmStyles.full_prepaid;
-                      row.style.borderColor = (fpStyles && fpStyles.mode === 'custom') ? fpStyles.borderColor : (isChecked ? '#22c55e' : '#bbf7d0');
+                      row.style.borderColor = (fpStyles && fpStyles.mode === 'custom') ? (isChecked ? fpStyles.borderColor : (hexToRgba(fpStyles.borderColor, 0.35) || fpStyles.borderColor)) : (isChecked ? '#22c55e' : '#bbf7d0');
                   } else if (row.classList.contains('pm-partial')) {
                       var partialStyles = pmStyles.partial_payment;
-                      row.style.borderColor = (partialStyles && partialStyles.mode === 'custom') ? partialStyles.borderColor : (isChecked ? '#2563eb' : '#bfdbfe');
+                      row.style.borderColor = (partialStyles && partialStyles.mode === 'custom') ? (isChecked ? partialStyles.borderColor : (hexToRgba(partialStyles.borderColor, 0.35) || partialStyles.borderColor)) : (isChecked ? '#2563eb' : '#bfdbfe');
                   } else if (row.classList.contains('pm-cod')) {
                       var codStyles = pmStyles.pure_cod;
+                      var codUnselected = (typeof isOnlyCodEnabled !== 'undefined' && isOnlyCodEnabled) ? '#bbf7d0' : '#fed7aa';
                       if (codStyles && codStyles.mode === 'custom') {
-                          row.style.borderColor = codStyles.borderColor;
+                          row.style.borderColor = isChecked ? codStyles.borderColor : (hexToRgba(codStyles.borderColor, 0.35) || codStyles.borderColor);
                       } else if (typeof isOnlyCodEnabled !== 'undefined' && isOnlyCodEnabled) {
                           row.style.borderColor = isChecked ? '#22c55e' : '#bbf7d0';
                       } else {
-                          row.style.borderColor = isChecked ? '#ea580c' : '#fed7aa';
+                          row.style.borderColor = isChecked ? '#ea580c' : codUnselected;
                       }
                   }
               });
