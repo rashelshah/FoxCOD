@@ -102,12 +102,22 @@ const TABLE = 'merchant_subscriptions';
 
 /**
  * Test subscriptions go through the whole approval flow but never charge a real
- * card. Defaults to on outside production so local and dev-store work is free;
- * set SHOPIFY_BILLING_TEST explicitly to override in either direction.
+ * card. Defaults to on outside true production so local, dev-store, AND
+ * Vercel Preview deployments are all free; set SHOPIFY_BILLING_TEST
+ * explicitly to override in either direction.
+ *
+ * Deliberately does NOT trust NODE_ENV alone: Vercel builds every deployment
+ * — Preview included — with NODE_ENV=production, since that just means
+ * "optimized build," not "this is the live site." VERCEL_ENV is what
+ * actually distinguishes them ('production' | 'preview' | 'development'), so
+ * it takes priority whenever Vercel sets it. Off Vercel, NODE_ENV is the only
+ * signal available, so it's the fallback.
  */
 export function isBillingTestMode(): boolean {
     const flag = process.env.SHOPIFY_BILLING_TEST;
     if (flag != null && flag !== '') return flag.toLowerCase() === 'true';
+
+    if (process.env.VERCEL_ENV) return process.env.VERCEL_ENV !== 'production';
     return process.env.NODE_ENV !== 'production';
 }
 
