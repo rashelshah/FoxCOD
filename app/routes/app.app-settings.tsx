@@ -1197,6 +1197,10 @@ const styles = `
     ${colorSelectorStyles}
     .preview-phone { background: #1f2937; border-radius: 32px; padding: 6px; max-width: 350px; margin: 0 auto; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
     .preview-phone-screen { background: white; border-radius: 24px; overflow-y: auto; height: 550px; }
+    .preview-phone-screen::-webkit-scrollbar { width: 4px; background: transparent; }
+    .preview-phone-screen::-webkit-scrollbar-track { background: transparent; }
+    .preview-phone-screen::-webkit-scrollbar-thumb { background: transparent; border-radius: 4px; }
+    .preview-phone-screen:hover::-webkit-scrollbar-thumb { background: rgba(156, 163, 175, 0.5); }
     .preview-phone-screen.preview-compact { min-height: auto; max-height: none; padding: 20px 16px; }
 
     @keyframes brd-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }

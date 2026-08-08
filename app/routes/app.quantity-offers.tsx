@@ -2256,6 +2256,10 @@ const styles = `
     .preview-content { padding: 24px; }
     .preview-phone { background: #1f2937; border-radius: 32px; padding: 6px; max-width: 380px; margin: 0 auto; }
     .preview-phone-screen { background: white; border-radius: 24px; max-height: 600px; overflow: hidden; overflow-y: auto; transform: translateZ(0); -webkit-mask-image: -webkit-radial-gradient(white, black); mask-image: radial-gradient(white, black); }
+    .preview-phone-screen::-webkit-scrollbar { width: 4px; background: transparent; }
+    .preview-phone-screen::-webkit-scrollbar-track { background: transparent; }
+    .preview-phone-screen::-webkit-scrollbar-thumb { background: transparent; border-radius: 4px; }
+    .preview-phone-screen:hover::-webkit-scrollbar-thumb { background: rgba(156, 163, 175, 0.5); }
     .preview-header-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f3f4f6; margin-bottom: 12px; }
     .preview-header-row span { font-size: 13px; font-weight: 500; }
     .preview-close { font-size: 18px; color: #9ca3af; cursor: pointer; }

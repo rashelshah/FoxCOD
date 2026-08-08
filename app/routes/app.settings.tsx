@@ -3809,6 +3809,10 @@ export default function SettingsPage() {
                 .preview-content { padding: 24px; }
                 .preview-phone { background: #1f2937; border-radius: 32px; padding: 6px; max-width: 350px; margin: 0 auto; }
                 .preview-phone-screen { background: white; border-radius: 24px; overflow: hidden; overflow-y: auto; height: 550px; transform: translateZ(0); -webkit-mask-image: -webkit-radial-gradient(white, black); mask-image: radial-gradient(white, black); }
+                .preview-phone-screen::-webkit-scrollbar { width: 4px; background: transparent; }
+                .preview-phone-screen::-webkit-scrollbar-track { background: transparent; }
+                .preview-phone-screen::-webkit-scrollbar-thumb { background: transparent; border-radius: 4px; }
+                .preview-phone-screen:hover::-webkit-scrollbar-thumb { background: rgba(156, 163, 175, 0.5); }
                 .preview-phone-screen.preview-compact { min-height: auto; max-height: none; padding: 20px 16px; }
                 .preview-product { padding: 16px; }
                 .preview-product-img { width: 80px; height: 80px; border-radius: 6px; flex-shrink: 0; object-fit: cover; }
