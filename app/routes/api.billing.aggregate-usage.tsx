@@ -1,12 +1,19 @@
 /**
- * Usage Charge Aggregation Endpoint
+ * Daily Billing Sweep Endpoint
  * Route: POST /api/billing/aggregate-usage
  *
- * Submits each shop's accrued overage to Shopify as a single aggregated usage
- * record. Intended to run once a day from a scheduler (Vercel Cron, GitHub
- * Actions, an external pinger — anything that can issue an authenticated POST).
+ * Two jobs, run together once a day from a scheduler (Vercel Cron, GitHub
+ * Actions, an external pinger — anything that can issue an authenticated POST):
  *
- * Usage charges are NOT created per order; see usage-charges.server.ts.
+ *   1. Submit each shop's accrued overage to Shopify as one aggregated usage
+ *      record. Usage charges are NOT created per order; see usage-charges.server.ts.
+ *   2. Execute any deferred cancellations whose cycle has actually ended —
+ *      the real appSubscriptionCancel call for a merchant who requested
+ *      cancellation earlier; see processDueCancellations in subscription.server.ts.
+ *
+ * Cancellations run first: a shop being cancelled today gets its overage
+ * flushed as part of that process, so the aggregation pass that follows
+ * simply finds nothing pending for it.
  *
  * AUTH: requires BILLING_CRON_SECRET (or Vercel's own CRON_SECRET, so the
  * scheduler in vercel.json authenticates with no extra setup), sent as either
@@ -19,6 +26,7 @@
 
 import type { ActionFunctionArgs, LoaderFunctionArgs } from 'react-router';
 import { runDailyUsageAggregation, aggregateUsageForShop } from '../services/billing/usage-charges.server';
+import { processDueCancellations } from '../services/billing/subscription.server';
 
 /**
  * Constant-time-ish comparison. Not a hard requirement for a cron trigger, but
@@ -70,12 +78,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             return Response.json({ success: true, shop, result });
         }
 
-        const summary = await runDailyUsageAggregation();
-        return Response.json({ success: true, summary });
+        const cancellations = await processDueCancellations();
+        const usage = await runDailyUsageAggregation();
+        return Response.json({ success: true, cancellations, usage });
     } catch (error: any) {
-        console.error('[Billing] Aggregation endpoint error:', error);
+        console.error('[Billing] Daily sweep endpoint error:', error);
         return Response.json(
-            { success: false, error: error?.message ?? 'Aggregation failed' },
+            { success: false, error: error?.message ?? 'Daily sweep failed' },
             { status: 500 },
         );
     }
@@ -88,12 +97,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }
 
     try {
-        const summary = await runDailyUsageAggregation();
-        return Response.json({ success: true, summary });
+        const cancellations = await processDueCancellations();
+        const usage = await runDailyUsageAggregation();
+        return Response.json({ success: true, cancellations, usage });
     } catch (error: any) {
-        console.error('[Billing] Aggregation endpoint error:', error);
+        console.error('[Billing] Daily sweep endpoint error:', error);
         return Response.json(
-            { success: false, error: error?.message ?? 'Aggregation failed' },
+            { success: false, error: error?.message ?? 'Daily sweep failed' },
             { status: 500 },
         );
     }

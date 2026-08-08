@@ -31,7 +31,9 @@ const shopify = shopifyApp({
       // a reinstall that still has an active subscription.
       try {
         const { ensureSubscription, syncFromShopify } = await import("./services/billing/subscription.server");
+        const { findOrCreateUsageCycle } = await import("./services/billing/order-counter.server");
         await ensureSubscription(session.shop);
+        await findOrCreateUsageCycle(session.shop);
         await syncFromShopify(session.shop);
         console.log(`[Install] Billing initialized for ${session.shop}`);
       } catch (error) {

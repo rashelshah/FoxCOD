@@ -148,8 +148,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     // Excluded: test orders (payload.test) and orders that arrive already
     // cancelled. Non-FoxlyCOD orders were filtered out further up; an order
     // that only carried inventory metadata is not ours to bill for.
+    //
+    // Shopify marks EVERY order placed on a development store as payload.test
+    // = true, regardless of how it was created — there is no way to produce a
+    // non-test order on a dev store. That's correct to exclude on a real
+    // merchant's live store (it's how Shopify's Bogus/test payment gateway
+    // orders are flagged), but it also means order counting can never be
+    // exercised on a dev store under this rule. BILLING_COUNT_TEST_ORDERS is
+    // an explicit, opt-in-only escape hatch for that: unset or "false" in
+    // every real deployment, set to "true" only in a dev store session to
+    // validate the counting logic end-to-end.
+    const countTestOrders = process.env.BILLING_COUNT_TEST_ORDERS === "true";
     if (isPartialCod || isFullPrepaid || isRegularCod) {
-      if (payload.test) {
+      if (payload.test && !countTestOrders) {
         console.log("[Billing] Skipping test order", payload.id);
       } else if (payload.cancelled_at) {
         console.log("[Billing] Skipping already-cancelled order", payload.id);

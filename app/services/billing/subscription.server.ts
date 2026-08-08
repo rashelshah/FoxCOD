@@ -2,19 +2,24 @@
  * Shopify Billing API — subscription management
  * ============================================================================
  * Owns the `merchant_subscriptions` row for each shop and every call into
- * Shopify's App Subscription API.
+ * Shopify's App Subscription API. This file is SUBSCRIPTION-ONLY: billing
+ * identity, plan, cycle, status. It holds no order counters and no usage
+ * window — that lives entirely in `merchant_usage_cycles`, owned by
+ * order-counter.server.ts, and is deliberately never touched by anything in
+ * this file except through the one narrow recompute hook below.
  *
- * Two distinct clocks live in this file — keep them straight:
- *
- *   USAGE window  (current_period_start → current_period_end)
- *       Always 30 days. Resets the order counter. Anchored to the subscription
- *       start date, never the calendar month. A yearly subscriber still gets
- *       their included orders *per month*, which is why this is not the same as:
- *
- *   BILLING period (renews_on)
- *       Shopify's `appSubscription.currentPeriodEnd` — when the merchant's card
- *       is charged next. 30 days out on monthly plans, a year out on yearly.
- *       Display only.
+ * WHY THE SPLIT: usage used to live on this same row, reset whenever a new
+ * Shopify subscription id showed up. That let a merchant burn their full
+ * allowance, cancel (collecting a prorated credit for the unused month),
+ * re-subscribe — new subscription id, fresh order_count — and repeat
+ * indefinitely for near-free unlimited orders. Usage now persists across
+ * every subscription event by construction: nothing in this file has the
+ * ability to reset it. A plan change only ever calls
+ * `recomputeOverageForPlanChange`, which re-derives overage against the new
+ * plan's allowance from the SAME already-accrued count — it never resets
+ * included_orders_used, and it never touches cycle_start/cycle_end. The only
+ * thing that starts a new cycle is that cycle's own cycle_end passing, which
+ * lives entirely in order-counter.server.ts's findOrCreateUsageCycle.
  *
  * Shopify is the source of truth for what the merchant is paying for.
  * `syncFromShopify` reconciles our row against it; nothing else may promote a
@@ -28,7 +33,6 @@ import {
     BILLING_CURRENCY,
     DEFAULT_CYCLE,
     DEFAULT_PLAN,
-    FREE_PLAN_PERIOD_DAYS,
     chargesOverage,
     getPlan,
     getPlanPrice,
@@ -52,6 +56,10 @@ export type SubscriptionStatus =
     | 'frozen'
     | 'declined';
 
+/**
+ * Billing identity only — no usage counters, no cycle window. See
+ * merchant_usage_cycles / order-counter.server.ts for order tracking.
+ */
 export interface MerchantSubscription {
     id: string;
     shop: string;
@@ -60,17 +68,20 @@ export interface MerchantSubscription {
     plan_name: PlanKey;
     billing_cycle: BillingCycle;
     status: SubscriptionStatus;
-    current_period_start: string;
-    current_period_end: string;
     renews_on: string | null;
-    included_orders: number;
-    order_count: number;
-    overage_orders: number;
-    overage_charged_orders: number;
-    last_usage_charge_date: string | null;
     usage_capped_amount: number;
     is_test: boolean;
     cancelled_at: string | null;
+    /**
+     * True once the merchant has requested cancellation but the current paid
+     * cycle hasn't ended yet. The Shopify subscription stays fully active —
+     * billing, allowance, overage, everything — until `renews_on` arrives,
+     * at which point processDueCancellations actually cancels it. No
+     * proration credit is ever issued, because nothing is ever cancelled
+     * mid-cycle by this app.
+     */
+    cancel_at_period_end: boolean;
+    cancel_requested_at: string | null;
     created_at: string;
     updated_at: string;
 }
@@ -84,10 +95,6 @@ export interface AdminGraphqlClient {
 }
 
 const TABLE = 'merchant_subscriptions';
-const DAY_MS = 86_400_000;
-
-/** Length of one usage window. Same for every plan and both billing cycles. */
-export const USAGE_PERIOD_MS = FREE_PLAN_PERIOD_DAYS * DAY_MS;
 
 // ────────────────────────────────────────────────────────────────────────────
 // Test mode
@@ -217,11 +224,8 @@ function normalizeRecord(row: any): MerchantSubscription {
         ...row,
         plan_name: resolvePlanKey(row.plan_name),
         billing_cycle: resolveCycle(row.billing_cycle),
-        included_orders: Number(row.included_orders ?? 0),
-        order_count: Number(row.order_count ?? 0),
-        overage_orders: Number(row.overage_orders ?? 0),
-        overage_charged_orders: Number(row.overage_charged_orders ?? 0),
         usage_capped_amount: Number(row.usage_capped_amount ?? 0),
+        cancel_at_period_end: Boolean(row.cancel_at_period_end),
     } as MerchantSubscription;
 }
 
@@ -237,39 +241,137 @@ export async function getSubscriptionRecord(shop: string): Promise<MerchantSubsc
 /**
  * Return the shop's subscription row, creating a Free-plan row on first touch.
  * The upsert is ignoreDuplicates so two concurrent callers can't both insert.
+ * Does NOT create a usage cycle — call findOrCreateUsageCycle separately
+ * (order-counter.server.ts) for that; the two are intentionally decoupled.
+ *
+ * ALSO the single safety-check chokepoint for deferred cancellations: every
+ * subscription-aware code path in the app calls this function — order
+ * counting, plan enforcement, the dashboard, the billing page, install — so
+ * putting the "is a cancellation actually due now" check here means it runs
+ * everywhere the user needs it (dashboard load, billing page load, app
+ * install, any subscription-related request) without hunting down each call
+ * site individually. See checkAndExecuteDueCancellation for why this is cheap.
  */
-export async function ensureSubscription(shop: string): Promise<MerchantSubscription> {
-    const existing = await getSubscriptionRecord(shop);
-    if (existing) return existing;
+export async function ensureSubscription(
+    shop: string,
+    admin?: AdminGraphqlClient | null,
+): Promise<MerchantSubscription> {
+    let existing = await getSubscriptionRecord(shop);
 
-    const now = new Date();
-    const plan = getPlan(DEFAULT_PLAN);
+    if (!existing) {
+        const { error } = await supabase.from(TABLE).upsert(
+            {
+                shop,
+                plan_name: DEFAULT_PLAN,
+                billing_cycle: DEFAULT_CYCLE,
+                status: 'active',
+                usage_capped_amount: 0,
+                is_test: isBillingTestMode(),
+            },
+            { onConflict: 'shop', ignoreDuplicates: true },
+        );
+        if (error) {
+            console.error('[Billing] Error creating subscription row:', error);
+            throw error;
+        }
 
-    const { error } = await supabase.from(TABLE).upsert(
-        {
-            shop,
-            plan_name: DEFAULT_PLAN,
-            billing_cycle: DEFAULT_CYCLE,
-            status: 'active',
-            current_period_start: now.toISOString(),
-            current_period_end: new Date(now.getTime() + USAGE_PERIOD_MS).toISOString(),
-            included_orders: plan.includedOrders,
-            order_count: 0,
-            overage_orders: 0,
-            overage_charged_orders: 0,
-            usage_capped_amount: 0,
-            is_test: isBillingTestMode(),
-        },
-        { onConflict: 'shop', ignoreDuplicates: true },
-    );
-    if (error) {
-        console.error('[Billing] Error creating subscription row:', error);
-        throw error;
+        existing = await getSubscriptionRecord(shop);
+        if (!existing) throw new Error(`[Billing] Failed to create subscription row for ${shop}`);
     }
 
-    const created = await getSubscriptionRecord(shop);
-    if (!created) throw new Error(`[Billing] Failed to create subscription row for ${shop}`);
-    return created;
+    return checkAndExecuteDueCancellation(existing, admin);
+}
+
+/** Descriptive alias for call sites (the cron sweep) that want the name to
+ *  read as "reconcile this shop's cancellation state," not "get or create." */
+export const syncSubscriptionFromShopify = ensureSubscription;
+
+/**
+ * The actual due-check. Pure in-memory comparison in the overwhelmingly
+ * common case (no pending cancellation, or pending but not due yet) — costs
+ * nothing beyond a date comparison on data already in hand, so calling it
+ * from every ensureSubscription() call (including the order-creation hot
+ * path) has no measurable performance impact.
+ *
+ * Only touches Shopify's API in the rare case a cancellation just became
+ * due, and even then at most once: the CAS claim below flips
+ * cancel_at_period_end to false immediately, so every other concurrent
+ * caller (a second browser tab, a racing request) sees it already claimed
+ * and returns without doing anything — exactly-once execution, no duplicate
+ * appSubscriptionCancel calls.
+ *
+ * On failure, the claim is rolled back (cancel_at_period_end restored to
+ * true) so the next check — or the daily cron backstop, for a shop nobody
+ * happens to touch — retries instead of silently losing the cancellation.
+ */
+async function checkAndExecuteDueCancellation(
+    record: MerchantSubscription,
+    admin?: AdminGraphqlClient | null,
+): Promise<MerchantSubscription> {
+    if (!record.cancel_at_period_end || !record.renews_on) return record;
+    if (new Date(record.renews_on).getTime() > Date.now()) return record;
+
+    const shop = record.shop;
+
+    // CAS claim: succeeds only for the first caller to see the flag still true.
+    const { data: claimed, error: claimError } = await supabase
+        .from(TABLE)
+        .update({ cancel_at_period_end: false, updated_at: new Date().toISOString() })
+        .eq('shop', shop)
+        .eq('cancel_at_period_end', true)
+        .select('*');
+
+    if (claimError) {
+        console.error(`[Billing] Could not claim due cancellation for ${shop}:`, claimError);
+        return record;
+    }
+    if (!claimed || claimed.length === 0) {
+        // Another request already claimed it (or it was undone since we read
+        // `record`) — nothing left for this caller to do.
+        return record;
+    }
+
+    const claimedRecord = normalizeRecord(claimed[0]);
+
+    try {
+        const client = admin ?? (await getAdminClient(shop));
+        if (!client) throw new Error('Could not reach Shopify for this shop.');
+
+        if (!claimedRecord.shopify_subscription_id) {
+            // Nothing active on Shopify's side to cancel — just finalize locally.
+            return await downgradeRecordToFree(claimedRecord, 'CANCELLED');
+        }
+
+        if (claimedRecord.shopify_usage_line_item_id) {
+            try {
+                const { submitPendingUsageForShop } = await import('./usage-charges.server');
+                await submitPendingUsageForShop(shop, client);
+            } catch (flushError: any) {
+                console.error(`[Billing] Overage flush before due cancel failed for ${shop}:`, flushError?.message);
+            }
+        }
+
+        // prorate: false — the merchant already fully consumed this cycle,
+        // there's nothing unused left to credit back.
+        const cancelData = await runGraphql(client, APP_SUBSCRIPTION_CANCEL, {
+            id: claimedRecord.shopify_subscription_id,
+            prorate: false,
+        });
+
+        const userErrors: any[] = cancelData?.appSubscriptionCancel?.userErrors ?? [];
+        if (userErrors.length) throw new Error(userErrors.map((e: any) => e.message).join('; '));
+
+        console.log(`[Billing] ${shop} deferred cancellation executed — now on Free`);
+        return await downgradeRecordToFree(claimedRecord, 'CANCELLED');
+    } catch (error: any) {
+        console.error(`[Billing] Due-cancellation execution failed for ${shop}, will retry:`, error?.message);
+        await supabase
+            .from(TABLE)
+            .update({ cancel_at_period_end: true, updated_at: new Date().toISOString() })
+            .eq('id', claimedRecord.id)
+            .eq('cancel_at_period_end', false);
+        return { ...claimedRecord, cancel_at_period_end: true };
+    }
 }
 
 export async function updateSubscriptionRecord(
@@ -289,75 +391,23 @@ export async function updateSubscriptionRecord(
     return normalizeRecord(data);
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// Usage period rollover
-// ────────────────────────────────────────────────────────────────────────────
-
 /**
- * Advance the usage window if it has elapsed, resetting counters.
- *
- * Any overage the closing period accrued but hasn't billed is flushed FIRST —
- * Shopify only accepts a usage record against the period it belongs to, so
- * skipping this would silently drop revenue.
- *
- * Windows advance in whole 30-day steps, so a shop that went quiet for months
- * lands on a window that actually contains `now` rather than a stale one.
+ * Re-derive the active usage cycle's overage against a (possibly new) plan's
+ * allowance, WITHOUT touching included_orders_used or the cycle window. This
+ * is the ONLY way a subscription-side event may affect usage state — called
+ * after every upgrade, downgrade, and cancel. It is intentionally NOT a reset:
+ * a merchant who has already used 900 orders and downgrades to a 450-order
+ * plan simply now shows 450 overage orders, not 0/450.
  */
-export async function rollUsagePeriodIfNeeded(
-    record: MerchantSubscription,
-    admin?: AdminGraphqlClient | null,
-): Promise<MerchantSubscription> {
-    const now = Date.now();
-    let periodEnd = new Date(record.current_period_end).getTime();
-    if (!Number.isFinite(periodEnd) || now < periodEnd) return record;
-
-    const pending = record.overage_orders - record.overage_charged_orders;
-    if (pending > 0) {
-        try {
-            const { submitPendingUsage } = await import('./usage-charges.server');
-            await submitPendingUsage(record, admin);
-        } catch (error: any) {
-            // Never block the reset on a billing failure — the charge is retried
-            // by the daily sweep, and a stuck window would break enforcement.
-            console.error(
-                `[Billing] Failed to flush overage for ${record.shop} before period reset:`,
-                error?.message,
-            );
-        }
+async function recomputeOverageForPlanChange(shop: string, planKey: PlanKey): Promise<void> {
+    try {
+        const { recomputeOverageForPlan } = await import('./order-counter.server');
+        await recomputeOverageForPlan(shop, planKey);
+    } catch (error: any) {
+        // Never let a display-only recompute block a real subscription change —
+        // the next order or the next page load will naturally correct it.
+        console.error(`[Billing] Overage recompute failed for ${shop}:`, error?.message);
     }
-
-    let periodStart = new Date(record.current_period_start).getTime();
-    while (periodEnd <= now) {
-        periodStart = periodEnd;
-        periodEnd = periodStart + USAGE_PERIOD_MS;
-    }
-
-    // Re-read the allowance from config so plan changes made in billing-plans.ts
-    // take effect at the start of the next cycle.
-    const plan = getPlan(record.plan_name);
-
-    console.log(
-        `[Billing] Usage period rolled for ${record.shop}: ` +
-        `${new Date(periodStart).toISOString()} → ${new Date(periodEnd).toISOString()}`,
-    );
-
-    return updateSubscriptionRecord(record.shop, {
-        current_period_start: new Date(periodStart).toISOString(),
-        current_period_end: new Date(periodEnd).toISOString(),
-        included_orders: plan.includedOrders,
-        order_count: 0,
-        overage_orders: 0,
-        overage_charged_orders: 0,
-    });
-}
-
-/** Fetch the shop's row, creating it if needed and rolling an elapsed period. */
-export async function getCurrentSubscription(
-    shop: string,
-    admin?: AdminGraphqlClient | null,
-): Promise<MerchantSubscription> {
-    const record = await ensureSubscription(shop);
-    return rollUsagePeriodIfNeeded(record, admin);
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -430,14 +480,15 @@ export async function fetchActiveShopifySubscription(
  * shop onto a paid plan — a merchant cannot reach one by manipulating the client.
  *
  * A subscription id we haven't seen before means the merchant just approved a
- * new plan, which starts a fresh billing period: flush any unbilled overage from
- * the old plan, then restart the usage window and counters.
+ * plan change. Usage is NEVER reset here — only recomputed against the new
+ * plan's allowance via recomputeOverageForPlanChange. See the file header for
+ * why this is the whole point of the subscription/usage split.
  */
 export async function syncFromShopify(
     shop: string,
     admin?: AdminGraphqlClient | null,
 ): Promise<MerchantSubscription> {
-    const record = await getCurrentSubscription(shop, admin);
+    const record = await ensureSubscription(shop);
     const client = admin ?? (await getAdminClient(shop));
     if (!client) return record;
 
@@ -459,49 +510,31 @@ export async function syncFromShopify(
     }
 
     const { planKey, cycle } = parseSubscriptionName(remote.name);
-    const plan = getPlan(planKey);
-    const isNewSubscription = record.shopify_subscription_id !== remote.id;
+    const isPlanChange = record.shopify_subscription_id !== remote.id;
 
-    const patch: Partial<MerchantSubscription> = {
+    const updated = await updateSubscriptionRecord(shop, {
         shopify_subscription_id: remote.id,
         shopify_usage_line_item_id: remote.usageLineItemId,
         plan_name: planKey,
         billing_cycle: cycle,
         status: 'active',
         renews_on: remote.currentPeriodEnd,
-        included_orders: plan.includedOrders,
         usage_capped_amount: remote.usageCappedAmount,
         is_test: remote.test,
         cancelled_at: null,
-    };
+        // A fresh subscription id means the merchant either resubscribed or
+        // changed plans — either way that supersedes any pending deferred
+        // cancellation on whatever came before.
+        cancel_at_period_end: false,
+        cancel_requested_at: null,
+    });
 
-    if (isNewSubscription) {
-        const pending = record.overage_orders - record.overage_charged_orders;
-        if (pending > 0) {
-            try {
-                const { submitPendingUsage } = await import('./usage-charges.server');
-                await submitPendingUsage(record, client);
-            } catch (error: any) {
-                console.error(
-                    `[Billing] Could not flush overage before plan change for ${shop}:`,
-                    error?.message,
-                );
-            }
-        }
-
-        // A newly approved subscription starts its own billing period, so the
-        // allowance starts over rather than inheriting the old plan's usage.
-        const start = remote.createdAt ? new Date(remote.createdAt) : new Date();
-        patch.current_period_start = start.toISOString();
-        patch.current_period_end = new Date(start.getTime() + USAGE_PERIOD_MS).toISOString();
-        patch.order_count = 0;
-        patch.overage_orders = 0;
-        patch.overage_charged_orders = 0;
-
-        console.log(`[Billing] ${shop} moved to ${planKey} (${cycle}) — usage window restarted`);
+    if (isPlanChange) {
+        await recomputeOverageForPlanChange(shop, planKey);
+        console.log(`[Billing] ${shop} moved to ${planKey} (${cycle}) — usage cycle unaffected`);
     }
 
-    return updateSubscriptionRecord(shop, patch);
+    return updated;
 }
 
 /**
@@ -509,9 +542,10 @@ export async function syncFromShopify(
  * actively on the Free plan — `cancelled_at` records that a paid subscription
  * ended, and `reason` is the Shopify status that caused it (for the log trail).
  *
- * Usage counters are deliberately preserved: a merchant who drops to Free
- * mid-cycle keeps the orders they already used, so cancelling and resubscribing
- * can't be used to reset the allowance.
+ * Usage is untouched here too — see recomputeOverageForPlanChange. A merchant
+ * who drops to Free mid-cycle keeps whatever they've already used; Free's
+ * lower allowance just means enforcement blocks them sooner, not that their
+ * usage was forgiven.
  */
 async function downgradeRecordToFree(
     record: MerchantSubscription,
@@ -521,17 +555,21 @@ async function downgradeRecordToFree(
         console.log(`[Billing] ${record.shop} downgraded to Free (Shopify status: ${reason})`);
     }
 
-    return updateSubscriptionRecord(record.shop, {
+    const updated = await updateSubscriptionRecord(record.shop, {
         shopify_subscription_id: null,
         shopify_usage_line_item_id: null,
         plan_name: DEFAULT_PLAN,
         billing_cycle: DEFAULT_CYCLE,
         status: 'active',
         renews_on: null,
-        included_orders: getPlan(DEFAULT_PLAN).includedOrders,
         usage_capped_amount: 0,
         cancelled_at: new Date().toISOString(),
+        cancel_at_period_end: false,
+        cancel_requested_at: null,
     });
+
+    await recomputeOverageForPlanChange(record.shop, DEFAULT_PLAN);
+    return updated;
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -551,6 +589,11 @@ export interface SubscribeResult {
  * and prorates the previous subscription itself. We never cancel manually to
  * simulate a change; the only real cancellation is a move to Free, which has no
  * subscription to replace it with.
+ *
+ * NOTE: the admin UI no longer offers a direct "downgrade" action — moving to
+ * a lower tier requires cancelling first (see cancelSubscription). This
+ * function still supports it at the API layer for completeness, since
+ * Shopify's replacement flow handles either direction identically.
  */
 export async function subscribeToPlan(options: {
     shop: string;
@@ -569,9 +612,9 @@ export async function subscribeToPlan(options: {
         return { success: false, confirmationUrl: null, error: 'Could not reach Shopify for this shop.' };
     }
 
-    // Free has no Shopify subscription — cancel whatever is active instead.
+    // Free has no Shopify subscription — request deferred cancellation instead.
     if (!plan.requiresSubscription) {
-        const cancelled = await cancelSubscription({ shop, admin: client, prorate: true });
+        const cancelled = await cancelSubscription({ shop, admin: client });
         return {
             success: cancelled.success,
             confirmationUrl: null,
@@ -644,13 +687,28 @@ export async function subscribeToPlan(options: {
     }
 }
 
-/** Cancel the active Shopify subscription and drop the shop to Free. */
+/**
+ * Request cancellation of the active Shopify subscription. This is the ONLY
+ * supported way off a paid plan in the admin UI — there is no direct
+ * "downgrade" action.
+ *
+ * DEFERRED, NOT IMMEDIATE: the Shopify subscription is NOT touched here. The
+ * merchant keeps full access — billing, allowance, overage — for the rest of
+ * the cycle they've already paid for. Only `cancel_at_period_end` and
+ * `cancel_requested_at` are set locally. The real `appSubscriptionCancel`
+ * call happens later, once `renews_on` actually arrives, via
+ * `processDueCancellations` (run from the daily cron). No proration credit
+ * is ever issued, because nothing is ever cancelled mid-cycle — the merchant
+ * simply isn't charged again after the period they're already in ends.
+ *
+ * If the shop has no active Shopify subscription at all (already on Free),
+ * there's nothing to defer — this is a no-op that just confirms Free.
+ */
 export async function cancelSubscription(options: {
     shop: string;
     admin?: AdminGraphqlClient | null;
-    prorate?: boolean;
-}): Promise<{ success: boolean; error?: string }> {
-    const { shop, prorate = true } = options;
+}): Promise<{ success: boolean; error?: string; renewsOn?: string | null }> {
+    const { shop } = options;
     const record = await ensureSubscription(shop);
 
     if (!record.shopify_subscription_id) {
@@ -658,41 +716,93 @@ export async function cancelSubscription(options: {
         return { success: true };
     }
 
-    const client = options.admin ?? (await getAdminClient(shop));
-    if (!client) return { success: false, error: 'Could not reach Shopify for this shop.' };
-
-    try {
-        // Bill whatever overage is outstanding before the subscription goes away —
-        // afterwards there is no line item to charge against.
-        const pending = record.overage_orders - record.overage_charged_orders;
-        if (pending > 0) {
-            try {
-                const { submitPendingUsage } = await import('./usage-charges.server');
-                await submitPendingUsage(record, client);
-            } catch (error: any) {
-                console.error(`[Billing] Overage flush before cancel failed for ${shop}:`, error?.message);
-            }
-        }
-
-        const data = await runGraphql(client, APP_SUBSCRIPTION_CANCEL, {
-            id: record.shopify_subscription_id,
-            prorate,
-        });
-
-        const userErrors: any[] = data?.appSubscriptionCancel?.userErrors ?? [];
-        if (userErrors.length) {
-            const message = userErrors.map((e) => e.message).join('; ');
-            console.error(`[Billing] appSubscriptionCancel failed for ${shop}:`, message);
-            return { success: false, error: message };
-        }
-
-        await downgradeRecordToFree(record, 'CANCELLED');
-        console.log(`[Billing] ${shop} subscription cancelled — now on Free`);
-        return { success: true };
-    } catch (error: any) {
-        console.error(`[Billing] cancelSubscription error for ${shop}:`, error?.message);
-        return { success: false, error: error?.message ?? 'Cancellation failed.' };
+    if (record.cancel_at_period_end) {
+        // Already requested — nothing new to do.
+        return { success: true, renewsOn: record.renews_on };
     }
+
+    await updateSubscriptionRecord(shop, {
+        cancel_at_period_end: true,
+        cancel_requested_at: new Date().toISOString(),
+    });
+
+    console.log(
+        `[Billing] ${shop} requested cancellation — stays on ${record.plan_name} until ` +
+        `${record.renews_on ?? 'the next renewal'}, then moves to Free`,
+    );
+    return { success: true, renewsOn: record.renews_on };
+}
+
+/**
+ * Reverse a pending cancellation before it takes effect. The subscription was
+ * never actually touched, so this is purely a local flag flip.
+ */
+export async function undoCancellation(shop: string): Promise<{ success: boolean; error?: string }> {
+    const record = await ensureSubscription(shop);
+    if (!record.cancel_at_period_end) return { success: true };
+
+    await updateSubscriptionRecord(shop, {
+        cancel_at_period_end: false,
+        cancel_requested_at: null,
+    });
+    console.log(`[Billing] ${shop} cancellation reversed — staying on ${record.plan_name}`);
+    return { success: true };
+}
+
+/**
+ * Backstop for merchants who never reopen the app: everything that actually
+ * executes a due cancellation lives in checkAndExecuteDueCancellation, run
+ * from every ensureSubscription() call. This just makes sure that function
+ * gets called at least once a day for every shop with a pending
+ * cancellation, so one isn't stranded indefinitely waiting for a page load
+ * that never comes. No duplicate cancellation logic — this is a thin loop
+ * over syncSubscriptionFromShopify, the same path the app itself uses.
+ */
+export async function processDueCancellations(): Promise<{
+    processed: number;
+    failed: number;
+    results: Array<{ shop: string; success: boolean; error?: string }>;
+}> {
+    const nowIso = new Date().toISOString();
+    const { data, error } = await supabase
+        .from(TABLE)
+        .select('shop')
+        .eq('cancel_at_period_end', true)
+        .lte('renews_on', nowIso);
+
+    if (error) {
+        console.error('[Billing] Could not list due cancellations:', error);
+        throw error;
+    }
+
+    const shops = (data ?? []).map((row: any) => row.shop as string);
+    const results: Array<{ shop: string; success: boolean; error?: string }> = [];
+    let processed = 0;
+    let failed = 0;
+
+    console.log(`[Billing] Cancellation sweep starting for ${shops.length} shop(s)`);
+
+    for (const shop of shops) {
+        try {
+            const record = await syncSubscriptionFromShopify(shop);
+            if (record.cancel_at_period_end) {
+                // Still pending — checkAndExecuteDueCancellation hit a failure
+                // and rolled the claim back for the next attempt.
+                results.push({ shop, success: false, error: 'Cancellation attempt failed, will retry.' });
+                failed += 1;
+            } else {
+                results.push({ shop, success: true });
+                processed += 1;
+            }
+        } catch (err: any) {
+            console.error(`[Billing] Due-cancellation sweep failed for ${shop}:`, err?.message);
+            results.push({ shop, success: false, error: err?.message });
+            failed += 1;
+        }
+    }
+
+    console.log(`[Billing] Cancellation sweep done — ${processed} processed, ${failed} failed`);
+    return { processed, failed, results };
 }
 
 /**
@@ -736,7 +846,8 @@ export async function requestUsageCapIncrease(options: {
 /**
  * Called from the app/uninstalled webhook. Shopify cancels the subscription on
  * its own side when an app is removed, so this only clears our billing state.
- * Usage events and charge history are preserved for reporting and disputes.
+ * Usage cycles, events and charge history are preserved for reporting and
+ * disputes — nothing about uninstall resets usage either.
  */
 export async function disableBillingForShop(shop: string): Promise<void> {
     const record = await getSubscriptionRecord(shop);
@@ -749,7 +860,6 @@ export async function disableBillingForShop(shop: string): Promise<void> {
         billing_cycle: DEFAULT_CYCLE,
         status: 'cancelled',
         renews_on: null,
-        included_orders: getPlan(DEFAULT_PLAN).includedOrders,
         usage_capped_amount: 0,
         cancelled_at: new Date().toISOString(),
     });

@@ -22,6 +22,7 @@ import {
     Card,
     Divider,
     InlineStack,
+    Modal,
     ProgressBar,
     Text,
 } from "@shopify/polaris";
@@ -46,17 +47,20 @@ import {
     requestUsageCapIncrease,
     subscribeToPlan,
     syncFromShopify,
+    undoCancellation,
 } from "../services/billing/subscription.server";
-import { buildUsageSnapshot } from "../services/billing/order-counter.server";
+import { getCurrentUsage } from "../services/billing/order-counter.server";
 import { getUsageChargeHistory } from "../services/billing/usage-charges.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
     const { session, admin } = await authenticate.admin(request);
     const shop = session.shop;
 
-    // Shopify is authoritative — reconcile before rendering anything.
-    const record = await syncFromShopify(shop, admin as any);
-    const usage = buildUsageSnapshot(record);
+    // Shopify is authoritative — reconcile the subscription before rendering.
+    // Usage lives independently (merchant_usage_cycles) and is never touched
+    // by this reconciliation beyond a plan-change overage recompute.
+    await syncFromShopify(shop, admin as any);
+    const usage = await getCurrentUsage(shop, admin as any);
     const charges = await getUsageChargeHistory(shop, 10);
 
     return {
@@ -70,7 +74,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             createdAt: c.created_at,
             error: c.error,
         })),
-        isTestBilling: record.is_test,
+        isTestBilling: usage.isTest,
     };
 };
 
@@ -110,13 +114,26 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
 
     if (intent === "cancel") {
-        const result = await cancelSubscription({ shop, admin: admin as any, prorate: true });
+        const result = await cancelSubscription({ shop, admin: admin as any });
         return {
             intent,
             success: result.success,
             confirmationUrl: null,
             error: result.error ?? null,
-            message: result.success ? "Your subscription was cancelled. You are now on the Free plan." : null,
+            message: result.success
+                ? `Your subscription will end on ${result.renewsOn ? new Date(result.renewsOn).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "your next renewal date"}. You'll keep full access until then, and won't be charged again after.`
+                : null,
+        };
+    }
+
+    if (intent === "undo-cancel") {
+        const result = await undoCancellation(shop);
+        return {
+            intent,
+            success: result.success,
+            confirmationUrl: null,
+            error: result.error ?? null,
+            message: result.success ? "Cancellation reversed — your subscription will continue as normal." : null,
         };
     }
 
@@ -153,6 +170,7 @@ export default function BillingPage() {
     const submit = useSubmit();
 
     const [cycle, setCycle] = useState<BillingCycle>(usage.cycle);
+    const [cancelModalOpen, setCancelModalOpen] = useState(false);
     const isSubmitting = navigation.state === "submitting";
 
     // Shopify's approval screen has to replace the whole page, not render inside
@@ -163,11 +181,49 @@ export default function BillingPage() {
         }
     }, [actionData]);
 
-    const changePlan = (planKey: PlanKey, nextCycle: BillingCycle) => {
+    // Close the confirmation modal once the cancel actually completes — keeps
+    // it open on failure so the merchant sees the error banner in context.
+    useEffect(() => {
+        if (actionData?.intent === "cancel" && actionData.success) {
+            setCancelModalOpen(false);
+        }
+    }, [actionData]);
+
+    // Upgrades and same-tier cycle switches only. Downgrading to a lower tier
+    // (including dropping to Free) is deliberately NOT offered as a direct
+    // action here — see confirmCancelSubscription below for why.
+    const upgradeToPlan = (planKey: PlanKey, nextCycle: BillingCycle) => {
         const formData = new FormData();
-        formData.set("intent", planKey === "FREE" ? "cancel" : "subscribe");
+        formData.set("intent", "subscribe");
         formData.set("planKey", planKey);
         formData.set("cycle", nextCycle);
+        submit(formData, { method: "post" });
+    };
+
+    // Cancelling is the only way off a paid plan. A direct "downgrade" button
+    // would instantly swap plans mid-cycle while order_count carries over from
+    // the old plan's usage — on a paid plan that's fine (metered plans never
+    // block), but landing on Free with, say, 452 orders already counted against
+    // a 70-order cap immediately blocks the merchant and reads as broken.
+    //
+    // Cancel is DEFERRED, not immediate: the merchant keeps their current plan
+    // — full allowance, overage billing, everything — until the cycle they've
+    // already paid for actually ends. Only then does the real Shopify
+    // cancellation happen and they drop to Free. No proration credit is ever
+    // issued, because nothing is ever cancelled mid-cycle.
+    //
+    // Confirmed via an in-app Modal rather than window.confirm — the native
+    // browser dialog renders as an ugly "an embedded page says..." prompt
+    // inside Shopify's iframe and looks broken, not like part of the app.
+    const confirmCancelSubscription = () => {
+        const formData = new FormData();
+        formData.set("intent", "cancel");
+        submit(formData, { method: "post" });
+    };
+
+    const undoCancelSubscription = () => {
+        const formData = new FormData();
+        formData.set("intent", "undo-cancel");
         submit(formData, { method: "post" });
     };
 
@@ -335,6 +391,20 @@ export default function BillingPage() {
                             </Banner>
                         )}
 
+                        {usage.cancelAtPeriodEnd && !actionData?.message && (
+                            <Banner
+                                tone="warning"
+                                title={`Your ${usage.planName} subscription is set to cancel`}
+                                action={{ content: "Undo cancellation", onAction: undoCancelSubscription }}
+                            >
+                                <p>
+                                    You&apos;ll keep full access to {usage.planName} until{" "}
+                                    {formatDate(usage.renewsOn)}. After that you won&apos;t be charged
+                                    again and you&apos;ll move to the Free plan.
+                                </p>
+                            </Banner>
+                        )}
+
                         {usage.limitReached && (
                             <Banner tone="critical" title="You have reached your Free plan limit">
                                 <p>
@@ -454,9 +524,13 @@ export default function BillingPage() {
                                             {formatMoney(usage.estimatedOverageAmount, usage.currency)}
                                         </div>
                                         <div className="billing-stat-sub">
-                                            {usage.pendingOverageOrders > 0
-                                                ? `${usage.pendingOverageOrders} not yet billed`
-                                                : "All charges submitted"}
+                                            {!usage.overageBillable
+                                                ? usage.overageOrders > 0
+                                                    ? "Not billed on this plan"
+                                                    : "No overage"
+                                                : usage.pendingOverageOrders > 0
+                                                    ? `${usage.pendingOverageOrders} not yet billed`
+                                                    : "All charges submitted"}
                                         </div>
                                     </div>
 
@@ -466,9 +540,11 @@ export default function BillingPage() {
                                             {usage.renewsOn ? formatDate(usage.renewsOn) : "—"}
                                         </div>
                                         <div className="billing-stat-sub">
-                                            {usage.renewsOn
-                                                ? `Renews ${usage.cycle === "yearly" ? "yearly" : "monthly"}`
-                                                : "Free plan — no renewal"}
+                                            {!usage.renewsOn
+                                                ? "Free plan — no renewal"
+                                                : usage.cancelAtPeriodEnd
+                                                    ? "Subscription ends — no further charge"
+                                                    : `Auto-renews ${usage.cycle === "yearly" ? "yearly" : "monthly"}`}
                                         </div>
                                     </div>
                                 </div>
@@ -478,15 +554,40 @@ export default function BillingPage() {
                         {/* ── Plans ── */}
                         <Card>
                             <BlockStack gap="400">
-                                <BlockStack gap="100">
-                                    <Text variant="headingMd" as="h2">
-                                        Plans
-                                    </Text>
-                                    <Text variant="bodySm" tone="subdued" as="p">
-                                        Changing plan uses Shopify&apos;s official subscription replacement —
-                                        your previous plan is cancelled and prorated automatically.
-                                    </Text>
-                                </BlockStack>
+                                <InlineStack align="space-between" blockAlign="start" wrap={false}>
+                                    <BlockStack gap="100">
+                                        <Text variant="headingMd" as="h2">
+                                            Plans
+                                        </Text>
+                                        <Text variant="bodySm" tone="subdued" as="p">
+                                            Upgrading uses Shopify&apos;s official subscription replacement and
+                                            takes effect immediately. Monthly and yearly plans renew and bill
+                                            automatically until cancelled. To move to a lower plan, cancel your
+                                            current subscription first — you&apos;ll keep it until the cycle
+                                            ends, then can choose whatever plan you want.
+                                        </Text>
+                                    </BlockStack>
+                                    {usage.planKey !== "FREE" && !usage.cancelAtPeriodEnd && (
+                                        <Button
+                                            variant="secondary"
+                                            tone="critical"
+                                            disabled={isSubmitting}
+                                            onClick={() => setCancelModalOpen(true)}
+                                        >
+                                            Cancel subscription
+                                        </Button>
+                                    )}
+                                    {usage.cancelAtPeriodEnd && (
+                                        <Button
+                                            variant="secondary"
+                                            disabled={isSubmitting}
+                                            loading={isSubmitting}
+                                            onClick={undoCancelSubscription}
+                                        >
+                                            Undo cancellation
+                                        </Button>
+                                    )}
+                                </InlineStack>
 
                                 <div>
                                     <div className="cycle-toggle">
@@ -528,11 +629,14 @@ export default function BillingPage() {
                                             usage.planKey === planKey &&
                                             (planKey === "FREE" || usage.cycle === cycle);
                                         const direction = comparePlans(planKey, usage.planKey);
+                                        // Lower tiers (including Free) are never directly selectable while
+                                        // another plan is active — see confirmCancelSubscription's comment.
+                                        const isDowngrade = !isCurrent && direction < 0;
 
                                         let label = "Choose plan";
                                         if (isCurrent) label = "Current plan";
                                         else if (direction > 0) label = "Upgrade";
-                                        else if (direction < 0) label = "Downgrade";
+                                        else if (isDowngrade) label = "Cancel current plan to switch";
                                         else label = cycle === "yearly" ? "Switch to yearly" : "Switch to monthly";
 
                                         return (
@@ -568,9 +672,9 @@ export default function BillingPage() {
 
                                                 <Button
                                                     variant={isCurrent ? "secondary" : direction > 0 ? "primary" : "secondary"}
-                                                    disabled={isCurrent || isSubmitting}
-                                                    loading={isSubmitting}
-                                                    onClick={() => changePlan(planKey, cycle)}
+                                                    disabled={isCurrent || isDowngrade || isSubmitting}
+                                                    loading={!isDowngrade && isSubmitting}
+                                                    onClick={() => upgradeToPlan(planKey, cycle)}
                                                     fullWidth
                                                 >
                                                     {label}
@@ -644,6 +748,40 @@ export default function BillingPage() {
                     </BlockStack>
                 </div>
             </s-page>
+
+            <Modal
+                open={cancelModalOpen}
+                onClose={() => setCancelModalOpen(false)}
+                title={`Cancel your ${usage.planName} subscription?`}
+                primaryAction={{
+                    content: "Cancel subscription",
+                    onAction: confirmCancelSubscription,
+                    destructive: true,
+                    loading: isSubmitting,
+                }}
+                secondaryActions={[
+                    {
+                        content: "Keep my plan",
+                        onAction: () => setCancelModalOpen(false),
+                        disabled: isSubmitting,
+                    },
+                ]}
+            >
+                <Modal.Section>
+                    <BlockStack gap="200">
+                        <Text as="p">
+                            You&apos;ll keep full access to {usage.planName} — your allowance, overage
+                            billing, everything — until {formatDate(usage.renewsOn)}, the end of the
+                            cycle you&apos;ve already paid for. You won&apos;t be charged again after that,
+                            and your store moves to the Free plan automatically.
+                        </Text>
+                        <Text as="p" tone="subdued">
+                            You can undo this any time before then. Your order usage carries over as-is
+                            either way — cancelling doesn&apos;t reset or reduce it.
+                        </Text>
+                    </BlockStack>
+                </Modal.Section>
+            </Modal>
         </>
     );
 }

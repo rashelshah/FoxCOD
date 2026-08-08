@@ -1,14 +1,17 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
-import { Outlet, useLoaderData, useLocation, useNavigation, useRouteError } from "react-router";
+import { Outlet, useFetcher, useLoaderData, useLocation, useNavigation, useRouteError } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
 
 import { authenticate } from "../shopify.server";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
-import { AppProvider as PolarisAppProvider } from "@shopify/polaris";
+import { AppProvider as PolarisAppProvider, Modal, Text, BlockStack } from "@shopify/polaris";
 import enTranslations from "@shopify/polaris/locales/en.json";
 import { getSkeletonForPath, skeletonShimmerCSS } from "./PageSkeletons";
+import { BILLING_PLANS } from "../config/billing-plans";
+import type { loader as billingStatusLoader } from "./api.billing-status";
+import type { action as billingAction } from "./app.billing";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
@@ -31,10 +34,19 @@ export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 const SHOP_STORAGE_KEY = "foxCodShop";
 const HOST_STORAGE_KEY = "foxCodHost";
 
+/** Dismissing the limit-reached prompt only lasts this browser session — it
+ *  reappears next time the merchant opens the app, since they're still
+ *  blocked and this is genuinely losing them orders. */
+const LIMIT_MODAL_DISMISSED_KEY = "foxCodLimitModalDismissed";
+
 export default function App() {
   const { apiKey } = useLoaderData<typeof loader>();
   const navigation = useNavigation();
   const location = useLocation();
+
+  const statusFetcher = useFetcher<typeof billingStatusLoader>();
+  const upgradeFetcher = useFetcher<typeof billingAction>();
+  const [limitModalDismissed, setLimitModalDismissed] = useState(false);
 
   // Only swap in a skeleton for an actual tab-to-tab navigation — navigation.state
   // also goes "loading" during the revalidation after a same-page form submit (e.g.
@@ -56,6 +68,50 @@ export default function App() {
     }
   }, [location.search]);
 
+  // Cheap, app-wide poll (not the Billing page's full stats) — fetched once
+  // per admin session load, not on every navigation, matching how the
+  // dashboard defers its own stats fetch behind the initial shell paint.
+  useEffect(() => {
+    if (statusFetcher.state === "idle" && statusFetcher.data == null) {
+      statusFetcher.load("/api/billing-status");
+    }
+    try {
+      setLimitModalDismissed(sessionStorage.getItem(LIMIT_MODAL_DISMISSED_KEY) === "true");
+    } catch {
+      // sessionStorage unavailable — just never treat it as dismissed.
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Shopify's approval screen has to replace the whole page, not render
+  // inside the embedded iframe — same pattern as the Billing page itself.
+  useEffect(() => {
+    if (upgradeFetcher.data?.confirmationUrl) {
+      window.open(upgradeFetcher.data.confirmationUrl, "_top");
+    }
+  }, [upgradeFetcher.data]);
+
+  const showLimitModal = Boolean(statusFetcher.data?.limitReached) && !limitModalDismissed;
+
+  const dismissLimitModal = () => {
+    setLimitModalDismissed(true);
+    try {
+      sessionStorage.setItem(LIMIT_MODAL_DISMISSED_KEY, "true");
+    } catch {
+      // sessionStorage unavailable — the modal just won't stay dismissed, harmless.
+    }
+  };
+
+  const upgradeToPro = () => {
+    const formData = new FormData();
+    formData.set("intent", "subscribe");
+    formData.set("planKey", "PRO");
+    formData.set("cycle", "monthly");
+    upgradeFetcher.submit(formData, { method: "post", action: "/app/billing" });
+  };
+
+  const isUpgrading = upgradeFetcher.state === "submitting" || upgradeFetcher.state === "loading";
+
   return (
     <PolarisAppProvider i18n={enTranslations}>
       <AppProvider embedded apiKey={apiKey}>
@@ -72,6 +128,36 @@ export default function App() {
           <s-link href="/app/app-settings">Settings</s-link>
         </s-app-nav>
         {isRouteChanging ? getSkeletonForPath(navigation.location.pathname) : <Outlet />}
+
+        <Modal
+          open={showLimitModal}
+          onClose={dismissLimitModal}
+          title="You've reached your Free plan limit"
+          primaryAction={{
+            content: `Upgrade to Pro — $${BILLING_PLANS.PRO.monthlyPrice}/mo`,
+            onAction: upgradeToPro,
+            loading: isUpgrading,
+          }}
+          secondaryActions={[
+            { content: "Maybe later", onAction: dismissLimitModal, disabled: isUpgrading },
+          ]}
+        >
+          <Modal.Section>
+            <BlockStack gap="200">
+              <Text as="p">
+                New orders are being blocked because you&apos;ve used all{" "}
+                {BILLING_PLANS.FREE.includedOrders} orders included in the Free plan this
+                cycle. Upgrade to Pro for {BILLING_PLANS.PRO.includedOrders.toLocaleString("en-US")}{" "}
+                orders a month and keep receiving orders right away.
+              </Text>
+              {upgradeFetcher.data?.error && (
+                <Text as="p" tone="critical">
+                  {upgradeFetcher.data.error}
+                </Text>
+              )}
+            </BlockStack>
+          </Modal.Section>
+        </Modal>
       </AppProvider>
     </PolarisAppProvider>
   );

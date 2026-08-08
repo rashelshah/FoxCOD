@@ -4,20 +4,22 @@
  * Turns accrued overage orders into Shopify usage records.
  *
  * AGGREGATED, NOT PER-ORDER. One order never produces one charge. Overage
- * accumulates on the subscription row and is submitted as a single record per
- * sweep — daily via /api/billing/aggregate-usage, plus a flush whenever the
- * usage period rolls, the plan changes, or the subscription is cancelled.
+ * accumulates on the shop's active usage cycle (merchant_usage_cycles) and is
+ * submitted as a single record per sweep — daily via
+ * /api/billing/aggregate-usage, plus a flush whenever the cycle rolls over,
+ * the plan changes and can no longer bill it, or the subscription is cancelled.
  *
  *     Day 1: 10 overage   Day 2: 20   Day 3: 15   →  one charge, 45 × $0.05 = $2.25
  *
  * NEVER DOUBLE-BILLS. Three independent guards, in order:
  *
- *   1. Compare-and-swap on `overage_charged_orders`. A submission claims the
- *      range (from, to] by updating the row only if it still reads `from`.
- *      Concurrent sweeps: exactly one claim succeeds, the rest abort.
+ *   1. Compare-and-swap on the cycle's `overage_charged_orders`. A submission
+ *      claims the range (from, to] by updating the row only if it still reads
+ *      `from` for that specific cycle id. Concurrent sweeps: exactly one claim
+ *      succeeds, the rest abort.
  *   2. UNIQUE `idempotency_key` on billing_usage_charges, derived
- *      deterministically from (shop, period, from, to) — a retry regenerates
- *      the same key rather than a new charge.
+ *      deterministically from (cycle id, from, to) — a retry regenerates the
+ *      same key rather than a new charge.
  *   3. The same key is passed to Shopify's `appUsageRecordCreate`, so even a
  *      request we believe failed cannot bill twice on the Shopify side.
  *
@@ -34,14 +36,17 @@ import {
     roundMoney,
 } from '../../config/billing-plans';
 import {
+    ensureSubscription,
     getAdminClient,
-    getCurrentSubscription,
-    getSubscriptionRecord,
     type AdminGraphqlClient,
     type MerchantSubscription,
 } from './subscription.server';
+import {
+    findOrCreateUsageCycle,
+    type MerchantUsageCycle,
+} from './order-counter.server';
 
-const SUBSCRIPTIONS_TABLE = 'merchant_subscriptions';
+const CYCLES_TABLE = 'merchant_usage_cycles';
 const CHARGES_TABLE = 'billing_usage_charges';
 
 /** Shopify caps idempotency keys at 255 characters. */
@@ -85,17 +90,12 @@ export interface UsageChargeResult {
 }
 
 /**
- * Deterministic per-range key. The same (shop, period, from, to) always yields
- * the same key, which is what makes retries safe on both sides.
+ * Deterministic per-range key, scoped to a specific usage cycle id. The same
+ * (cycle, from, to) always yields the same key, which is what makes retries
+ * safe on both sides.
  */
-function buildIdempotencyKey(
-    shop: string,
-    periodStart: string,
-    from: number,
-    to: number,
-): string {
-    const periodMs = new Date(periodStart).getTime();
-    const key = `foxlycod:${shop}:${periodMs}:${from}-${to}`;
+function buildIdempotencyKey(shop: string, cycleId: string, from: number, to: number): string {
+    const key = `foxlycod:${shop}:${cycleId}:${from}-${to}`;
     return key.length > MAX_IDEMPOTENCY_KEY_LENGTH
         ? key.slice(key.length - MAX_IDEMPOTENCY_KEY_LENGTH)
         : key;
@@ -120,22 +120,24 @@ function isCapError(message: string): boolean {
 }
 
 /**
- * Submit the shop's outstanding overage as one Shopify usage record.
+ * Submit the shop's outstanding overage (on the given usage cycle) as one
+ * Shopify usage record.
  *
  * Safe to call as often as you like: it no-ops when there is nothing pending,
  * when the plan/cycle can't be billed, or when another caller already claimed
  * the same range.
  */
 export async function submitPendingUsage(
-    record: MerchantSubscription,
+    subscription: MerchantSubscription,
+    cycle: MerchantUsageCycle,
     admin?: AdminGraphqlClient | null,
 ): Promise<UsageChargeResult> {
-    const shop = record.shop;
-    const plan = getPlan(record.plan_name);
+    const shop = subscription.shop;
+    const plan = getPlan(subscription.plan_name);
     const currency = BILLING_CURRENCY;
 
-    const from = record.overage_charged_orders;
-    const to = record.overage_orders;
+    const from = cycle.overage_charged_orders;
+    const to = cycle.overage_orders;
     const pending = to - from;
 
     if (pending <= 0) {
@@ -145,11 +147,11 @@ export async function submitPendingUsage(
     // Free and Unlimited have no overage pricing; yearly cycles cannot carry a
     // Shopify usage line item at all (see billing-plans.ts). In every case the
     // overage stays visible in the UI, it just isn't charged.
-    if (!chargesOverage(record.plan_name, record.billing_cycle)) {
+    if (!chargesOverage(subscription.plan_name, subscription.billing_cycle)) {
         return { outcome: 'not_billable', overageOrders: pending, amount: 0, currency };
     }
 
-    if (!record.shopify_usage_line_item_id) {
+    if (!subscription.shopify_usage_line_item_id) {
         console.warn(`[Billing] ${shop} has billable overage but no usage line item — skipping`);
         return { outcome: 'no_line_item', overageOrders: pending, amount: 0, currency };
     }
@@ -159,18 +161,18 @@ export async function submitPendingUsage(
         return { outcome: 'nothing_pending', overageOrders: pending, amount: 0, currency };
     }
 
-    const idempotencyKey = buildIdempotencyKey(shop, record.current_period_start, from, to);
+    const idempotencyKey = buildIdempotencyKey(shop, cycle.id, from, to);
 
-    // ── Guard 1: claim the range. Succeeds only if nobody else moved the
-    //    watermark since we read it.
+    // ── Guard 1: claim the range on THIS specific cycle. Succeeds only if
+    //    nobody else moved the watermark since we read it.
     const { data: claimed, error: claimError } = await supabase
-        .from(SUBSCRIPTIONS_TABLE)
+        .from(CYCLES_TABLE)
         .update({
             overage_charged_orders: to,
             last_usage_charge_date: new Date().toISOString(),
             updated_at: new Date().toISOString(),
         })
-        .eq('shop', shop)
+        .eq('id', cycle.id)
         .eq('overage_charged_orders', from)
         .select('id');
 
@@ -185,9 +187,9 @@ export async function submitPendingUsage(
 
     const releaseClaim = async () => {
         await supabase
-            .from(SUBSCRIPTIONS_TABLE)
+            .from(CYCLES_TABLE)
             .update({ overage_charged_orders: from, updated_at: new Date().toISOString() })
-            .eq('shop', shop)
+            .eq('id', cycle.id)
             .eq('overage_charged_orders', to);
     };
 
@@ -195,16 +197,17 @@ export async function submitPendingUsage(
     const chargeRow = {
         shop,
         idempotency_key: idempotencyKey,
-        subscription_line_item_id: record.shopify_usage_line_item_id,
+        usage_cycle_id: cycle.id,
+        subscription_line_item_id: subscription.shopify_usage_line_item_id,
         overage_orders: pending,
         from_index: from,
         to_index: to,
         amount,
         currency,
-        plan_name: record.plan_name,
-        billing_cycle: record.billing_cycle,
-        period_start: record.current_period_start,
-        period_end: record.current_period_end,
+        plan_name: subscription.plan_name,
+        billing_cycle: subscription.billing_cycle,
+        period_start: cycle.cycle_start,
+        period_end: cycle.cycle_end,
         status: 'pending' as const,
     };
 
@@ -252,7 +255,7 @@ export async function submitPendingUsage(
             `(${pending} × $${plan.overagePrice.toFixed(2)})`;
 
         const data = await runGraphql(client, APP_USAGE_RECORD_CREATE, {
-            subscriptionLineItemId: record.shopify_usage_line_item_id,
+            subscriptionLineItemId: subscription.shopify_usage_line_item_id,
             description,
             price: { amount, currencyCode: currency },
             idempotencyKey,
@@ -313,8 +316,17 @@ export async function aggregateUsageForShop(
     shop: string,
     admin?: AdminGraphqlClient | null,
 ): Promise<UsageChargeResult> {
-    const record = await getCurrentSubscription(shop, admin);
-    return submitPendingUsage(record, admin);
+    const subscription = await ensureSubscription(shop);
+    const cycle = await findOrCreateUsageCycle(shop, admin);
+    return submitPendingUsage(subscription, cycle, admin);
+}
+
+/** Convenience wrapper for call sites that only have a shop domain on hand. */
+export async function submitPendingUsageForShop(
+    shop: string,
+    admin?: AdminGraphqlClient | null,
+): Promise<UsageChargeResult> {
+    return aggregateUsageForShop(shop, admin);
 }
 
 export interface AggregationSweepResult {
@@ -346,9 +358,9 @@ export async function runDailyUsageAggregation(): Promise<AggregationSweepResult
     };
 
     const { data, error } = await supabase
-        .from(SUBSCRIPTIONS_TABLE)
+        .from(CYCLES_TABLE)
         .select('shop')
-        .neq('status', 'cancelled')
+        .eq('status', 'active')
         .gt('overage_orders', 0);
 
     if (error) {
@@ -356,19 +368,12 @@ export async function runDailyUsageAggregation(): Promise<AggregationSweepResult
         throw error;
     }
 
-    const shops = (data ?? []).map((row: any) => row.shop as string);
+    const shops = Array.from(new Set((data ?? []).map((row: any) => row.shop as string)));
     console.log(`[Billing] Aggregation sweep starting for ${shops.length} shop(s)`);
 
     for (const shop of shops) {
         result.shopsScanned += 1;
         try {
-            const record = await getSubscriptionRecord(shop);
-            if (!record) continue;
-            if (record.overage_orders <= record.overage_charged_orders) {
-                result.skipped += 1;
-                continue;
-            }
-
             const charge = await aggregateUsageForShop(shop);
             result.results.push({
                 shop,
